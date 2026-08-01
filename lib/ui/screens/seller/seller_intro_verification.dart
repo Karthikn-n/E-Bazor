@@ -58,7 +58,7 @@ class _SellerIntroVerificationScreenState
           "userVerificationHeadline1".translate(context),
           textAlign: TextAlign.center,
         )
-            .color(context.color.textDefaultColor.withOpacity(0.65))
+            .color(context.color.textDefaultColor.withValues(alpha: 0.65))
             .size(context.font.normal)
             .bold(),
         SizedBox(height: 10,),

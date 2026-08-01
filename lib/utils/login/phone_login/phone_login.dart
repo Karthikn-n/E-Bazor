@@ -1,4 +1,4 @@
-
+import 'package:Ebozor/utils/logger.dart';
 import 'package:Ebozor/utils/login/lib/login_status.dart';
 import 'package:Ebozor/utils/login/lib/payloads.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,75 +13,87 @@ class PhoneLogin extends LoginSystem {
   Future<UserCredential?> login() async {
     try {
       emit(MProgress());
-      // (state);
+      final otpVal = (payload as PhoneLoginPayload).getOTP();
+      AppLog.i(
+          'Attempting sign in. verificationId set: ${verificationId != null}',
+          name: 'PhoneLogin');
 
       PhoneAuthCredential credential = PhoneAuthProvider.credential(
-          verificationId: verificationId ?? "",
-          smsCode: (payload as PhoneLoginPayload).getOTP()!);
+          verificationId: verificationId ?? "", smsCode: otpVal!);
 
       UserCredential userCredential =
           await firebaseAuth.signInWithCredential(credential);
 
+      AppLog.i('Phone login successful.', name: 'PhoneLogin');
       emit(MSuccess());
 
       return userCredential;
     } catch (e) {
-      emit(MFail(e));
+      AppLog.e('Phone login failed', error: e, name: 'PhoneLogin');
+      rethrow;
     }
-    return null;
   }
 
   @override
   Future<void> requestVerification() async {
     emit(MOtpSendInProgress());
+    final phoneNum =
+        "+${(payload as PhoneLoginPayload).countryCode}${(payload as PhoneLoginPayload).phoneNumber}";
+    // NOTE: phone number intentionally omitted from log to avoid leaking PII
+    AppLog.i('requestVerification: calling verifyPhoneNumber',
+        name: 'PhoneLogin');
+
     await FirebaseAuth.instance
         .verifyPhoneNumber(
-          timeout: Duration(
-            seconds: Constant.otpTimeOutSecond,
-          ),
-          phoneNumber:
-              "+${(payload as PhoneLoginPayload).countryCode}${(payload as PhoneLoginPayload).phoneNumber}",
-          verificationCompleted: (PhoneAuthCredential credential) {},
+          timeout: Duration(seconds: Constant.otpTimeOutSecond),
+          phoneNumber: phoneNum,
+          verificationCompleted: (PhoneAuthCredential credential) {
+            AppLog.i('verificationCompleted: auto-resolution triggered.',
+                name: 'PhoneLogin');
+          },
           verificationFailed: (FirebaseAuthException e) {
+            AppLog.e('verificationFailed: ${e.code}',
+                error: e, name: 'PhoneLogin');
             emit(MFail(e));
           },
           codeSent: (String verificationId, int? resendToken) {
+            AppLog.i('codeSent: SMS dispatched.', name: 'PhoneLogin');
             super.requestVerification();
             forceResendingToken = resendToken;
             this.verificationId = verificationId;
           },
-          codeAutoRetrievalTimeout: (String verificationId) {},
+          codeAutoRetrievalTimeout: (String verificationId) {
+            AppLog.w('codeAutoRetrievalTimeout reached.', name: 'PhoneLogin');
+          },
           forceResendingToken: forceResendingToken,
         )
         .then((value) {});
   }
 
-//verify otp
+  /// Verify OTP manually (called from the OTP input screen).
   Future<void> verifyOtp(String otp) async {
     try {
-      // Check if verificationId is set
+      AppLog.i('verifyOtp called.', name: 'PhoneLogin');
+
       if (verificationId == null) {
         throw Exception("Verification ID not found");
       }
 
-      // Create credential using the verification ID and OTP
       PhoneAuthCredential credential = PhoneAuthProvider.credential(
         verificationId: verificationId!,
         smsCode: otp,
       );
 
-      // Sign in with the credential
-      UserCredential userCredential = await firebaseAuth.signInWithCredential(credential);
+      UserCredential userCredential =
+          await firebaseAuth.signInWithCredential(credential);
 
-      // Successfully signed in
       emit(MSuccess());
-      print("User signed in successfully: ${userCredential.user?.uid}");
+      AppLog.i('Manual OTP verification successful.', name: 'PhoneLogin');
     } catch (e) {
       emit(MFail(e));
-      print("Error during OTP verification: $e");
+      AppLog.e('Manual OTP verification failed', error: e, name: 'PhoneLogin');
     }
   }
-
 
   @override
   void onEvent(MLoginState state) {}

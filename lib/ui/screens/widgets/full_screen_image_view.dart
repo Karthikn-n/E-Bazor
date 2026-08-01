@@ -27,7 +27,7 @@ class _FullScreenImageViewState extends State<FullScreenImageView> {
       child: AnnotatedRegion(
         value: SystemUiOverlayStyle(
             systemNavigationBarDividerColor: Colors.transparent,
-            statusBarColor: Colors.black.withOpacity(0)),
+            statusBarColor: Colors.black.withValues(alpha: 0)),
         child: Scaffold(
           extendBodyBehindAppBar: true,
           appBar: AppBar(
@@ -51,7 +51,7 @@ class _FullScreenImageViewState extends State<FullScreenImageView> {
                           height: 100,
                           decoration: BoxDecoration(
                               color:
-                                  context.color.territoryColor.withOpacity(0.2),
+                                  context.color.territoryColor.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(10)),
                           child: UiUtils.getSvg(AppIcons.placeHolder,
                               color: context.color.territoryColor));

@@ -67,7 +67,7 @@ class BlogDetails extends StatelessWidget {
               ),
               Text(blog.createdAt.toString().formatDate())
                   .size(context.font.smaller)
-                  .color(context.color.textColorDark.withOpacity(0.5)),
+                  .color(context.color.textColorDark.withValues(alpha: 0.5)),
               const SizedBox(
                 height: 12,
               ),
@@ -85,7 +85,7 @@ class BlogDetails extends StatelessWidget {
               ),
               HtmlWidget(blog.description ?? "")
               //Html(data: blog.description ?? "")
-              //Text(stripHtmlTags(blog.description ?? "").trim()).color(context.color.textColorDark.withOpacity(0.5))
+              //Text(stripHtmlTags(blog.description ?? "").trim()).color(context.color.textColorDark.withValues(alpha: 0.5))
               /* Html(
                 data: blog.description ?? "",
                 shrinkWrap: true,

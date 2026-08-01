@@ -156,7 +156,7 @@ class _SubscriptionPackageListScreenState
                   // Set background color here
                   boxShadow: [
                     BoxShadow(
-                      color: context.color.borderColor.withOpacity(0.8),
+                      color: context.color.borderColor.withValues(alpha: 0.8),
                       // Shadow color
                       spreadRadius: 3,
                       // Spread radius
@@ -180,7 +180,7 @@ class _SubscriptionPackageListScreenState
                 labelColor: context.color.territoryColor,
                 // Selected tab text color
                 unselectedLabelColor:
-                    context.color.textDefaultColor.withOpacity(0.5),
+                    context.color.textDefaultColor.withValues(alpha: 0.5),
                 // Unselected tab text color
                 labelStyle: TextStyle(
                   fontSize: 16,

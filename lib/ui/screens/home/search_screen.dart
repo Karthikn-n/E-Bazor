@@ -307,7 +307,7 @@ class SearchScreenState extends State<SearchScreen>
       shadowColor:
           context.watch<AppThemeCubit>().state.appTheme == AppTheme.dark
               ? null
-              : context.color.textDefaultColor.withOpacity(0.2),
+              : context.color.textDefaultColor.withValues(alpha: 0.2),
       backgroundColor: context.color.backgroundColor,
     );
   }
@@ -505,7 +505,7 @@ class SearchScreenState extends State<SearchScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text("recentSearches".translate(context))
-                        .color(context.color.textDefaultColor.withOpacity(0.5))
+                        .color(context.color.textDefaultColor.withValues(alpha: 0.5))
                         .bold(weight: FontWeight.w600),
                     InkWell(
                       child: Text("clear".translate(context))
@@ -546,7 +546,7 @@ class SearchScreenState extends State<SearchScreen>
                             Icon(Icons.history,
                                 size: 16,
                                 color: context.color.textDefaultColor
-                                    .withOpacity(0.6)),
+                                    .withValues(alpha: 0.6)),
                             const SizedBox(width: 8),
                             Flexible(
                               child: Text(item.name!)
@@ -704,7 +704,7 @@ class SearchScreenState extends State<SearchScreen>
                 Padding(
                   padding: EdgeInsetsDirectional.only(start: 5.0),
                   child: Text("searchedItems".translate(context))
-                      .color(context.color.textDefaultColor.withOpacity(0.5))
+                      .color(context.color.textDefaultColor.withValues(alpha: 0.5))
                       .size(context.font.normal),
                 ),
                 SizedBox(
@@ -800,7 +800,7 @@ class SearchScreenState extends State<SearchScreen>
                 Padding(
                   padding: EdgeInsetsDirectional.only(start: 5.0),
                   child: Text("popularAds".translate(context))
-                      .color(context.color.textDefaultColor.withOpacity(0.5))
+                      .color(context.color.textDefaultColor.withValues(alpha: 0.5))
                       .size(context.font.normal),
                 ),
                 SizedBox(

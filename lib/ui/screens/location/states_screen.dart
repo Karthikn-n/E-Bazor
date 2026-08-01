@@ -2,12 +2,9 @@
 import 'dart:async';
 import 'package:Ebozor/app/app_theme.dart';
 import 'package:Ebozor/app/routes.dart';
-import 'package:Ebozor/data/cubits/home/fetch_home_all_items_cubit.dart';
-import 'package:Ebozor/data/cubits/home/fetch_home_screen_cubit.dart';
 import 'package:Ebozor/data/cubits/system/app_theme_cubit.dart';
 import 'package:Ebozor/data/model/location/statesModel.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
-import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -15,8 +12,6 @@ import 'package:shimmer/shimmer.dart';
 
 import 'package:Ebozor/utils/ApiService/api.dart';
 
-import 'package:Ebozor/utils/helper_utils.dart';
-import 'package:Ebozor/data/cubits/location/fetch_cities_cubit.dart';
 import 'package:Ebozor/data/cubits/location/fetch_states_cubit.dart';
 
 import 'package:Ebozor/ui/screens/widgets/errors/no_data_found.dart';
@@ -211,7 +206,7 @@ class StatesScreenState extends State<StatesScreen> {
       shadowColor:
       context.watch<AppThemeCubit>().state.appTheme == AppTheme.dark
           ? null
-          : context.color.textDefaultColor.withOpacity(0.2),
+          : context.color.textDefaultColor.withValues(alpha: 0.2),
       backgroundColor: context.color.backgroundColor,
     );
   }
@@ -369,7 +364,7 @@ class StatesScreenState extends State<StatesScreen> {
                                 border: Border.all(
                                   color: isSelected ? context.color.territoryColor : context.color.borderColor,
                                 ),
-                                color: isSelected ? context.color.territoryColor.withOpacity(0.1) : context.color.secondaryColor,
+                                color: isSelected ? context.color.territoryColor.withValues(alpha: 0.1) : context.color.secondaryColor,
                               ),
                               child: Text(
                                 states.name!,
@@ -411,7 +406,7 @@ class StatesScreenState extends State<StatesScreen> {
         color: context.color.secondaryColor,
         boxShadow: [
           BoxShadow(
-            color: context.color.borderColor.withOpacity(0.5),
+            color: context.color.borderColor.withValues(alpha: 0.5),
             blurRadius: 10,
             offset: const Offset(0, -5),
           )

@@ -102,7 +102,7 @@ class ChooseLocatonBottomSheetState extends State<ChooseLocatonBottomSheet> {
                     focusedBorder: OutlineInputBorder(
                         borderSide:
                             BorderSide(color: context.color.territoryColor)),
-                    fillColor: context.color.territoryColor.withOpacity(0.01),
+                    fillColor: context.color.territoryColor.withValues(alpha: 0.01),
                     filled: true,
                     prefixIcon: Icon(
                       Icons.search,

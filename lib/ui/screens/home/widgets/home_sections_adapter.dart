@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:Ebozor/app/app_theme.dart';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/system/app_theme_cubit.dart';
@@ -54,7 +56,7 @@ class HomeSectionsAdapter extends StatelessWidget {
         GridListAdapter(
           type: ListUiType.List,
           listAxis: Axis.horizontal,
-          height: 220,
+          height: 210,
           listSaperator: (_, __) => const SizedBox(width: 14),
           builder: (context, index, _) {
             final item = section.sectionData![index];
@@ -88,30 +90,38 @@ class _ItemCardState extends State<ItemCard> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.pushNamed(
-          context,
-          Routes.adDetailsScreen,
-          arguments: {"model": widget.item},
-        );
-      },
-      child: Container(
-        width: widget.width ?? 160,
-        decoration: BoxDecoration(
-          color: context.color.secondaryColor,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: context.color.borderColor.darken(30),
-          ),
+    return Container(
+      width: widget.width ?? 160,
+      decoration: BoxDecoration(
+        color: context.color.secondaryColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: context.color.borderColor.darken(30),
         ),
-        child: Stack(
-          children: [
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () {
+            log(widget.item?.toJson().toString() ?? "");
+            // Navigator.pushNamed(
+            //   context,
+            //   Routes.adDetailsScreen,
+            //   arguments: {"model": widget.item},
+            // );
+          },
+          child: Stack(
+            children: [
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 /// IMAGE
-                Flexible(
+                SizedBox(
+                  height: imageHeight,
+                  width: double.infinity,
                   child: ClipRRect(
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(18),
@@ -119,6 +129,7 @@ class _ItemCardState extends State<ItemCard> {
                     child: UiUtils.getImage(
                       widget.item?.image ?? "",
                       width: double.infinity,
+                      height: imageHeight,
                       fit: BoxFit.cover,
                     ),
                   ),
@@ -170,7 +181,7 @@ class _ItemCardState extends State<ItemCard> {
                                   fontSize: context.font.small,
                                   height: 1,
                                   color: context.color.textDefaultColor
-                                      .withOpacity(0.5),
+                                      .withValues(alpha: 0.5),
                                 ),
                               ),
                             ),
@@ -187,6 +198,7 @@ class _ItemCardState extends State<ItemCard> {
           ],
         ),
       ),
+    ),
     );
   }
 

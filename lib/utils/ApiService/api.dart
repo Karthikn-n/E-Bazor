@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:Ebozor/ui/screens/home/widgets/subCategoryFilterScreen.dart';
+import 'package:Ebozor/utils/logger.dart';
 import 'package:dio/dio.dart';
 import 'package:Ebozor/data/cubits/system/user_details.dart';
 import 'package:Ebozor/utils/constant.dart';
@@ -13,7 +13,6 @@ import 'package:Ebozor/data/cubits/chat/get_buyer_chat_users_cubit.dart';
 import 'package:Ebozor/data/cubits/report/update_report_items_list_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/blocked_users_list_cubit.dart';
 import 'package:Ebozor/data/cubits/favorite/favorite_cubit.dart';
-
 
 import 'package:Ebozor/utils/errorFilter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -30,6 +29,11 @@ class ApiException implements Exception {
 }
 
 class Api {
+  static Dio _dio() => Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 12),
+        sendTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+      ));
   // static Map<String, dynamic> headers() {
   //   if (!HiveUtils.isUserAuthenticated()) {
   //     if (HiveUtils.getLanguage() != null &&
@@ -63,8 +67,10 @@ class Api {
     final language = HiveUtils.getLanguage();
     final jwtToken = HiveUtils.getJWT();
 
-    print("jwt token****$jwtToken");
-    print("language****$language");
+    // NOTE: token presence logged, not the token value itself (security)
+    AppLog.i(
+        'headers() — auth: ${jwtToken != null}, lang: ${language?["code"]}',
+        name: 'Api');
 
     Map<String, dynamic> header = {
       "Accept": "application/json",
@@ -77,6 +83,7 @@ class Api {
 
     return header;
   }
+
   static const String _placeApiBaseUrl =
       "https://maps.googleapis.com/maps/api/place/";
   static String placeApiKey = "key";
@@ -89,14 +96,14 @@ class Api {
 //
 
   static String stripeIntentAPI = "https://api.stripe.com/v1/payment_intents";
-  static String SubCategoryFilterScreen = "http://143.110.251.34/api/get-category-filters?";
+  static String SubCategoryFilterScreen =
+      "http://143.110.251.34/api/get-category-filters?";
 //api fun
   static String loginApi = "user-signup";
   static String updateProfileApi = "update-profile";
   static String getSliderApi = "get-slider";
-  static String getCategoriesApi =
-      "front_categories";
-    //  "get-categories";
+  static String getCategoriesApi = "front_categories";
+  //  "get-categories";
   static String getItemApi = "get-item";
   static String getMyItemApi = "my-items";
   static String getNotificationListApi = "get-notification-list";
@@ -273,10 +280,9 @@ class Api {
     dynamic parameter,
     Options? options,
     bool? useBaseUrl,
-  }) async
-  {
+  }) async {
     try {
-      final Dio dio = Dio();
+      final Dio dio = _dio();
       dio.interceptors.add(NetworkRequestInterseptor());
 
       late FormData formData;
@@ -376,11 +382,10 @@ class Api {
   static Future<Map<String, dynamic>> delete(
       {required String url,
       Map<String, dynamic>? queryParameters,
-      bool? useBaseUrl}) async
-  {
+      bool? useBaseUrl}) async {
     try {
 //
-      final Dio dio = Dio();
+      final Dio dio = _dio();
       dio.interceptors.add(NetworkRequestInterseptor());
 
       final response =
@@ -419,9 +424,8 @@ class Api {
       bool? useBaseUrl}) async {
     try {
 //
-      final Dio dio = Dio();
+      final Dio dio = _dio();
       dio.interceptors.add(NetworkRequestInterseptor());
-
 
       final response = await dio.get(
           ((useBaseUrl ?? true) ? Constant.baseUrl : "") + url,

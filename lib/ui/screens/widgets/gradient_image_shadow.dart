@@ -32,7 +32,7 @@ class _GradientedShadowImageState extends State<GradientedShadowImage> {
       decoration: BoxDecoration(
         boxShadow: [
           BoxShadow(
-            color: _paletteGenerator?.dominantColor?.color.withOpacity(0.4) ??
+            color: _paletteGenerator?.dominantColor?.color.withValues(alpha: 0.4) ??
                 Colors.transparent,
             blurRadius: 8.0,
             spreadRadius: 6.0,

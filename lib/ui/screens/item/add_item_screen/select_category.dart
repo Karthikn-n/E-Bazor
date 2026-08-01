@@ -272,7 +272,7 @@ class _SelectNestedCategoryState extends CloudState<SelectNestedCategory> {
           context: context, statusBarColor: context.color.secondaryColor),
       child: PopScope(
         canPop: true,
-        onPopInvoked: (didPop) async {
+        onPopInvokedWithResult: (didPop, result)  async {
           return;
         },
         child: SafeArea(

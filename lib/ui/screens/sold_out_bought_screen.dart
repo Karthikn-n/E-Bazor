@@ -109,7 +109,7 @@ class _SoldOutBoughtScreenState extends State<SoldOutBoughtScreen> {
                             buttonColor: context.color.backgroundColor,
                             border: BorderSide(
                                 color: context.color.textDefaultColor
-                                    .withOpacity(0.5)),
+                                    .withValues(alpha: 0.5)),
                             textColor: context.color.textDefaultColor,
                             onPressed: () async {
                           var soldOut = await UiUtils.showBlurredDialoge(
@@ -243,7 +243,7 @@ class _SoldOutBoughtScreenState extends State<SoldOutBoughtScreen> {
                             buttonColor: context.color.backgroundColor,
                             border: BorderSide(
                                 color: context.color.textDefaultColor
-                                    .withOpacity(0.5)),
+                                    .withValues(alpha: 0.5)),
                             textColor: context.color.textDefaultColor,
                             onPressed: () async {
                           var soldOut = await UiUtils.showBlurredDialoge(
@@ -328,7 +328,7 @@ class _SoldOutBoughtScreenState extends State<SoldOutBoughtScreen> {
                             buttonTitle: 'markAsSoldOut'.translate(context),
                             disabled: _selectedBuyerIndex == null,
                             disabledColor:
-                                context.color.textLightColor.withOpacity(0.3)),
+                                context.color.textLightColor.withValues(alpha: 0.3)),
                       ),
                     ),
                   );

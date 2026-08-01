@@ -1,7 +1,6 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/report/fetch_item_report_reason_list.dart';
 import 'package:Ebozor/data/cubits/subscription/fetch_ads_listing_subscription_packages_cubit.dart';
@@ -40,7 +39,6 @@ import 'package:video_player/video_player.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/cloudState/cloud_state.dart';
-import 'package:Ebozor/utils/customHeroAnimation.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/data/cubits/report/item_report_cubit.dart';
@@ -159,10 +157,10 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     if (!isAddedByMe) {
       context.read<FetchItemReportReasonsListCubit>().fetch();
       context.read<FetchSafetyTipsListCubit>().fetchSafetyTips();
-      context.read<FetchSellerRatingsCubit>().fetch(
-          sellerId: (widget.model.user?.id != null
-              ? widget.model.user!.id!
-              : widget.model.userId!));
+      final int? sellerId = widget.model.user?.id ?? widget.model.userId;
+      if (sellerId != null) {
+        context.read<FetchSellerRatingsCubit>().fetch(sellerId: sellerId);
+      }
     } else {
       context.read<FetchAdsListingSubscriptionPackagesCubit>().fetchPackages();
     }
@@ -450,7 +448,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   if (Constant.isGoogleBannerAdsEnabled == "1") ...[
                     Divider(
                         thickness: 1,
-                        color: context.color.textDefaultColor.withOpacity(0.1)),
+                        color: context.color.textDefaultColor.withValues(alpha: 0.1)),
                     Container(
                       alignment: AlignmentDirectional.center,
                       child: AdBannerWidget(), // Custom widget for banner ad
@@ -464,7 +462,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   //Dynamic Ads here
                   Divider(
                       thickness: 1,
-                      color: context.color.textDefaultColor.withOpacity(0.1)),
+                      color: context.color.textDefaultColor.withValues(alpha: 0.1)),
                   // this is description widget
                   setDescription(),
 
@@ -473,7 +471,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
 
                   Divider(
                       thickness: 1,
-                      color: context.color.textDefaultColor.withOpacity(0.1)),
+                      color: context.color.textDefaultColor.withValues(alpha: 0.1)),
                   makeOfferButtonWidget(),
                   setLocation(),
 
@@ -483,7 +481,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   if (Constant.isGoogleBannerAdsEnabled == "1") ...[
                     Divider(
                         thickness: 1,
-                        color: context.color.textDefaultColor.withOpacity(0.1)),
+                        color: context.color.textDefaultColor.withValues(alpha: 0.1)),
                     Container(
                       alignment: AlignmentDirectional.center,
                       child: AdBannerWidget(), // Custom widget for banner ad
@@ -587,7 +585,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                 Expanded(
                   child: Text(model.address ?? "")
                       .size(context.font.small)
-                      .color(context.color.textDefaultColor.withOpacity(0.5)),
+                      .color(context.color.textDefaultColor.withValues(alpha: 0.5)),
                 ),
               ],
             ),
@@ -715,7 +713,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   //height: 116,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
-                    color: context.color.territoryColor.withOpacity(0.1),
+                    color: context.color.territoryColor.withValues(alpha: 0.1),
                     border:
                     Border.all(color: context.color.borderColor.darken(30)),
                   ),
@@ -739,7 +737,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                               "${"featureYourAdsAttractMore".translate(context)}\n${"clientsAndSellFaster".translate(context)}",
                               style: TextStyle(
                                 color: context.color.textDefaultColor
-                                    .withOpacity(0.7),
+                                    .withValues(alpha: 0.7),
                                 fontSize: context.font.large,
                               ),
                             ),
@@ -828,7 +826,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                                   .setMaxLines(lines: 1)
                                   .size(context.font.small)
                                   .color(context.color.textDefaultColor
-                                  .withOpacity(0.5)),
+                                  .withValues(alpha: 0.5)),
                             ),
                             valueContent(model.customFields![index].value),
                             const SizedBox(
@@ -884,7 +882,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                                     .setMaxLines(lines: 1)
                                     .size(context.font.small)
                                     .color(context.color.textDefaultColor
-                                    .withOpacity(0.5)),
+                                    .withValues(alpha: 0.5)),
                               ),
                               valueContent(model.customFields![index].value),
                               const SizedBox(
@@ -942,7 +940,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
               margin: EdgeInsets.only(top: 2),
               decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
-                  color: context.color.territoryColor.withOpacity(0.1)),
+                  color: context.color.territoryColor.withValues(alpha: 0.1)),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: UiUtils.imageType(
@@ -1003,7 +1001,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   border: Border.all(
                       color: index == _selectedPackageIndex
                           ? context.color.territoryColor
-                          : context.color.textDefaultColor.withOpacity(0.1),
+                          : context.color.textDefaultColor.withValues(alpha: 0.1),
                       width: 1.5)),
               child:
               !model.isActive! ? adsWidget(model) : activeAdsWidget(model),
@@ -1036,14 +1034,14 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                     '${model.limit == "unlimited" ? "unlimitedLbl".translate(context) : model.limit.toString()}\t${"adsLbl".translate(context)}\t\t·\t\t',
                     overflow: TextOverflow.ellipsis,
                     softWrap: true,
-                  ).color(context.color.textDefaultColor.withOpacity(0.5)),
+                  ).color(context.color.textDefaultColor.withValues(alpha: 0.5)),
                   Flexible(
                     child: Text(
                       '${model.duration.toString()}\t${"days".translate(context)}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       softWrap: true,
-                    ).color(context.color.textDefaultColor.withOpacity(0.5)),
+                    ).color(context.color.textDefaultColor.withValues(alpha: 0.5)),
                   ),
                 ],
               ),
@@ -1090,7 +1088,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                           ? "${"unlimitedLbl".translate(context)}\t${"adsLbl".translate(context)}\t\t·\t\t"
                           : '',
                       style: TextStyle(
-                        color: context.color.textDefaultColor.withOpacity(0.5),
+                        color: context.color.textDefaultColor.withValues(alpha: 0.5),
                       ),
                       children: [
                         if (model.limit != "unlimited")
@@ -1118,7 +1116,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                             : '',
                         style: TextStyle(
                           color:
-                          context.color.textDefaultColor.withOpacity(0.5),
+                          context.color.textDefaultColor.withValues(alpha: 0.5),
                         ),
                         children: [
                           if (model.duration != "unlimited")
@@ -1326,7 +1324,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                             height: 46,
                             disabled: _selectedPackageIndex == null,
                             disabledColor:
-                            context.color.textLightColor.withOpacity(0.3),
+                            context.color.textLightColor.withValues(alpha: 0.3),
                             fontSize: context.font.large,
                             buttonColor: context.color.territoryColor,
                             textColor: context.color.secondaryColor,
@@ -1701,7 +1699,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(3),
-                      color: context.color.textColorDark.withOpacity(0.1),
+                      color: context.color.textColorDark.withValues(alpha: 0.1),
                     ),
                     height: 6,
                     width: 60,
@@ -1860,7 +1858,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                             child: Container(
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: Colors.black.withOpacity(0.5),
+                                color: Colors.black.withValues(alpha: 0.5),
                               ),
                               padding: EdgeInsets.all(12),
                               child: Icon(
@@ -1891,9 +1889,9 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                         Color(0x00FFFFFF),
                         Color(0x7F060606)
 
-                        /*Colors.black.withOpacity(0.01),
-                        Colors.black.withOpacity(0.30),
-                        Colors.black.withOpacity(0.55)*/
+                        /*Colors.black.withValues(alpha: 0.01),
+                        Colors.black.withValues(alpha: 0.30),
+                        Colors.black.withValues(alpha: 0.55)*/
                       ],
                     ).createShader(bounds);
                     //TODO: change black color to some other app color if required
@@ -2017,7 +2015,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                             )
                                 : UiUtils.getSvg(
                                 isLike ? AppIcons.like_fill : AppIcons.like,
-                                color: isLike ? context.color.territoryColor : context.color.textLightColor.withOpacity(0.5),
+                                color: isLike ? context.color.territoryColor : context.color.textLightColor.withValues(alpha: 0.5),
                                 //color: context.color.textLightColor,
                                 width: 22,
                                 height: 22),
@@ -2041,7 +2039,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   child: Icon(
                     Icons.share,
                     size: 22,
-                    color: context.color.textLightColor.withOpacity(0.5),
+                    color: context.color.textLightColor.withValues(alpha: 0.5),
                   )),
             ),
           ],
@@ -2095,7 +2093,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                       border: Border.all(
                           width: 1,
                           color:
-                          context.color.textDefaultColor.withOpacity(0.1))),
+                          context.color.textDefaultColor.withValues(alpha: 0.1))),
                   padding: const EdgeInsets.symmetric(horizontal: 5),
                   height: 46.rh(context),
                   child: Row(
@@ -2108,7 +2106,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                       ),
                       Text(model.views != null ? model.views!.toString() : "0")
                           .color(
-                          context.color.textDefaultColor.withOpacity(0.8))
+                          context.color.textDefaultColor.withValues(alpha: 0.8))
                           .size(context.font.large)
                     ],
                   ))),
@@ -2120,7 +2118,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                       border: Border.all(
                           width: 1,
                           color:
-                          context.color.textDefaultColor.withOpacity(0.1))),
+                          context.color.textDefaultColor.withValues(alpha: 0.1))),
                   padding: const EdgeInsets.symmetric(horizontal: 5),
                   height: 46.rh(context),
                   //alignment: AlignmentDirectional.center,
@@ -2136,7 +2134,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                           ? "0"
                           : model.totalLikes.toString())
                           .color(
-                          context.color.textDefaultColor.withOpacity(0.8))
+                          context.color.textDefaultColor.withValues(alpha: 0.8))
                           .size(context.font.large)
                     ],
                   ))),
@@ -2152,7 +2150,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-              color: context.color.textDefaultColor.withOpacity(0.1)),
+              color: context.color.textDefaultColor.withValues(alpha: 0.1)),
 
           // Background color
         ),
@@ -2238,19 +2236,19 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   Color _getStatusColor(String? status) {
     switch (status) {
       case "review":
-        return pendingButtonColor.withOpacity(0.1);
+        return pendingButtonColor.withValues(alpha: 0.1);
       case "active" || "approved":
-        return activateButtonColor.withOpacity(0.1);
+        return activateButtonColor.withValues(alpha: 0.1);
       case "inactive":
-        return deactivateButtonColor.withOpacity(0.1);
+        return deactivateButtonColor.withValues(alpha: 0.1);
       case "sold out":
-        return soldOutButtonColor.withOpacity(0.1);
+        return soldOutButtonColor.withValues(alpha: 0.1);
       case "rejected":
-        return deactivateButtonColor.withOpacity(0.1);
+        return deactivateButtonColor.withValues(alpha: 0.1);
       case "expired":
-        return deactivateButtonColor.withOpacity(0.1);
+        return deactivateButtonColor.withValues(alpha: 0.1);
       default:
-        return context.color.territoryColor.withOpacity(0.1);
+        return context.color.territoryColor.withValues(alpha: 0.1);
     }
   }
 
@@ -2298,7 +2296,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
               ? Expanded(
               child: Text(model.created!.formatDate(format: "d MMM yyyy"))
                   .setMaxLines(lines: 1)
-                  .color(context.color.textDefaultColor.withOpacity(0.5)))
+                  .color(context.color.textDefaultColor.withValues(alpha: 0.5)))
               : const SizedBox.shrink()
           //TODO: add DATE from model
         ],
@@ -2313,8 +2311,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
         Text("aboutThisItemLbl".translate(context)).bold().size(context.font.large), //TODO: replace label with your own - aboutThisPropLbl
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 5.0),
-          child: Text(model.description!)
-              .color(context.color.textDefaultColor.withOpacity(0.5)),
+          child: Text(model.description ?? "")
+              .color(context.color.textDefaultColor.withValues(alpha: 0.5)),
         ),
       ],
     );
@@ -2459,7 +2457,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
         children: [
           Divider(
             thickness: 1,
-            color: context.color.textDefaultColor.withOpacity(0.1),
+            color: context.color.textDefaultColor.withValues(alpha: 0.1),
           ),
           InkWell(
             onTap: () {
@@ -2490,7 +2488,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
           ),
           Divider(
             thickness: 1,
-            color: context.color.textDefaultColor.withOpacity(0.1),
+            color: context.color.textDefaultColor.withValues(alpha: 0.1),
           ),
         ],
       ),
@@ -2594,7 +2592,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                 text: TextSpan(
                   text: "Seller asking price:".translate(context),
                   style: TextStyle(
-                    color: context.color.textDefaultColor.withOpacity(0.5),
+                    color: context.color.textDefaultColor.withValues(alpha: 0.5),
                     fontSize: 16,
                   ),
                   children: <TextSpan>[
@@ -2614,7 +2612,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
               SizedBox(height: 6,),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: TextFormField(
@@ -2651,7 +2649,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                     hintStyle: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 15,
-                      color: context.color.textDefaultColor.withOpacity(0.3),
+                      color: context.color.textDefaultColor.withValues(alpha: 0.3),
                     ),
                   ),
                 ),

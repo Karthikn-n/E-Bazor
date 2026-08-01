@@ -10,7 +10,7 @@ final appThemeData = {
     // scaffoldBackgroundColor: pageBackgroundColor,
     brightness: Brightness.light,
     //textTheme
-    useMaterial3: false,
+    useMaterial3: true,
     fontFamily: "Manrope",
     textSelectionTheme: const TextSelectionThemeData(
       selectionColor: territoryColor_,
@@ -21,7 +21,7 @@ final appThemeData = {
       thumbColor: const MaterialStatePropertyAll(territoryColor_),
       trackColor: MaterialStateProperty.resolveWith((states) {
         if (states.contains(MaterialState.selected)) {
-          return territoryColor_.withOpacity(0.3);
+          return territoryColor_.withValues(alpha: 0.3);
         }
         return primaryColorDark;
       }),
@@ -31,7 +31,7 @@ final appThemeData = {
   ),
   AppTheme.dark: ThemeData(
     brightness: Brightness.dark,
-    useMaterial3: false,
+    useMaterial3: true,
     fontFamily: "Manrope",
     textSelectionTheme: const TextSelectionThemeData(
       selectionHandleColor: territoryColorDark,
@@ -39,15 +39,15 @@ final appThemeData = {
       cursorColor: territoryColorDark,
     ),
     colorScheme: ColorScheme.fromSeed(
-        error: errorMessageColor.withOpacity(0.7),
+        error: errorMessageColor.withValues(alpha: 0.7),
         seedColor: territoryColorDark,brightness:Brightness.dark),
     switchTheme: SwitchThemeData(
         thumbColor: const MaterialStatePropertyAll(territoryColor_),
         trackColor: MaterialStateProperty.resolveWith((states) {
           if (states.contains(MaterialState.selected)) {
-            return territoryColor_.withOpacity(0.3);
+            return territoryColor_.withValues(alpha: 0.3);
           }
-          return primaryColor_.withOpacity(0.2);
+          return primaryColor_.withValues(alpha: 0.2);
         })),
   )
 };

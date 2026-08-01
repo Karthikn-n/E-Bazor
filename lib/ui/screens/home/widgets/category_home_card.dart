@@ -22,23 +22,20 @@ class CategoryHomeCard extends StatelessWidget {
     final extension = url.split(".").last.toLowerCase();
     final bool isFullImage = !(extension == "png" || extension == "svg");
 
-    return Material(
+    return Card(
       elevation: 1,
-      borderRadius: BorderRadius.circular(10),
-      child: SizedBox(
-        // width: 85,
-        // height: 120,
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFFFFF),
-                borderRadius: BorderRadius.circular(10),
-             // border: Border.all(color: Colors.black)
-            ),
-            child: Column(
+      color: context.color.secondaryColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+          child: Column(
             mainAxisSize: MainAxisSize.max,
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               Flexible(
                 child: ClipRRect(
@@ -49,15 +46,12 @@ class CategoryHomeCard extends StatelessWidget {
                   ),
                 ),
               ),
-
-             // const SizedBox(height: ),
-
               Expanded(
                 child: Center(
                   child: Text(
                     title,
                     textAlign: TextAlign.center,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: context.font.small,
@@ -69,9 +63,6 @@ class CategoryHomeCard extends StatelessWidget {
               ),
             ],
           ),
-
-
-        ),
         ),
       ),
     );

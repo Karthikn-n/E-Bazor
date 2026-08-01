@@ -240,7 +240,7 @@ class _FeaturedAdsSubscriptionPlansItemState
                                   ? context.color.textLightColor.brighten(300)
                                   : context.color.territoryColor,
                           textColor: widget.modelList[selectedIndex!].isActive!
-                              ? context.color.textDefaultColor.withOpacity(0.5)
+                              ? context.color.textDefaultColor.withValues(alpha: 0.5)
                               : context.color.secondaryColor,
                           buttonTitle: widget
                                       .modelList[selectedIndex!].finalPrice! >
@@ -327,7 +327,7 @@ class _FeaturedAdsSubscriptionPlansItemState
                       color: widget.modelList[index].isActive! ||
                               index == selectedIndex
                           ? context.color.territoryColor
-                          : context.color.textDefaultColor.withOpacity(0.1),
+                          : context.color.textDefaultColor.withValues(alpha: 0.1),
                       width: 1.5)),
               child: !widget.modelList[index].isActive!
                   ? adsWidget(index)
@@ -361,14 +361,14 @@ class _FeaturedAdsSubscriptionPlansItemState
                     '${widget.modelList[index].limit == "unlimited" ? "unlimitedLbl".translate(context) : widget.modelList[index].limit.toString()}\t${"adsLbl".translate(context)}\t\t·\t\t',
                     overflow: TextOverflow.ellipsis,
                     softWrap: true,
-                  ).color(context.color.textDefaultColor.withOpacity(0.5)),
+                  ).color(context.color.textDefaultColor.withValues(alpha: 0.5)),
                   Flexible(
                     child: Text(
                       '${widget.modelList[index].duration.toString()}\t${"days".translate(context)}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       softWrap: true,
-                    ).color(context.color.textDefaultColor.withOpacity(0.5)),
+                    ).color(context.color.textDefaultColor.withValues(alpha: 0.5)),
                   ),
                 ],
               ),
@@ -415,7 +415,7 @@ class _FeaturedAdsSubscriptionPlansItemState
                           ? "${"unlimitedLbl".translate(context)}\t${"adsLbl".translate(context)}\t\t·\t\t"
                           : '',
                       style: TextStyle(
-                        color: context.color.textDefaultColor.withOpacity(0.5),
+                        color: context.color.textDefaultColor.withValues(alpha: 0.5),
                       ),
                       children: [
                         if (widget.modelList[index].limit != "unlimited")
@@ -443,7 +443,7 @@ class _FeaturedAdsSubscriptionPlansItemState
                             : '',
                         style: TextStyle(
                           color:
-                              context.color.textDefaultColor.withOpacity(0.5),
+                              context.color.textDefaultColor.withValues(alpha: 0.5),
                         ),
                         children: [
                           if (widget.modelList[index].duration != "unlimited")
@@ -528,7 +528,7 @@ class _FeaturedAdsSubscriptionPlansItemState
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(3),
                           color:
-                              context.color.textDefaultColor.withOpacity(0.1),
+                              context.color.textDefaultColor.withValues(alpha: 0.1),
                         ),
                         height: 6,
                         width: 60,
@@ -598,7 +598,7 @@ class PaymentMethodTile extends StatelessWidget {
       trailing: isSelected
           ? Icon(Icons.check_circle, color: context.color.territoryColor)
           : Icon(Icons.radio_button_unchecked,
-              color: context.color.textDefaultColor.withOpacity(0.5)),
+              color: context.color.textDefaultColor.withValues(alpha: 0.5)),
       onTap: () => onSelect(gateway.type),
     );
   }

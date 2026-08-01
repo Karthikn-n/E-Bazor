@@ -1,5 +1,7 @@
 abstract class LoginPayload {}
 
+enum AuthenticationIntent { signIn, signUp }
+
 class MultiLoginPayload {
   final Map<String, LoginPayload> payloads;
 
@@ -18,20 +20,24 @@ class EmailLoginPayload extends LoginPayload {
 }
 
 class GoogleLoginPayload extends LoginPayload {
-  GoogleLoginPayload();
+  final AuthenticationIntent intent;
+
+  GoogleLoginPayload({required this.intent});
 }
 
 class AppleLoginPayload extends LoginPayload {
-  AppleLoginPayload();
-}
+  final AuthenticationIntent intent;
 
+  AppleLoginPayload({required this.intent});
+}
 
 class PhoneLoginPayload extends LoginPayload {
   final String phoneNumber;
   final String countryCode;
+  final AuthenticationIntent intent;
   String? otp;
 
-  PhoneLoginPayload(this.phoneNumber, this.countryCode);
+  PhoneLoginPayload(this.phoneNumber, this.countryCode, {required this.intent});
 
   void setOTP(String value) {
     otp = value;

@@ -232,7 +232,7 @@ class _ChooseLocationMapState extends State<ChooseLocationMap> {
 
     return PopScope(
       canPop: true,
-      onPopInvoked: (didPop) async {
+      onPopInvokedWithResult: (didPop, result)  async {
         _googleMapController?.dispose();
         (await completer.future).dispose();
         showGoogleMap = false;

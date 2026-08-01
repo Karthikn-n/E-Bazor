@@ -3,7 +3,6 @@ import 'package:Ebozor/data/model/personalized/personalized_settings.dart';
 import 'package:Ebozor/firebase_options.dart';
 import 'package:Ebozor/main.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
-import 'package:Ebozor/utils/LocalStoreage/hive_keys.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
@@ -12,7 +11,6 @@ import 'package:flutter/services.dart';
 import 'package:google_maps_flutter_android/google_maps_flutter_android.dart';
 import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 
 PersonalizedInterestSettings personalizedInterestSettings =
     PersonalizedInterestSettings.empty();
@@ -128,17 +126,8 @@ void initApp() async {
   // Ads init
   MobileAds.instance.initialize();
 
-  // ✅ Hive Init
-  await Hive.initFlutter();
-
-  // ✅ Open boxes — DO NOT clear languageBox, it breaks navigation logic
-  await Hive.openBox(HiveKeys.languageBox);
-  await Hive.openBox(HiveKeys.userDetailsBox);
-  await Hive.openBox(HiveKeys.authBox);
-  await Hive.openBox(HiveKeys.themeBox);
-  await Hive.openBox(HiveKeys.svgBox);
-  await Hive.openBox(HiveKeys.jwtToken);
-  await Hive.openBox(HiveKeys.historyBox);
+  // Initialize hive and open boxes
+  await HiveUtils.initHive();
 
   // ✅ Use await instead of .then() to avoid async issues
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);

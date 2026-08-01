@@ -19,12 +19,12 @@ import 'package:Ebozor/utils/login/lib/login_status.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/data/cubits/auth/authentication_cubit.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
+import 'package:Ebozor/ui/screens/auth/sign_up/signup_auth_listener.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:Ebozor/utils/login/lib/payloads.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
 
 class SignUpMainScreen extends StatefulWidget {
   const SignUpMainScreen({super.key});
@@ -41,6 +41,8 @@ class LoginScreenState extends State<SignUpMainScreen> {
   final TextEditingController emailMobileTextController =
       TextEditingController();
   String? phone, countryCode, countryName, flagEmoji;
+  // Inline validation error shown below the input field
+  String? _inputError;
 
   Timer? timer;
   late Size size;
@@ -50,8 +52,9 @@ class LoginScreenState extends State<SignUpMainScreen> {
   String numberOrEmail = "";
   final _formKey = GlobalKey<FormState>();
 
-  late PhoneLoginPayload phoneLoginPayload =
-      PhoneLoginPayload(emailMobileTextController.text, countryCode!);
+  late PhoneLoginPayload phoneLoginPayload = PhoneLoginPayload(
+      emailMobileTextController.text, countryCode!,
+      intent: AuthenticationIntent.signUp);
   bool isBack = false;
 
   @override
@@ -73,16 +76,35 @@ class LoginScreenState extends State<SignUpMainScreen> {
       }
 
       if (state is MFail) {
-        if (state.error is FirebaseAuthException) {
-          try {
-            HelperUtils.showSnackBarMessage(context,
-                (state.error as FirebaseAuthException).message!.toString());
-          } catch (e) {}
-        } else {
-          HelperUtils.showSnackBarMessage(context, state.error.toString());
+        if (context.read<AuthenticationCubit>().state
+            is AuthenticationInProcess) {
+          return;
         }
-        /*HelperUtils.showSnackBarMessage(context, state.error.toString(),
-              type: MessageType.error);*/
+        if (mounted) {
+          // Always show a user-friendly message — never the raw Firebase text
+          final err = state.error;
+          String friendlyMsg;
+          if (err is FirebaseAuthException) {
+            switch (err.code) {
+              case 'invalid-phone-number':
+              case 'missing-phone-number':
+                friendlyMsg = "pleaseEnterValidPhoneNumber".translate(context);
+                break;
+              case 'too-many-requests':
+                friendlyMsg = "tooManyRequests".translate(context);
+                break;
+              case 'network-request-failed':
+                friendlyMsg = "noInternet".translate(context);
+                break;
+              default:
+                friendlyMsg = "pleaseEnterValidPhoneNumber".translate(context);
+            }
+          } else {
+            friendlyMsg = "pleaseEnterValidPhoneNumber".translate(context);
+          }
+          HelperUtils.showSnackBarMessage(context, friendlyMsg,
+              type: MessageType.error);
+        }
       }
       if (state is MSuccess) {
         // Widgets.hideLoder(context);
@@ -146,14 +168,26 @@ class LoginScreenState extends State<SignUpMainScreen> {
 
   void _onTapContinue() {
     if (isMobileNumberField) {
+      final number = emailMobileTextController.text.toString().trim();
+      final code = countryCode ?? "";
+
+      final cleanCode = code.replaceAll('+', '');
       Navigator.pushNamed(context, Routes.mobileSignUp, arguments: {
-        "mobile": emailMobileTextController.text.toString().trim(),
-        "countryCode": countryCode
+        "mobile": number,
+        "countryCode": cleanCode,
       });
     } else {
-      Navigator.pushNamed(context, Routes.signup, arguments: {
-        "emailId": emailMobileTextController.text.toString().trim()
-      });
+      final email = emailMobileTextController.text.toString().trim();
+      final emailRegex =
+          RegExp(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$');
+      if (email.isEmpty || !emailRegex.hasMatch(email)) {
+        setState(() {
+          _inputError = "pleaseEnterValidEmailAddress".translate(context);
+        });
+        return;
+      }
+      Navigator.pushNamed(context, Routes.signup,
+          arguments: {"emailId": email});
     }
   }
 
@@ -192,7 +226,7 @@ class LoginScreenState extends State<SignUpMainScreen> {
           onTap: () => FocusScope.of(context).unfocus(),
           child: PopScope(
             canPop: isBack,
-            onPopInvoked: (didPop) {
+            onPopInvokedWithResult: (didPop, result) {
               setState(() {
                 isBack = true;
               });
@@ -205,12 +239,14 @@ class LoginScreenState extends State<SignUpMainScreen> {
               child: Scaffold(
                 backgroundColor: Colors.white,
                 bottomNavigationBar: termAndPolicyTxt(),
-                body: Builder(builder: (context) {
-                  return Form(
-                    key: _formKey,
-                    child: buildLoginWidget(),
-                  );
-                }),
+                body: SignupAuthListener(
+                  child: Builder(builder: (context) {
+                    return Form(
+                      key: _formKey,
+                      child: buildLoginWidget(),
+                    );
+                  }),
+                ),
               ),
             ),
           ),
@@ -235,6 +271,11 @@ class LoginScreenState extends State<SignUpMainScreen> {
             controller: emailMobileTextController,
             fillColor: context.color.secondaryColor,
             borderColor: context.color.borderColor.darken(30),
+            phoneCountryCode: isMobileNumberField ? countryCode : null,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            formaters: isMobileNumberField
+                ? [FilteringTextInputFormatter.digitsOnly]
+                : null,
             onChange: (value) {
               bool isNumber = value.toString().contains(RegExp(r'^[0-9]+$'));
 
@@ -242,7 +283,12 @@ class LoginScreenState extends State<SignUpMainScreen> {
                   Constant.mobileAuthentication == "1" ? isNumber : false;
 
               numberOrEmail = value;
-              setState(() {});
+              // Clear the inline error as user types
+              if (_inputError != null) {
+                setState(() => _inputError = null);
+              } else {
+                setState(() {});
+              }
             },
             keyboard: (Constant.mobileAuthentication == "1" &&
                     Constant.emailAuthentication == "1")
@@ -328,7 +374,7 @@ class LoginScreenState extends State<SignUpMainScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    color: context.color.forthColor.withOpacity(0.102),
+                    color: context.color.forthColor.withValues(alpha: 0.102),
                     elevation: 0,
                     height: 28,
                     minWidth: 64,
@@ -405,23 +451,19 @@ class LoginScreenState extends State<SignUpMainScreen> {
                   border: context.watch<AppThemeCubit>().state.appTheme !=
                           AppTheme.dark
                       ? BorderSide(
-                          color:
-                              context.color.textDefaultColor.withOpacity(0.5))
+                          color: context.color.textDefaultColor
+                              .withValues(alpha: 0.5))
                       : null,
                   textColor: textDarkColor, onPressed: () {
                 context.read<AuthenticationCubit>().setData(
-                    payload: GoogleLoginPayload(),
+                    payload:
+                        GoogleLoginPayload(intent: AuthenticationIntent.signUp),
                     type: AuthenticationType.google);
                 context.read<AuthenticationCubit>().authenticate();
               },
                   radius: 8,
                   height: 46,
                   buttonTitle: "continueWithGoogle".translate(context)),
-
-
-
-
-
 
 //apple login
             const SizedBox(
@@ -441,12 +483,13 @@ class LoginScreenState extends State<SignUpMainScreen> {
                   border: context.watch<AppThemeCubit>().state.appTheme !=
                           AppTheme.dark
                       ? BorderSide(
-                          color:
-                              context.color.textDefaultColor.withOpacity(0.5))
+                          color: context.color.textDefaultColor
+                              .withValues(alpha: 0.5))
                       : null,
                   textColor: textDarkColor, onPressed: () {
                 context.read<AuthenticationCubit>().setData(
-                    payload: AppleLoginPayload(),
+                    payload:
+                        AppleLoginPayload(intent: AuthenticationIntent.signUp),
                     type: AuthenticationType.apple);
                 context.read<AuthenticationCubit>().authenticate();
               },
@@ -463,9 +506,6 @@ class LoginScreenState extends State<SignUpMainScreen> {
     );
   }
 
-
-
-
   Widget termAndPolicyTxt() {
     return Padding(
       padding: EdgeInsetsDirectional.only(bottom: 15.0, start: 25.0, end: 25.0),
@@ -476,7 +516,7 @@ class LoginScreenState extends State<SignUpMainScreen> {
           Text("bySigningUpLoggingIn".translate(context))
               .centerAlign()
               .size(context.font.small)
-              .color(context.color.textLightColor.withOpacity(0.8)),
+              .color(context.color.textLightColor.withValues(alpha: 0.8)),
           const SizedBox(
             height: 3,
           ),
@@ -505,7 +545,7 @@ class LoginScreenState extends State<SignUpMainScreen> {
             ),
             Text("andTxt".translate(context))
                 .size(context.font.small)
-                .color(context.color.textLightColor.withOpacity(0.8)),
+                .color(context.color.textLightColor.withValues(alpha: 0.8)),
             const SizedBox(
               width: 5.0,
             ),

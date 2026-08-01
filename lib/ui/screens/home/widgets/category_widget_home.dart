@@ -41,7 +41,7 @@ class CategoryWidgetHome extends StatelessWidget {
               itemCount: state.categories.length,
 
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
+                crossAxisCount: 3,
                 crossAxisSpacing: 10,
                 mainAxisSpacing: 10,
                 childAspectRatio: 0.95,

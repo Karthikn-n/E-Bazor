@@ -25,6 +25,7 @@ import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/login/lib/login_status.dart';
 import 'package:Ebozor/utils/login/lib/payloads.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
+import 'package:Ebozor/utils/logger.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -67,8 +68,9 @@ class LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
 
   bool isObscure = true;
-  late PhoneLoginPayload phoneLoginPayload =
-      PhoneLoginPayload(emailMobileTextController.text, countryCode!);
+  late PhoneLoginPayload phoneLoginPayload = PhoneLoginPayload(
+      emailMobileTextController.text, countryCode!,
+      intent: AuthenticationIntent.signIn);
   bool isBack = false;
   String signature = "";
 
@@ -106,13 +108,17 @@ class LoginScreenState extends State<LoginScreen> {
       }
 
       if (state is MFail) {
+        if (context.read<AuthenticationCubit>().state
+            is AuthenticationInProcess) {
+          return;
+        }
         //Widgets.hideLoder(context);
 
         if (!isOtpSent && isMobileNumberField) {
           Widgets.hideLoder(context);
         }
 
-        if (isOtpSent && (otp!.trim().isEmpty)) {
+        if (isOtpSent && (otp?.trim().isEmpty ?? true)) {
           HelperUtils.showSnackBarMessage(context,
               "${"weSentCodeOnNumber".translate(context)}\t${emailMobileTextController.text}",
               type: MessageType.error);
@@ -198,10 +204,13 @@ class LoginScreenState extends State<LoginScreen> {
   }
 
   void _onTapContinue() {
+    AppLog.i('_onTapContinue: isMobileNumberField=$isMobileNumberField',
+        name: 'LoginScreen');
     if (isMobileNumberField) {
       // isOtpSent = true;
-      phoneLoginPayload =
-          PhoneLoginPayload(emailMobileTextController.text, countryCode!);
+      phoneLoginPayload = PhoneLoginPayload(
+          emailMobileTextController.text, countryCode!,
+          intent: AuthenticationIntent.signIn);
 
       context
           .read<AuthenticationCubit>()
@@ -216,6 +225,7 @@ class LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> sendVerificationCode() async {
+    AppLog.i('sendVerificationCode initiated', name: 'LoginScreen');
     if (widget.isDeleteAccount ?? false) {
       isOtpSent = true;
 
@@ -237,7 +247,6 @@ class LoginScreenState extends State<LoginScreen> {
         _onTapContinue();
       }
     }
-    // showSnackBar( UiUtils.getTranslatedLabel(context, "acceptPolicy"), context);
   }
 
   void setDemoOTP() {
@@ -270,7 +279,7 @@ class LoginScreenState extends State<LoginScreen> {
           onTap: () => FocusScope.of(context).unfocus(),
           child: PopScope(
             canPop: isBack,
-            onPopInvoked: (didPop) {
+            onPopInvokedWithResult: (didPop, result) {
               if (widget.isDeleteAccount ?? false) {
                 Navigator.pop(context);
               } else {
@@ -306,7 +315,11 @@ class LoginScreenState extends State<LoginScreen> {
                     : SizedBox.shrink(),
                 body: BlocListener<LoginCubit, LoginState>(
                   listener: (context, state) {
+                    AppLog.i('LoginCubit state: $state', name: 'LoginScreen');
                     if (state is LoginSuccess) {
+                      AppLog.i(
+                          'LoginSuccess. isProfileCompleted=${state.isProfileCompleted}',
+                          name: 'LoginScreen');
                       HiveUtils.setUserIsAuthenticated(true);
                       //GuestChecker.set(isGuest: false);
                       //context.read<AuthCubit>().updateFCM(context);
@@ -347,17 +360,18 @@ class LoginScreenState extends State<LoginScreen> {
                     }
 
                     if (state is LoginFailure) {
-                      ////////
-                      debugPrint("Login Failure: ${state.errorMessage}");
-                      HelperUtils.showSnackBarMessage(
-                          context, "Login Failed");
+                      AppLog.e('LoginFailure: ${state.errorMessage}',
+                          name: 'LoginScreen');
+                      HelperUtils.showSnackBarMessage(context, "Login Failed");
                     }
                   },
                   child: BlocConsumer<AuthenticationCubit, AuthenticationState>(
                     listener: (context, state) {
+                      AppLog.i('AuthState: $state', name: 'LoginScreen');
                       if (state is AuthenticationSuccess) {
                         Widgets.hideLoder(context);
-
+                        AppLog.i('AuthSuccess type: ${state.type}',
+                            name: 'LoginScreen');
                         if (state.type == AuthenticationType.email) {
                           //FirebaseAuth.instance.currentUser?.sendEmailVerification();
                           if (state.credential.user!.emailVerified) {
@@ -368,7 +382,8 @@ class LoginScreenState extends State<LoginScreen> {
                                 credential: state.credential,
                                 countryCode: null);
                           } else {
-                             HelperUtils.showSnackBarMessage(context,"Please Verify Your email first" );
+                            HelperUtils.showSnackBarMessage(
+                                context, "Please Verify Your email first");
                           }
                         } else if (state.type == AuthenticationType.phone) {
                           context.read<LoginCubit>().login(
@@ -392,28 +407,13 @@ class LoginScreenState extends State<LoginScreen> {
                       if (state is AuthenticationFail) {
                         Widgets.hideLoder(context);
 
-                        // 🔴 EXACT LOGIN ERROR PRINT HERE
-                        debugPrint('========== LOGIN ERROR ==========');
-                        debugPrint('ERROR OBJ : ${state.error}');
-                        
-                        String message = "Login Failed"; // Default friendly message
-
-                        if (state.error is FirebaseAuthException) {
-                          final e = state.error as FirebaseAuthException;
-                          debugPrint('FIREBASE CODE : ${e.code}');
-                          debugPrint('FIREBASE MSG  : ${e.message}');
-                          
-                          if (e.code == 'credential-already-in-use' || 
-                              e.code == 'account-exists-with-different-credential' || 
-                              e.code == 'email-already-in-use') {
-                            message = "Account already used";
-                          }
+                        AppLog.e('AuthFail: ${state.error}',
+                            name: 'LoginScreen');
+                        final message = authenticationErrorMessage(state.error);
+                        if (message.isNotEmpty) {
+                          HelperUtils.showSnackBarMessage(context, message,
+                              type: MessageType.error);
                         }
-
-                        debugPrint('=================================');
-                        
-                        // Show friendly message in SnackBar
-                        HelperUtils.showSnackBarMessage(context, message, type: MessageType.error);
                       }
 
                       if (state is AuthenticationInProcess) {
@@ -458,6 +458,11 @@ class LoginScreenState extends State<LoginScreen> {
             controller: emailMobileTextController,
             fillColor: context.color.secondaryColor,
             borderColor: context.color.borderColor.darken(30),
+            phoneCountryCode: isMobileNumberField ? countryCode : null,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            formaters: isMobileNumberField
+                ? [FilteringTextInputFormatter.digitsOnly]
+                : null,
             onChange: (value) {
               bool isNumber = value.toString().contains(RegExp(r'^[0-9]+$'));
 
@@ -555,7 +560,7 @@ class LoginScreenState extends State<LoginScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    color: context.color.forthColor.withOpacity(0.102),
+                    color: context.color.forthColor.withValues(alpha: 0.102),
                     elevation: 0,
                     height: 28,
                     minWidth: 64,
@@ -648,6 +653,7 @@ class LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+
   //Apple login Widgets
   Widget googleAndAppleLogin() {
     return Column(
@@ -674,11 +680,14 @@ class LoginScreenState extends State<LoginScreen> {
               border: context.watch<AppThemeCubit>().state.appTheme !=
                       AppTheme.dark
                   ? BorderSide(
-                      color: context.color.textDefaultColor.withOpacity(0.5))
+                      color:
+                          context.color.textDefaultColor.withValues(alpha: 0.5))
                   : null,
               textColor: textDarkColor, onPressed: () {
             context.read<AuthenticationCubit>().setData(
-                payload: GoogleLoginPayload(), type: AuthenticationType.google);
+                payload:
+                    GoogleLoginPayload(intent: AuthenticationIntent.signIn),
+                type: AuthenticationType.google);
             context.read<AuthenticationCubit>().authenticate();
           },
               radius: 8,
@@ -699,11 +708,13 @@ class LoginScreenState extends State<LoginScreen> {
               border: context.watch<AppThemeCubit>().state.appTheme !=
                       AppTheme.dark
                   ? BorderSide(
-                      color: context.color.textDefaultColor.withOpacity(0.5))
+                      color:
+                          context.color.textDefaultColor.withValues(alpha: 0.5))
                   : null,
               textColor: textDarkColor, onPressed: () {
             context.read<AuthenticationCubit>().setData(
-                payload: AppleLoginPayload(), type: AuthenticationType.apple);
+                payload: AppleLoginPayload(intent: AuthenticationIntent.signIn),
+                type: AuthenticationType.apple);
             context.read<AuthenticationCubit>().authenticate();
           },
               height: 46,
@@ -723,7 +734,7 @@ class LoginScreenState extends State<LoginScreen> {
           Text("bySigningUpLoggingIn".translate(context))
               .centerAlign()
               .size(context.font.small)
-              .color(context.color.textLightColor.withOpacity(0.8)),
+              .color(context.color.textLightColor.withValues(alpha: 0.8)),
           const SizedBox(
             height: 3,
           ),
@@ -752,7 +763,7 @@ class LoginScreenState extends State<LoginScreen> {
             ),
             Text("andTxt".translate(context))
                 .size(context.font.small)
-                .color(context.color.textLightColor.withOpacity(0.8)),
+                .color(context.color.textLightColor.withValues(alpha: 0.8)),
             const SizedBox(
               width: 5.0,
             ),
@@ -858,7 +869,7 @@ class LoginScreenState extends State<LoginScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
-                color: context.color.forthColor.withOpacity(0.102),
+                color: context.color.forthColor.withValues(alpha: 0.102),
                 elevation: 0,
                 height: 28,
                 minWidth: 64,
@@ -914,7 +925,7 @@ class LoginScreenState extends State<LoginScreen> {
                 context.read<AuthenticationCubit>().verify();
               },
               child: Text("resendOTP".translate(context))
-                  .color(context.color.textColorDark.withOpacity(0.7)),
+                  .color(context.color.textColorDark.withValues(alpha: 0.7)),
             ),
           ),
           const SizedBox(
@@ -965,7 +976,7 @@ class LoginScreenState extends State<LoginScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
-                color: context.color.forthColor.withOpacity(0.102),
+                color: context.color.forthColor.withValues(alpha: 0.102),
                 elevation: 0,
                 height: 28,
                 minWidth: 64,
@@ -1010,7 +1021,7 @@ class LoginScreenState extends State<LoginScreen> {
               },
               icon: Icon(
                 !isObscure ? Icons.visibility : Icons.visibility_off,
-                color: context.color.textColorDark.withOpacity(0.3),
+                color: context.color.textColorDark.withValues(alpha: 0.3),
               ),
             ),
           ),

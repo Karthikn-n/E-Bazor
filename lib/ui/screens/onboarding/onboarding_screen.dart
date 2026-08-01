@@ -155,7 +155,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        color: context.color.forthColor.withOpacity(0.102),
+                        color: context.color.forthColor.withValues(alpha: 0.102),
                         elevation: 0,
                         height: 28,
                         minWidth: 64,
@@ -387,7 +387,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                   : [
                                       BoxShadow(
                                           color: context.color.forthColor
-                                              .withOpacity(0.8),
+                                              .withValues(alpha: 0.8),
                                           blurRadius: 10,
                                           offset: const Offset(0, 4),
                                           spreadRadius: 1)
@@ -413,7 +413,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       : [
                           BoxShadow(
                               color:
-                                  context.color.territoryColor.withOpacity(0.3),
+                                  context.color.territoryColor.withValues(alpha: 0.3),
                               blurRadius: 20,
                               offset: const Offset(0, 8),
                               /*spreadRadius: 1*/)
@@ -488,7 +488,7 @@ class IndicatorBuilder extends StatelessWidget {
 //     path_0.lineTo(0.2, 0);
 //     path_0.close();
 //     Paint paint_0_fill = Paint()..style = PaintingStyle.fill;
-//     paint_0_fill.color = Color(0xff606060).withOpacity(1.0);
+//     paint_0_fill.color = Color(0xff606060).withValues(alpha: 1.0);
 //     canvas.drawPath(path_0, paint_0_fill);
 //     Path path_1 = Path();
 //     path_1.moveTo(216, 0);
@@ -497,7 +497,7 @@ class IndicatorBuilder extends StatelessWidget {
 //     path_1.lineTo(216, 0);
 //     path_1.close();
 //     Paint paint_1_fill = Paint()..style = PaintingStyle.fill;
-//     paint_1_fill.color = Color(0xff606060).withOpacity(1.0);
+//     paint_1_fill.color = Color(0xff606060).withValues(alpha: 1.0);
 //     canvas.drawPath(path_1, paint_1_fill);
 //     Path path_2 = Path();
 //     path_2.moveTo(216, 0.2);
@@ -527,7 +527,7 @@ class IndicatorBuilder extends StatelessWidget {
 //         215.91, 0, 215.99999999999997, 0.09, 215.99999999999997, 0.2);
 //     path_2.close();
 //     Paint paint_2_fill = Paint()..style = PaintingStyle.fill;
-//     paint_2_fill.color = Color(0xff606060).withOpacity(1.0);
+//     paint_2_fill.color = Color(0xff606060).withValues(alpha: 1.0);
 //     canvas.drawPath(path_2, paint_2_fill);
 //   }
 //
@@ -541,11 +541,11 @@ class IndicatorBuilder extends StatelessWidget {
 //   @override
 //   void paint(Canvas canvas, Size size) {
 //     Paint paint_0_fill = Paint()..style = PaintingStyle.fill;
-//     paint_0_fill.color = Color(0xff606060).withOpacity(1.0);
+//     paint_0_fill.color = Color(0xff606060).withValues(alpha: 1.0);
 //     canvas.drawRect(
 //         Rect.fromLTWH(0, 0, size.width, size.height * 0.5555556), paint_0_fill);
 //     Paint paint_1_fill = Paint()..style = PaintingStyle.fill;
-//     paint_1_fill.color = Color(0xffffffff).withOpacity(1.0);
+//     paint_1_fill.color = Color(0xffffffff).withValues(alpha: 1.0);
 //     canvas.drawRRect(
 //         RRect.fromRectAndCorners(
 //             Rect.fromLTWH(size.width * 0.3333333, size.height * 0.1111111,
@@ -567,7 +567,7 @@ class IndicatorBuilder extends StatelessWidget {
 //     path_2.cubicTo(144, 0.09, 144.09, 0, 144.2, 0);
 //     path_2.close();
 //     Paint paint_2_fill = Paint()..style = PaintingStyle.fill;
-//     paint_2_fill.color = Color(0xff606060).withOpacity(1.0);
+//     paint_2_fill.color = Color(0xff606060).withValues(alpha: 1.0);
 //     canvas.drawPath(path_2, paint_2_fill);
 //     Path path_3 = Path();
 //     path_3.moveTo(0.2, 0);
@@ -581,7 +581,7 @@ class IndicatorBuilder extends StatelessWidget {
 //     path_3.cubicTo(0, 0.09, 0.09, 0, 0.2, 0);
 //     path_3.close();
 //     Paint paint_3_fill = Paint()..style = PaintingStyle.fill;
-//     paint_3_fill.color = Color(0xff606060).withOpacity(1.0);
+//     paint_3_fill.color = Color(0xff606060).withValues(alpha: 1.0);
 //     canvas.drawPath(path_3, paint_3_fill);
 //   }
 //
@@ -658,7 +658,7 @@ class BottomCurvePainter extends CustomPainter {
     path.cubicTo(0, 0, 0, 0, 0, 0);
     canvas.drawShadow(
       path,
-      Colors.grey.withOpacity(0.1),
+      Colors.grey.withValues(alpha: 0.1),
       6.0, // Shadow radius
       true, // Whether to include the shape itself in the shadow calculation
     );
@@ -741,7 +741,7 @@ class BottomCurvePainter extends CustomPainter {
 //     path_0.close();
 //
 //     Paint paint_0_fill = Paint()..style = PaintingStyle.fill;
-//     paint_0_fill.color = Color(0xffffffff).withOpacity(1.0);
+//     paint_0_fill.color = Color(0xffffffff).withValues(alpha: 1.0);
 //     canvas.drawPath(path_0, paint_0_fill);
 //   }
 //

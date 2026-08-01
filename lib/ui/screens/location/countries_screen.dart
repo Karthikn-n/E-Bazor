@@ -339,7 +339,7 @@ class CountriesScreenState extends State<CountriesScreen> {
       shadowColor:
           context.watch<AppThemeCubit>().state.appTheme == AppTheme.dark
               ? null
-              : context.color.textDefaultColor.withOpacity(0.2),
+              : context.color.textDefaultColor.withValues(alpha: 0.2),
       backgroundColor: context.color.backgroundColor,
     );
   }
@@ -442,7 +442,7 @@ class CountriesScreenState extends State<CountriesScreen> {
               height: 48,
               disabled: selectedCountry == null,
               disabledColor:
-                  context.color.territoryColor.withOpacity(0.5), // Lighter red
+                  context.color.territoryColor.withValues(alpha: 0.5), // Lighter red
               buttonColor: context.color.territoryColor, // Red background
             ),
           ],
@@ -593,7 +593,7 @@ class CountriesScreenState extends State<CountriesScreen> {
                                     ),
                                     color: isSelected
                                         ? context.color.territoryColor
-                                            .withOpacity(0.1)
+                                            .withValues(alpha: 0.1)
                                         : context.color.secondaryColor,
                                   ),
                                   child: Text(

@@ -72,7 +72,7 @@ class CustomRadioField extends CustomField {
                     width: 48.rw(context),
                     height: 48.rh(context),
                     decoration: BoxDecoration(
-                      color: context.color.territoryColor.withOpacity(0.1),
+                      color: context.color.territoryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: SizedBox(
@@ -146,7 +146,7 @@ class CustomRadioField extends CustomField {
                                     width: 1.5),
                                 color: selectedRadioValue == element
                                     ? context.color.territoryColor
-                                        .withOpacity(0.1)
+                                        .withValues(alpha: 0.1)
                                     : context.color.secondaryColor,
                                 borderRadius: BorderRadius.circular(10)),
                             child: Padding(
@@ -156,7 +156,7 @@ class CustomRadioField extends CustomField {
                                     (selectedRadioValue == element
                                         ? context.color.territoryColor
                                         : context.color.textDefaultColor
-                                            .withOpacity(0.5)))),
+                                            .withValues(alpha: 0.5)))),
                           ),
                         ),
                       );

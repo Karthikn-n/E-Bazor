@@ -19,12 +19,12 @@ class Widgets {
         builder: (BuildContext context) {
           return AnnotatedRegion(
             value: SystemUiOverlayStyle(
-              statusBarColor: Colors.black.withOpacity(0),
+              statusBarColor: Colors.black.withValues(alpha: 0),
             ),
             child: SafeArea(
               child: PopScope(
                 canPop: false,
-                onPopInvoked: (didPop) {
+                onPopInvokedWithResult: (didPop, result)  {
                   return;
                 },
                 child: Center(

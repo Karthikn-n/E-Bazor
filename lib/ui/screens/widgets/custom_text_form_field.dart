@@ -41,6 +41,8 @@ class CustomTextFormField extends StatelessWidget {
   final TextCapitalization? capitalization;
   final bool? isRequired;
   final bool? isMobileRequired;
+  final String? phoneCountryCode;
+  final AutovalidateMode? autovalidateMode;
 
   const CustomTextFormField({
     super.key,
@@ -65,7 +67,10 @@ class CustomTextFormField extends StatelessWidget {
     this.hintTextStyle,
     this.minLength,
     this.capitalization,
-    this.isRequired, this.isMobileRequired=true,
+    this.isRequired,
+    this.isMobileRequired = true,
+    this.phoneCountryCode,
+    this.autovalidateMode,
   });
 
   @override
@@ -86,6 +91,7 @@ class CustomTextFormField extends StatelessWidget {
       minLines: minLine ?? 1,
       maxLines: maxLine ?? 1,
       onChanged: onChange,
+      autovalidateMode: autovalidateMode,
       validator: (String? value) {
         if (validator == CustomTextFieldValidator.nullCheck) {
           return Validator.nullCheckValidator(value, context: context);
@@ -144,7 +150,10 @@ class CustomTextFormField extends StatelessWidget {
         }
         if (validator == CustomTextFieldValidator.phoneNumber) {
           return Validator.validatePhoneNumber(
-              value: value, context: context, isRequired: isMobileRequired!);
+              value: value,
+              countryCode: phoneCountryCode,
+              context: context,
+              isRequired: isMobileRequired!);
         }
         if (validator == CustomTextFieldValidator.url) {
           return Validator.urlValidation(value: value, context: context);
@@ -164,7 +173,7 @@ class CustomTextFormField extends StatelessWidget {
           hintText: hintText,
           hintStyle: hintTextStyle ??
               TextStyle(
-                  color: context.color.textColorDark.withOpacity(0.7),
+                  color: context.color.textColorDark.withValues(alpha: 0.7),
                   fontSize: context.font.large),
           filled: true,
           fillColor: fillColor ?? context.color.secondaryColor,

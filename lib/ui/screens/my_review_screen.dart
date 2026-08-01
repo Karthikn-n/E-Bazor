@@ -302,7 +302,7 @@ class MyReviewScreenState extends State<MyReviewScreen>
         SizedBox(width: 10),
         Text(ratingCount.toString())
             .bold(weight: FontWeight.w600)
-            .color(context.color.textDefaultColor.withOpacity(0.7)),
+            .color(context.color.textDefaultColor.withValues(alpha: 0.7)),
       ],
     );
   }
@@ -454,7 +454,7 @@ class MyReviewScreenState extends State<MyReviewScreen>
                             borderRadius: BorderRadius.circular(5),
                             borderSide: BorderSide(
                               color:
-                                  context.color.textLightColor.withOpacity(0.7),
+                                  context.color.textLightColor.withValues(alpha: 0.7),
                             ),
                           ),
                         ),
@@ -607,7 +607,7 @@ class MyReviewScreenState extends State<MyReviewScreen>
                   dateTime(ratings.createdAt!),
                 )
                     .size(context.font.small)
-                    .color(context.color.textDefaultColor.withOpacity(0.3)),
+                    .color(context.color.textDefaultColor.withValues(alpha: 0.3)),
               ],
               if (ratings.reportReason != null) ...[
                 SizedBox(height: 5),
@@ -616,7 +616,7 @@ class MyReviewScreenState extends State<MyReviewScreen>
                   "${"reportReason".translate(context)}: ${ratings.reportReason}",
                 )
                     .size(context.font.small)
-                    .color(context.color.textDefaultColor.withOpacity(0.5)),
+                    .color(context.color.textDefaultColor.withValues(alpha: 0.5)),
               ],
             ],
           ),

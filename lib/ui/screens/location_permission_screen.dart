@@ -201,7 +201,7 @@ class LocationPermissionScreenState extends State<LocationPermissionScreen>
                       .translate(context),
                 )
                     .size(context.font.larger)
-                    .color(context.color.textDefaultColor.withOpacity(0.65))
+                    .color(context.color.textDefaultColor.withValues(alpha: 0.65))
                     .centerAlign(),
               ),
               const SizedBox(height: 58),

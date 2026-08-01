@@ -57,7 +57,7 @@
 //                 "Search ${category.name}".toTranslate(context),
 //                 key: ValueKey(category.name),
 //                 style: TextStyle(
-//                   color: context.color.textDefaultColor.withOpacity(0.6),
+//                   color: context.color.textDefaultColor.withValues(alpha: 0.6),
 //                 ),
 //               ),
 //             ),
@@ -118,7 +118,7 @@ class _DynamicSearchTextState extends State<_DynamicSearchText> {
           child: UiUtils.getSvg(
             category.url ?? AppIcons.search, // 👈 dynamic icon
             key: ValueKey(category.id),
-            color: context.color.textDefaultColor.withOpacity(0.6),
+            color: context.color.textDefaultColor.withValues(alpha: 0.6),
             width: 18,
             height: 18,
           ),
@@ -142,7 +142,7 @@ class _DynamicSearchTextState extends State<_DynamicSearchText> {
             "${"searchIn".translate(context)} ${category.name}",
             key: ValueKey(category.name),
             style: TextStyle(
-              color: context.color.textDefaultColor.withOpacity(0.5),
+              color: context.color.textDefaultColor.withValues(alpha: 0.5),
             ),
           ),
         ),

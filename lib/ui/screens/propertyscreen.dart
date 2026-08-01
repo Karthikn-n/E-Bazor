@@ -1,7 +1,6 @@
 import 'package:Ebozor/data/cubits/category/fetch_sub_categories_cubit.dart';
 import 'package:Ebozor/ui/screens/home/widgets/location_widget.dart';
 import 'package:Ebozor/data/model/category_model.dart';
-import 'package:Ebozor/ui/screens/main_activity.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
@@ -121,7 +120,7 @@ class _PropertyFilterScreenState extends State<PropertyFilterScreen> {
               child: Text(
                 "Reset".translate(context),
                 style: TextStyle(
-                    color: context.color.textDefaultColor.withOpacity(0.5)),
+                    color: context.color.textDefaultColor.withValues(alpha: 0.5)),
               ),
             )
           ],

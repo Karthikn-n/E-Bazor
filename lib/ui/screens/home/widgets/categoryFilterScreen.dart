@@ -138,7 +138,7 @@ class _CategoryFilterScreenState extends State<CategoryFilterScreen>
                                     decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(20),
                                         color: context.color.territoryColor
-                                            .withOpacity(0.1)),
+                                            .withValues(alpha: 0.1)),
                                     child: UiUtils.imageType(
                                       category.url!,
                                       color: context.color.territoryColor,

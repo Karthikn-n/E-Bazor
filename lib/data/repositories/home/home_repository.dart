@@ -5,13 +5,14 @@ import 'package:Ebozor/data/model/item/item_model.dart';
 
 class HomeRepository {
   Future<List<HomeScreenSection>> fetchHome(
-      {String? country, String? state, String? city, int? areaId}) async {
+      {String? country, String? state, String? city, int? areaId, String? slug}) async {
     try {
       Map<String, dynamic> parameters = {
         if (city != null && city != "") 'city': city,
         if (areaId != null && areaId != "") 'area_id': areaId,
         if (country != null && country != "") 'country': country,
         if (state != null && state != "") 'state': state,
+        if (slug != null && slug != "") 'slug': slug,
       };
 
       Map<String, dynamic> response = await Api.get(

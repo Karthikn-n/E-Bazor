@@ -238,7 +238,7 @@ class NearbyLocationScreenState extends State<NearbyLocationScreen>
           center: position,
           radius: radiusInMeters,
           // Set radius in meters
-          fillColor: context.color.territoryColor.withOpacity(0.15),
+          fillColor: context.color.territoryColor.withValues(alpha: 0.15),
           strokeColor: context.color.territoryColor,
           strokeWidth: 2,
         ),
@@ -495,7 +495,7 @@ class NearbyLocationScreenState extends State<NearbyLocationScreen>
                                                   decoration: BoxDecoration(
                                                     color: context
                                                         .color.territoryColor
-                                                        .withOpacity(0.15),
+                                                        .withValues(alpha: 0.15),
                                                     borderRadius:
                                                         BorderRadius.circular(5),
                                                   ),

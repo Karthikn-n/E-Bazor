@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:country_picker/country_picker.dart';
 import 'package:device_region/device_region.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:Ebozor/app/app_theme.dart';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/system/app_theme_cubit.dart';
@@ -21,6 +22,7 @@ import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/data/cubits/auth/authentication_cubit.dart';
 import 'package:Ebozor/utils/login/lib/payloads.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
+import 'package:Ebozor/ui/screens/auth/sign_up/signup_auth_listener.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -57,11 +59,12 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
   bool isLoginButtonDisabled = true;
   final _formKey = GlobalKey<FormState>();
 
-  TextEditingController _otpController = TextEditingController();
+  // _otpController removed: PinFieldAutoFill writes to the `otp` String variable directly
 
   bool isObscure = true;
-  late PhoneLoginPayload phoneLoginPayload =
-      PhoneLoginPayload(widget.mobile!, widget.countryCode!);
+  late PhoneLoginPayload phoneLoginPayload = PhoneLoginPayload(
+      widget.mobile!, widget.countryCode!,
+      intent: AuthenticationIntent.signUp);
   bool isBack = false;
   String signature = "";
 
@@ -74,14 +77,32 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
     context.read<AuthenticationCubit>().init();
     context.read<FetchSystemSettingsCubit>().fetchSettings();
     context.read<AuthenticationCubit>().listen((MLoginState state) {
-
-
       if (state is MFail) {
-        //Widgets.hideLoder(context);
-
-        //if (!isOtpSent && isMobileNumberField) {
+        if (context.read<AuthenticationCubit>().state
+            is AuthenticationInProcess) {
+          return;
+        }
         Widgets.hideLoder(context);
-        //}
+
+        // Show the Firebase error message so the user knows why it failed
+        // (e.g. invalid-phone-number, TOO_LONG, etc.)
+        if (mounted) {
+          final error = state.error;
+          String message;
+          if (error is FirebaseAuthException) {
+            message = error.message ?? error.code;
+          } else {
+            message = error.toString();
+          }
+          HelperUtils.showSnackBarMessage(context, message);
+
+          // If OTP was never actually sent, go back to the phone input view
+          if (isOtpSent) {
+            setState(() {
+              isOtpSent = false;
+            });
+          }
+        }
       }
     });
   }
@@ -141,34 +162,18 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
     super.dispose();
   }
 
-  void _onTapContinue() {
-    phoneLoginPayload = PhoneLoginPayload(widget.mobile!, widget.countryCode!);
-    context
-        .read<AuthenticationCubit>()
-        .setData(payload: phoneLoginPayload, type: AuthenticationType.phone);
-    context.read<AuthenticationCubit>().verify();
-
-    setState(() {});
-  }
-
   Future<void> sendVerificationCode() async {
-    isOtpSent = true;
-
+    // Set the payload and request OTP — only call verify() once
+    phoneLoginPayload = PhoneLoginPayload(widget.mobile!, widget.countryCode!,
+        intent: AuthenticationIntent.signUp);
     context
         .read<AuthenticationCubit>()
         .setData(payload: phoneLoginPayload, type: AuthenticationType.phone);
     context.read<AuthenticationCubit>().verify();
 
-    setState(() {});
-
-    final form = _formKey.currentState;
-
-    if (form == null) return;
-    form.save();
-    //checkbox value should be 1 before Login/SignUp
-    if (form.validate()) {
-      _onTapContinue();
-    }
+    setState(() {
+      isOtpSent = true;
+    });
   }
 
   @override
@@ -185,7 +190,7 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
           onTap: () => FocusScope.of(context).unfocus(),
           child: PopScope(
             canPop: isBack,
-            onPopInvoked: (didPop) {
+            onPopInvokedWithResult: (didPop, result) {
               if (isOtpSent) {
                 setState(() {
                   isOtpSent = false;
@@ -210,12 +215,14 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
                 backgroundColor: context.color.backgroundColor,
                 bottomNavigationBar:
                     !isOtpSent ? termAndPolicyTxt() : SizedBox.shrink(),
-                body: Builder(builder: (context) {
-                  return Form(
-                    key: _formKey,
-                    child: isOtpSent ? verifyOTPWidget() : buildLoginWidget(),
-                  );
-                }),
+                body: SignupAuthListener(
+                  child: Builder(builder: (context) {
+                    return Form(
+                      key: _formKey,
+                      child: isOtpSent ? verifyOTPWidget() : buildLoginWidget(),
+                    );
+                  }),
+                ),
               ),
             ),
           ),
@@ -282,7 +289,7 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    color: context.color.forthColor.withOpacity(0.102),
+                    color: context.color.forthColor.withValues(alpha: 0.102),
                     elevation: 0,
                     height: 28,
                     minWidth: 64,
@@ -399,11 +406,14 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
               border: context.watch<AppThemeCubit>().state.appTheme !=
                       AppTheme.dark
                   ? BorderSide(
-                      color: context.color.textDefaultColor.withOpacity(0.5))
+                      color:
+                          context.color.textDefaultColor.withValues(alpha: 0.5))
                   : null,
               textColor: textDarkColor, onPressed: () {
             context.read<AuthenticationCubit>().setData(
-                payload: GoogleLoginPayload(), type: AuthenticationType.google);
+                payload:
+                    GoogleLoginPayload(intent: AuthenticationIntent.signUp),
+                type: AuthenticationType.google);
             context.read<AuthenticationCubit>().authenticate();
           },
               radius: 8,
@@ -424,11 +434,13 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
               border: context.watch<AppThemeCubit>().state.appTheme !=
                       AppTheme.dark
                   ? BorderSide(
-                      color: context.color.textDefaultColor.withOpacity(0.5))
+                      color:
+                          context.color.textDefaultColor.withValues(alpha: 0.5))
                   : null,
               textColor: textDarkColor, onPressed: () {
             context.read<AuthenticationCubit>().setData(
-                payload: AppleLoginPayload(), type: AuthenticationType.apple);
+                payload: AppleLoginPayload(intent: AuthenticationIntent.signUp),
+                type: AuthenticationType.apple);
             context.read<AuthenticationCubit>().authenticate();
           },
               height: 46,
@@ -449,7 +461,7 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
           Text("bySigningUpLoggingIn".translate(context))
               .centerAlign()
               .size(context.font.small)
-              .color(context.color.textLightColor.withOpacity(0.8)),
+              .color(context.color.textLightColor.withValues(alpha: 0.8)),
           const SizedBox(
             height: 3,
           ),
@@ -478,7 +490,7 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
             ),
             Text("andTxt".translate(context))
                 .size(context.font.small)
-                .color(context.color.textLightColor.withOpacity(0.8)),
+                .color(context.color.textLightColor.withValues(alpha: 0.8)),
             const SizedBox(
               width: 5.0,
             ),
@@ -498,7 +510,6 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
     );
   }
 
-
   Widget otpInput() {
     return Center(
         child: PinFieldAutoFill(
@@ -511,9 +522,9 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
             codeLength: 6,
             onCodeChanged: (String? code) {
               otp = code;
-              print("OTP changed: $otp");  // Log the OTP value to confirm it updates
-            }
-            ,
+              print(
+                  "OTP changed: $otp"); // Log the OTP value to confirm it updates
+            },
             onCodeSubmitted: (String code) {
               otp = code;
             }));
@@ -543,7 +554,7 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
-                color: context.color.forthColor.withOpacity(0.102),
+                color: context.color.forthColor.withValues(alpha: 0.102),
                 elevation: 0,
                 height: 28,
                 minWidth: 64,
@@ -599,7 +610,7 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
                 context.read<AuthenticationCubit>().verify();
               },
               child: Text("resendOTP".translate(context))
-                  .color(context.color.textColorDark.withOpacity(0.7)),
+                  .color(context.color.textColorDark.withValues(alpha: 0.7)),
             ),
           ),
           const SizedBox(
@@ -608,18 +619,14 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
           UiUtils.buildButton(
             context,
             onPressed: () {
-               if (_otpController.text.length != 6) {
-                HelperUtils.showSnackBarMessage(
-                    context, "lblEnterOtp".translate(context));
-              } else {
-
-              if (otp!.trim().length < 6) {
+              // otp is populated by PinFieldAutoFill, not _otpController
+              final enteredOtp = otp?.trim() ?? "";
+              if (enteredOtp.length < 6) {
                 HelperUtils.showSnackBarMessage(
                     context, "pleaseEnterSixDigits".translate(context));
               } else {
-                phoneLoginPayload.setOTP(otp!.trim());
+                phoneLoginPayload.setOTP(enteredOtp);
                 context.read<AuthenticationCubit>().authenticate();
-              }
               }
             },
             buttonTitle: "signIn".translate(context),

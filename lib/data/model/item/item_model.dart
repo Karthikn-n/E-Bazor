@@ -303,6 +303,7 @@ class ItemModel {
     data['city'] = city;
     data['state'] = state;
     data['country'] = country;
+    print(data['category']);
     data['category'] = category!.toJson();
     if (areaId != null && area != null) {
       data['area'] = {

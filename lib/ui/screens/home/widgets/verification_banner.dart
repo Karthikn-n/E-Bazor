@@ -47,7 +47,7 @@ class VerificationBanner extends StatelessWidget {
       //           top: 10,
       //           child: CircleAvatar(
       //             radius: 4,
-      //             backgroundColor: Colors.white.withOpacity(0.3),
+      //             backgroundColor: Colors.white.withValues(alpha: 0.3),
       //           ),
       //         ),
       //          Positioned(
@@ -55,7 +55,7 @@ class VerificationBanner extends StatelessWidget {
       //           top: 50,
       //           child: CircleAvatar(
       //             radius: 3,
-      //             backgroundColor: Colors.white.withOpacity(0.3),
+      //             backgroundColor: Colors.white.withValues(alpha: 0.3),
       //           ),
       //         ),
       //         Positioned(
@@ -63,7 +63,7 @@ class VerificationBanner extends StatelessWidget {
       //           top: 20,
       //           child: CircleAvatar(
       //             radius: 5,
-      //             backgroundColor: Colors.white.withOpacity(0.3),
+      //             backgroundColor: Colors.white.withValues(alpha: 0.3),
       //           ),
       //         ),
       //          Positioned(
@@ -71,7 +71,7 @@ class VerificationBanner extends StatelessWidget {
       //           bottom: 40,
       //           child: CircleAvatar(
       //             radius: 4,
-      //             backgroundColor: Colors.white.withOpacity(0.3),
+      //             backgroundColor: Colors.white.withValues(alpha: 0.3),
       //           ),
       //         ),
       //          Positioned(
@@ -79,7 +79,7 @@ class VerificationBanner extends StatelessWidget {
       //           top: 50,
       //           child: CircleAvatar(
       //             radius: 2,
-      //             backgroundColor: Colors.white.withOpacity(0.3),
+      //             backgroundColor: Colors.white.withValues(alpha: 0.3),
       //           ),
       //         ),
       //          Positioned(
@@ -87,7 +87,7 @@ class VerificationBanner extends StatelessWidget {
       //           bottom: 80,
       //           child: CircleAvatar(
       //             radius: 6,
-      //             backgroundColor: Colors.white.withOpacity(0.3),
+      //             backgroundColor: Colors.white.withValues(alpha: 0.3),
       //           ),
       //         ),
       //
@@ -135,7 +135,7 @@ class VerificationBanner extends StatelessWidget {
       //                             "Get more Visibility | Enhance your Credibility",
       //                             style: TextStyle(
       //                               fontSize: 13,
-      //                               color: Colors.white.withOpacity(0.9),
+      //                               color: Colors.white.withValues(alpha: 0.9),
       //                               height: 1.2
       //                             ),
       //                           ),

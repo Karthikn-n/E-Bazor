@@ -30,12 +30,15 @@ class FilterCubit extends Cubit<FilterState> {
 
   Future<void> fetchFilters(String slug) async {
     try {
+      if (isClosed) return;
       emit(FilterLoading());
 
       final data = await repository.getFilters(slug);
 
+      if (isClosed) return;
       emit(FilterLoaded(data));
     } catch (e) {
+      if (isClosed) return;
       emit(FilterError(e.toString()));
     }
   }

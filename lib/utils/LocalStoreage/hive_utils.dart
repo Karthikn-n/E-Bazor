@@ -2,16 +2,31 @@ import 'package:Ebozor/app/app_theme.dart';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/utils/constant.dart';
 import 'package:flutter/foundation.dart';
-import 'package:hive/hive.dart';
 
 import 'package:Ebozor/data/model/user_model.dart';
 
 import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_keys.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 class HiveUtils {
   ///private constructor
   HiveUtils._();
+
+  /// initialize hive and open boxes
+  static Future<void> initHive()  async {
+    // ✅ Hive Init
+    await Hive.initFlutter();
+
+    // ✅ Open boxes — DO NOT clear languageBox, it breaks navigation logic
+    await Hive.openBox(HiveKeys.languageBox);
+    await Hive.openBox(HiveKeys.userDetailsBox);
+    await Hive.openBox(HiveKeys.authBox);
+    await Hive.openBox(HiveKeys.themeBox);
+    await Hive.openBox(HiveKeys.svgBox);
+    await Hive.openBox(HiveKeys.jwtToken);
+    await Hive.openBox(HiveKeys.historyBox);
+  }
 
   static String? getJWT() {
     return Hive.box(HiveKeys.userDetailsBox).get(HiveKeys.jwtToken);

@@ -88,7 +88,14 @@ class HomeSearchField extends StatelessWidget {
 
         /// 🔔 NOTIFICATION ICON
         GestureDetector(
-          onTap: () {},
+          onTap: () {
+            UiUtils.checkUser(
+              onNotGuest: () {
+                Navigator.pushNamed(context, Routes.notificationPage);
+              },
+              context: context,
+            );
+          },
           child: UiUtils.getSvg(
             AppIcons.notification,
             color: Colors.grey,
@@ -209,7 +216,7 @@ class _DynamicSearchTextState extends State<_DynamicSearchText>
                 child: Text(
                   category.name ?? "",
                   style: TextStyle(
-                    color: context.color.textDefaultColor.withOpacity(0.6),
+                    color: context.color.textDefaultColor.withValues(alpha: 0.6),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),

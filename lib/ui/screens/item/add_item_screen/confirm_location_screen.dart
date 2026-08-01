@@ -263,7 +263,7 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
   Widget build(BuildContext context) {
     return PopScope(
       canPop: true,
-      onPopInvoked: (didPop) async {
+      onPopInvokedWithResult: (didPop, result)  async {
         Future.delayed(Duration(milliseconds: 500), () {
           return;
         });
@@ -448,7 +448,7 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
                       buttonColor: context.color.secondaryColor,
                       border: BorderSide(
                           color:
-                              context.color.textDefaultColor.withOpacity(0.3),
+                              context.color.textDefaultColor.withValues(alpha: 0.3),
                           width: 1.5),
                       radius: 5),
                 ),
@@ -582,7 +582,7 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
                                       height: 25,
                                       decoration: BoxDecoration(
                                         color: context.color.territoryColor
-                                            .withOpacity(0.1),
+                                            .withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(5),
                                         border: Border.all(
                                             width: Constant.borderWidth,
@@ -744,7 +744,7 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
                   textAlign: TextAlign.center,
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: context.color.textDefaultColor.withOpacity(0.5)),
+                      color: context.color.textDefaultColor.withValues(alpha: 0.5)),
                   controller: controller,
                   cursorColor: context.color.territoryColor,
                   validator: (val) {
@@ -764,7 +764,7 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
                       hintStyle: TextStyle(
                           fontWeight: FontWeight.bold,
                           color:
-                              context.color.textDefaultColor.withOpacity(0.5)),
+                              context.color.textDefaultColor.withValues(alpha: 0.5)),
                       focusColor: context.color.territoryColor,
                       enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),

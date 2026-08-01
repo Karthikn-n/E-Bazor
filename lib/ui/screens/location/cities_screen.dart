@@ -225,7 +225,7 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
       shadowColor:
       context.watch<AppThemeCubit>().state.appTheme == AppTheme.dark
           ? null
-          : context.color.textDefaultColor.withOpacity(0.2),
+          : context.color.textDefaultColor.withValues(alpha: 0.2),
       backgroundColor: context.color.backgroundColor,
     );
   }
@@ -428,7 +428,7 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
                                 border: Border.all(
                                     color: isSelected ? context.color.territoryColor :
                                     context.color.borderColor),
-                                color: isSelected ? context.color.territoryColor.withOpacity(0.1) :
+                                color: isSelected ? context.color.territoryColor.withValues(alpha: 0.1) :
                                 context.color.secondaryColor,
                               ),
                               child: Text(city.name!)
@@ -493,7 +493,7 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
         color: context.color.secondaryColor,
         boxShadow: [
           BoxShadow(
-            color: context.color.borderColor.withOpacity(0.5),
+            color: context.color.borderColor.withValues(alpha: 0.5),
             blurRadius: 10,
             offset: const Offset(0, -5),
           )

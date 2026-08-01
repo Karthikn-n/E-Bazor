@@ -215,7 +215,7 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
                                   style: TextStyle(
                                     fontSize: 16,
                                     color: context.color.textDefaultColor
-                                        .withOpacity(0.5),
+                                        .withValues(alpha: 0.5),
                                   ),
                                 ),
                                 TextSpan(
@@ -225,7 +225,7 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
                                   style: TextStyle(
                                     fontSize: 16,
                                     color: context.color.textDefaultColor
-                                        .withOpacity(0.3),
+                                        .withValues(alpha: 0.3),
                                   ),
                                 ),
                               ],
@@ -255,7 +255,7 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
                             .titleMedium!
                             .copyWith(fontWeight: FontWeight.w500),
                         unselectedLabelColor:
-                            context.color.textDefaultColor.withOpacity(0.7),
+                            context.color.textDefaultColor.withValues(alpha: 0.7),
                         unselectedLabelStyle: Theme.of(context)
                             .textTheme
                             .titleMedium!
@@ -268,7 +268,7 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
                       Divider(
                         height: 0,
                         thickness: 2,
-                        color: context.color.textDefaultColor.withOpacity(0.2),
+                        color: context.color.textDefaultColor.withValues(alpha: 0.2),
                       ),
                     ],
                   ),
@@ -622,7 +622,7 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
         SizedBox(width: 10),
         Text(ratingCount.toString())
             .bold(weight: FontWeight.w600)
-            .color(context.color.textDefaultColor.withOpacity(0.7)),
+            .color(context.color.textDefaultColor.withValues(alpha: 0.7)),
       ],
     );
   }
@@ -700,7 +700,7 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
                         Text(
                           dateTime(ratings.createdAt!),
                         ).size(context.font.small).color(
-                            context.color.textDefaultColor.withOpacity(0.3)),
+                            context.color.textDefaultColor.withValues(alpha: 0.3)),
                     ],
                   ),
                   SizedBox(height: 5),
@@ -833,7 +833,7 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
                         Text(
                           dateTime(ratings.createdAt!),
                         ).size(context.font.small).color(
-                            context.color.textDefaultColor.withOpacity(0.3)),
+                            context.color.textDefaultColor.withValues(alpha: 0.3)),
                     ],
                   ),
                   SizedBox(height: 5),
@@ -1041,7 +1041,7 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
                               .titleMedium!
                               .copyWith(fontWeight: FontWeight.w500),
                           unselectedLabelColor:
-                              context.color.textDefaultColor.withOpacity(0.7),
+                              context.color.textDefaultColor.withValues(alpha: 0.7),
                           unselectedLabelStyle: Theme.of(context)
                               .textTheme
                               .titleMedium!
@@ -1055,7 +1055,7 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
                           height: 0,
                           thickness: 2,
                           color:
-                              context.color.textDefaultColor.withOpacity(0.2),
+                              context.color.textDefaultColor.withValues(alpha: 0.2),
                         ),
                       ],
                     ),

@@ -275,7 +275,7 @@ class _ChatScreenState extends State<ChatScreen>
                             borderRadius: BorderRadius.circular(5),
                             borderSide: BorderSide(
                               color:
-                              context.color.textLightColor.withOpacity(0.7),
+                              context.color.textLightColor.withValues(alpha: 0.7),
                             ),
                           ),
                         ),
@@ -361,7 +361,7 @@ class _ChatScreenState extends State<ChatScreen>
 
     return PopScope(
       canPop: true,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result)  {
 
         currentlyChatingWith = "";
         showDeletebutton.value = false;
@@ -520,7 +520,7 @@ class _ChatScreenState extends State<ChatScreen>
                                                 context))
                                             .color(context
                                             .color.textColorDark
-                                            .withOpacity(0.7)),
+                                            .withValues(alpha: 0.7)),
                                         onTap: () async {
                                           var unBlock = await UiUtils
                                               .showBlurredDialoge(
@@ -1215,8 +1215,8 @@ class _ChatScreenState extends State<ChatScreen>
               padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
                   border: Border.all(
-                      color: context.color.territoryColor.withOpacity(0.3)),
-                  color: context.color.territoryColor.withOpacity(0.17),
+                      color: context.color.territoryColor.withValues(alpha: 0.3)),
+                  color: context.color.territoryColor.withValues(alpha: 0.17),
                   borderRadius: BorderRadius.only(
                       topRight: Radius.circular(0),
                       topLeft: Radius.circular(8),
@@ -1226,10 +1226,10 @@ class _ChatScreenState extends State<ChatScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text("yourOffer".translate(context))
-                      .color(context.color.textDefaultColor.withOpacity(0.5)),
+                      .color(context.color.textDefaultColor.withValues(alpha: 0.5)),
 
                   /*  Text("yourOffer".translate(context))
-                  .color(context.color.textDefaultColor.withOpacity(0.5)),*/
+                  .color(context.color.textDefaultColor.withValues(alpha: 0.5)),*/
                   Text(Constant.currencySymbol +
                       widget.itemOfferPrice.toString())
                       .bold()
@@ -1248,8 +1248,8 @@ class _ChatScreenState extends State<ChatScreen>
               padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
                   border: Border.all(
-                      color: context.color.territoryColor.withOpacity(0.3)),
-                  color: context.color.territoryColor.withOpacity(0.17),
+                      color: context.color.territoryColor.withValues(alpha: 0.3)),
+                  color: context.color.territoryColor.withValues(alpha: 0.17),
                   borderRadius: BorderRadius.only(
                       topRight: Radius.circular(8),
                       topLeft: Radius.circular(0),
@@ -1259,7 +1259,7 @@ class _ChatScreenState extends State<ChatScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text("offerLbl".translate(context))
-                      .color(context.color.textDefaultColor.withOpacity(0.5)),
+                      .color(context.color.textDefaultColor.withValues(alpha: 0.5)),
                   Text(Constant.currencySymbol +
                       widget.itemOfferPrice.toString())
                       .bold()

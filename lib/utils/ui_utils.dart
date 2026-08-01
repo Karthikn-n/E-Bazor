@@ -156,7 +156,7 @@ class UiUtils {
       placeholderBuilder: (context) {
         return Container(
             width: width,
-            color: context.color.territoryColor.withOpacity(0.1),
+            color: context.color.territoryColor.withValues(alpha: 0.1),
             height: height,
             alignment: AlignmentDirectional.center,
             child: SizedBox(
@@ -187,7 +187,7 @@ class UiUtils {
       placeholder: (context, url) {
         return Container(
             width: width,
-            color: context.color.territoryColor.withOpacity(0.1),
+            color: context.color.territoryColor.withValues(alpha: 0.1),
             height: height,
             alignment: AlignmentDirectional.center,
             child: SizedBox(
@@ -202,7 +202,7 @@ class UiUtils {
       errorWidget: (context, url, error) {
         return Container(
           width: width,
-          color: context.color.territoryColor.withOpacity(0.1),
+          color: context.color.territoryColor.withValues(alpha: 0.1),
           height: height,
           alignment: AlignmentDirectional.center,
           child: SizedBox(

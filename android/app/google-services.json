@@ -7,34 +7,18 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:655632443224:android:9875b6ad94e9345f60e72d",
+        "mobilesdk_app_id": "1:655632443224:android:72e8266a144fec6d60e72d",
         "android_client_info": {
           "package_name": "com.app.ebozor"
         }
       },
       "oauth_client": [
         {
-          "client_id": "655632443224-hm0jit0ilnqbolt0ktga6e3iubu8qgmv.apps.googleusercontent.com",
+          "client_id": "655632443224-nuvri68k2o32327atev68gi2f29nurft.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.app.ebozor",
-            "certificate_hash": "50daba4ec4f92f6f065b4f9896aed8c1ea77858c"
-          }
-        },
-        {
-          "client_id": "655632443224-nqc2hkebk1dlav3g6gidulj3drdrhpte.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.app.ebozor",
-            "certificate_hash": "36f039542f8303ba7df2d63c04d3f67c515654c4"
-          }
-        },
-        {
-          "client_id": "655632443224-s6qvem8s9p5ah2t2f4q8ge4ivfk4u0ko.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.app.ebozor",
-            "certificate_hash": "571443c66a33881d95e565d72cfcaf6649cd2aa6"
+            "certificate_hash": "356fcac09f6b2183b5a8983b461086d1c29d61f5"
           }
         },
         {

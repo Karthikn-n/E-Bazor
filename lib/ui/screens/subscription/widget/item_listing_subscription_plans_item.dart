@@ -295,7 +295,7 @@ class _ItemListingSubscriptionPlansItemState
                                   : context.color.territoryColor,
                               textColor: widget.model.isActive!
                                   ? context.color.textDefaultColor
-                                      .withOpacity(0.5)
+                                      .withValues(alpha: 0.5)
                                   : context.color.secondaryColor,
                               buttonTitle:
                                   "purchaseThisPackage".translate(context),
@@ -382,7 +382,7 @@ class _ItemListingSubscriptionPlansItemState
                 child: Text(
                   widget.model.description!,
                   textAlign: TextAlign.start,
-                ).color(context.color.textDefaultColor.withOpacity(0.7)),
+                ).color(context.color.textDefaultColor.withValues(alpha: 0.7)),
               ),
             ),
           ]
@@ -424,7 +424,7 @@ class _ItemListingSubscriptionPlansItemState
                 child: Text(
                   widget.model.description!,
                   textAlign: TextAlign.start,
-                ).color(context.color.textDefaultColor.withOpacity(0.7)),
+                ).color(context.color.textDefaultColor.withValues(alpha: 0.7)),
               ),
             ),
         ],
@@ -549,7 +549,7 @@ class _ItemListingSubscriptionPlansItemState
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(3),
                           color:
-                              context.color.textDefaultColor.withOpacity(0.1),
+                              context.color.textDefaultColor.withValues(alpha: 0.1),
                         ),
                         height: 6,
                         width: 60,
@@ -619,7 +619,7 @@ class PaymentMethodTile extends StatelessWidget {
       trailing: isSelected
           ? Icon(Icons.check_circle, color: context.color.territoryColor)
           : Icon(Icons.radio_button_unchecked,
-              color: context.color.textDefaultColor.withOpacity(0.5)),
+              color: context.color.textDefaultColor.withValues(alpha: 0.5)),
       onTap: () => onSelect(gateway.type),
     );
   }

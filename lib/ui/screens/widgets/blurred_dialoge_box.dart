@@ -58,7 +58,7 @@ class BlurredDialogBox extends StatelessWidget implements BlurDialoge {
     return AnnotatedRegion(
       value: SystemUiOverlayStyle(
           systemNavigationBarDividerColor: Colors.transparent,
-          statusBarColor: Colors.black.withOpacity(0)),
+          statusBarColor: Colors.black.withValues(alpha: 0)),
       child: Stack(
         children: [
           //Make dialoge box's background lighter black
@@ -69,12 +69,12 @@ class BlurredDialogBox extends StatelessWidget implements BlurDialoge {
               }
             },
             child: Container(
-              color: Colors.black.withOpacity(0.14),
+              color: Colors.black.withValues(alpha: 0.14),
             ),
           ),
           PopScope(
             canPop: isBack,
-            onPopInvoked: (didPop) {
+            onPopInvokedWithResult: (didPop, result)  {
               if (backAllowedButton == false) {
                 isBack = false;
                 return;
@@ -103,7 +103,7 @@ class BlurredDialogBox extends StatelessWidget implements BlurDialoge {
                       CircleAvatar(
                         radius: 186 / 2,
                         backgroundColor:
-                            context.color.territoryColor.withOpacity(0.1),
+                            context.color.territoryColor.withValues(alpha: 0.1),
                         child: SizedBox(
                             // width: 87 / 2,
                             // height: 87 / 2,
@@ -289,17 +289,17 @@ class BlurredDialogBuilderBox extends StatelessWidget implements BlurDialoge {
     return AnnotatedRegion(
       value: SystemUiOverlayStyle(
           systemNavigationBarDividerColor: Colors.transparent,
-          statusBarColor: Colors.black.withOpacity(0)),
+          statusBarColor: Colors.black.withValues(alpha: 0)),
       child: Stack(
         children: [
           //Make dialoge box's background lighter black
           Container(
-            color: Colors.black.withOpacity(0.14),
+            color: Colors.black.withValues(alpha: 0.14),
           ),
 
           PopScope(
             canPop: isBack,
-            onPopInvoked: (didPop) async {
+            onPopInvokedWithResult: (didPop, result)  async {
               if (backAllowedButton == false) {
                 isBack = false;
                 return;
@@ -318,7 +318,7 @@ class BlurredDialogBuilderBox extends StatelessWidget implements BlurDialoge {
                       CircleAvatar(
                         radius: 98 / 2,
                         backgroundColor:
-                            context.color.territoryColor.withOpacity(0.1),
+                            context.color.territoryColor.withValues(alpha: 0.1),
                         child: SizedBox(
                             width: 87 / 2,
                             height: 87 / 2,
@@ -341,7 +341,7 @@ class BlurredDialogBuilderBox extends StatelessWidget implements BlurDialoge {
                       context,
                       constraints: constraints,
                       buttonColor: cancelButtonColor ??
-                          context.color.territoryColor.withOpacity(.10),
+                          context.color.territoryColor.withValues(alpha: .10),
                       buttonName:
                           cancelButtonName ?? "cancelBtnLbl".translate(context),
                       textColor: cancelTextColor ?? context.color.textColorDark,
@@ -465,7 +465,7 @@ class EmptyDialogBox extends StatelessWidget with BlurDialoge {
             if (barrierDismisable ?? true) Navigator.pop(context);
           },
           child: Container(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
           ),
         ),
         Center(child: child),

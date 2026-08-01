@@ -211,7 +211,7 @@ class AreasScreenState extends State<AreasScreen> {
       shadowColor:
           context.watch<AppThemeCubit>().state.appTheme == AppTheme.dark
               ? null
-              : context.color.textDefaultColor.withOpacity(0.2),
+              : context.color.textDefaultColor.withValues(alpha: 0.2),
       backgroundColor: context.color.backgroundColor,
     );
   }
@@ -340,7 +340,7 @@ class AreasScreenState extends State<AreasScreen> {
                         bool isSelected = selectedArea?.id == area.id;
 
                         return ListTile(
-                          tileColor: isSelected ? context.color.territoryColor.withOpacity(0.1) : null,
+                          tileColor: isSelected ? context.color.territoryColor.withValues(alpha: 0.1) : null,
                           onTap: () {
                             setState(() {
                               selectedArea = area;
@@ -386,7 +386,7 @@ class AreasScreenState extends State<AreasScreen> {
           color: context.color.secondaryColor,
           boxShadow: [
             BoxShadow(
-              color: context.color.borderColor.withOpacity(0.5),
+              color: context.color.borderColor.withValues(alpha: 0.5),
               blurRadius: 10,
               offset: const Offset(0, -5),
             )

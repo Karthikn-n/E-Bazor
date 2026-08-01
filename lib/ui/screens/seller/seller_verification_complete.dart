@@ -97,7 +97,7 @@ class _SellerVerificationCompleteScreenState
   Widget build(BuildContext context) {
     return PopScope(
       canPop: isBack,
-      onPopInvoked: (didPop) async {
+      onPopInvokedWithResult: (didPop, result)  async {
         // Handle back button press
         _handleBackButtonPressed();
       },

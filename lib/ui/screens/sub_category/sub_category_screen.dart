@@ -141,7 +141,7 @@ class _CategoryListState extends State<SubCategoryScreenOne>
           body: Padding(
             padding: const EdgeInsets.only(top: 5.0),
             child: SingleChildScrollView(
-              child: Container(
+              child: Material(
                 color: context.color.secondaryColor,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -234,7 +234,7 @@ class _CategoryListState extends State<SubCategoryScreenOne>
                               clipBehavior: Clip.antiAlias,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: context.color.territoryColor.withOpacity(0.1),
+                                color: context.color.territoryColor.withValues(alpha: 0.1),
                               ),
                               child: ClipRRect(
                                 child: UiUtils.imageType(
@@ -316,7 +316,7 @@ class _CategoryListState extends State<SubCategoryScreenOne>
                         //         decoration: BoxDecoration(
                         //             shape: BoxShape.circle,
                         //             color: context.color.territoryColor
-                        //                 .withOpacity(0.1)),
+                        //                 .withValues(alpha: 0.1)),
                         //         child: ClipRRect(
                         //           child: UiUtils.imageType(
                         //             category.url!,
@@ -444,7 +444,7 @@ class _CategoryListState extends State<SubCategoryScreenOne>
                           decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(20),
                               color: context.color.territoryColor
-                                  .withOpacity(0.1)),
+                                  .withValues(alpha: 0.1)),
                           child: UiUtils.imageType(
                             category.url!,
                             color: context.color.territoryColor,

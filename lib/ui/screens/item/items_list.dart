@@ -256,7 +256,7 @@ class ItemsListState extends State<ItemsList> {
                   AppIcons.gridViewIcon,
                   color: !isList
                       ? context.color.blackColor
-                      : context.color.textDefaultColor.withOpacity(0.2),
+                      : context.color.textDefaultColor.withValues(alpha: 0.2),
                 ),
               ),
             ),
@@ -289,7 +289,7 @@ class ItemsListState extends State<ItemsList> {
                   Icons.menu,
                   color: isList
                       ? context.color.blackColor
-                      : context.color.textDefaultColor.withOpacity(0.2),
+                      : context.color.textDefaultColor.withValues(alpha: 0.2),
                 ),
               ),
             ),
@@ -530,7 +530,7 @@ class ItemsListState extends State<ItemsList> {
                                       decoration: BoxDecoration(
                                         color: isSelected
                                             ? context.color.territoryColor
-                                                .withOpacity(0.1)
+                                                .withValues(alpha: 0.1)
                                             : context.color.backgroundColor,
                                         borderRadius: BorderRadius.circular(10),
                                         border: Border.all(

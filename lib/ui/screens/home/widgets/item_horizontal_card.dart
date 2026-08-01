@@ -198,7 +198,7 @@ class ItemHorizontalCard extends StatelessWidget {
                         Icon(
                           Icons.location_on_outlined,
                           size: 14,
-                          color: context.color.textDefaultColor.withOpacity(0.5),
+                          color: context.color.textDefaultColor.withValues(alpha: 0.5),
                         ),
                         const SizedBox(width: 4),
                         Expanded(
@@ -206,7 +206,7 @@ class ItemHorizontalCard extends StatelessWidget {
                               .setMaxLines(lines: 1)
                               .size(context.font.smaller)
                               .color(context.color.textDefaultColor
-                              .withOpacity(0.5)),
+                              .withValues(alpha: 0.5)),
                         ),
                       ],
                     ),

@@ -321,7 +321,7 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                                color: context.color.borderColor.withOpacity(0.3),
+                                color: context.color.borderColor.withValues(alpha: 0.3),
                                 blurRadius: 10,
                                 offset: const Offset(0, 5)
                             )
@@ -357,7 +357,7 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
               color: context.color.secondaryColor,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, -5),
                 )

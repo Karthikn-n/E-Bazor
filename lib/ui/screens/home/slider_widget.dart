@@ -240,7 +240,7 @@ class _SliderWidgetState extends State<SliderWidget>
                 width: isActive ? 12 : 8,
                 height: isActive ?12:8,
                 decoration: BoxDecoration(
-                  color: isActive ? context.color.territoryColor:context.color.territoryColor.withOpacity(0.5) ,
+                  color: isActive ? context.color.territoryColor:context.color.territoryColor.withValues(alpha: 0.5) ,
                   borderRadius: BorderRadius.circular(10),
                 ),
               );

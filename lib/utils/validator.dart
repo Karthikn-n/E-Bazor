@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:flutter/material.dart';
+import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 
 class Validator {
   static String emailPattern =
@@ -47,22 +48,28 @@ class Validator {
 
   static String? validatePhoneNumber(
       {String? value,
+      String? countryCode,
       required BuildContext context,
       required bool isRequired}) {
-    final pattern = RegExp(r"^[0-9]{6,15}$");
-
-    // If the field is required and the value is empty
-    if (isRequired && (value ??= "").trim().isEmpty) {
+    final number = (value ?? '').trim();
+    if (isRequired && number.isEmpty) {
       return "pleaseEnterValidPhoneNumber".translate(context);
     }
-
-    // If the value is not empty, check the pattern
-    if (value!.isNotEmpty && !pattern.hasMatch(value)) {
+    if (number.isNotEmpty && !isValidPhoneNumber(number, countryCode)) {
       return "pleaseEnterValidPhoneNumber".translate(context);
     }
-
-    // No issues, return null
     return null;
+  }
+
+  static bool isValidPhoneNumber(String value, String? countryCode) {
+    final number = value.trim();
+    final code = (countryCode ?? '').replaceAll(RegExp(r'\D'), '');
+    if (code.isEmpty || !RegExp(r'^\d+$').hasMatch(number)) return false;
+    try {
+      return PhoneNumber.parse('+$code$number').isValid();
+    } catch (_) {
+      return false;
+    }
   }
 
   static String? validateName(String? value,

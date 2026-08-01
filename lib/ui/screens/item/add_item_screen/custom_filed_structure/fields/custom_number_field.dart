@@ -43,7 +43,7 @@ class CustomNumberField extends CustomField {
                     width: 48.rw(context),
                     height: 48.rh(context),
                     decoration: BoxDecoration(
-                      color: context.color.territoryColor.withOpacity(0.1),
+                      color: context.color.territoryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: SizedBox(

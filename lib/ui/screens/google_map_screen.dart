@@ -48,7 +48,7 @@ class _GoogleMapScreenState extends State<GoogleMapScreen> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) async {
+      onPopInvokedWithResult: (didPop, result)  async {
         isGoogleMapVisible = false;
         setState(() {});
         await Future.delayed(const Duration(milliseconds: 500));

@@ -3,6 +3,7 @@
 import 'dart:io';
 
 import 'package:Ebozor/utils/ApiService/api.dart';
+import 'package:Ebozor/utils/logger.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/data/repositories/auth_repository.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -75,7 +76,8 @@ class LoginCubit extends Cubit<LoginState> {
       if (type == AuthenticationType.apple.name) {
         updatedUser = firebaseAuth.currentUser;
         if (updatedUser != null) {
-          print("Updated Display Name: ${updatedUser.displayName}");
+          AppLog.i('Apple login: display name present: ${updatedUser.displayName != null}',
+              name: 'LoginCubit');
         }
         await credential.user!.reload();
       }

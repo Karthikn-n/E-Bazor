@@ -49,15 +49,13 @@ class DefaultFirebaseOptions {
     }
   }
 
-
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAyObg0okwSIGdKQpHyzWHqk8xSBlwLK7w',  // API Key
-    appId: '1:655632443224:android:9875b6ad94e9345f60e72d',  // App ID
-    messagingSenderId: '655632443224',  // Messaging Sender ID (project_number)
-    projectId: 'ebazar-ef30c',  // Project ID
-    storageBucket: 'ebazar-ef30c.firebasestorage.app',  // Storage Bucket
+    apiKey: 'AIzaSyAyObg0okwSIGdKQpHyzWHqk8xSBlwLK7w',
+    appId: '1:655632443224:android:72e8266a144fec6d60e72d',
+    messagingSenderId: '655632443224',
+    projectId: 'ebazar-ef30c',
+    storageBucket: 'ebazar-ef30c.firebasestorage.app',
   );
-
 /*
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDmUQcHSujt5ZZC0_ME7stWuMXx1FZR5is',  // API Key from your Firebase configuration
@@ -66,8 +64,6 @@ class DefaultFirebaseOptions {
     projectId: 'Ebozor-bee45',  // Project ID
     storageBucket: 'Ebozor-bee45.firebasestorage.app',  // Storage Bucket
   );
-
-
 
   // static const FirebaseOptions android = FirebaseOptions(
   //   apiKey: 'AIzaSyApCJcVfUTKAdfiNB2vZ399YgJEFy_d-vk',
@@ -78,17 +74,16 @@ class DefaultFirebaseOptions {
   // );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDmUQcHSujt5ZZC0_ME7stWuMXx1FZR5is',
-    appId: '1:6343732161:ios:5cc58a2dcfbbb66b2b5d40',  // You can also use the value from the Dart config
-    messagingSenderId: '6343732161',  // You may want to keep this consistent with the iOS project
-    projectId: 'Ebozor-bee45',
-    storageBucket: 'Ebozor-bee45.firebasestorage.app',
-    androidClientId: '36985304599-o5u3fcsu1ubfdb01qfbu3vntnvcjd07r.apps.googleusercontent.com',  // Same as in your config
-    iosClientId: '36985304599-gh3h4ropppmlirddla2tssa9ofpcnq86.apps.googleusercontent.com',
-    iosBundleId: 'com.cashgatetech.Ebozor',  // Updated Bundle ID from JSON
+    apiKey: 'AIzaSyA6btHOHSWRKyoERLlpnVsdxmFHnb4YzXQ',
+    appId: '1:655632443224:ios:a26f11f5048c148a60e72d',
+    messagingSenderId: '655632443224',
+    projectId: 'ebazar-ef30c',
+    storageBucket: 'ebazar-ef30c.firebasestorage.app',
+    androidClientId: '655632443224-aua64m8spd0iaelr3ornuhalr5410r2r.apps.googleusercontent.com',
+    iosClientId: '655632443224-962i5tpnps5l782th633actn19rb0p9e.apps.googleusercontent.com',
+    iosBundleId: 'com.app.ebazar',
   );
   */
-
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyAyObg0okwSIGdKQpHyzWHqk8xSBlwLK7w',  // API Key

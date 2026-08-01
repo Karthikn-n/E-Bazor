@@ -560,7 +560,7 @@ class UserProfileScreenState extends State<UserProfileScreen> {
             .bold(weight: FontWeight.w300)
             .color(
           context.color.textColorDark
-              .withOpacity(0.8),
+              .withValues(alpha: 0.8),
         ),*/
       ],
     );
@@ -618,7 +618,7 @@ class UserProfileScreenState extends State<UserProfileScreen> {
           child: Container(
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-              color: context.color.territoryColor.withOpacity(0.2),
+              color: context.color.territoryColor.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
             width: 106.rw(context),

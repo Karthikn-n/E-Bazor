@@ -1,32 +1,16 @@
-// import 'dart:async';
-
 import 'dart:async';
-import 'dart:developer';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/system/fetch_language_cubit.dart';
 import 'package:Ebozor/data/cubits/system/fetch_system_settings_cubit.dart';
 import 'package:Ebozor/data/cubits/system/language_cubit.dart';
-import 'package:Ebozor/settings.dart';
+import 'package:Ebozor/data/model/system_settings_model.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/no_internet.dart';
-import 'package:Ebozor/ui/theme/theme.dart';
+import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/app_icon.dart';
 import 'package:Ebozor/utils/constant.dart';
-import 'package:Ebozor/utils/extensions/extensions.dart';
-import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/responsiveSize.dart';
-import 'package:Ebozor/utils/ui_utils.dart';
-import 'package:Ebozor/data/repositories/system_repository.dart';
-
-// import 'package:flutter/services.dart';
-// import 'package:flutter_svg/flutter_svg.dart';
-
-// import '../app/routes.dart';
-import 'package:Ebozor/data/model/system_settings_model.dart';
-
-// import 'package:Ebozor/main.dart';
-// import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -35,237 +19,162 @@ class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  SplashScreenState createState() => SplashScreenState();
+  State<SplashScreen> createState() => SplashScreenState();
 }
 
-class SplashScreenState extends State<SplashScreen>
-    with TickerProviderStateMixin {
-  //late OldAuthenticationState authenticationState;
-
-  bool isTimerCompleted = false;
-  bool isSettingsLoaded = false; //TODO: temp
-  bool isLanguageLoaded = false;
-  late StreamSubscription<List<ConnectivityResult>> subscription;
-  bool hasInternet = true;
+class SplashScreenState extends State<SplashScreen> {
+  late final StreamSubscription<List<ConnectivityResult>> _subscription;
+  Timer? _minimumSplashTimer;
+  bool _minimumSplashCompleted = false;
+  bool _settingsLoaded = false;
+  bool _languageLoaded = false;
+  bool _startupRunning = false;
+  bool _startupFailed = false;
+  bool _hasInternet = true;
+  bool _hasNavigated = false;
 
   @override
   void initState() {
-    //locationPermission();
     super.initState();
-
-    subscription = Connectivity().onConnectivityChanged.listen((result) {
-      setState(() {
-        hasInternet = (!result.contains(ConnectivityResult.none));
-        //hasInternet = result != ConnectivityResult.none;
-      });
-      if (hasInternet) {
-        getDefaultLanguage();
-
-        checkIsUserAuthenticated();
-        startTimer();
-      }
+    _minimumSplashTimer = Timer(const Duration(milliseconds: 800), () {
+      _minimumSplashCompleted = true;
+      _tryNavigate();
     });
+    _subscription = Connectivity().onConnectivityChanged.listen(
+          _handleConnectivity,
+        );
+    _checkConnectivityAndLoad();
+  }
+
+  Future<void> _checkConnectivityAndLoad() async {
+    final result = await Connectivity().checkConnectivity();
+    await _handleConnectivity(result);
+  }
+
+  Future<void> _handleConnectivity(List<ConnectivityResult> result) async {
+    if (!mounted) return;
+    final online = !result.contains(ConnectivityResult.none);
+    setState(() => _hasInternet = online);
+    if (online) await _loadStartupData();
+  }
+
+  Future<void> _loadStartupData() async {
+    if (_startupRunning || (_settingsLoaded && _languageLoaded)) return;
+    _startupRunning = true;
+    _startupFailed = false;
+
+    try {
+      final settingsCubit = context.read<FetchSystemSettingsCubit>();
+      await settingsCubit
+          .fetchSettings(forceRefresh: true)
+          .timeout(const Duration(seconds: 15));
+      if (settingsCubit.state is! FetchSystemSettingsSuccess) {
+        throw StateError('System settings could not be loaded');
+      }
+
+      Constant.isDemoModeOn = settingsCubit.getSetting(SystemSetting.demoMode);
+      _settingsLoaded = true;
+
+      final cachedLanguage = HiveUtils.getLanguage();
+      final defaultLanguage =
+          settingsCubit.getRawSettings()['default_language']?.toString();
+      final needsLanguage = cachedLanguage == null ||
+          cachedLanguage['data'] == null ||
+          (HiveUtils.isUserFirstTime() &&
+              defaultLanguage != cachedLanguage['code']);
+
+      if (!needsLanguage) {
+        _languageLoaded = true;
+      } else if (defaultLanguage != null && defaultLanguage.isNotEmpty) {
+        final languageCubit = context.read<FetchLanguageCubit>();
+        await languageCubit
+            .getLanguage(defaultLanguage)
+            .timeout(const Duration(seconds: 15));
+        final state = languageCubit.state;
+        if (state is FetchLanguageSuccess) {
+          final language = state.toMap();
+          language['data'] = language.remove('file_name');
+          await HiveUtils.storeLanguage(language);
+          if (mounted) {
+            context.read<LanguageCubit>().emit(LanguageLoader(language));
+          }
+          _languageLoaded = true;
+        } else if (cachedLanguage?['data'] != null) {
+          _languageLoaded = true;
+        } else {
+          throw StateError('Language could not be loaded');
+        }
+      }
+    } catch (_) {
+      _startupFailed = true;
+    } finally {
+      _startupRunning = false;
+      if (mounted) setState(() {});
+      _tryNavigate();
+    }
+  }
+
+  void _tryNavigate() {
+    if (!mounted ||
+        _hasNavigated ||
+        !_minimumSplashCompleted ||
+        !_settingsLoaded ||
+        !_languageLoaded) {
+      return;
+    }
+    _hasNavigated = true;
+
+    if (context
+            .read<FetchSystemSettingsCubit>()
+            .getSetting(SystemSetting.maintenanceMode) ==
+        '1') {
+      Navigator.of(context).pushReplacementNamed(Routes.maintenanceMode);
+    } else if (HiveUtils.isUserFirstTime()) {
+      Navigator.of(context).pushReplacementNamed(Routes.onboarding);
+    } else if (HiveUtils.isUserAuthenticated()) {
+      final user = HiveUtils.getUserDetails();
+      if (user.name?.isEmpty ?? true || user.email?.isEmpty ?? true) {
+        Navigator.pushReplacementNamed(
+          context,
+          Routes.completeProfile,
+          arguments: {'from': 'login'},
+        );
+      } else {
+        Navigator.of(context)
+            .pushReplacementNamed(Routes.main, arguments: {'from': 'main'});
+      }
+    } else if (HiveUtils.isUserSkip()) {
+      Navigator.of(context)
+          .pushReplacementNamed(Routes.main, arguments: {'from': 'main'});
+    } else {
+      Navigator.of(context).pushReplacementNamed(Routes.login);
+    }
   }
 
   @override
   void dispose() {
-    subscription.cancel();
+    _minimumSplashTimer?.cancel();
+    _subscription.cancel();
     super.dispose();
-  }
-
-/*  Future<void> locationPermission() async {
-    if ((await Permission.location.status) == PermissionStatus.denied) {
-      await Permission.location.request();
-    }
-  }*/
-
-  Future getDefaultLanguage() async {
-    try {
-      Map result = await SystemRepository().fetchSystemSettings();
-
-      var code = (result['data']['default_language']);
-
-      if (HiveUtils.getLanguage() == null ||
-          HiveUtils.getLanguage()?['data'] == null) {
-        context.read<FetchLanguageCubit>().getLanguage(code);
-      } else if (HiveUtils.isUserFirstTime() == true &&
-          code != HiveUtils.getLanguage()?['code']) {
-        context.read<FetchLanguageCubit>().getLanguage(code);
-      } else {
-        isLanguageLoaded = true;
-        setState(() {});
-      }
-    } catch (e) {
-      log("Error while load default language $e");
-    }
-  }
-
-  void checkIsUserAuthenticated() async {
-    context.read<FetchSystemSettingsCubit>().fetchSettings(forceRefresh: true);
-  }
-
-  Future<void> startTimer() async {
-    Timer(const Duration(seconds: 1), () {
-      isTimerCompleted = true;
-      if (mounted) setState(() {});
-    });
-  }
-
-  void navigateCheck() {
-    if (isTimerCompleted && isSettingsLoaded && isLanguageLoaded) {
-      navigateToScreen();
-    }
-  }
-
-  void navigateToScreen() async {
-    if (context
-            .read<FetchSystemSettingsCubit>()
-            .getSetting(SystemSetting.maintenanceMode) ==
-        "1") {
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) {
-          Navigator.of(context).pushReplacementNamed(Routes.maintenanceMode);
-        }
-      });
-    } else if (HiveUtils.isUserFirstTime() == true) {
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) {
-          Navigator.of(context).pushReplacementNamed(Routes.onboarding);
-        }
-      });
-    } else if (HiveUtils.isUserAuthenticated()) {
-      if ((HiveUtils.getUserDetails().name == null ||
-              HiveUtils.getUserDetails().name == "") ||
-          (HiveUtils.getUserDetails().email == null ||
-              HiveUtils.getUserDetails().email == "")) {
-        Future.delayed(
-          const Duration(seconds: 1),
-          () {
-            Navigator.pushReplacementNamed(
-              context,
-              Routes.completeProfile,
-              arguments: {
-                "from": "login",
-              },
-            );
-          },
-        );
-      } else {
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) {
-            Navigator.of(context)
-                .pushReplacementNamed(Routes.main, arguments: {'from': "main"});
-          }
-        });
-      }
-    } else {
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) {
-          if (HiveUtils.isUserSkip() == true) {
-            Navigator.of(context)
-                .pushReplacementNamed(Routes.main, arguments: {'from': "main"});
-          } else {
-            Navigator.of(context).pushReplacementNamed(Routes.login);
-          }
-        }
-      });
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    /* SystemChrome.setEnabledSystemUIMode(
-      SystemUiMode.manual,
-      overlays: SystemUiOverlay.values,
-    );*/
-
-    navigateCheck();
-
-    return hasInternet
-        ? BlocListener<FetchLanguageCubit, FetchLanguageState>(
-            listener: (context, state) {
-              if (state is FetchLanguageSuccess) {
-                Map<String, dynamic> map = state.toMap();
-
-                var data = map['file_name'];
-                map['data'] = data;
-                map.remove("file_name");
-
-                HiveUtils.storeLanguage(map);
-                context.read<LanguageCubit>().emit(LanguageLoader(map));
-                isLanguageLoaded = true;
-                if (mounted) {
-                  setState(() {});
-                }
-              }
-            },
-            child: BlocListener<FetchSystemSettingsCubit,
-                FetchSystemSettingsState>(
-              listener: (context, state) {
-                if (state is FetchSystemSettingsSuccess) {
-                  Constant.isDemoModeOn = context
-                      .read<FetchSystemSettingsCubit>()
-                      .getSetting(SystemSetting.demoMode);
-
-                  isSettingsLoaded = true;
-                  setState(() {});
-                }
-                if (state is FetchSystemSettingsFailure) {}
-              },
-              child: AnnotatedRegion(
-                value: SystemUiOverlayStyle(
-                  statusBarColor: Colors.white,
-                ),
-                child: Scaffold(
-                  backgroundColor: Colors.white,
-                  // bottomNavigationBar: Padding(
-                  //   padding: const EdgeInsets.symmetric(vertical: 10.0),
-                  //   child: UiUtils.getSvg(AppIcons.companyLogo),
-                  // ),
-                  body: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Align(
-                        alignment: AlignmentDirectional.center,
-                        child: Padding(
-                          padding: EdgeInsets.only(top: 10.0.rh(context)),
-                          child: SizedBox(
-                            width: 150.rw(context),
-                            height: 150.rh(context),
-                            child: Image.asset(AppIcons.splashLogo),
-                          ),
-                        ),
-                      ),
-                      /*
-                      Padding(
-                        padding: EdgeInsets.only(top: 10.0.rh(context)),
-                        child: Column(
-                          children: [
-                            Text(AppSettings.applicationName)
-                                .size(context.font.xxLarge)
-                                .color(context.color.secondaryColor)
-                                .centerAlign()
-                                .bold(weight: FontWeight.w600),
-                            Text("\"${"buyAndSellAnything".translate(context)}\"")
-                                .size(context.font.smaller)
-                                .color(context.color.secondaryColor)
-                                .centerAlign(),
-                          ],
-                        ),
-                      ),
-
-                       */
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          )
-        : NoInternet(
-            onRetry: () {
-              setState(() {});
-            },
-          );
+    if (!_hasInternet || _startupFailed) {
+      return NoInternet(onRetry: _checkConnectivityAndLoad);
+    }
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(statusBarColor: Colors.white),
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: SizedBox(
+            width: 150.rw(context),
+            height: 150.rh(context),
+            child: Image.asset(AppIcons.splashLogo),
+          ),
+        ),
+      ),
+    );
   }
 }

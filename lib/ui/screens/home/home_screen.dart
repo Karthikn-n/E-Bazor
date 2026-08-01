@@ -209,11 +209,12 @@ class HomeScreenState extends State<HomeScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
      // seach widget at home scree
-                      const    HomeSearchField(),
+                          const HomeSearchField(),
                           const SliderWidget(),
                           const CategoryWidgetHome(),
-                          if(HiveUtils.isUserAuthenticated() && HiveUtils.getUserDetails().isVerified != 1)
-                          const VerificationBanner(),
+                          if(HiveUtils.isUserAuthenticated() && HiveUtils.getUserDetails().isVerified != 1)...[
+                            const VerificationBanner(),
+                          ],
                           ...List.generate(state.sections.length, (index) {
                             HomeScreenSection section = state.sections[index];
                             if (state.sections.isNotEmpty) {

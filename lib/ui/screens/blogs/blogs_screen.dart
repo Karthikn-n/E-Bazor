@@ -182,7 +182,7 @@ class _BlogsScreenState extends State<BlogsScreen> {
                 child: Text(stripHtmlTags(blog.description ?? "").trim())
                     .setMaxLines(lines: 3)
                     .size(context.font.small)
-                    .color(context.color.textColorDark.withOpacity(0.5)),
+                    .color(context.color.textColorDark.withValues(alpha: 0.5)),
               ),
               Padding(
                 padding: const EdgeInsetsDirectional.fromSTEB(12.0, 4, 12, 6),
@@ -190,7 +190,7 @@ class _BlogsScreenState extends State<BlogsScreen> {
                         ? ""
                         : blog.createdAt.toString().formatDate())
                     .size(context.font.smaller)
-                    .color(context.color.textColorDark.withOpacity(0.5)),
+                    .color(context.color.textColorDark.withValues(alpha: 0.5)),
               ),
               const SizedBox(
                 height: 5,

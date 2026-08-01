@@ -1,10 +1,10 @@
 
-
-import 'dart:convert';
+import 'dart:developer';
 
 import 'package:Ebozor/data/model/category_model.dart';
 import 'package:Ebozor/data/model/data_output.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
+import 'package:Ebozor/utils/constant.dart';
 import 'package:dio/dio.dart';
 
 // class CategoryRepository {
@@ -101,7 +101,7 @@ class CategoryRepository {
 class FilterRepository {
   final Dio _dio = Dio(
     BaseOptions(
-      baseUrl: "http://143.110.251.34/api/",
+      baseUrl: Constant.baseUrl,
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
     ),
@@ -109,10 +109,13 @@ class FilterRepository {
 
   Future<FilterCategory> getFilters(String slug) async {
     try {
+      log("🌐 [FILTER API REQ] → GET ${Constant.baseUrl}get-category-filters | params: {slug: $slug}");
       final response = await _dio.get(
         "get-category-filters",
         queryParameters: {"slug": slug},
       );
+
+      log("📦 [FILTER API RES] → Status: ${response.statusCode} | Data: ${response.data}");
 
       if (response.statusCode == 200) {
         final raw = response.data['data'];
@@ -126,6 +129,7 @@ class FilterRepository {
         throw Exception("Failed to load filters");
       }
     } on DioException catch (e) {
+      log("❌ [FILTER API ERR] → ${e.message} | Response: ${e.response?.data}");
       throw Exception(e.message ?? "Dio error");
     }
   }

@@ -198,9 +198,11 @@ class FilterScreenState extends State<FilterScreen> {
         minController.text.trim().isNotEmpty ||
         maxController.text.trim().isNotEmpty ||
         selectedCategory != defaultCategory) {
+            print("true");
       return true;
     }
 
+            print("fase");
     return false;
   }
 
@@ -255,7 +257,7 @@ class FilterScreenState extends State<FilterScreen> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: true,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result)  {
         checkFilterValSet();
         return;
       },
@@ -264,6 +266,7 @@ class FilterScreenState extends State<FilterScreen> {
         appBar: UiUtils.buildAppBar(
           context,
           onBackPress: () {
+            print("Clicked");
             checkFilterValSet();
             Navigator.pop(context);
           },
@@ -426,7 +429,7 @@ class FilterScreenState extends State<FilterScreen> {
               min: 0,
               max: 1000000, 
               activeColor: Color(0xFFE52D2D),
-              inactiveColor: Color(0xFFE52D2D).withOpacity(0.2),
+              inactiveColor: Color(0xFFE52D2D).withValues(alpha: 0.2),
               onChanged: (RangeValues values) {
                 setState(() {
                   _priceRangeValues = values;
@@ -669,7 +672,7 @@ class FilterScreenState extends State<FilterScreen> {
                               )
                             : Text("allCities".translate(context)).color(context
                                 .color.textDefaultColor
-                                .withOpacity(0.5)),
+                                .withValues(alpha: 0.5)),
                   ),
                 ),
               ],
@@ -723,7 +726,7 @@ class FilterScreenState extends State<FilterScreen> {
                         ? Text("${categoryList.map((e) => e.name).join(' - ')}",
                             maxLines: 1, overflow: TextOverflow.ellipsis)
                         : Text("allInClassified".translate(context)).color(
-                            context.color.textDefaultColor.withOpacity(0.5)),
+                            context.color.textDefaultColor.withValues(alpha: 0.5)),
                   ),
                 ),
                 Padding(
@@ -831,7 +834,7 @@ class FilterScreenState extends State<FilterScreen> {
                     borderSide: BorderSide(
                         color: context.color.borderColor.darken(30))),
                 labelStyle: TextStyle(
-                    color: context.color.textDefaultColor.withOpacity(0.5)),
+                    color: context.color.textDefaultColor.withValues(alpha: 0.5)),
                 hintText: "00",
                 label: Text(
                   minMax,
@@ -889,7 +892,7 @@ class FilterScreenState extends State<FilterScreen> {
                 Padding(
                   padding: const EdgeInsetsDirectional.only(start: 15.0),
                   child: Text(Constant.postedSince[index].status)
-                      .color(context.color.textDefaultColor.withOpacity(0.5)),
+                      .color(context.color.textDefaultColor.withValues(alpha: 0.5)),
                 ),
                 Spacer(),
                 Padding(

@@ -183,19 +183,19 @@ class _MyItemTabState extends CloudState<MyItemTab> {
   Color _getStatusColor(String? status) {
     switch (status) {
       case "review":
-        return pendingButtonColor.withOpacity(0.1);
+        return pendingButtonColor.withValues(alpha: 0.1);
       case "active" || "approved":
-        return activateButtonColor.withOpacity(0.1);
+        return activateButtonColor.withValues(alpha: 0.1);
       case "inactive":
-        return deactivateButtonColor.withOpacity(0.1);
+        return deactivateButtonColor.withValues(alpha: 0.1);
       case "sold out":
-        return soldOutButtonColor.withOpacity(0.1);
+        return soldOutButtonColor.withValues(alpha: 0.1);
       case "rejected":
-        return deactivateButtonColor.withOpacity(0.1);
+        return deactivateButtonColor.withValues(alpha: 0.1);
       case "expired":
-        return deactivateButtonColor.withOpacity(0.1);
+        return deactivateButtonColor.withValues(alpha: 0.1);
       default:
-        return context.color.territoryColor.withOpacity(0.1);
+        return context.color.territoryColor.withValues(alpha: 0.1);
     }
   }
 
@@ -374,7 +374,7 @@ class _MyItemTabState extends CloudState<MyItemTab> {
                                                       .size(context.font.small)
                                                       .color(context
                                                           .color.textColorDark
-                                                          .withOpacity(0.5)),
+                                                          .withValues(alpha: 0.5)),
                                                 ],
                                               ),
                                             ),
@@ -401,7 +401,7 @@ class _MyItemTabState extends CloudState<MyItemTab> {
                                                       .size(context.font.small)
                                                       .color(context
                                                           .color.textColorDark
-                                                          .withOpacity(0.5)),
+                                                          .withValues(alpha: 0.5)),
                                                 ],
                                               ),
                                             ),
@@ -693,7 +693,7 @@ class _MyItemTabState extends CloudState<MyItemTab> {
                                                                 .color(context
                                                                     .color
                                                                     .textColorDark
-                                                                    .withOpacity(
+                                                                    .withValues(alpha: 
                                                                         0.8))
                                                           ],
                                                         ),
@@ -718,7 +718,7 @@ class _MyItemTabState extends CloudState<MyItemTab> {
                                                                 .color(context
                                                                     .color
                                                                     .textColorDark
-                                                                    .withOpacity(
+                                                                    .withValues(alpha: 
                                                                         0.8)),
                                                           ],
                                                         ),

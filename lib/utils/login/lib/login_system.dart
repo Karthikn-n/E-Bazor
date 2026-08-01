@@ -97,12 +97,12 @@ class MMultiAuthentication {
     _selectedLoginSystem = key;
   }
 
-  ///This will listen changes in state
+  ///This will listen changes in state (replaces previous listener to avoid accumulation)
   void listen(Function(MLoginState state) fn) {
-    systems.forEach((String key, LoginSystem value) async {
-
+    systems.forEach((String key, LoginSystem value) {
+      // Clear previous listeners first so they don't accumulate across screens
+      systems[key]?.listeners.clear();
       systems[key]?.listeners.add(fn);
-
     });
   }
 

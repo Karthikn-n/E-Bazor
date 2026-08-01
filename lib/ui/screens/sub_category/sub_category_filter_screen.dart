@@ -413,7 +413,10 @@ class _FiltersPageState extends State<FiltersPage> {
         child: Row(
           children: [
             GestureDetector(
-              onTap: () {},
+              onTap: () {
+                print("Filter screen close clicked");
+                Navigator.pop(context);
+              },
               child: const Icon(Icons.close, color: _redColor, size: 24),
             ),
             const Expanded(

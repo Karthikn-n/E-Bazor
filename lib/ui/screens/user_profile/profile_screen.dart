@@ -116,7 +116,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-              color: context.color.textDefaultColor.withOpacity(0.1))),
+              color: context.color.textDefaultColor.withValues(alpha: 0.1))),
       child: InkWell(
           onTap: onTap,
           child: SvgPicture.asset(
@@ -600,7 +600,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         shape: RoundedRectangleBorder(
                           side: BorderSide(
                             color:
-                                context.color.textDefaultColor.withOpacity(0.3),
+                                context.color.textDefaultColor.withValues(alpha: 0.3),
                             width: 1.5,
                           ),
                           borderRadius: BorderRadius.circular(10),
@@ -974,7 +974,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               height: 40,
               decoration: BoxDecoration(
                 color: context.color.territoryColor
-                    .withOpacity(0.10000000149011612),
+                    .withValues(alpha: 0.10000000149011612),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: FittedBox(
@@ -1012,7 +1012,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   border:
                       Border.all(color: context.color.borderColor, width: 1.5),
                   color: context.color.secondaryColor
-                      .withOpacity(0.10000000149011612),
+                      .withValues(alpha: 0.10000000149011612),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: FittedBox(
@@ -1065,7 +1065,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: context.color.territoryColor.withOpacity(0.1),
+                    color: context.color.territoryColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: FittedBox(
@@ -1327,7 +1327,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     return Container(
       width: 49,
       height: 49,
-      color: context.color.territoryColor.withOpacity(0.1),
+      color: context.color.territoryColor.withValues(alpha: 0.1),
       child: FittedBox(
         fit: BoxFit.none,
         child: UiUtils.getSvg(AppIcons.defaultPersonLogo,
