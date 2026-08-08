@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "655632443224-dov0mt85mcfdjfquo22kfe6js1qr1k72.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.app.ebozor",
+            "certificate_hash": "aed3dc6e97b5f94639e9635d2b10b04d8b82ad79"
+          }
+        },
+        {
           "client_id": "655632443224-nuvri68k2o32327atev68gi2f29nurft.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

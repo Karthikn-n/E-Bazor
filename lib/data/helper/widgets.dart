@@ -1,4 +1,3 @@
-
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
@@ -6,12 +5,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class Widgets {
-  static bool isLoadingShowing=false;
+  static bool isLoadingShowing = false;
+  static Route<dynamic>? _loaderOwnerRoute;
+
+  static bool isCurrentOrLoaderOwner(BuildContext context) {
+    final route = ModalRoute.of(context);
+    return route?.isCurrent == true ||
+        (isLoadingShowing && identical(route, _loaderOwnerRoute));
+  }
+
   static void showLoader(BuildContext context) async {
-    if(isLoadingShowing){
+    if (isLoadingShowing) {
       return;
     }
-    isLoadingShowing=true;
+    isLoadingShowing = true;
+    _loaderOwnerRoute = ModalRoute.of(context);
     showDialog(
         context: context,
         barrierDismissible: false,
@@ -24,13 +32,12 @@ class Widgets {
             child: SafeArea(
               child: PopScope(
                 canPop: false,
-                onPopInvokedWithResult: (didPop, result)  {
+                onPopInvokedWithResult: (didPop, result) {
                   return;
                 },
                 child: Center(
                   child: UiUtils.progress(
                     normalProgressColor: context.color.territoryColor,
-
                   ),
                 ),
                 /*onWillPop: () {
@@ -45,11 +52,11 @@ class Widgets {
   }
 
   static void hideLoder(BuildContext context) {
-
-    if(isLoadingShowing){
-      isLoadingShowing=false;
+    if (isLoadingShowing &&
+        identical(ModalRoute.of(context), _loaderOwnerRoute)) {
+      isLoadingShowing = false;
+      _loaderOwnerRoute = null;
       Navigator.of(context).pop();
-
     }
   }
 

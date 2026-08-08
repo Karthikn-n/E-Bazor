@@ -254,12 +254,14 @@ class HelperUtils {
     return mobileNumber;
   }
 
-  static showSnackBarMessage(BuildContext? context, String message,
+  static Future<void> showSnackBarMessage(BuildContext? context, String message,
       {int messageDuration = 3,
       MessageType? type,
       bool? isFloating,
       VoidCallback? onClose}) async {
-    var snackBar = ScaffoldMessenger.of(context!).showSnackBar(
+    final messenger = ScaffoldMessenger.of(context!);
+    messenger.clearSnackBars();
+    var snackBar = messenger.showSnackBar(
       SnackBar(
         content: Text(message),
         behavior: (isFloating ?? false) ? SnackBarBehavior.floating : null,

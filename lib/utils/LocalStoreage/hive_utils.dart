@@ -10,11 +10,13 @@ import 'package:Ebozor/utils/LocalStoreage/hive_keys.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 class HiveUtils {
+  static const _pendingEmailVerificationKey = 'pendingEmailVerification';
+
   ///private constructor
   HiveUtils._();
 
   /// initialize hive and open boxes
-  static Future<void> initHive()  async {
+  static Future<void> initHive() async {
     // ✅ Hive Init
     await Hive.initFlutter();
 
@@ -178,6 +180,15 @@ class HiveUtils {
     Hive.box(HiveKeys.authBox).put(HiveKeys.isAuthenticated, value);
   }
 
+  static void setEmailVerificationPending(bool value) {
+    Hive.box(HiveKeys.authBox).put(_pendingEmailVerificationKey, value);
+  }
+
+  static bool isEmailVerificationPending() {
+    return Hive.box(HiveKeys.authBox).get(_pendingEmailVerificationKey) ??
+        false;
+  }
+
 /*  static setUserIsNotAuthenticated() async {
     await Hive.box(HiveKeys.authBox).put(HiveKeys.isAuthenticated, false);
   }*/
@@ -316,6 +327,7 @@ class HiveUtils {
       {required VoidCallback onLogout, bool? isRedirect}) async {
     await Hive.box(HiveKeys.userDetailsBox).clear();
     HiveUtils.setUserIsAuthenticated(false);
+    HiveUtils.setEmailVerificationPending(false);
 
     //GuestChecker.set(isGuest: true);
     onLogout.call();
@@ -334,6 +346,7 @@ class HiveUtils {
     await Hive.box(HiveKeys.userDetailsBox).clear();
     await Hive.box(HiveKeys.historyBox).clear();
     HiveUtils.setUserIsAuthenticated(false);
+    HiveUtils.setEmailVerificationPending(false);
     //GuestChecker.set(isGuest: true);
   }
 }

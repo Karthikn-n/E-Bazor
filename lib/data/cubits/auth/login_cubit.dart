@@ -20,12 +20,14 @@ class LoginInProgress extends LoginState {}
 
 class LoginSuccess extends LoginState {
   final bool isProfileCompleted;
-  final UserCredential credential;
+  final User user;
+  final UserCredential? credential;
   final Map<String, dynamic> apiResponse;
 
   LoginSuccess({
     required this.isProfileCompleted,
-    required this.credential,
+    required this.user,
+    this.credential,
     required this.apiResponse,
   });
 }
@@ -51,11 +53,44 @@ class LoginCubit extends Cubit<LoginState> {
     return token;
   }
 
-  void login({
+  Future<void> login({
     String? phoneNumber,
     required String firebaseUserId,
     required String type,
     required UserCredential credential,
+    String? countryCode,
+  }) {
+    return _login(
+      phoneNumber: phoneNumber,
+      firebaseUserId: firebaseUserId,
+      type: type,
+      user: credential.user!,
+      credential: credential,
+      countryCode: countryCode,
+    );
+  }
+
+  Future<void> loginWithUser({
+    String? phoneNumber,
+    required User user,
+    required String type,
+    String? countryCode,
+  }) {
+    return _login(
+      phoneNumber: phoneNumber,
+      firebaseUserId: user.uid,
+      type: type,
+      user: user,
+      countryCode: countryCode,
+    );
+  }
+
+  Future<void> _login({
+    String? phoneNumber,
+    required String firebaseUserId,
+    required String type,
+    required User user,
+    UserCredential? credential,
     String? countryCode,
   }) async {
     try {
@@ -63,9 +98,9 @@ class LoginCubit extends Cubit<LoginState> {
 
       /*String? token = await getDeviceToken();*/
       String? token = await () async {
-        try{
+        try {
           return await FirebaseMessaging.instance.getToken();
-        } catch(_){
+        } catch (_) {
           return '';
         }
       }();
@@ -76,24 +111,28 @@ class LoginCubit extends Cubit<LoginState> {
       if (type == AuthenticationType.apple.name) {
         updatedUser = firebaseAuth.currentUser;
         if (updatedUser != null) {
-          AppLog.i('Apple login: display name present: ${updatedUser.displayName != null}',
+          AppLog.i(
+              'Apple login: display name present: ${updatedUser.displayName != null}',
               name: 'LoginCubit');
         }
-        await credential.user!.reload();
+        await user.reload();
       }
 
+      final provider =
+          user.providerData.isEmpty ? null : user.providerData.first;
+
       Map<String, dynamic> result = await _authRepository.numberLoginWithApi(
-        phone: phoneNumber ?? credential.user!.providerData[0].phoneNumber,
+        phone: phoneNumber ?? user.phoneNumber ?? provider?.phoneNumber,
         type: type,
         uid: firebaseUserId,
         fcmId: token,
-        email: credential.user!.providerData[0].email,
+        email: user.email ?? provider?.email,
         name: type == AuthenticationType.apple.name
             ? updatedUser?.displayName ??
-                credential.user!.displayName ??
-                credential.user!.providerData[0].displayName
-            : credential.user!.providerData[0].displayName,
-        profile: credential.user!.providerData[0].photoURL,
+                user.displayName ??
+                provider?.displayName
+            : user.displayName ?? provider?.displayName,
+        profile: user.photoURL ?? provider?.photoURL,
         countryCode: countryCode,
       );
 
@@ -110,6 +149,7 @@ class LoginCubit extends Cubit<LoginState> {
         emit(LoginSuccess(
           apiResponse: Map<String, dynamic>.from(result['data']),
           isProfileCompleted: false,
+          user: user,
           credential: credential,
         ));
       } else {
@@ -119,6 +159,7 @@ class LoginCubit extends Cubit<LoginState> {
         emit(LoginSuccess(
           apiResponse: Map<String, dynamic>.from(result['data']),
           isProfileCompleted: true,
+          user: user,
           credential: credential,
         ));
       }

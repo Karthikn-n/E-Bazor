@@ -31,7 +31,8 @@ class AppSettings {
   static const String shareAppText = "Share this App";
 
   ///static const String hostUrl = "https://admin.Ebozor.co"; //don't add / at end but https:// is required
-  static const String hostUrl ="http://13.233.244.104";
+  static const String hostUrl = "http://13.233.244.104";
+
   ///API Setting
 
   static const int apiDataLoadLimit = 20;
@@ -56,10 +57,6 @@ it will call API in background without showing the process and when data availab
 
   //static const String shareNavigationWebUrl = "eclassify.wrteam.me";
   static const String shareNavigationWebUrl = "api.Ebozor.co";
-
-  /// You will find this prefix from firebase console in dynamic link section
-  static const String deepLinkPrefix =
-      "https://eclassify.page.link"; //demo.page.link
 
   //set anything you want
   static const String deepLinkName = "Ebozor.co"; //deeplink demo.com

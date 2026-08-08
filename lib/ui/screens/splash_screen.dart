@@ -2,9 +2,12 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:Ebozor/app/routes.dart';
+import 'package:Ebozor/data/cubits/auth/authentication_cubit.dart';
+import 'package:Ebozor/data/cubits/auth/login_cubit.dart';
 import 'package:Ebozor/data/cubits/system/fetch_language_cubit.dart';
 import 'package:Ebozor/data/cubits/system/fetch_system_settings_cubit.dart';
 import 'package:Ebozor/data/cubits/system/language_cubit.dart';
+import 'package:Ebozor/data/cubits/system/user_details.dart';
 import 'package:Ebozor/data/model/system_settings_model.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/no_internet.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
@@ -14,6 +17,7 @@ import 'package:Ebozor/utils/responsiveSize.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -32,6 +36,7 @@ class SplashScreenState extends State<SplashScreen> {
   bool _startupFailed = false;
   bool _hasInternet = true;
   bool _hasNavigated = false;
+  bool _verificationRecoveryRunning = false;
 
   @override
   void initState() {
@@ -96,7 +101,7 @@ class SplashScreenState extends State<SplashScreen> {
           language['data'] = language.remove('file_name');
           await HiveUtils.storeLanguage(language);
           if (mounted) {
-            context.read<LanguageCubit>().emit(LanguageLoader(language));
+            context.read<LanguageCubit>().changeLanguage(language);
           }
           _languageLoaded = true;
         } else if (cachedLanguage?['data'] != null) {
@@ -114,7 +119,7 @@ class SplashScreenState extends State<SplashScreen> {
     }
   }
 
-  void _tryNavigate() {
+  Future<void> _tryNavigate() async {
     if (!mounted ||
         _hasNavigated ||
         !_minimumSplashCompleted ||
@@ -122,18 +127,39 @@ class SplashScreenState extends State<SplashScreen> {
         !_languageLoaded) {
       return;
     }
-    _hasNavigated = true;
-
     if (context
             .read<FetchSystemSettingsCubit>()
             .getSetting(SystemSetting.maintenanceMode) ==
         '1') {
+      _hasNavigated = true;
       Navigator.of(context).pushReplacementNamed(Routes.maintenanceMode);
+    } else if (!HiveUtils.isUserAuthenticated() &&
+        HiveUtils.isEmailVerificationPending()) {
+      if (_verificationRecoveryRunning) return;
+      _verificationRecoveryRunning = true;
+      final user = FirebaseAuth.instance.currentUser;
+      await user?.reload();
+      if (!mounted) return;
+
+      if (user?.emailVerified == true) {
+        _hasNavigated = true;
+        context.read<LoginCubit>().loginWithUser(
+              user: FirebaseAuth.instance.currentUser!,
+              type: AuthenticationType.email.name,
+            );
+        return;
+      }
+
+      _verificationRecoveryRunning = false;
+      _hasNavigated = true;
+      Navigator.of(context).pushReplacementNamed(Routes.login);
     } else if (HiveUtils.isUserFirstTime()) {
+      _hasNavigated = true;
       Navigator.of(context).pushReplacementNamed(Routes.onboarding);
     } else if (HiveUtils.isUserAuthenticated()) {
+      _hasNavigated = true;
       final user = HiveUtils.getUserDetails();
-      if (user.name?.isEmpty ?? true || user.email?.isEmpty ?? true) {
+      if ((user.name?.isEmpty ?? true) || (user.email?.isEmpty ?? true)) {
         Navigator.pushReplacementNamed(
           context,
           Routes.completeProfile,
@@ -144,9 +170,11 @@ class SplashScreenState extends State<SplashScreen> {
             .pushReplacementNamed(Routes.main, arguments: {'from': 'main'});
       }
     } else if (HiveUtils.isUserSkip()) {
+      _hasNavigated = true;
       Navigator.of(context)
           .pushReplacementNamed(Routes.main, arguments: {'from': 'main'});
     } else {
+      _hasNavigated = true;
       Navigator.of(context).pushReplacementNamed(Routes.login);
     }
   }
@@ -163,15 +191,33 @@ class SplashScreenState extends State<SplashScreen> {
     if (!_hasInternet || _startupFailed) {
       return NoInternet(onRetry: _checkConnectivityAndLoad);
     }
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(statusBarColor: Colors.white),
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(
-          child: SizedBox(
-            width: 150.rw(context),
-            height: 150.rh(context),
-            child: Image.asset(AppIcons.splashLogo),
+    return BlocListener<LoginCubit, LoginState>(
+      listener: (context, state) {
+        if (!_verificationRecoveryRunning) return;
+        if (state is LoginSuccess) {
+          HiveUtils.setEmailVerificationPending(false);
+          HiveUtils.setUserIsAuthenticated(true);
+          context.read<UserDetailsCubit>().fill(HiveUtils.getUserDetails());
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            Routes.main,
+            (route) => false,
+            arguments: {'from': 'signup'},
+          );
+        } else if (state is LoginFailure) {
+          HiveUtils.setEmailVerificationPending(false);
+          Navigator.of(context).pushReplacementNamed(Routes.login);
+        }
+      },
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(statusBarColor: Colors.white),
+        child: Scaffold(
+          backgroundColor: Colors.white,
+          body: Center(
+            child: SizedBox(
+              width: 150.rw(context),
+              height: 150.rh(context),
+              child: Image.asset(AppIcons.splashLogo),
+            ),
           ),
         ),
       ),

@@ -154,15 +154,19 @@ class _DynamicSearchTextState extends State<_DynamicSearchText>
   void _startLoop() async {
     while (mounted) {
       await Future.delayed(const Duration(milliseconds: 300));
+      if (!mounted) return;
 
       // 🔥 ENTER animation
       await _controller.forward();
+      if (!mounted) return;
 
       // 🔥 STAY visible
       await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
 
       // 🔥 EXIT animation (go up + fade)
       await _controller.reverse();
+      if (!mounted) return;
 
       // 🔁 CHANGE TEXT
       if (widget.categories.isNotEmpty) {

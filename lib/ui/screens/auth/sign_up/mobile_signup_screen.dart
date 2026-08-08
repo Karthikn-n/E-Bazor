@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:country_picker/country_picker.dart';
 import 'package:device_region/device_region.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:Ebozor/app/app_theme.dart';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/system/app_theme_cubit.dart';
@@ -67,6 +66,21 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
       intent: AuthenticationIntent.signUp);
   bool isBack = false;
   String signature = "";
+  bool _isOtpFlowActive = false;
+  Key _otpFieldKey = UniqueKey();
+
+  void _resetOtp({bool rebuild = true}) {
+    otp = null;
+    _otpFieldKey = UniqueKey();
+    if (rebuild && mounted) setState(() {});
+  }
+
+  void _cancelOtpFlow() {
+    context.read<AuthenticationCubit>().cancelPhoneVerification();
+    _isOtpFlowActive = false;
+    otp = null;
+    _otpFieldKey = UniqueKey();
+  }
 
   @override
   void initState() {
@@ -78,6 +92,7 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
     context.read<FetchSystemSettingsCubit>().fetchSettings();
     context.read<AuthenticationCubit>().listen((MLoginState state) {
       if (state is MFail) {
+        if (!_isOtpFlowActive) return;
         if (context.read<AuthenticationCubit>().state
             is AuthenticationInProcess) {
           return;
@@ -87,14 +102,11 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
         // Show the Firebase error message so the user knows why it failed
         // (e.g. invalid-phone-number, TOO_LONG, etc.)
         if (mounted) {
-          final error = state.error;
-          String message;
-          if (error is FirebaseAuthException) {
-            message = error.message ?? error.code;
-          } else {
-            message = error.toString();
+          final message = authenticationErrorMessage(state.error);
+          if (message.isNotEmpty) {
+            HelperUtils.showSnackBarMessage(context, message,
+                type: MessageType.error);
           }
-          HelperUtils.showSnackBarMessage(context, message);
 
           // If OTP was never actually sent, go back to the phone input view
           if (isOtpSent) {
@@ -104,13 +116,33 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
           }
         }
       }
+      if (state is MSuccess) _isOtpFlowActive = false;
     });
+  }
+
+  Widget emailSignUp() {
+    return UiUtils.buildButton(
+      context,
+      onPressed: () => Navigator.pushNamed(context, Routes.signupMainScreen),
+      showElevation: false,
+      buttonColor: secondaryColor_,
+      border: context.watch<AppThemeCubit>().state.appTheme != AppTheme.dark
+          ? BorderSide(
+              color: context.color.textDefaultColor.withValues(alpha: 0.5),
+            )
+          : null,
+      textColor: textDarkColor,
+      radius: 8,
+      height: 46,
+      buttonTitle:
+          '${"signupWithLbl".translate(context)} ${"emailLbl".translate(context)}',
+    );
   }
 
   Future<void> getSignature() async {
     signature = await SmsAutoFill().getAppSignature;
     await SmsAutoFill().listenForCode;
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   /// it will return user's sim cards country code
@@ -166,6 +198,8 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
     // Set the payload and request OTP — only call verify() once
     phoneLoginPayload = PhoneLoginPayload(widget.mobile!, widget.countryCode!,
         intent: AuthenticationIntent.signUp);
+    _resetOtp(rebuild: false);
+    _isOtpFlowActive = true;
     context
         .read<AuthenticationCubit>()
         .setData(payload: phoneLoginPayload, type: AuthenticationType.phone);
@@ -191,7 +225,9 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
           child: PopScope(
             canPop: isBack,
             onPopInvokedWithResult: (didPop, result) {
+              if (didPop) return;
               if (isOtpSent) {
+                _cancelOtpFlow();
                 setState(() {
                   isOtpSent = false;
                 });
@@ -228,35 +264,6 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget emailSignUp() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        const SizedBox(
-          height: 36,
-        ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text("signupWithLbl".translate(context))
-                .color(context.color.textColorDark.brighten(50)),
-            const SizedBox(
-              width: 5,
-            ),
-            GestureDetector(
-              onTap: () {
-                Navigator.pushNamed(context, Routes.signupMainScreen);
-              },
-              child: Text("emailLbl".translate(context))
-                  .underline()
-                  .color(context.color.territoryColor),
-            )
-          ],
-        ),
-      ],
     );
   }
 
@@ -391,9 +398,7 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const SizedBox(
-          height: 24,
-        ),
+        const SizedBox(height: 12),
         if (Constant.googleAuthentication == "1")
           UiUtils.buildButton(context,
               prefixWidget: Padding(
@@ -513,6 +518,7 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
   Widget otpInput() {
     return Center(
         child: PinFieldAutoFill(
+            key: _otpFieldKey,
             decoration: UnderlineDecoration(
               textStyle:
                   TextStyle(fontSize: 20, color: context.color.textColorDark),
@@ -583,7 +589,10 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
                       .underline()
                       .color(context.color.territoryColor)
                       .size(context.font.large),
-                  onTap: () => Navigator.pushNamed(context, Routes.login)),
+                  onTap: () {
+                    _cancelOtpFlow();
+                    Navigator.pop(context);
+                  }),
             ],
           ),
           const SizedBox(
@@ -603,11 +612,14 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
             alignment: AlignmentDirectional.centerEnd,
             child: MaterialButton(
               onPressed: () {
+                _resetOtp(rebuild: false);
+                _isOtpFlowActive = true;
                 context.read<AuthenticationCubit>().setData(
                       payload: phoneLoginPayload,
                       type: AuthenticationType.phone,
                     );
                 context.read<AuthenticationCubit>().verify();
+                setState(() {});
               },
               child: Text("resendOTP".translate(context))
                   .color(context.color.textColorDark.withValues(alpha: 0.7)),
@@ -619,6 +631,9 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
           UiUtils.buildButton(
             context,
             onPressed: () {
+              if (!_isOtpFlowActive) return;
+              if (context.read<AuthenticationCubit>().state
+                  is AuthenticationInProcess) return;
               // otp is populated by PinFieldAutoFill, not _otpController
               final enteredOtp = otp?.trim() ?? "";
               if (enteredOtp.length < 6) {
@@ -631,6 +646,9 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
             },
             buttonTitle: "signIn".translate(context),
             radius: 8,
+            disabled: !_isOtpFlowActive ||
+                context.watch<AuthenticationCubit>().state
+                    is AuthenticationInProcess,
           ),
         ],
       ),

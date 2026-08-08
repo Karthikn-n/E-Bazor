@@ -1,80 +1,165 @@
 import 'dart:async';
+import 'dart:io';
 
-import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/auth/authentication_cubit.dart';
+import 'package:Ebozor/data/cubits/auth/login_cubit.dart';
+import 'package:Ebozor/ui/screens/auth/sign_up/signup_auth_listener.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
+import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/app_icon.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:url_launcher/url_launcher_string.dart';
-
+import 'package:url_launcher/url_launcher.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
   final String username;
   final String email;
   final String password;
 
-  EmailVerificationScreen(
-      {super.key,
-      required this.email,
-      required this.password,
-      required this.username});
+  const EmailVerificationScreen({
+    super.key,
+    required this.email,
+    required this.password,
+    required this.username,
+  });
 
   @override
   State<EmailVerificationScreen> createState() =>
       _EmailVerificationScreenState();
 }
 
-class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
-  Timer? timer;
-  bool isVerified = false;
+class _EmailVerificationScreenState extends State<EmailVerificationScreen>
+    with WidgetsBindingObserver {
+  static const _emailChannel = MethodChannel('com.app.ebozor/email');
+  Timer? _pollTimer;
+  Timer? _resendTimer;
+  bool _isSending = true;
+  bool _isChecking = false;
+  bool _isVerified = false;
+  int _resendSeconds = 0;
+  String _statusMessage = 'Sending verification email...';
 
   @override
   void initState() {
-    initFunction();
     super.initState();
-  }
-
-  void initFunction() {
-    timer = Timer.periodic(const Duration(seconds: 3), (timer) async {
-      bool? emailVerified = FirebaseAuth.instance.currentUser?.emailVerified;
-      await FirebaseAuth.instance.currentUser?.reload();
-      if (emailVerified == true) {
-        Future.delayed(
-          Duration.zero,
-          () async {
-            if (isVerified == false) {
-              isVerified = true;
-              setState(() {});
-
-              await Future.delayed(const Duration(seconds: 2));
-              // HelperUtils.killPreviousPages(
-              //     context, Routes.main, {"from": "login"});
-              /* Navigator.pushReplacementNamed(
-                context,
-                Routes.main,
-                arguments: {"from": "login"},
-              );*/
-
-              Navigator.pushReplacementNamed(context, Routes.login
-              );
-              return;
-            }
-            // timer.cancel();
-          },
-        );
-      }
+    HiveUtils.setEmailVerificationPending(true);
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _sendVerificationEmail();
+      _pollTimer = Timer.periodic(
+        const Duration(seconds: 4),
+        (_) => _checkVerification(),
+      );
     });
   }
 
   @override
-  void dispose() {
-    timer?.cancel();
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkVerification();
+    }
+  }
 
+  Future<void> _sendVerificationEmail() async {
+    if (_isSending && _statusMessage != 'Sending verification email...') {
+      return;
+    }
+    if (mounted) {
+      setState(() {
+        _isSending = true;
+        _statusMessage = 'Sending verification email...';
+      });
+    }
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw const AuthenticationFlowException('authentication-failed');
+      }
+      await user.sendEmailVerification();
+      if (!mounted) return;
+      setState(() {
+        _statusMessage =
+            'Verification email sent to ${widget.email}. Check spam or junk too.';
+      });
+      _startResendCooldown();
+    } catch (error) {
+      if (!mounted) return;
+      final message = authenticationErrorMessage(error);
+      setState(() {
+        _statusMessage = message.isEmpty
+            ? 'Could not send the verification email. Please try again.'
+            : message;
+      });
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  void _startResendCooldown() {
+    _resendTimer?.cancel();
+    setState(() => _resendSeconds = 60);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted || _resendSeconds <= 1) {
+        timer.cancel();
+        if (mounted) setState(() => _resendSeconds = 0);
+      } else {
+        setState(() => _resendSeconds--);
+      }
+    });
+  }
+
+  Future<void> _checkVerification() async {
+    if (_isChecking || _isVerified) return;
+    if (mounted) setState(() => _isChecking = true);
+    try {
+      await FirebaseAuth.instance.currentUser?.reload();
+      if (FirebaseAuth.instance.currentUser?.emailVerified != true ||
+          !mounted) {
+        return;
+      }
+
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: widget.email.trim(),
+        password: widget.password,
+      );
+      await credential.user?.updateDisplayName(widget.username.trim());
+      await credential.user?.reload();
+      if (!mounted) return;
+
+      _pollTimer?.cancel();
+      setState(() {
+        _isVerified = true;
+        _statusMessage = 'Email verified. Setting up your profile...';
+      });
+      context.read<LoginCubit>().login(
+            firebaseUserId: FirebaseAuth.instance.currentUser!.uid,
+            type: AuthenticationType.email.name,
+            credential: credential,
+          );
+    } catch (error) {
+      if (mounted) {
+        final message = authenticationErrorMessage(error);
+        setState(() {
+          _statusMessage = message.isEmpty
+              ? 'Could not check verification. Please try again.'
+              : message;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isChecking = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _pollTimer?.cancel();
+    _resendTimer?.cancel();
     super.dispose();
   }
 
@@ -82,113 +167,81 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Scaffold(
-        body: BlocConsumer<AuthenticationCubit, AuthenticationState>(
-          listener: (context, state) async {
-            if (state is AuthenticationSuccess) {
-              // if (state.type == AuthenticationType.email) {
-              //   HiveUtils.setUserIsAuthenticated(true);
-              //
-              //   context.read<AuthCubit>().updateFCM(context);
-              //   //GuestChecker.set(isGuest: false);
-              //   FirebaseAuth.instance.currentUser?.sendEmailVerification();
-              //
-              //   Navigator.pushReplacementNamed(context, Routes.login);
-              //   /* context.read<LoginCubit>().login(
-              //       // phoneNumber: phoneNumber,
-              //       credential: state.credential,
-              //       firebaseUserId: state.credential.user!.uid,
-              //       type: state.type.name);*/
-              // }
-            }
-
-            if (state is AuthenticationFail) {
-              // Navigator.pop<Map>(context, {
-              //   "type":"Error",
-              //   "error":state.error
-              // });
-            }
-          },
-          builder: (context, state) {
-            if (state is AuthenticationInProcess) {
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
-            }
-            if (state is AuthenticationSuccess) {
-              return Padding(
-                padding: const EdgeInsets.all(18.0),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Flexible(child: SvgPicture.asset(AppIcons.verificationMail)),
-                      Text("youHaveGotEmail".translate(context))
-                          .size(context.font.extraLarge)
-                          .bold(weight: FontWeight.w600),
-                      const SizedBox(
-                        height: 14,
-                      ),
-                      Text("clickLinkInYourEmail".translate(context)),
-                      const SizedBox(
-                        height: 58,
-                      ),
-                      MaterialButton(
-                        onPressed: () {
-                          if (!isVerified) {
-                            openEmailAppToList();
-                            /*HelperUtils.launchPathURL(
-                                isTelephone: false,
-                                isSMS: false,
-                                isMail: true,
-                                value: '',
-                                context: context);*/
-                          }
-                        },
-                        elevation: 0,
-                        minWidth: double.infinity,
-                        height: 46,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        color: isVerified
-                            ? context.color.territoryColor
-                            : context.color.textLightColor,
-                        child: Text(isVerified
-                                ? "verified".translate(context)
-                                : "checkMail".translate(context))
-                            .color(context.color.buttonColor)
-                            .size(context.font.large),
-                      ),
-                    ],
+        appBar: AppBar(
+          backgroundColor: context.color.backgroundColor,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
+        ),
+        backgroundColor: context.color.backgroundColor,
+        body: SignupAuthListener(
+          emailSignupUsername: widget.username,
+          navigateToHomeOnSuccess: true,
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Flexible(child: SvgPicture.asset(AppIcons.verificationMail)),
+                Text('Verify your email')
+                    .size(context.font.extraLarge)
+                    .bold(weight: FontWeight.w600),
+                const SizedBox(height: 12),
+                Text(_statusMessage).centerAlign(),
+                const SizedBox(height: 28),
+                MaterialButton(
+                  onPressed: _isVerified ? null : _openEmailApp,
+                  minWidth: double.infinity,
+                  height: 46,
+                  color: context.color.territoryColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child:
+                      Text('Open email app').color(context.color.buttonColor),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _isSending || _resendSeconds > 0
+                      ? null
+                      : _sendVerificationEmail,
+                  child: Text(
+                    _resendSeconds > 0
+                        ? 'Resend available in ${_resendSeconds}s'
+                        : 'Resend verification email',
                   ),
                 ),
-              );
-            }
-            if (state is AuthenticationFail) {
-              return Center(
-                child: Text(state.error.toString()),
-              );
-            }
-
-            return Container();
-          },
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  void openEmailAppToList() async {
-    const String customUriScheme = 'email://inbox'; // Example URI
-    if (await canLaunchUrlString(customUriScheme)) {
-      await launchUrlString(customUriScheme);
-    } else {
-      // Handle case where custom URI scheme cannot be launched
+  Future<void> _openEmailApp() async {
+    try {
+      if (Platform.isAndroid) {
+        await _emailChannel.invokeMethod<bool>('openInbox');
+        return;
+      }
 
-      // Fallback to opening the email app normally
-      await launchUrlString(
-          'mailto:'); // Opens the email app without specifying the inbox
+      for (final inboxUri in <Uri>[
+        Uri.parse('googlegmail://'),
+        Uri.parse('message://'),
+      ]) {
+        if (await launchUrl(inboxUri, mode: LaunchMode.externalApplication)) {
+          return;
+        }
+      }
+    } catch (_) {
+      if (!mounted) return;
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No email app is available.')),
+      );
     }
   }
 }

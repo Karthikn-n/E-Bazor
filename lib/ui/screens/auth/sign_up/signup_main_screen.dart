@@ -41,8 +41,6 @@ class LoginScreenState extends State<SignUpMainScreen> {
   final TextEditingController emailMobileTextController =
       TextEditingController();
   String? phone, countryCode, countryName, flagEmoji;
-  // Inline validation error shown below the input field
-  String? _inputError;
 
   Timer? timer;
   late Size size;
@@ -178,14 +176,6 @@ class LoginScreenState extends State<SignUpMainScreen> {
       });
     } else {
       final email = emailMobileTextController.text.toString().trim();
-      final emailRegex =
-          RegExp(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$');
-      if (email.isEmpty || !emailRegex.hasMatch(email)) {
-        setState(() {
-          _inputError = "pleaseEnterValidEmailAddress".translate(context);
-        });
-        return;
-      }
       Navigator.pushNamed(context, Routes.signup,
           arguments: {"emailId": email});
     }
@@ -283,12 +273,7 @@ class LoginScreenState extends State<SignUpMainScreen> {
                   Constant.mobileAuthentication == "1" ? isNumber : false;
 
               numberOrEmail = value;
-              // Clear the inline error as user types
-              if (_inputError != null) {
-                setState(() => _inputError = null);
-              } else {
-                setState(() {});
-              }
+              setState(() {});
             },
             keyboard: (Constant.mobileAuthentication == "1" &&
                     Constant.emailAuthentication == "1")

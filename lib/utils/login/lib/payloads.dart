@@ -14,6 +14,7 @@ class EmailLoginPayload extends LoginPayload {
   final String email;
   final String password;
   final EmailLoginType type;
+  bool recoveredUnverifiedAccount = false;
 
   EmailLoginPayload(
       {required this.email, required this.password, required this.type});

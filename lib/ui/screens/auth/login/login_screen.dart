@@ -26,7 +26,6 @@ import 'package:Ebozor/utils/login/lib/login_status.dart';
 import 'package:Ebozor/utils/login/lib/payloads.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/utils/logger.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -73,6 +72,21 @@ class LoginScreenState extends State<LoginScreen> {
       intent: AuthenticationIntent.signIn);
   bool isBack = false;
   String signature = "";
+  bool _isOtpFlowActive = false;
+  Key _otpFieldKey = UniqueKey();
+
+  void _resetOtp({bool rebuild = true}) {
+    otp = null;
+    _otpFieldKey = UniqueKey();
+    if (rebuild && mounted) setState(() {});
+  }
+
+  void _cancelOtpFlow() {
+    context.read<AuthenticationCubit>().cancelPhoneVerification();
+    _isOtpFlowActive = false;
+    otp = null;
+    _otpFieldKey = UniqueKey();
+  }
 
   @override
   void initState() {
@@ -88,11 +102,13 @@ class LoginScreenState extends State<LoginScreen> {
     context.read<AuthenticationCubit>().init();
     context.read<FetchSystemSettingsCubit>().fetchSettings();
     context.read<AuthenticationCubit>().listen((MLoginState state) {
+      if (!mounted || !Widgets.isCurrentOrLoaderOwner(context)) return;
       if (state is MOtpSendInProgress) {
         if (mounted) Widgets.showLoader(context);
       }
 
       if (state is MVerificationPending) {
+        if (!_isOtpFlowActive) return;
         if (mounted) {
           Widgets.hideLoder(context);
 
@@ -108,6 +124,7 @@ class LoginScreenState extends State<LoginScreen> {
       }
 
       if (state is MFail) {
+        if (!_isOtpFlowActive) return;
         if (context.read<AuthenticationCubit>().state
             is AuthenticationInProcess) {
           return;
@@ -123,23 +140,20 @@ class LoginScreenState extends State<LoginScreen> {
               "${"weSentCodeOnNumber".translate(context)}\t${emailMobileTextController.text}",
               type: MessageType.error);
         } else {
-          if (state.error is FirebaseAuthException) {
-            try {
-              HelperUtils.showSnackBarMessage(context,
-                  (state.error as FirebaseAuthException).message!.toString());
-            } catch (e) {}
-          } else {
-            HelperUtils.showSnackBarMessage(context, state.error.toString());
+          final message = authenticationErrorMessage(state.error);
+          if (message.isNotEmpty) {
+            HelperUtils.showSnackBarMessage(context, message,
+                type: MessageType.error);
           }
-          /*HelperUtils.showSnackBarMessage(context, state.error.toString(),
-              type: MessageType.error);*/
         }
       }
       if (state is MSuccess) {
+        _isOtpFlowActive = false;
         // Widgets.hideLoder(context);
       }
     });
     getSimCountry().then((value) {
+      if (!mounted) return;
       countryCode = value.phoneCode;
 
       flagEmoji = value.flagEmoji;
@@ -187,7 +201,7 @@ class LoginScreenState extends State<LoginScreen> {
   Future<void> getSignature() async {
     signature = await SmsAutoFill().getAppSignature;
     SmsAutoFill().listenForCode;
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   @override
@@ -208,6 +222,8 @@ class LoginScreenState extends State<LoginScreen> {
         name: 'LoginScreen');
     if (isMobileNumberField) {
       // isOtpSent = true;
+      _resetOtp(rebuild: false);
+      _isOtpFlowActive = true;
       phoneLoginPayload = PhoneLoginPayload(
           emailMobileTextController.text, countryCode!,
           intent: AuthenticationIntent.signIn);
@@ -227,6 +243,8 @@ class LoginScreenState extends State<LoginScreen> {
   Future<void> sendVerificationCode() async {
     AppLog.i('sendVerificationCode initiated', name: 'LoginScreen');
     if (widget.isDeleteAccount ?? false) {
+      _resetOtp(rebuild: false);
+      _isOtpFlowActive = true;
       isOtpSent = true;
 
       context
@@ -280,10 +298,12 @@ class LoginScreenState extends State<LoginScreen> {
           child: PopScope(
             canPop: isBack,
             onPopInvokedWithResult: (didPop, result) {
+              if (didPop) return;
               if (widget.isDeleteAccount ?? false) {
                 Navigator.pop(context);
               } else {
                 if (isOtpSent) {
+                  _cancelOtpFlow();
                   setState(() {
                     isOtpSent = false;
                     isMobileNumberField = true;
@@ -315,6 +335,7 @@ class LoginScreenState extends State<LoginScreen> {
                     : SizedBox.shrink(),
                 body: BlocListener<LoginCubit, LoginState>(
                   listener: (context, state) {
+                    if (!Widgets.isCurrentOrLoaderOwner(context)) return;
                     AppLog.i('LoginCubit state: $state', name: 'LoginScreen');
                     if (state is LoginSuccess) {
                       AppLog.i(
@@ -338,9 +359,9 @@ class LoginScreenState extends State<LoginScreen> {
                               (route) => false);
                         }
                       } else {
-                        Navigator.pushReplacementNamed(
-                          context,
+                        Navigator.of(context).pushNamedAndRemoveUntil(
                           Routes.completeProfile,
+                          (route) => false,
                           arguments: {
                             "from": "login",
                             "popToCurrent": false,
@@ -348,7 +369,7 @@ class LoginScreenState extends State<LoginScreen> {
                                 ? AuthenticationType.phone
                                 : AuthenticationType.email,
                             "extraData": {
-                              "email": state.credential.user?.email ??
+                              "email": state.user.email ??
                                   state.apiResponse['email'],
                               "username": state.apiResponse['name'],
                               "mobile": state.apiResponse['mobile'],
@@ -367,8 +388,12 @@ class LoginScreenState extends State<LoginScreen> {
                   },
                   child: BlocConsumer<AuthenticationCubit, AuthenticationState>(
                     listener: (context, state) {
+                      if (!Widgets.isCurrentOrLoaderOwner(context)) return;
                       AppLog.i('AuthState: $state', name: 'LoginScreen');
                       if (state is AuthenticationSuccess) {
+                        if (state.type == AuthenticationType.phone) {
+                          _isOtpFlowActive = false;
+                        }
                         Widgets.hideLoder(context);
                         AppLog.i('AuthSuccess type: ${state.type}',
                             name: 'LoginScreen');
@@ -412,7 +437,7 @@ class LoginScreenState extends State<LoginScreen> {
                         final message = authenticationErrorMessage(state.error);
                         if (message.isNotEmpty) {
                           HelperUtils.showSnackBarMessage(context, message,
-                              type: MessageType.error);
+                              type: MessageType.error, messageDuration: 5);
                         }
                       }
 
@@ -828,6 +853,7 @@ class LoginScreenState extends State<LoginScreen> {
   Widget otpInput() {
     return Center(
         child: PinFieldAutoFill(
+            key: _otpFieldKey,
             decoration: UnderlineDecoration(
               textStyle:
                   TextStyle(fontSize: 20, color: context.color.textColorDark),
@@ -898,7 +924,13 @@ class LoginScreenState extends State<LoginScreen> {
                       .underline()
                       .color(context.color.territoryColor)
                       .size(context.font.large),
-                  onTap: () => Navigator.pushNamed(context, Routes.login)),
+                  onTap: () {
+                    _cancelOtpFlow();
+                    setState(() {
+                      isOtpSent = false;
+                      isMobileNumberField = true;
+                    });
+                  }),
             ],
           ),
           const SizedBox(
@@ -918,11 +950,14 @@ class LoginScreenState extends State<LoginScreen> {
             alignment: AlignmentDirectional.centerEnd,
             child: MaterialButton(
               onPressed: () {
+                _resetOtp(rebuild: false);
+                _isOtpFlowActive = true;
                 context.read<AuthenticationCubit>().setData(
                       payload: phoneLoginPayload,
                       type: AuthenticationType.phone,
                     );
                 context.read<AuthenticationCubit>().verify();
+                setState(() {});
               },
               child: Text("resendOTP".translate(context))
                   .color(context.color.textColorDark.withValues(alpha: 0.7)),
@@ -934,16 +969,23 @@ class LoginScreenState extends State<LoginScreen> {
           UiUtils.buildButton(
             context,
             onPressed: () {
-              if (otp!.trim().length < 6) {
+              if (!_isOtpFlowActive) return;
+              if (context.read<AuthenticationCubit>().state
+                  is AuthenticationInProcess) return;
+              final enteredOtp = otp?.trim() ?? '';
+              if (enteredOtp.length < 6) {
                 HelperUtils.showSnackBarMessage(
                     context, "pleaseEnterSixDigits".translate(context));
               } else {
-                phoneLoginPayload.setOTP(otp!.trim());
+                phoneLoginPayload.setOTP(enteredOtp);
                 context.read<AuthenticationCubit>().authenticate();
               }
             },
             buttonTitle: "signIn".translate(context),
             radius: 8,
+            disabled: !_isOtpFlowActive ||
+                context.watch<AuthenticationCubit>().state
+                    is AuthenticationInProcess,
           ),
         ],
       ),

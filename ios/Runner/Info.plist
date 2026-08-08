@@ -55,10 +55,6 @@
 		<string>$(FLUTTER_BUILD_NUMBER)</string>
 		<key>FirebaseAppDelegateProxyEnabled</key>
 		<false/>
-		<key>FirebaseDynamicLinksCustomDomains</key>
-		<array>
-			<string>https://eclassify.page.link</string>
-		</array>
 		<key>GADApplicationIdentifier</key>
 		<string>ca-app-pub-8783993549835852~4182601864</string>
 		<key>GADNativeAdValidatorEnabled</key>
@@ -69,6 +65,8 @@
 		<false/>
 		<key>LSApplicationQueriesSchemes</key>
 		<array>
+			<string>googlegmail</string>
+			<string>message</string>
 			<string>sms</string>
 			<string>tel</string>
 			<string>mailto</string>

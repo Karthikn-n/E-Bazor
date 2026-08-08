@@ -8,6 +8,13 @@ import 'package:Ebozor/utils/login/lib/login_system.dart';
 
 class PhoneLogin extends LoginSystem {
   String? verificationId;
+  String? _lastPhoneNumber;
+  int _verificationAttempt = 0;
+
+  void cancelVerification() {
+    _verificationAttempt++;
+    verificationId = null;
+  }
 
   @override
   Future<UserCredential?> login() async {
@@ -21,7 +28,7 @@ class PhoneLogin extends LoginSystem {
       PhoneAuthCredential credential = PhoneAuthProvider.credential(
           verificationId: verificationId ?? "", smsCode: otpVal!);
 
-      UserCredential userCredential =
+      final userCredential =
           await firebaseAuth.signInWithCredential(credential);
 
       AppLog.i('Phone login successful.', name: 'PhoneLogin');
@@ -39,6 +46,10 @@ class PhoneLogin extends LoginSystem {
     emit(MOtpSendInProgress());
     final phoneNum =
         "+${(payload as PhoneLoginPayload).countryCode}${(payload as PhoneLoginPayload).phoneNumber}";
+    final attempt = ++_verificationAttempt;
+    if (_lastPhoneNumber != phoneNum) forceResendingToken = null;
+    _lastPhoneNumber = phoneNum;
+    verificationId = null;
     // NOTE: phone number intentionally omitted from log to avoid leaking PII
     AppLog.i('requestVerification: calling verifyPhoneNumber',
         name: 'PhoneLogin');
@@ -48,21 +59,25 @@ class PhoneLogin extends LoginSystem {
           timeout: Duration(seconds: Constant.otpTimeOutSecond),
           phoneNumber: phoneNum,
           verificationCompleted: (PhoneAuthCredential credential) {
+            if (attempt != _verificationAttempt) return;
             AppLog.i('verificationCompleted: auto-resolution triggered.',
                 name: 'PhoneLogin');
           },
           verificationFailed: (FirebaseAuthException e) {
+            if (attempt != _verificationAttempt) return;
             AppLog.e('verificationFailed: ${e.code}',
                 error: e, name: 'PhoneLogin');
             emit(MFail(e));
           },
           codeSent: (String verificationId, int? resendToken) {
+            if (attempt != _verificationAttempt) return;
             AppLog.i('codeSent: SMS dispatched.', name: 'PhoneLogin');
             super.requestVerification();
             forceResendingToken = resendToken;
             this.verificationId = verificationId;
           },
           codeAutoRetrievalTimeout: (String verificationId) {
+            if (attempt != _verificationAttempt) return;
             AppLog.w('codeAutoRetrievalTimeout reached.', name: 'PhoneLogin');
           },
           forceResendingToken: forceResendingToken,
@@ -84,8 +99,7 @@ class PhoneLogin extends LoginSystem {
         smsCode: otp,
       );
 
-      UserCredential userCredential =
-          await firebaseAuth.signInWithCredential(credential);
+      await firebaseAuth.signInWithCredential(credential);
 
       emit(MSuccess());
       AppLog.i('Manual OTP verification successful.', name: 'PhoneLogin');

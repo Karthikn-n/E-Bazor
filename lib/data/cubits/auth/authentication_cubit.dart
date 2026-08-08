@@ -50,7 +50,11 @@ class AuthenticationFlowException implements Exception {
   String toString() => code;
 }
 
+const passwordResetRequestMessage =
+    'If this email has an email/password account, a reset link will arrive shortly. Check Spam too. If you registered with Google, return to Login and use Continue with Google.';
+
 String authenticationErrorMessage(dynamic error) {
+  if (error is GoogleSignInCancelledException) return '';
   if (error is AuthenticationFlowException) {
     switch (error.code) {
       case 'account-not-found':
@@ -69,15 +73,23 @@ String authenticationErrorMessage(dynamic error) {
         return 'No account found. Please sign up first.';
       case 'wrong-password':
       case 'invalid-credential':
-        return 'The email or password is incorrect.';
+        return 'No account matches these credentials. Check your email and password, or sign up first.';
       case 'account-exists-with-different-credential':
       case 'credential-already-in-use':
-        return 'This account uses a different sign-in method.';
+        return 'An account already exists for this email. Continue with Google if you registered with Google, or use Login/Forgot Password.';
       case 'invalid-email':
         return 'Please enter a valid email address.';
       case 'invalid-phone-number':
       case 'missing-phone-number':
         return 'Please enter a valid phone number.';
+      case 'missing-client-identifier':
+      case 'app-not-authorized':
+      case 'captcha-check-failed':
+        return 'Phone verification is not configured for this app build. Please contact support.';
+      case 'operation-not-allowed':
+        return 'Phone sign-in is not enabled. Please contact support.';
+      case 'quota-exceeded':
+        return 'The SMS limit has been reached. Please try again later.';
       case 'invalid-verification-code':
         return 'The verification code is incorrect.';
       case 'session-expired':
@@ -88,7 +100,6 @@ String authenticationErrorMessage(dynamic error) {
         return 'Too many attempts. Please try again later.';
     }
   }
-  if (error.toString().contains('google-terminated')) return '';
   return 'Authentication failed. Please try again.';
 }
 
@@ -110,7 +121,16 @@ class AuthenticationCubit extends Cubit<AuthenticationState> {
 
   void setData(
       {required LoginPayload payload, required AuthenticationType type}) {
-    AppLog.i('setData type: $type', name: 'AuthCubit');
+    final intent = payload is EmailLoginPayload
+        ? payload.type.name
+        : payload is GoogleLoginPayload
+            ? payload.intent.name
+            : payload is AppleLoginPayload
+                ? payload.intent.name
+                : payload is PhoneLoginPayload
+                    ? payload.intent.name
+                    : 'unknown';
+    AppLog.i('setData type: $type, intent: $intent', name: 'AuthCubit');
     this.type = type;
     this.payload = payload;
   }
@@ -142,13 +162,18 @@ class AuthenticationCubit extends Cubit<AuthenticationState> {
       final payloadData = payload!;
       final intent = _intentFor(payloadData);
       final isNewUser = credential.additionalUserInfo?.isNewUser ?? false;
+      final isUnverifiedEmailRecovery = payloadData is EmailLoginPayload &&
+          payloadData.recoveredUnverifiedAccount;
 
       if (intent == AuthenticationIntent.signIn && isNewUser) {
-        await FirebaseAuth.instance.signOut();
+        await _deleteAccidentallyCreatedUser(credential.user!);
         throw const AuthenticationFlowException('account-not-found');
       }
 
-      if (intent == AuthenticationIntent.signUp && !isNewUser) {
+      if (payloadData is EmailLoginPayload &&
+          intent == AuthenticationIntent.signUp &&
+          !isNewUser &&
+          !isUnverifiedEmailRecovery) {
         await FirebaseAuth.instance.signOut();
         throw const AuthenticationFlowException('account-already-exists');
       }
@@ -183,6 +208,18 @@ class AuthenticationCubit extends Cubit<AuthenticationState> {
     throw const AuthenticationFlowException('authentication-failed');
   }
 
+  Future<void> _deleteAccidentallyCreatedUser(User user) async {
+    AppLog.w('Rolling back a new Firebase user created during sign-in.',
+        name: 'AuthCubit');
+    try {
+      await user.delete();
+    } finally {
+      if (FirebaseAuth.instance.currentUser != null) {
+        await FirebaseAuth.instance.signOut();
+      }
+    }
+  }
+
   void listen(Function(MLoginState state) fn) {
     mMultiAuthentication.listen((state) {
       AppLog.i('MultiAuthentication state: $state', name: 'AuthCubit');
@@ -198,5 +235,11 @@ class AuthenticationCubit extends Cubit<AuthenticationState> {
     });
     AppLog.i('Requesting verification for: ${type!.name}', name: 'AuthCubit');
     mMultiAuthentication.requestVerification();
+  }
+
+  void cancelPhoneVerification() {
+    final phoneSystem =
+        mMultiAuthentication.systems[AuthenticationType.phone.name];
+    if (phoneSystem is PhoneLogin) phoneSystem.cancelVerification();
   }
 }

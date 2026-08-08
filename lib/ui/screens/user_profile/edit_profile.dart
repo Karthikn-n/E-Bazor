@@ -102,12 +102,11 @@ class UserProfileScreenState extends State<UserProfileScreen> {
     }
 
     if (HiveUtils.getCountryCode() != null) {
-      countryCode = (HiveUtils.getCountryCode() != null
-          ? HiveUtils.getCountryCode()!
-          : "");
-      phoneController.text = HiveUtils.getUserDetails().mobile != null
-          ? HiveUtils.getUserDetails().mobile!.replaceFirst("+$countryCode", "")
-          : "";
+      countryCode = formatCountryCode(HiveUtils.getCountryCode()!);
+      final storedMobile = HiveUtils.getUserDetails().mobile ?? '';
+      phoneController.text = storedMobile.startsWith(countryCode!)
+          ? storedMobile.substring(countryCode!.length)
+          : storedMobile;
     } else {
       phoneController.text = HiveUtils.getUserDetails().mobile != null
           ? HiveUtils.getUserDetails().mobile!
@@ -312,6 +311,7 @@ class UserProfileScreenState extends State<UserProfileScreen> {
           setState(() {});
         },
         isMobileRequired: false,
+        phoneCountryCode: countryCode,
         fixedPrefix: SizedBox(
           width: 55,
           child: Align(

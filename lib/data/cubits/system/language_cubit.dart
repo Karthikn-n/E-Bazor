@@ -31,6 +31,10 @@ class LanguageCubit extends Cubit<LanguageState> {
     }
   }
 
+  void changeLanguage(dynamic language) {
+    emit(LanguageLoader(language));
+  }
+
   dynamic currentLanguageCode() {
     return Hive.box(HiveKeys.languageBox)
         .get(HiveKeys.currentLanguageKey)['code'];

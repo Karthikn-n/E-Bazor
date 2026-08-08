@@ -12,11 +12,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 class SignupAuthListener extends StatelessWidget {
   final Widget child;
   final ValueChanged<AuthenticationSuccess>? onEmailSuccess;
+  final String? emailSignupUsername;
+  final bool navigateToHomeOnSuccess;
 
   const SignupAuthListener({
     super.key,
     required this.child,
     this.onEmailSuccess,
+    this.emailSignupUsername,
+    this.navigateToHomeOnSuccess = false,
   });
 
   @override
@@ -33,6 +37,7 @@ class SignupAuthListener extends StatelessWidget {
   }
 
   void _onAuthenticationState(BuildContext context, AuthenticationState state) {
+    if (!Widgets.isCurrentOrLoaderOwner(context)) return;
     if (state is AuthenticationInProcess) {
       Widgets.showLoader(context);
       return;
@@ -42,7 +47,7 @@ class SignupAuthListener extends StatelessWidget {
       final message = authenticationErrorMessage(state.error);
       if (message.isNotEmpty) {
         HelperUtils.showSnackBarMessage(context, message,
-            type: MessageType.error);
+            type: MessageType.error, messageDuration: 5);
       }
       return;
     }
@@ -69,6 +74,7 @@ class SignupAuthListener extends StatelessWidget {
   }
 
   void _onLoginState(BuildContext context, LoginState state) {
+    if (!Widgets.isCurrentOrLoaderOwner(context)) return;
     if (state is LoginInProgress) {
       Widgets.showLoader(context);
       return;
@@ -77,14 +83,20 @@ class SignupAuthListener extends StatelessWidget {
       Widgets.hideLoder(context);
       HelperUtils.showSnackBarMessage(
           context, 'Unable to finish sign up. Please try again.',
-          type: MessageType.error);
+          type: MessageType.error, messageDuration: 5);
       return;
     }
     if (state is! LoginSuccess) return;
 
     Widgets.hideLoder(context);
     HiveUtils.setUserIsAuthenticated(true);
+    HiveUtils.setEmailVerificationPending(false);
     context.read<UserDetailsCubit>().fill(HiveUtils.getUserDetails());
+
+    if (navigateToHomeOnSuccess) {
+      HelperUtils.killPreviousPages(context, Routes.main, {'from': 'signup'});
+      return;
+    }
 
     if (state.isProfileCompleted) {
       if (HiveUtils.getCityName()?.isNotEmpty == true) {
@@ -100,16 +112,16 @@ class SignupAuthListener extends StatelessWidget {
     final phonePayload = authCubit.payload is PhoneLoginPayload
         ? authCubit.payload as PhoneLoginPayload
         : null;
-    Navigator.pushReplacementNamed(
-      context,
+    Navigator.of(context).pushNamedAndRemoveUntil(
       Routes.completeProfile,
+      (route) => false,
       arguments: {
         'from': 'signup',
         'popToCurrent': false,
         'type': authCubit.type,
         'extraData': {
-          'email': state.credential.user?.email ?? state.apiResponse['email'],
-          'username': state.apiResponse['name'],
+          'email': state.user.email ?? state.apiResponse['email'],
+          'username': emailSignupUsername ?? state.apiResponse['name'],
           'mobile': state.apiResponse['mobile'],
           'countryCode':
               phonePayload == null ? null : '+${phonePayload.countryCode}',

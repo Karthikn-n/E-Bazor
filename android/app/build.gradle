@@ -101,7 +101,9 @@ flutter {
 }
 
 dependencies {
-    implementation platform('com.google.firebase:firebase-bom:33.5.1')
+    // Auth 23.2.0+ uses Firebase Hosting for email actions instead of
+    // the retired Firebase Dynamic Links implementation.
+    implementation platform('com.google.firebase:firebase-bom:33.16.0')
     implementation 'com.google.firebase:firebase-analytics'
     implementation 'com.android.support:multidex:2.0.1'
     implementation 'com.google.android.gms:play-services-location:21.3.0'

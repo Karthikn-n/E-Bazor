@@ -12,11 +12,9 @@ import 'package:Ebozor/utils/app_icon.dart';
 import 'package:Ebozor/utils/cloudState/cloud_state.dart';
 import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
-import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/login/lib/payloads.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/ui/screens/auth/sign_up/signup_auth_listener.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -50,6 +48,20 @@ class _SignupScreenState extends CloudState<SignupScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool isObscure = true;
 
+  @override
+  void initState() {
+    super.initState();
+    _emailController.text = widget.emailId?.trim() ?? '';
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
   void onTapSignup() async {
     if (_formKey.currentState?.validate() ?? false) {
       debugPrint(
@@ -57,7 +69,7 @@ class _SignupScreenState extends CloudState<SignupScreen> {
       addCloudData("signup_details", {"username": _usernameController.text});
       context.read<AuthenticationCubit>().setData(
           payload: EmailLoginPayload(
-              email: _emailController.text,
+              email: _emailController.text.trim(),
               password: _passwordController.text,
               type: EmailLoginType.signup),
           type: AuthenticationType.email);
@@ -67,7 +79,6 @@ class _SignupScreenState extends CloudState<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    _emailController.text = widget.emailId!;
     return Scaffold(
       backgroundColor: context.color.backgroundColor,
       bottomNavigationBar: termAndPolicyTxt(),
@@ -84,11 +95,6 @@ class _SignupScreenState extends CloudState<SignupScreen> {
                 debugPrint(
                     '[SignupScreen] AuthenticationSuccess. type: ${state.type}');
                 if (state.type == AuthenticationType.email) {
-                  debugPrint(
-                      '[SignupScreen] Sending verification email to ${FirebaseAuth.instance.currentUser?.email}');
-                  FirebaseAuth.instance.currentUser?.sendEmailVerification();
-
-                  // Navigator.pushReplacementNamed(context, Routes.);
                   Navigator.push<dynamic>(context, BlurredRouter(
                     builder: (context) {
                       return EmailVerificationScreen(
@@ -253,23 +259,21 @@ class _SignupScreenState extends CloudState<SignupScreen> {
   }
 
   Widget mobileAuth() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text("signupWithLbl".translate(context))
-            .color(context.color.textColorDark.brighten(50)),
-        const SizedBox(
-          width: 5,
-        ),
-        GestureDetector(
-          onTap: () {
-            Navigator.pushNamed(context, Routes.signupMainScreen);
-          },
-          child: Text("mobileNumberLbl".translate(context))
-              .underline()
-              .color(context.color.territoryColor),
-        )
-      ],
+    return UiUtils.buildButton(
+      context,
+      onPressed: () => Navigator.pushNamed(context, Routes.signupMainScreen),
+      showElevation: false,
+      buttonColor: secondaryColor_,
+      border: context.watch<AppThemeCubit>().state.appTheme != AppTheme.dark
+          ? BorderSide(
+              color: context.color.textDefaultColor.withValues(alpha: 0.5),
+            )
+          : null,
+      textColor: textDarkColor,
+      radius: 8,
+      height: 46,
+      buttonTitle:
+          '${"signupWithLbl".translate(context)} ${"mobileNumberLbl".translate(context)}',
     );
   }
 
@@ -277,9 +281,7 @@ class _SignupScreenState extends CloudState<SignupScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const SizedBox(
-          height: 24,
-        ),
+        const SizedBox(height: 12),
         if (Constant.googleAuthentication == "1")
           UiUtils.buildButton(context,
               prefixWidget: Padding(

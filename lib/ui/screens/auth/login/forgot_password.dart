@@ -1,5 +1,5 @@
-
 import 'package:Ebozor/app/routes.dart';
+import 'package:Ebozor/data/cubits/auth/authentication_cubit.dart';
 import 'package:Ebozor/ui/screens/home/home_screen.dart';
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
 import 'package:Ebozor/ui/screens/widgets/custom_text_form_field.dart';
@@ -27,6 +27,40 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final TextEditingController _emailController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final _formKey = GlobalKey<FormState>();
+  bool _isSubmitting = false;
+  String? _requestStatus;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _requestPasswordReset() async {
+    FocusScope.of(context).unfocus();
+    if (_isSubmitting || _formKey.currentState?.validate() != true) return;
+
+    setState(() {
+      _isSubmitting = true;
+      _requestStatus = null;
+    });
+
+    try {
+      await _auth.sendPasswordResetEmail(email: _emailController.text.trim());
+      if (!mounted) return;
+      setState(() => _requestStatus = passwordResetRequestMessage);
+    } on FirebaseAuthException catch (error) {
+      if (!mounted) return;
+      HelperUtils.showSnackBarMessage(
+        context,
+        authenticationErrorMessage(error),
+        type: MessageType.error,
+        messageDuration: 5,
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,38 +129,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               ),
               UiUtils.buildButton(
                 context,
-                onPressed: () async {
-                  FocusScope.of(context).unfocus(); //dismiss keyboard
-
-                  Future.delayed(const Duration(seconds: 1)).then((_) async {
-                    if (_formKey.currentState!.validate()) {
-                      try {
-                        await _auth
-                            .sendPasswordResetEmail(
-                                email: _emailController.text)
-                            .then((value) {
-                          HelperUtils.showSnackBarMessage(context,
-                              "resetPasswordSuccess".translate(context),
-                              type: MessageType.success);
-                          Navigator.of(context).pushNamedAndRemoveUntil(
-                              Routes.login, (route) => false);
-                        });
-                      } on FirebaseAuthException catch (e) {
-                        if (e.code == 'user-not-found') {
-                          HelperUtils.showSnackBarMessage(
-                              context, "userNotFound".translate(context),
-                              type: MessageType.error);
-                        } else {
-                          HelperUtils.showSnackBarMessage(context, e.toString(),
-                              type: MessageType.error);
-                        }
-                      }
-                    }
-                  });
-                },
+                onPressed: _requestPasswordReset,
+                isInProgress: _isSubmitting,
                 buttonTitle: "submitBtnLbl".translate(context),
                 radius: 8,
               ),
+              if (_requestStatus != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(_requestStatus!)
+                      .size(context.font.small)
+                      .color(context.color.textLightColor),
+                ),
             ],
           ),
         ),

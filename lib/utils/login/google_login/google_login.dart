@@ -1,8 +1,11 @@
 import 'package:Ebozor/utils/login/lib/login_status.dart';
 import 'package:Ebozor/utils/login/lib/login_system.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+
+class GoogleSignInCancelledException implements Exception {
+  const GoogleSignInCancelledException();
+}
 
 class GoogleLogin extends LoginSystem {
   GoogleSignIn? _googleSignIn;
@@ -18,10 +21,9 @@ class GoogleLogin extends LoginSystem {
   Future<UserCredential?> login() async {
     try {
       emit(MProgress());
-      GoogleSignInAccount? googleSignIn = await _googleSignIn?.signIn();
+      final googleSignIn = await _googleSignIn?.signIn();
       if (googleSignIn == null) {
-        print("google-terminated");
-        throw ErrorDescription("google-terminated");
+        throw const GoogleSignInCancelledException();
       }
 
       GoogleSignInAuthentication? googleAuth =
