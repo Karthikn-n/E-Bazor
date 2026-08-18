@@ -89,20 +89,28 @@ class _SubCategoryFilterScreenState extends State<SubCategoryFilterScreen>
                               Navigator.pop(context);
                             },
                             leading: Container(
-                                width: 40,
-                                height: 40,
-                                padding: const EdgeInsets.all(8),
+                                width: 48,
+                                height: 48,
+                                padding: const EdgeInsets.all(9),
                                 decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(20),
+                                    shape: BoxShape.circle,
                                     color: context.color.territoryColor
                                         .withValues(alpha: 0.1)),
-                                child: UiUtils.imageType(
-                                  category.url!,
-                                  color: context.color.territoryColor,
-                                  fit: BoxFit.cover,
-                                )),
+                                child: (category.url != null && category.url!.trim().isNotEmpty)
+                                    ? UiUtils.imageType(
+                                        category.url!,
+                                        color: category.url!.endsWith('.svg')
+                                            ? context.color.territoryColor
+                                            : null,
+                                        fit: BoxFit.contain,
+                                      )
+                                    : Icon(
+                                        Icons.category_outlined,
+                                        color: context.color.territoryColor,
+                                        size: 24,
+                                      )),
                             title: Text(
-                              category.name!,
+                              category.name ?? "",
                               textAlign: TextAlign.start,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,

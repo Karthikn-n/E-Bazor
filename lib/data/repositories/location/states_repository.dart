@@ -10,7 +10,7 @@ class StatesRepository {
     Map<String, dynamic> parameters = {
       Api.page: page,
       Api.countryId: countryId,
-      if(search!=null) Api.search:search
+      if (search != null && search.trim().isNotEmpty) Api.search: search.trim()
     };
 
     Map<String, dynamic> response = await Api.get(

@@ -101,9 +101,10 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
   void pageScrollListen() {
     if (controller.isEndReached()) {
       if (context.read<FetchCitiesCubit>().hasMoreData()) {
-        context
-            .read<FetchCitiesCubit>()
-            .fetchCitiesMore(stateId: widget.stateId);
+        context.read<FetchCitiesCubit>().fetchCitiesMore(
+              stateId: widget.stateId,
+              search: searchController.text,
+            );
       }
     }
   }
@@ -365,92 +366,106 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
             padding: const EdgeInsets.only(top: 17),
             child: Container(
               color: context.color.secondaryColor,
-              child: SingleChildScrollView(
-                controller: controller,
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    /// ---------- HEADER (UNCHANGED) ----------
-                    widget.from == "addItem"
-                        ? Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 18),
-                      child: Text(
-                        "${"chooseLbl".translate(context)} ${"city".translate(context)}",
-                      )
-                          .color(context.color.textDefaultColor)
-                          .size(context.font.normal)
-                          .bold(weight: FontWeight.w600),
-                    )
-                        : SizedBox.shrink(),
-
-                    /// ---------- POPULAR SEARCHES ----------
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      child: Row(
-                        children: [
-                          Icon(Icons.trending_up,
-                              size: 18,
-                              color: context.color.textDefaultColor),
-                          const SizedBox(width: 6),
-                          Text(" All Cities".translate(context))
-                              .color(context.color.textDefaultColor)
-                              .size(context.font.normal)
-                              .bold(weight: FontWeight.w600),
-                        ],
-                      ),
-                    ),
-
-                    /// ---------- CITY CHIP UI ----------
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: state.citiesModel.map((city) {
-                          bool isSelected = selectedCity?.id == city.id;
-                          return InkWell(
-                            borderRadius:
-                            BorderRadius.circular(8),
-                            onTap: () {
-                              setState(() {
-                                selectedCity = city;
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 8),
-                              decoration: BoxDecoration(
-                                borderRadius:
-                                BorderRadius.circular(8),
-                                border: Border.all(
-                                    color: isSelected ? context.color.territoryColor :
-                                    context.color.borderColor),
-                                color: isSelected ? context.color.territoryColor.withValues(alpha: 0.1) :
-                                context.color.secondaryColor,
-                              ),
-                              child: Text(city.name!)
-                                  .color(isSelected ? context.color.territoryColor : context.color.textDefaultColor)
-                                  .size(context.font.small),
-                            ),
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (ScrollNotification scrollInfo) {
+                  if (scrollInfo.metrics.pixels >=
+                      scrollInfo.metrics.maxScrollExtent - 50) {
+                    if (context.read<FetchCitiesCubit>().hasMoreData()) {
+                      context.read<FetchCitiesCubit>().fetchCitiesMore(
+                            stateId: widget.stateId,
+                            search: searchController.text,
                           );
-                        }).toList(),
-                      ),
-                    ),
+                    }
+                  }
+                  return false;
+                },
+                child: SingleChildScrollView(
+                  controller: controller,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      /// ---------- HEADER (UNCHANGED) ----------
+                      widget.from == "addItem"
+                          ? Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 18),
+                        child: Text(
+                          "${"chooseLbl".translate(context)} ${"city".translate(context)}",
+                        )
+                            .color(context.color.textDefaultColor)
+                            .size(context.font.normal)
+                            .bold(weight: FontWeight.w600),
+                      )
+                          : SizedBox.shrink(),
 
-                    if (state.isLoadingMore)
+                      /// ---------- POPULAR SEARCHES ----------
                       Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Center(
-                          child: UiUtils.progress(
-                            normalProgressColor:
-                            context.color.territoryColor,
-                          ),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        child: Row(
+                          children: [
+                            Icon(Icons.trending_up,
+                                size: 18,
+                                color: context.color.textDefaultColor),
+                            const SizedBox(width: 6),
+                            Text(" All Cities".translate(context))
+                                .color(context.color.textDefaultColor)
+                                .size(context.font.normal)
+                                .bold(weight: FontWeight.w600),
+                          ],
                         ),
                       ),
-                  ],
+
+                      /// ---------- CITY CHIP UI ----------
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: state.citiesModel.map((city) {
+                            bool isSelected = selectedCity?.id == city.id;
+                            return InkWell(
+                              borderRadius:
+                              BorderRadius.circular(8),
+                              onTap: () {
+                                setState(() {
+                                  selectedCity = city;
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  borderRadius:
+                                  BorderRadius.circular(8),
+                                  border: Border.all(
+                                      color: isSelected ? context.color.territoryColor :
+                                      context.color.borderColor),
+                                  color: isSelected ? context.color.territoryColor.withValues(alpha: 0.1) :
+                                  context.color.secondaryColor,
+                                ),
+                                child: Text(city.name!)
+                                    .color(isSelected ? context.color.territoryColor : context.color.textDefaultColor)
+                                    .size(context.font.small),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+
+                      if (state.isLoadingMore)
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Center(
+                            child: UiUtils.progress(
+                              normalProgressColor:
+                              context.color.territoryColor,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),

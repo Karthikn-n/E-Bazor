@@ -117,7 +117,9 @@ class CountriesScreenState extends State<CountriesScreen> {
   void pageScrollListen() {
     if (controller.isEndReached()) {
       if (context.read<FetchCountriesCubit>().hasMoreData()) {
-        context.read<FetchCountriesCubit>().fetchCountriesMore();
+        context
+            .read<FetchCountriesCubit>()
+            .fetchCountriesMore(search: searchController.text);
       }
     }
   }
@@ -487,141 +489,154 @@ class CountriesScreenState extends State<CountriesScreen> {
                 return Container(
                   width: double.infinity,
                   color: context.color.secondaryColor,
-                  child: SingleChildScrollView(
-                    controller: controller,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        /// -------- RECENT SEARCHES ----------
-                        if (recentSearches.isNotEmpty) ...[
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (ScrollNotification scrollInfo) {
+                      if (scrollInfo.metrics.pixels >=
+                          scrollInfo.metrics.maxScrollExtent - 50) {
+                        if (context.read<FetchCountriesCubit>().hasMoreData()) {
+                          context
+                              .read<FetchCountriesCubit>()
+                              .fetchCountriesMore(search: searchController.text);
+                        }
+                      }
+                      return false;
+                    },
+                    child: SingleChildScrollView(
+                      controller: controller,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          /// -------- RECENT SEARCHES ----------
+                          if (recentSearches.isNotEmpty) ...[
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 12),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.history,
+                                      size: 18,
+                                      color: context.color.textDefaultColor),
+                                  const SizedBox(width: 6),
+                                  Text("Your Last Searches".translate(context))
+                                      .color(context.color.textDefaultColor)
+                                      .size(context.font.normal)
+                                      .bold(weight: FontWeight.bold),
+                                  const Spacer(),
+                                  InkWell(
+                                    onTap: () {
+                                      // See All Logic
+                                    },
+                                    child: Text("seeAll".translate(context))
+                                        .size(context.font.small)
+                                        .color(context.color.textLightColor),
+                                  )
+                                ],
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: recentSearches.map((search) {
+                                    return Padding(
+                                      padding: const EdgeInsetsDirectional.only(
+                                          end: 10),
+                                      child: Chip(
+                                        label: Text(search),
+                                        backgroundColor:
+                                            context.color.secondaryColor,
+                                        side: BorderSide(
+                                            color: context.color.borderColor),
+                                        labelStyle: TextStyle(
+                                            color: context.color.textDefaultColor,
+                                            fontSize: 12),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ),
+                          ],
+
+                          /// -------- POPULAR SEARCHES ----------
                           Padding(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 12),
                             child: Row(
                               children: [
-                                Icon(Icons.history,
+                                Icon(Icons.trending_up,
                                     size: 18,
                                     color: context.color.textDefaultColor),
                                 const SizedBox(width: 6),
-                                Text("Your Last Searches".translate(context))
+                                Text(
+                                  "All Countries".translate(context),
+                                )
                                     .color(context.color.textDefaultColor)
                                     .size(context.font.normal)
                                     .bold(weight: FontWeight.bold),
-                                const Spacer(),
-                                InkWell(
-                                  onTap: () {
-                                    // See All Logic
-                                  },
-                                  child: Text("seeAll".translate(context))
-                                      .size(context.font.small)
-                                      .color(context.color.textLightColor),
-                                )
                               ],
                             ),
                           ),
+
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: recentSearches.map((search) {
-                                  return Padding(
-                                    padding: const EdgeInsetsDirectional.only(
-                                        end: 10),
-                                    child: Chip(
-                                      label: Text(search),
-                                      backgroundColor:
-                                          context.color.secondaryColor,
-                                      side: BorderSide(
-                                          color: context.color.borderColor),
-                                      labelStyle: TextStyle(
-                                          color: context.color.textDefaultColor,
-                                          fontSize: 12),
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-                          ),
-                        ],
-
-                        /// -------- POPULAR SEARCHES ----------
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                          child: Row(
-                            children: [
-                              Icon(Icons.trending_up,
-                                  size: 18,
-                                  color: context.color.textDefaultColor),
-                              const SizedBox(width: 6),
-                              Text(
-                                "All Countries".translate(context),
-                              )
-                                  .color(context.color.textDefaultColor)
-                                  .size(context.font.normal)
-                                  .bold(weight: FontWeight.bold),
-                            ],
-                          ),
-                        ),
-
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: state.countriesModel.map((country) {
-                              bool isSelected =
-                                  selectedCountry?.id == country.id;
-                              return InkWell(
-                                borderRadius: BorderRadius.circular(20),
-                                onTap: () {
-                                  setState(() {
-                                    selectedCountry = country;
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 14, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
+                            child: Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: state.countriesModel.map((country) {
+                                bool isSelected =
+                                    selectedCountry?.id == country.id;
+                                return InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: () {
+                                    setState(() {
+                                      selectedCountry = country;
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: isSelected
+                                            ? context.color.territoryColor
+                                            : context.color.borderColor,
+                                      ),
                                       color: isSelected
                                           ? context.color.territoryColor
-                                          : context.color.borderColor,
+                                          .withValues(alpha: 0.1)
+                                          : context.color.secondaryColor,
                                     ),
-                                    color: isSelected
+                                    child: Text(
+                                      country.name!,
+                                    )
+                                        .color(isSelected
                                         ? context.color.territoryColor
-                                            .withValues(alpha: 0.1)
-                                        : context.color.secondaryColor,
+                                        : context.color.textDefaultColor)
+                                        .size(context.font.small),
                                   ),
-                                  child: Text(
-                                    country.name!,
-                                  )
-                                      .color(isSelected
-                                          ? context.color.territoryColor
-                                          : context.color.textDefaultColor)
-                                      .size(context.font.small),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-
-                        if (state.isLoadingMore)
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Center(
-                              child: UiUtils.progress(
-                                normalProgressColor:
-                                    context.color.territoryColor,
-                              ),
+                                );
+                              }).toList(),
                             ),
                           ),
 
-                        SizedBox(height: 20), // Bottom padding
-                      ],
+                          if (state.isLoadingMore)
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Center(
+                                child: UiUtils.progress(
+                                  normalProgressColor:
+                                  context.color.territoryColor,
+                                ),
+                              ),
+                            ),
+
+                          SizedBox(height: 20), // Bottom padding
+                        ],
+                      ),
                     ),
                   ),
                 );

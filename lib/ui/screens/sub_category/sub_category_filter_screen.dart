@@ -1,422 +1,499 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:Ebozor/data/model/item_filter_model.dart';
+import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
+
+import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/category/subcategory_filters_cubit.dart';
 import 'package:Ebozor/data/model/category_model.dart';
 import 'package:Ebozor/data/repositories/category_repository.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-
-
+import 'package:Ebozor/utils/ApiService/api.dart';
+import 'package:Ebozor/utils/constant.dart';
 
 class FiltersPage extends StatefulWidget {
   final CategoryModel category;
 
   const FiltersPage({super.key, required this.category});
 
+  static Route route(RouteSettings settings) {
+    final category = settings.arguments as CategoryModel;
 
-
-    static Route route(RouteSettings settings) {
-      final category = settings.arguments as CategoryModel;
-
-      return MaterialPageRoute(
-        builder: (context) => BlocProvider(
-          create: (context) => FilterCubit(
-            FilterRepository(), // 👈 இங்க தான் fix
-          ),
-          child: FiltersPage(category: category),
-        ),
-      );
-    }
+    return MaterialPageRoute(
+      builder: (context) => BlocProvider(
+        create: (context) => FilterCubit(FilterRepository()),
+        child: FiltersPage(category: category),
+      ),
+    );
+  }
 
   @override
-
   State<FiltersPage> createState() => _FiltersPageState();
 }
 
 class _FiltersPageState extends State<FiltersPage> {
   late FilterCubit cubit;
   String selectedSlug = "residential";
-  // Tab
-  int _selectedTab = 0; // 0=Rent, 1=Buy, 2=Off-Plan
 
-  // Property Type
-  int _selectedPropertyType = 0; // 0=Residential, 1=Commercial, 2=Rooms, 3=Hotel Apt, 4=Land
+  // Tab: 0=Rent, 1=Buy, 2=Off-Plan
+  int _selectedTab = 0;
 
-  // Residential Categories
-  int _selectedCategory = 0; // 0=All Residential, 1=Apartment, 2=Villa, ...
+  // Property Type index
+  int _selectedPropertyType = 0;
+
+  // Sub-category (e.g., All, Apartment, Villa) index
+  int _selectedCategory = 0;
 
   // Price Range
-  final TextEditingController _priceMinController = TextEditingController(text: '0');
-  final TextEditingController _priceMaxController = TextEditingController(text: '');
-  RangeValues _priceRange = const RangeValues(0, 1);
+  final TextEditingController _priceMinController =
+      TextEditingController(text: '');
+  final TextEditingController _priceMaxController =
+      TextEditingController(text: '');
 
-  // Bedrooms - multi select
-  final Set<String> _selectedBedrooms = {};
+  // Area/Size Range
+  final TextEditingController _areaMinController =
+      TextEditingController(text: '');
+  final TextEditingController _areaMaxController =
+      TextEditingController(text: '');
 
-  // Bathrooms - multi select
-  final Set<String> _selectedBathrooms = {};
+  // Dynamic filter state stored per filter name:
+  // Multi-select stores Set<String>
+  // Single-select stores String?
+  final Map<String, dynamic> _selectedFilters = {};
 
-  // Area/Size
-  final TextEditingController _areaMinController = TextEditingController(text: '0');
-  final TextEditingController _areaMaxController = TextEditingController(text: '');
-  RangeValues _areaRange = const RangeValues(0, 1);
+  // Text / numeric input dynamic filters stored per filter name
+  final Map<String, TextEditingController> _filterTextControllers = {};
 
-  // Furnishing Type
-  int _selectedFurnishing = 0; // 0=All, 1=Furnished, 2=Unfurnished
-
-  // Amenities - multi select
-  final Set<String> _selectedAmenities = {};
-
-  // Listed By - multi select
-  final Set<String> _selectedListedBy = {};
-
-  // Rent is Paid - multi select
-  final Set<String> _selectedRentPaid = {};
-
-  // More Filters - multi select
-  final Set<String> _selectedMoreFilters = {};
-
-  // Text controllers
+  // Location & keywords
   final TextEditingController _locationController = TextEditingController();
-  final TextEditingController _excludeLocationController = TextEditingController();
+  final TextEditingController _excludeLocationController =
+      TextEditingController();
   final TextEditingController _keywordController = TextEditingController();
   final TextEditingController _agencyController = TextEditingController();
+
+  // More Filters static toggles
+  final Set<String> _selectedMoreFilters = {};
+
+  // Live count state
+  int _resultCount = 0;
+  bool _isLoadingCount = false;
+  Timer? _countDebounceTimer;
 
   static const Color _redColor = Color(0xFFE02020);
   static const Color _borderColor = Color(0xFFDDDDDD);
   static const Color _greyText = Color(0xFF888888);
+
   @override
   void initState() {
     super.initState();
-
     cubit = context.read<FilterCubit>();
 
-    final initialSlug = widget.category.children?.first.slug ?? "residential";
+    final initialSlug = (widget.category.children != null &&
+            widget.category.children!.isNotEmpty)
+        ? (widget.category.children!.first.slug ?? "residential")
+        : (widget.category.slug ?? "residential");
 
     selectedSlug = initialSlug;
-
     cubit.fetchFilters(initialSlug);
+
+    _priceMinController.addListener(_onFilterChanged);
+    _priceMaxController.addListener(_onFilterChanged);
+    _areaMinController.addListener(_onFilterChanged);
+    _areaMaxController.addListener(_onFilterChanged);
+    _locationController.addListener(_onFilterChanged);
+    _keywordController.addListener(_onFilterChanged);
+    _agencyController.addListener(_onFilterChanged);
+
+    _updateItemCount();
   }
 
+  @override
+  void dispose() {
+    _countDebounceTimer?.cancel();
+    _priceMinController.dispose();
+    _priceMaxController.dispose();
+    _areaMinController.dispose();
+    _areaMaxController.dispose();
+    _locationController.dispose();
+    _excludeLocationController.dispose();
+    _keywordController.dispose();
+    _agencyController.dispose();
+    for (var controller in _filterTextControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _onFilterChanged() {
+    _updateItemCount();
+  }
+
+  void _updateItemCount() {
+    _countDebounceTimer?.cancel();
+    _countDebounceTimer = Timer(const Duration(milliseconds: 400), () async {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingCount = true;
+      });
+
+      try {
+        String activeCategorySlug = selectedSlug;
+        final filterState = cubit.state;
+        if (filterState is FilterLoaded) {
+          if (_selectedCategory > 0 &&
+              _selectedCategory < filterState.data.children.length) {
+            final childSlug = filterState.data.children[_selectedCategory].slug;
+            if (childSlug != null &&
+                childSlug.isNotEmpty &&
+                !childSlug.endsWith('-all')) {
+              activeCategorySlug = childSlug;
+            }
+          }
+        }
+
+        Map<String, dynamic> queryParams = {
+          "page": 1,
+          "sort_by": "new-to-old",
+          if (_priceMinController.text.trim().isNotEmpty &&
+              _priceMinController.text.trim() != '0')
+            "min_price": _priceMinController.text.trim(),
+          if (_priceMaxController.text.trim().isNotEmpty)
+            "max_price": _priceMaxController.text.trim(),
+          if (_locationController.text.trim().isNotEmpty)
+            "city": _locationController.text.trim(),
+          "category_slug": activeCategorySlug,
+        };
+
+        // Add dynamic filters: filters[Key]=Value or filters[Key]=["Val1", "Val2"]
+        _selectedFilters.forEach((key, val) {
+          if (val is Set<String> && val.isNotEmpty) {
+            queryParams["filters[$key]"] = jsonEncode(val.toList());
+          } else if (val is List<String> && val.isNotEmpty) {
+            queryParams["filters[$key]"] = jsonEncode(val);
+          } else if (val is String && val.isNotEmpty) {
+            queryParams["filters[$key]"] = val;
+          }
+        });
+
+        // Add text-based dynamic filters
+        _filterTextControllers.forEach((key, controller) {
+          if (controller.text.trim().isNotEmpty) {
+            queryParams["filters[$key]"] = controller.text.trim();
+          }
+        });
+
+        final dio = Dio(
+          BaseOptions(
+            baseUrl: Constant.baseUrl,
+            connectTimeout: const Duration(seconds: 8),
+            receiveTimeout: const Duration(seconds: 8),
+          ),
+        );
+
+        final response =
+            await dio.get(Api.getItemApi, queryParameters: queryParams);
+
+        if (response.statusCode == 200 && mounted) {
+          final data = response.data['data'];
+          int total = 0;
+          if (data is Map && data.containsKey('total')) {
+            total = data['total'] is int
+                ? data['total']
+                : int.tryParse(data['total'].toString()) ?? 0;
+          } else if (response.data is Map &&
+              response.data.containsKey('total')) {
+            total = response.data['total'] is int
+                ? response.data['total']
+                : int.tryParse(response.data['total'].toString()) ?? 0;
+          }
+
+          setState(() {
+            _resultCount = total;
+            _isLoadingCount = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isLoadingCount = false;
+          });
+        }
+      }
+    });
+  }
+
+  Future<void> _fetchCurrentLocation() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied ||
+            permission == LocationPermission.deniedForever) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Location permission denied')),
+            );
+          }
+          return;
+        }
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+      );
+
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty && mounted) {
+        Placemark place = placemarks[0];
+        String locName = place.locality ??
+            place.subAdministrativeArea ??
+            place.administrativeArea ??
+            place.name ??
+            "Dubai";
+
+        setState(() {
+          _locationController.text = locName;
+        });
+        _onFilterChanged();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not fetch location: $e')),
+        );
+      }
+    }
+  }
+
+  void _resetAllFilters() {
+    setState(() {
+      _selectedTab = 0;
+      _selectedPropertyType = 0;
+      _selectedCategory = 0;
+      _priceMinController.clear();
+      _priceMaxController.clear();
+      _areaMinController.clear();
+      _areaMaxController.clear();
+      _locationController.clear();
+      _excludeLocationController.clear();
+      _keywordController.clear();
+      _agencyController.clear();
+      _selectedFilters.clear();
+      _selectedMoreFilters.clear();
+      for (var controller in _filterTextControllers.values) {
+        controller.clear();
+      }
+    });
+    final initialSlug = (widget.category.children != null &&
+            widget.category.children!.isNotEmpty)
+        ? (widget.category.children!.first.slug ?? "residential")
+        : (widget.category.slug ?? "residential");
+    selectedSlug = initialSlug;
+    cubit.fetchFilters(initialSlug);
+    _onFilterChanged();
+  }
+
+  void _applyFiltersAndNavigate() {
+    String activeCategoryId = widget.category.id.toString();
+    String activeCategoryName = widget.category.name ?? "Properties";
+    final filterState = cubit.state;
+    if (filterState is FilterLoaded) {
+      if (_selectedCategory > 0 &&
+          _selectedCategory < filterState.data.children.length) {
+        final child = filterState.data.children[_selectedCategory];
+        if (child.slug != null &&
+            child.slug!.isNotEmpty &&
+            !child.slug!.endsWith('-all')) {
+          activeCategoryId = child.id.toString();
+          activeCategoryName = child.name ?? activeCategoryName;
+        }
+      }
+    }
+
+    Map<String, dynamic> customFieldFilterMap = {};
+    _selectedFilters.forEach((key, val) {
+      if (val is Set<String> && val.isNotEmpty) {
+        customFieldFilterMap[key] = val.toList();
+      } else if (val is List<String> && val.isNotEmpty) {
+        customFieldFilterMap[key] = val;
+      } else if (val is String && val.isNotEmpty) {
+        customFieldFilterMap[key] = [val];
+      }
+    });
+
+    _filterTextControllers.forEach((key, controller) {
+      if (controller.text.trim().isNotEmpty) {
+        customFieldFilterMap[key] = [controller.text.trim()];
+      }
+    });
+
+    ItemFilterModel appliedFilter = ItemFilterModel(
+      categoryId: activeCategoryId,
+      minPrice: _priceMinController.text.trim().isNotEmpty &&
+              _priceMinController.text.trim() != '0'
+          ? _priceMinController.text.trim()
+          : null,
+      maxPrice: _priceMaxController.text.trim().isNotEmpty
+          ? _priceMaxController.text.trim()
+          : null,
+      city: _locationController.text.trim().isNotEmpty
+          ? _locationController.text.trim()
+          : (HiveUtils.getCityName() ?? ""),
+      state: HiveUtils.getStateName() ?? "",
+      country: HiveUtils.getCountryName() ?? "",
+      customFields:
+          customFieldFilterMap.isNotEmpty ? customFieldFilterMap : null,
+    );
+
+    Constant.itemFilter = appliedFilter;
+
+    List<CategoryModel> categoryChain = [widget.category];
+    List<String> categoryIds = [widget.category.id.toString()];
+
+    if (activeCategoryId != widget.category.id.toString()) {
+      categoryChain.add(CategoryModel(
+        id: int.tryParse(activeCategoryId) ?? 0,
+        name: activeCategoryName,
+        children: [],
+        subcategoriesCount: 0,
+      ));
+      categoryIds.add(activeCategoryId);
+    }
+
+    Navigator.pushNamed(
+      context,
+      Routes.itemsList,
+      arguments: {
+        "catID": activeCategoryId,
+        "catName": activeCategoryName,
+        "categoryIds": categoryIds,
+        "selectedCategoryChain": categoryChain,
+        "appliedFilter": appliedFilter,
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final propertyTypes = (widget.category.children != null &&
+            widget.category.children!.isNotEmpty)
+        ? widget.category.children!
+        : [widget.category];
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Column(
         children: [
           _buildAppBar(),
           _buildTabBar(),
-          // Expanded(
-          //   child: SingleChildScrollView(
-          //     padding: const EdgeInsets.symmetric(horizontal: 16),
-          //     child: Column(
-          //       crossAxisAlignment: CrossAxisAlignment.start,
-          //       children: [
-          //         const SizedBox(height: 20),
-          //         _buildLocationSection(),
-          //         const SizedBox(height: 24),
-          //         _buildPropertyTypeSection(),
-          //         const SizedBox(height: 24),
-          //         _buildResidentialCategoriesSection(),
-          //         const SizedBox(height: 24),
-          //         _buildPriceRangeSection(),
-          //         const SizedBox(height: 24),
-          //         _buildBedroomsSection(),
-          //         const SizedBox(height: 24),
-          //         _buildBathroomsSection(),
-          //         const SizedBox(height: 24),
-          //         _buildAreaSizeSection(),
-          //         const SizedBox(height: 24),
-          //         _buildFurnishingTypeSection(),
-          //         const SizedBox(height: 24),
-          //         _buildExcludeLocationsSection(),
-          //         const SizedBox(height: 24),
-          //         _buildAmenitiesSection(),
-          //         const SizedBox(height: 24),
-          //         _buildKeywordSection(),
-          //         const SizedBox(height: 24),
-          //         _buildListedBySection(),
-          //         const SizedBox(height: 24),
-          //         _buildRealEstateAgenciesSection(),
-          //         const SizedBox(height: 24),
-          //         _buildRentIsPaidSection(),
-          //         const SizedBox(height: 24),
-          //         _buildMoreFiltersSection(),
-          //         const SizedBox(height: 24),
-          //       ],
-          //     ),
-          //   ),
-          // ),
-
-          // Expanded(
-          //   child: BlocBuilder<FilterCubit, FilterState>(
-          //     builder: (context, state) {
-          //
-          //       if (state is FilterLoading) {
-          //         return const Center(child: CircularProgressIndicator());
-          //       }
-          //
-          //       if (state is FilterError) {
-          //         return Center(child: Text(state.message));
-          //       }
-          //
-          //       if (state is FilterLoaded) {
-          //         final data = state.data;
-          //
-          //         final propertyTypes = widget.category.children ?? [];
-          //
-          //         // 👉 IMPORTANT: selected property
-          //         final selectedProperty =
-          //         (_selectedPropertyType < propertyTypes.length)
-          //             ? propertyTypes[_selectedPropertyType]
-          //             : null;
-          //
-          //         final categories = selectedProperty?.children ?? [];
-          //
-          //
-          //         print("👉 propertyTypes length: ${propertyTypes.length}");
-          //         print("👉 selectedPropertyType: $_selectedPropertyType");
-          //
-          //
-          //
-          //         print("👉 selectedProperty: $selectedProperty");
-          //
-          //
-          //
-          //         print("👉 categories length: ${categories.length}");
-          //         print("👉 selectedCategory: $_selectedCategory");
-          //
-          //         return SingleChildScrollView(
-          //           padding: const EdgeInsets.symmetric(horizontal: 16),
-          //           child: Column(
-          //             crossAxisAlignment: CrossAxisAlignment.start,
-          //             children: [
-          //
-          //               const SizedBox(height: 20),
-          //
-          //               _buildPropertyTypeSection(propertyTypes),
-          //
-          //               const SizedBox(height: 24),
-          //
-          //               _buildResidentialCategoriesSection(categories),
-          //
-          //             ],
-          //           ),
-          //         );
-          //       }
-          //
-          //       return const SizedBox();
-          //     },
-          //   ),
-          // ),
-// Replace the entire BlocBuilder Expanded section:
-
           Expanded(
-            child: BlocBuilder<FilterCubit, FilterState>(
+            child: BlocConsumer<FilterCubit, FilterState>(
+              listener: (context, state) {
+                if (state is FilterLoaded) {
+                  _onFilterChanged();
+                }
+              },
               builder: (context, state) {
-                final propertyTypes = widget.category.children ?? [];
-
                 return SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
+                  physics: const BouncingScrollPhysics(),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 20),
 
-                      // ✅ Static - Location
+                      // Location Section
                       _buildLocationSection(),
                       const SizedBox(height: 24),
 
-                      // ✅ Static - Property Type (from widget.category.children)
+                      // Property Type Section
                       _buildPropertyTypeSection(propertyTypes),
                       const SizedBox(height: 24),
 
                       if (state is FilterLoading)
-                        const Center(child: CircularProgressIndicator())
-
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 30),
+                          child: Center(
+                            child: CircularProgressIndicator(color: _redColor),
+                          ),
+                        )
                       else if (state is FilterError)
-                        Center(child: Text(state.message))
-
-                      else if (state is FilterLoaded) ...[
-
-                          // ✅ API - Categories chips
-                          if (state.data.children.isNotEmpty) ...[
-                            _buildResidentialCategoriesSection(
-                              state.data.children,
-                              state.data.name ?? 'Categories',
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          child: Center(
+                            child: Text(
+                              state.message,
+                              style: const TextStyle(color: Colors.red),
                             ),
-                            const SizedBox(height: 24),
-                          ],
-
-                          // ✅ Static - Price Range
-                          _buildPriceRangeSection(),
-                          const SizedBox(height: 24),
-
-                          // ✅ API - Dynamic filters (Bedrooms, Bathrooms, Furnishing, etc.)
-                          ...state.data.filters
-                              .map((filter) => _buildDynamicFilterSection(filter))
-                    .where((widget) => widget is! SizedBox) // 👈 remove empty widgets
-                    .expand((widget) => [
-                widget,
-                const SizedBox(height: 24),
-                ]),
-
-
-                          // ✅ Static - Exclude Locations
-                          _buildExcludeLocationsSection(),
-                          const SizedBox(height: 24),
-
-                          // ✅ Static - Keyword
-                          _buildKeywordSection(),
-                          const SizedBox(height: 24),
-
-                          // ✅ Static - Real Estate Agencies
-                          _buildRealEstateAgenciesSection(),
-                          const SizedBox(height: 24),
-
-                          // ✅ Static - More Filters
-                          _buildMoreFiltersSection(),
+                          ),
+                        )
+                      else if (state is FilterLoaded) ...[
+                        // Sub-categories Chips (e.g. All, Apartment, Villa, etc.)
+                        if (state.data.children.isNotEmpty) ...[
+                          _buildResidentialCategoriesSection(
+                            state.data.children,
+                            state.data.name ?? 'Categories',
+                          ),
                           const SizedBox(height: 24),
                         ],
+
+                        // Price Range Section
+                        _buildPriceRangeSection(),
+                        const SizedBox(height: 24),
+
+                        // Dynamic API Filters (Bedrooms, Bathrooms, Furnishing, Amenities, etc.)
+                        ...state.data.filters
+                            .map((filter) => _buildDynamicFilterSection(filter))
+                            .where((w) => w is! SizedBox)
+                            .expand((w) => [w, const SizedBox(height: 24)]),
+
+                        // Static filters commented out - Filter screen now only contains API-driven filters
+                        // // Static Exclude Locations
+                        // _buildExcludeLocationsSection(),
+                        // const SizedBox(height: 24),
+
+                        // // Static Keyword Section
+                        // _buildKeywordSection(),
+                        // const SizedBox(height: 24),
+
+                        // // Static Real Estate Agencies Section
+                        // _buildRealEstateAgenciesSection(),
+                        // const SizedBox(height: 24),
+
+                        // // Static More Filters
+                        // _buildMoreFiltersSection(),
+                        // const SizedBox(height: 24),
+                      ],
                     ],
                   ),
                 );
               },
             ),
           ),
-          // Expanded(
-          //   child: BlocBuilder<FilterCubit, FilterState>(
-          //     builder: (context, state) {
-          //       final propertyTypes = widget.category.children ?? [];
-          //
-          //       return SingleChildScrollView(
-          //         padding: const EdgeInsets.symmetric(horizontal: 16),
-          //         child: Column(
-          //           crossAxisAlignment: CrossAxisAlignment.start,
-          //           children: [
-          //             const SizedBox(height: 20),
-          //                     _buildLocationSection(),
-          //             const SizedBox(height: 24),
-          //             // ✅ Property Type — always from widget.category.children
-          //             _buildPropertyTypeSection(propertyTypes),
-          //
-          //             const SizedBox(height: 24),
-          //
-          //             // ✅ Below sections depend on API state
-          //             if (state is FilterLoading)
-          //               const Center(child: CircularProgressIndicator())
-          //
-          //             else if (state is FilterError)
-          //               Center(child: Text(state.message))
-          //
-          //             else if (state is FilterLoaded) ...[
-          //
-          //                 // ✅ Categories — from API response (state.data.children)
-          //                 if (state.data.children.isNotEmpty)
-          //                   _buildResidentialCategoriesSection(
-          //                     state.data.children,
-          //                     state.data.name ?? 'Categories', // ✅ pass name here
-          //                   ),
-          //                 const SizedBox(height: 24),
-          //                 //         _buildPriceRangeSection(),
-          //                 // ✅ Dynamic filters — from API response (state.data.filters)
-          //                 ...state.data.filters.map((filter) => Column(
-          //                   children: [
-          //                     _buildDynamicFilterSection(filter),
-          //                     const SizedBox(height: 24),
-          //                   ],
-          //                 )),
-          //               ],
-          //           ],
-          //         ),
-          //       );
-          //     },
-          //   ),
-          // ),
           _buildShowResultsButton(),
         ],
       ),
     );
   }
-  Widget _buildDynamicFilterSection(FilterItem filter) {
-    if (filter.values.isEmpty) return const SizedBox();
 
-    // ✅ multi select chips (checkbox)
-    if (filter.multiSelect) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSectionTitle(filter.name ?? ''),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: filter.values.map((val) {
-              final isSelected = _selectedMoreFilters.contains(val);
-              return _buildToggleChip(
-                val,
-                isSelected,
-                    () => setState(() {
-                  isSelected
-                      ? _selectedMoreFilters.remove(val)
-                      : _selectedMoreFilters.add(val);
-                }),
-              );
-            }).toList(),
-          ),
-        ],
-      );
-    }
-
-    // ✅ single select (radio)
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle(filter.name ?? ''),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: filter.values.map((val) {
-            final isSelected = _selectedMoreFilters.contains(val);
-            return GestureDetector(
-              onTap: () => setState(() {
-                // clear all values of this filter first (single select)
-                for (final v in filter.values) {
-                  _selectedMoreFilters.remove(v);
-                }
-                _selectedMoreFilters.add(val);
-              }),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: isSelected ? Colors.black : _borderColor,
-                    width: isSelected ? 1.5 : 1,
-                  ),
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: Text(
-                  val,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                    color: isSelected ? Colors.black : _greyText,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
   Widget _buildAppBar() {
     return SafeArea(
+      bottom: false,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
             GestureDetector(
-              onTap: () {
-                print("Filter screen close clicked");
-                Navigator.pop(context);
-              },
+              onTap: () => Navigator.pop(context),
               child: const Icon(Icons.close, color: _redColor, size: 24),
             ),
             const Expanded(
@@ -432,13 +509,13 @@ class _FiltersPageState extends State<FiltersPage> {
               ),
             ),
             GestureDetector(
-              onTap: () {},
+              onTap: _resetAllFilters,
               child: const Text(
                 'Reset',
                 style: TextStyle(
                   fontSize: 16,
                   color: _greyText,
-                  fontWeight: FontWeight.w400,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
@@ -459,13 +536,20 @@ class _FiltersPageState extends State<FiltersPage> {
           final isSelected = _selectedTab == i;
           return Expanded(
             child: GestureDetector(
-              onTap: () => setState(() => _selectedTab = i),
+              onTap: () {
+                if (_selectedTab != i) {
+                  setState(() => _selectedTab = i);
+                  _onFilterChanged();
+                }
+              },
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
                   color: isSelected ? Colors.white : const Color(0xFFEEEEEE),
                   border: isSelected
-                      ? const Border(bottom: BorderSide(color: _redColor, width: 2))
+                      ? const Border(
+                          bottom: BorderSide(color: _redColor, width: 2.5),
+                        )
                       : null,
                 ),
                 child: Center(
@@ -473,7 +557,8 @@ class _FiltersPageState extends State<FiltersPage> {
                     tabs[i],
                     style: TextStyle(
                       fontSize: 15,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                      fontWeight:
+                          isSelected ? FontWeight.w700 : FontWeight.w400,
                       color: isSelected ? Colors.black : _greyText,
                     ),
                   ),
@@ -505,107 +590,39 @@ class _FiltersPageState extends State<FiltersPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitle('Location'),
-        _buildSearchField(_locationController, 'e.g. Dubai Marina'),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: _borderColor),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: TextField(
+            controller: _locationController,
+            decoration: InputDecoration(
+              hintText: 'e.g. Dubai Marina',
+              hintStyle: const TextStyle(color: _greyText, fontSize: 15),
+              prefixIcon: const Icon(Icons.location_on_outlined,
+                  color: _greyText, size: 22),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.my_location,
+                    color: _redColor, size: 20),
+                tooltip: 'Use current location',
+                onPressed: _fetchCurrentLocation,
+              ),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+        ),
         const SizedBox(height: 8),
         const Text(
-          'Select the cities, neighborhoods or buildings that you want to  search properties in.',
+          'Select the cities, neighborhoods or buildings that you want to search properties in.',
           style: TextStyle(fontSize: 13, color: _greyText, height: 1.4),
         ),
       ],
     );
   }
 
-  Widget _buildSearchField(TextEditingController controller, String hint) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: _borderColor),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: TextField(
-        controller: controller,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: _greyText, fontSize: 15),
-          prefixIcon: const Icon(Icons.location_on_outlined, color: _greyText, size: 20),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 14),
-        ),
-      ),
-    );
-  }
-
-  // Widget _buildPropertyTypeSection() {
-  //   final subCategories = widget.category.children ?? [];
-  //
-  //   return Column(
-  //     crossAxisAlignment: CrossAxisAlignment.start,
-  //     children: [
-  //       _buildSectionTitle('Property Type'),
-  //       SizedBox(
-  //         height: 90,
-  //         child: ListView.separated(
-  //           scrollDirection: Axis.horizontal,
-  //           itemCount: subCategories.length,
-  //           separatorBuilder: (_, __) => const SizedBox(width: 10),
-  //           itemBuilder: (context, i) {
-  //             final item = subCategories[i];
-  //             final isSelected = _selectedPropertyType == i;
-  //
-  //             return GestureDetector(
-  //             //  onTap: () => setState(() => _selectedPropertyType = i),
-  //               onTap: () {
-  //                 setState(() {
-  //                   _selectedPropertyType = i;
-  //                 });
-  //
-  //                 final slug = widget.category.children![i].slug;
-  //
-  //                 setState(() {
-  //                   selectedSlug = slug!;
-  //                 });
-  //
-  //                 cubit.fetchFilters(slug!);
-  //               },
-  //               child: Container(
-  //                 width: 100,
-  //                 decoration: BoxDecoration(
-  //                   border: Border.all(
-  //                     color: isSelected ? Colors.black : _borderColor,
-  //                     width: isSelected ? 1.5 : 1,
-  //                   ),
-  //                   borderRadius: BorderRadius.circular(8),
-  //                 ),
-  //                 child: Column(
-  //                   mainAxisAlignment: MainAxisAlignment.center,
-  //                   children: [
-  //                     _buildCategoryImage(
-  //                       item.url,   // 👈 API image
-  //                       item.name,
-  //                       isSelected,
-  //                     ),
-  //                     const SizedBox(height: 6),
-  //                     Text(
-  //                       item.name ?? '',
-  //                       textAlign: TextAlign.center,
-  //                       style: TextStyle(
-  //                         fontSize: 12,
-  //                         fontWeight:
-  //                         isSelected ? FontWeight.w700 : FontWeight.w400,
-  //                         color: isSelected ? Colors.black : _greyText,
-  //                       ),
-  //                     ),
-  //                   ],
-  //                 ),
-  //               ),
-  //             );
-  //           },
-  //         ),
-  //       ),
-  //     ],
-  //   );
-  // }
-
-  Widget _buildPropertyTypeSection(List propertyTypes) {
+  Widget _buildPropertyTypeSection(List<dynamic> propertyTypes) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -617,19 +634,18 @@ class _FiltersPageState extends State<FiltersPage> {
             itemCount: propertyTypes.length,
             separatorBuilder: (_, __) => const SizedBox(width: 10),
             itemBuilder: (context, i) {
-
               final item = propertyTypes[i];
               final isSelected = _selectedPropertyType == i;
 
               return GestureDetector(
                 onTap: () {
-                  setState(() {
-                    _selectedPropertyType = i;
-                    _selectedCategory = 0; // 🔥 reset category
-                  });
-                  final slug = item.slug;
-
-                  if (slug != null && slug.isNotEmpty) {
+                  if (_selectedPropertyType != i) {
+                    setState(() {
+                      _selectedPropertyType = i;
+                      _selectedCategory = 0; // reset subcategory
+                    });
+                    final slug = item.slug ?? "residential";
+                    selectedSlug = slug;
                     cubit.fetchFilters(slug);
                   }
                 },
@@ -641,21 +657,29 @@ class _FiltersPageState extends State<FiltersPage> {
                       width: isSelected ? 1.5 : 1,
                     ),
                     borderRadius: BorderRadius.circular(8),
+                    color: isSelected
+                        ? Colors.black.withValues(alpha: 0.04)
+                        : Colors.white,
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       _buildCategoryImage(item.url, item.name, isSelected),
                       const SizedBox(height: 6),
-                      Text(
-                        item.name ?? '',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: isSelected
-                              ? FontWeight.w700
-                              : FontWeight.w400,
-                          color: isSelected ? Colors.black : _greyText,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          item.name ?? '',
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w400,
+                            color: isSelected ? Colors.black : _greyText,
+                          ),
                         ),
                       ),
                     ],
@@ -668,6 +692,7 @@ class _FiltersPageState extends State<FiltersPage> {
       ],
     );
   }
+
   IconData _getIcon(String? name) {
     switch (name?.toLowerCase()) {
       case 'residential':
@@ -681,9 +706,10 @@ class _FiltersPageState extends State<FiltersPage> {
       case 'daily short term':
         return Icons.today;
       default:
-        return Icons.category;
+        return Icons.category_outlined;
     }
   }
+
   Widget _buildCategoryImage(String? image, String? name, bool isSelected) {
     if (image != null && image.isNotEmpty) {
       return Image.network(
@@ -707,17 +733,15 @@ class _FiltersPageState extends State<FiltersPage> {
       );
     }
   }
-  Widget _buildResidentialCategoriesSection(List categories, String title) {
 
-    if (categories.isEmpty) {
-      return const SizedBox();
-    }
+  Widget _buildResidentialCategoriesSection(
+      List<FilterSubCategory> categories, String title) {
+    if (categories.isEmpty) return const SizedBox();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitle("${title} Categories"),
-
         SizedBox(
           height: 44,
           child: ListView.separated(
@@ -725,7 +749,6 @@ class _FiltersPageState extends State<FiltersPage> {
             itemCount: categories.length,
             separatorBuilder: (_, __) => const SizedBox(width: 8),
             itemBuilder: (context, i) {
-
               final item = categories[i];
               final isSelected = _selectedCategory == i;
 
@@ -734,17 +757,16 @@ class _FiltersPageState extends State<FiltersPage> {
                   setState(() {
                     _selectedCategory = i;
                   });
-
-                  final slug = item.slug;
-                  cubit.fetchFilters(slug);
+                  _onFilterChanged();
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
+                    color: isSelected ? Colors.black : Colors.white,
                     border: Border.all(
                       color: isSelected ? Colors.black : _borderColor,
-                      width: isSelected ? 1.5 : 1,
+                      width: 1,
                     ),
                     borderRadius: BorderRadius.circular(22),
                   ),
@@ -752,10 +774,9 @@ class _FiltersPageState extends State<FiltersPage> {
                     item.name ?? '',
                     style: TextStyle(
                       fontSize: 14,
-                      fontWeight: isSelected
-                          ? FontWeight.w700
-                          : FontWeight.w400,
-                      color: isSelected ? Colors.black : _greyText,
+                      fontWeight:
+                          isSelected ? FontWeight.w700 : FontWeight.w400,
+                      color: isSelected ? Colors.white : Colors.black87,
                     ),
                   ),
                 ),
@@ -774,104 +795,186 @@ class _FiltersPageState extends State<FiltersPage> {
         _buildSectionTitle('Price Range'),
         Row(
           children: [
-            Expanded(child: _buildRangeInputField(_priceMinController, '0', 'AED')),
+            Expanded(
+              child: _buildEditableRangeField(
+                  _priceMinController, '0', 'AED'),
+            ),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Text('to', style: TextStyle(fontSize: 15, color: Colors.black)),
+              child: Text('to',
+                  style: TextStyle(fontSize: 15, color: Colors.black)),
             ),
-            Expanded(child: _buildRangeInputField(_priceMaxController, 'Any', 'AED')),
+            Expanded(
+              child: _buildEditableRangeField(
+                  _priceMaxController, 'Any', 'AED'),
+            ),
           ],
-        ),
-        const SizedBox(height: 12),
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            trackHeight: 3,
-            activeTrackColor: Colors.black,
-            inactiveTrackColor: Colors.black,
-            thumbColor: Colors.black,
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 12),
-            overlayShape: const RoundSliderOverlayShape(overlayRadius: 0),
-          ),
-          child: RangeSlider(
-            values: _priceRange,
-            onChanged: (v) => setState(() => _priceRange = v),
-          ),
         ),
       ],
     );
   }
 
-  Widget _buildRangeInputField(TextEditingController controller, String hint, String suffix) {
+  Widget _buildEditableRangeField(
+      TextEditingController controller, String hint, String suffix) {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: _borderColor),
         borderRadius: BorderRadius.circular(8),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              controller.text.isEmpty ? hint : controller.text,
-              style: TextStyle(
-                fontSize: 15,
-                color: controller.text.isEmpty ? _greyText : Colors.black,
+            child: TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: const TextStyle(color: _greyText, fontSize: 15),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
+              style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black),
             ),
           ),
-          Text(suffix, style: const TextStyle(fontSize: 14, color: _greyText)),
+          Text(suffix,
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: _greyText)),
         ],
       ),
     );
   }
 
-  Widget _buildBedroomsSection() {
-    final options = ['Studio', '1', '2', '3', '4', '5', '6', '7+'];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('Bedrooms'),
-        SizedBox(
-          height: 44,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: options.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (context, i) {
-              final isSelected = _selectedBedrooms.contains(options[i]);
-              return _buildToggleChip(
-                options[i],
-                isSelected,
-                    () => setState(() {
-                  isSelected
-                      ? _selectedBedrooms.remove(options[i])
-                      : _selectedBedrooms.add(options[i]);
-                }),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
+  Widget _buildDynamicFilterSection(FilterItem filter) {
+    final filterName = filter.name ?? '';
+    if (filterName.isEmpty) return const SizedBox();
 
-  Widget _buildBathroomsSection() {
-    final options = ['1', '2', '3', '4', '5', '6+'];
+    // Text or Number input filter
+    if (filter.type == 'text' || filter.type == 'number') {
+      _filterTextControllers.putIfAbsent(
+          filterName, () => TextEditingController());
+      final controller = _filterTextControllers[filterName]!;
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitle(filterName),
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: _borderColor),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: TextField(
+              controller: controller,
+              keyboardType: filter.type == 'number'
+                  ? TextInputType.number
+                  : TextInputType.text,
+              inputFormatters: filter.type == 'number'
+                  ? [FilteringTextInputFormatter.digitsOnly]
+                  : null,
+              onChanged: (_) => _onFilterChanged(),
+              decoration: InputDecoration(
+                hintText: filter.placeholder ?? 'Enter $filterName',
+                hintStyle: const TextStyle(color: _greyText, fontSize: 15),
+                border: InputBorder.none,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (filter.values.isEmpty) return const SizedBox();
+
+    // Multi-select filter (e.g. Amenities, Listed By)
+    if (filter.multiSelect) {
+      if (!_selectedFilters.containsKey(filterName) ||
+          _selectedFilters[filterName] is! Set<String>) {
+        _selectedFilters[filterName] = <String>{};
+      }
+      final selectedSet = _selectedFilters[filterName] as Set<String>;
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitle(filterName),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: filter.values.map((val) {
+              final isSelected = selectedSet.contains(val);
+              return _buildToggleChip(
+                val,
+                isSelected,
+                () {
+                  setState(() {
+                    if (isSelected) {
+                      selectedSet.remove(val);
+                    } else {
+                      selectedSet.add(val);
+                    }
+                  });
+                  _onFilterChanged();
+                },
+              );
+            }).toList(),
+          ),
+        ],
+      );
+    }
+
+    // Single-select filter (e.g. Bedrooms, Bathrooms, Furnishing, Rent is paid)
+    final selectedVal = _selectedFilters[filterName] as String?;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('Bathrooms'),
+        _buildSectionTitle(filterName),
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: options.map((opt) {
-            final isSelected = _selectedBathrooms.contains(opt);
-            return _buildToggleChip(
-              opt,
-              isSelected,
-                  () => setState(() {
-                isSelected ? _selectedBathrooms.remove(opt) : _selectedBathrooms.add(opt);
-              }),
+          children: filter.values.map((val) {
+            final isSelected = selectedVal == val;
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (isSelected) {
+                    _selectedFilters.remove(filterName);
+                  } else {
+                    _selectedFilters[filterName] = val;
+                  }
+                });
+                _onFilterChanged();
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.black : Colors.white,
+                  border: Border.all(
+                    color: isSelected ? Colors.black : _borderColor,
+                    width: 1.5,
+                  ),
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Text(
+                  val,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight:
+                        isSelected ? FontWeight.w700 : FontWeight.w400,
+                    color: isSelected ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ),
             );
           }).toList(),
         ),
@@ -885,9 +988,10 @@ class _FiltersPageState extends State<FiltersPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
+          color: isSelected ? Colors.black : Colors.white,
           border: Border.all(
             color: isSelected ? Colors.black : _borderColor,
-            width: isSelected ? 1.5 : 1,
+            width: 1.5,
           ),
           borderRadius: BorderRadius.circular(8),
         ),
@@ -896,105 +1000,10 @@ class _FiltersPageState extends State<FiltersPage> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-            color: isSelected ? Colors.black : _greyText,
+            color: isSelected ? Colors.white : Colors.black87,
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildAreaSizeSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('Area / Size'),
-        Row(
-          children: [
-            Expanded(child: _buildAreaInputField('0', 'sqft')),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Text('to', style: TextStyle(fontSize: 15, color: Colors.black)),
-            ),
-            Expanded(child: _buildAreaInputField('Any', 'sqft')),
-          ],
-        ),
-        const SizedBox(height: 12),
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            trackHeight: 3,
-            activeTrackColor: Colors.black,
-            inactiveTrackColor: Colors.black,
-            thumbColor: Colors.black,
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 12),
-            overlayShape: const RoundSliderOverlayShape(overlayRadius: 0),
-          ),
-          child: RangeSlider(
-            values: _areaRange,
-            onChanged: (v) => setState(() => _areaRange = v),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAreaInputField(String value, String suffix) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: _borderColor),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 15,
-                color: value == 'Any' || value == '0' ? _greyText : Colors.black,
-              ),
-            ),
-          ),
-          Text(suffix, style: const TextStyle(fontSize: 14, color: _greyText)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFurnishingTypeSection() {
-    final options = ['All', 'Furnished', 'Unfurnished'];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('Furnishing Type'),
-        Wrap(
-          spacing: 8,
-          children: List.generate(options.length, (i) {
-            final isSelected = _selectedFurnishing == i;
-            return GestureDetector(
-              onTap: () => setState(() => _selectedFurnishing = i),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: isSelected ? Colors.black : _borderColor,
-                    width: isSelected ? 1.5 : 1,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  options[i],
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                    color: isSelected ? Colors.black : _greyText,
-                  ),
-                ),
-              ),
-            );
-          }),
-        ),
-      ],
     );
   }
 
@@ -1003,58 +1012,21 @@ class _FiltersPageState extends State<FiltersPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitle('Exclude locations'),
-        _buildSearchField(_excludeLocationController, 'e.g. Dubai Marina'),
-        const SizedBox(height: 8),
-        const Text(
-          'Select the locations or buildings that you want to exclude from your search.',
-          style: TextStyle(fontSize: 13, color: _greyText, height: 1.4),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAmenitiesSection() {
-    final amenities = ['Maids Room', 'Study', 'Central A/C', 'Balcony', 'Private Garden', 'Private Pool', 'Private Gym', 'Private Jacuzzi', 'Shared Pool', 'Shared Spa', 'Shared Gym'];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('Amenities'),
-        SizedBox(
-          height: 44,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: 3,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (context, i) {
-              final isSelected = _selectedAmenities.contains(amenities[i]);
-              return _buildToggleChip(
-                amenities[i],
-                isSelected,
-                    () => setState(() {
-                  isSelected
-                      ? _selectedAmenities.remove(amenities[i])
-                      : _selectedAmenities.add(amenities[i]);
-                }),
-              );
-            },
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: _borderColor),
+            borderRadius: BorderRadius.circular(8),
           ),
-        ),
-        const SizedBox(height: 10),
-        GestureDetector(
-          onTap: () {},
-          child: const Row(
-            children: [
-              Text(
-                'View all',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF1565C0),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              SizedBox(width: 4),
-              Icon(Icons.chevron_right, color: Color(0xFF1565C0), size: 18),
-            ],
+          child: TextField(
+            controller: _excludeLocationController,
+            decoration: const InputDecoration(
+              hintText: 'e.g. Dubai Marina',
+              hintStyle: TextStyle(color: _greyText, fontSize: 15),
+              prefixIcon: Icon(Icons.location_off_outlined,
+                  color: _greyText, size: 20),
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(vertical: 14),
+            ),
           ),
         ),
       ],
@@ -1077,32 +1049,10 @@ class _FiltersPageState extends State<FiltersPage> {
               hintText: 'e.g. Pool, Security, Ref ID',
               hintStyle: TextStyle(color: _greyText, fontSize: 15),
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              contentPadding:
+                  EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             ),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildListedBySection() {
-    final options = ['Agency', 'Landlord', 'Developer'];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('Listed By'),
-        Wrap(
-          spacing: 8,
-          children: options.map((opt) {
-            final isSelected = _selectedListedBy.contains(opt);
-            return _buildToggleChip(
-              opt,
-              isSelected,
-                  () => setState(() {
-                isSelected ? _selectedListedBy.remove(opt) : _selectedListedBy.add(opt);
-              }),
-            );
-          }).toList(),
         ),
       ],
     );
@@ -1121,41 +1071,12 @@ class _FiltersPageState extends State<FiltersPage> {
           child: TextField(
             controller: _agencyController,
             decoration: const InputDecoration(
-              hintText: 'e.g. dubizzle Properties',
+              hintText: 'e.g. Agency name',
               hintStyle: TextStyle(color: _greyText, fontSize: 15),
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              contentPadding:
+                  EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRentIsPaidSection() {
-    final options = ['Yearly', 'Bi-Yearly', 'Quarterly', 'Monthly'];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('Rent is Paid'),
-        SizedBox(
-          height: 44,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: options.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (context, i) {
-              final isSelected = _selectedRentPaid.contains(options[i]);
-              return _buildToggleChip(
-                options[i],
-                isSelected,
-                    () => setState(() {
-                  isSelected
-                      ? _selectedRentPaid.remove(options[i])
-                      : _selectedRentPaid.add(options[i]);
-                }),
-              );
-            },
           ),
         ),
       ],
@@ -1168,6 +1089,7 @@ class _FiltersPageState extends State<FiltersPage> {
       {'icon': Icons.play_circle_outline, 'label': 'Ads with\nVideo'},
       {'icon': Icons.rotate_left, 'label': 'Ads with\n360 View'},
     ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1178,18 +1100,26 @@ class _FiltersPageState extends State<FiltersPage> {
             final isSelected = _selectedMoreFilters.contains(label);
             return Expanded(
               child: GestureDetector(
-                onTap: () => setState(() {
-                  isSelected
-                      ? _selectedMoreFilters.remove(label)
-                      : _selectedMoreFilters.add(label);
-                }),
+                onTap: () {
+                  setState(() {
+                    if (isSelected) {
+                      _selectedMoreFilters.remove(label);
+                    } else {
+                      _selectedMoreFilters.add(label);
+                    }
+                  });
+                  _onFilterChanged();
+                },
                 child: Container(
                   margin: const EdgeInsets.only(right: 8),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(
+                    color: isSelected
+                        ? Colors.black.withValues(alpha: 0.05)
+                        : Colors.white,
                     border: Border.all(
                       color: isSelected ? Colors.black : _borderColor,
-                      width: isSelected ? 1.5 : 1,
+                      width: 1.5,
                     ),
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -1207,7 +1137,9 @@ class _FiltersPageState extends State<FiltersPage> {
                         style: TextStyle(
                           fontSize: 12,
                           color: isSelected ? Colors.black : _greyText,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
                         ),
                       ),
                     ],
@@ -1222,6 +1154,11 @@ class _FiltersPageState extends State<FiltersPage> {
   }
 
   Widget _buildShowResultsButton() {
+    final countFormatted = _resultCount
+        .toString()
+        .replaceAllMapped(
+            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},');
+
     return Container(
       width: double.infinity,
       color: Colors.white,
@@ -1230,20 +1167,30 @@ class _FiltersPageState extends State<FiltersPage> {
         width: double.infinity,
         height: 52,
         child: ElevatedButton(
-          onPressed: () {},
+          onPressed: _applyFiltersAndNavigate,
           style: ElevatedButton.styleFrom(
             backgroundColor: _redColor,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             elevation: 0,
           ),
-          child: const Text(
-            'Show 216,176 Results',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-            ),
-          ),
+          child: _isLoadingCount
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: Colors.white,
+                  ),
+                )
+              : Text(
+                  'Show $countFormatted Results',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
         ),
       ),
     );

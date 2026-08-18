@@ -35,13 +35,15 @@ class ItemsList extends StatefulWidget {
   final String categoryId, categoryName;
   final List<String> categoryIds;
   final List<CategoryModel>? selectedCategoryChain;
+  final ItemFilterModel? appliedFilter;
 
   const ItemsList(
       {super.key,
         required this.categoryId,
         required this.categoryName,
         required this.categoryIds,
-        this.selectedCategoryChain});
+        this.selectedCategoryChain,
+        this.appliedFilter});
 
   @override
   ItemsListState createState() => ItemsListState();
@@ -54,6 +56,7 @@ class ItemsList extends StatefulWidget {
         categoryName: arguments?['catName'],
         categoryIds: arguments?['categoryIds'],
         selectedCategoryChain: arguments?['selectedCategoryChain'],
+        appliedFilter: arguments?['appliedFilter'] as ItemFilterModel?,
       ),
     );
   }
@@ -82,11 +85,7 @@ class ItemsListState extends State<ItemsList> {
     _chipFilterCubit = FetchSubCategoriesCubit();
     // Initialize chain from arguments or empty
     _currentChain = widget.selectedCategoryChain ?? [];
-    // Fallback: If chain is empty but we have a main category and it's not "Property" (which is root), add it.
-    // Actually, simply relying on arguments is safer.
-    // If empty & we have categoryName, maybe add it?
     if (_currentChain.isEmpty && widget.categoryId.isNotEmpty) {
-      // Basic fallback
       _currentChain.add(CategoryModel(
           id: int.tryParse(widget.categoryId) ?? 0,
           name: widget.categoryName,
@@ -97,17 +96,13 @@ class ItemsListState extends State<ItemsList> {
 
     _currentCategoryIds = List.from(widget.categoryIds);
     searchbody = {};
-    Constant.itemFilter = null;
+    filter = widget.appliedFilter ?? Constant.itemFilter;
     searchController = TextEditingController();
     searchController.addListener(searchItemListener);
     controller = ScrollController()..addListener(_loadMore);
 
-    context.read<FetchItemFromCategoryCubit>().fetchItemFromCategory(
-        categoryId: int.parse(
-          widget.categoryId,
-        ),
-        search: "",
-        filter: ItemFilterModel(
+    ItemFilterModel initialFilter = filter ??
+        ItemFilterModel(
             country: HiveUtils.getCountryName() ?? "",
             areaId: HiveUtils.getAreaId() != null
                 ? int.parse(HiveUtils.getAreaId().toString())
@@ -117,7 +112,17 @@ class ItemsListState extends State<ItemsList> {
             categoryId: widget.categoryId,
             radius: HiveUtils.getNearbyRadius() ?? null,
             latitude: HiveUtils.getLatitude() ?? null,
-            longitude: HiveUtils.getLongitude() ?? null));
+            longitude: HiveUtils.getLongitude() ?? null);
+
+    filter = initialFilter;
+    Constant.itemFilter = initialFilter;
+
+    context.read<FetchItemFromCategoryCubit>().fetchItemFromCategory(
+        categoryId: int.parse(
+          widget.categoryId,
+        ),
+        search: "",
+        filter: initialFilter);
 
     Future.delayed(Duration.zero, () {
       selectedcategoryId = widget.categoryId;
@@ -368,8 +373,8 @@ class ItemsListState extends State<ItemsList> {
             _buildChip(
                 label: "All Fields",
                 isActive: _isAllFieldsSelected,
-                onTap: _onAllFieldsTap
-            ),
+                showDropdown: false,
+                onTap: _onAllFieldsTap),
           ],
         ),
       ),
@@ -381,6 +386,7 @@ class ItemsListState extends State<ItemsList> {
     return _buildChip(
       label: currentModel.name ?? "",
       isActive: !_isAllFieldsSelected, // Inactive if All Fields is selected
+      showDropdown: true,
       onTap: () {
         if (_isAllFieldsSelected) {
           _restoreSelection(chainIndex);
@@ -397,13 +403,17 @@ class ItemsListState extends State<ItemsList> {
   void _onAllFieldsTap() {
     setState(() {
       // Do not clear the chain, just reset the search to root
-       _isAllFieldsSelected = true;
-      _currentCategoryIds = [widget.categoryId];
+      _isAllFieldsSelected = true;
+      int rootId = int.tryParse(widget.categoryIds.isNotEmpty
+              ? widget.categoryIds[0]
+              : widget.categoryId) ??
+          0;
+      _currentCategoryIds = [rootId.toString()];
 
       context.read<FetchItemFromCategoryCubit>().fetchItemFromCategory(
-          categoryId: int.tryParse(widget.categoryId) ?? 0,
-          search: searchController.text
-      );
+          categoryId: rootId,
+          search: searchController.text,
+          filter: filter);
     });
   }
 
@@ -413,189 +423,391 @@ class ItemsListState extends State<ItemsList> {
 
       // Truncate chain after chainIndex
       if (_currentChain.length > chainIndex + 1) {
-         _currentChain.removeRange(chainIndex + 1, _currentChain.length);
+        _currentChain.removeRange(chainIndex + 1, _currentChain.length);
       }
 
-      List<String> newIds = [widget.categoryId];
+      List<String> newIds = [];
+      if (widget.categoryIds.isNotEmpty && widget.categoryIds.length > 1) {
+        newIds.add(widget.categoryIds[0]);
+      }
       for (var cat in _currentChain) {
-        newIds.add(cat.id.toString());
+        if (cat.id != null && !newIds.contains(cat.id.toString())) {
+          newIds.add(cat.id.toString());
+        }
       }
       _currentCategoryIds = newIds;
 
       // Fetch
-      CategoryModel? targetCat = _currentChain.isNotEmpty ? _currentChain.last : null;
+      CategoryModel? targetCat =
+          _currentChain.isNotEmpty ? _currentChain.last : null;
       int targetId = targetCat?.id ?? int.tryParse(widget.categoryId) ?? 0;
 
       context.read<FetchItemFromCategoryCubit>().fetchItemFromCategory(
           categoryId: targetId,
-          search: searchController.text
-      );
+          search: searchController.text,
+          filter: filter);
     });
   }
 
+  CategoryModel? _findCategoryInTree(List<CategoryModel> categories, int targetId) {
+    for (var cat in categories) {
+      if (cat.id == targetId) return cat;
+      if (cat.children != null && cat.children!.isNotEmpty) {
+        final found = _findCategoryInTree(cat.children!, targetId);
+        if (found != null) return found;
+      }
+    }
+    return null;
+  }
+
   void _showDynamicFilterBottomSheet(int chainIndex) {
-    // Determine the Parent ID to fetch siblings from.
-    // Index 0 in chain corresponds to Level 1 (Rent). Its parent is Level 0 (Property).
-    
-    // Robust way:
-    String parentId;
+    int parentId = 0;
     if (chainIndex == 0) {
-      // Index 0 in chain is Level 1 (e.g., Rent). Its parent is Level 0 (Property).
-      // Level 0 ID is stored at index 0 of the full ID list passed to this screen.
-      parentId = widget.categoryIds.isNotEmpty ? widget.categoryIds[0] : "0";
-    } else {
-      // Parent is the previous item in the chain
-      if (chainIndex - 1 < _currentChain.length) {
-         parentId = _currentChain[chainIndex - 1].id.toString();
+      if (widget.categoryIds.length > 1) {
+        parentId = int.tryParse(widget.categoryIds[0]) ?? 0;
+      } else if (_currentChain.isNotEmpty) {
+        parentId = _currentChain[0].id ?? int.tryParse(widget.categoryId) ?? 0;
       } else {
-         return; // Error state
+        parentId = int.tryParse(widget.categoryId) ?? 0;
+      }
+    } else {
+      if (chainIndex - 1 < _currentChain.length) {
+        parentId = _currentChain[chainIndex - 1].id ?? 0;
       }
     }
 
-    _chipFilterCubit.fetchSubCategories(categoryId: int.tryParse(parentId) ?? 0);
+    if (parentId != 0) {
+      _chipFilterCubit.fetchSubCategories(categoryId: parentId);
+    }
 
     showModalBottomSheet(
       context: context,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) {
         CategoryModel? selectedCategory;
-        // Initialize with current selection if available
         if (_currentChain.length > chainIndex) {
           selectedCategory = _currentChain[chainIndex];
         }
 
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
-            return Container(
-              decoration: BoxDecoration(
+            return DraggableScrollableSheet(
+              initialChildSize: 0.65,
+              minChildSize: 0.4,
+              maxChildSize: 0.9,
+              expand: false,
+              builder: (context, scrollController) {
+                return Material(
                   color: context.color.secondaryColor,
                   borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(20))),
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text("Select Category",
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: context.color.textDefaultColor)),
-                       GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: Icon(Icons.close, color: context.color.textDefaultColor),
-                      )
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  BlocProvider.value(
-                    value: _chipFilterCubit,
-                    child: BlocBuilder<FetchSubCategoriesCubit,
-                        FetchSubCategoriesState>(
-                      builder: (context, state) {
-                        if (state is FetchSubCategoriesInProgress) {
-                          return Center(child: CircularProgressIndicator());
-                        }
-                        if (state is FetchSubCategoriesSuccess) {
-                          return Container(
-                            constraints: BoxConstraints(
-                              maxHeight: MediaQuery.of(context).size.height * 0.5,
+                      const BorderRadius.vertical(top: Radius.circular(20)),
+                  clipBehavior: Clip.antiAlias,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                    child: Column(
+                      children: [
+                        // Drag Handle
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: context.color.borderColor,
+                              borderRadius: BorderRadius.circular(2),
                             ),
-                            child: SingleChildScrollView(
-                               child: GridView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: state.categories.length,
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 4,
-                                  mainAxisSpacing: 10,
-                                  crossAxisSpacing: 10,
-                                  childAspectRatio: 0.9,
-                                ),
-                                itemBuilder: (context, index) {
-                                  CategoryModel cat = state.categories[index];
-                                  bool isSelected = selectedCategory?.id == cat.id;
+                          ),
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text("Select Category",
+                                style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: context.color.textDefaultColor)),
+                            GestureDetector(
+                              onTap: () => Navigator.pop(context),
+                              child: Icon(Icons.close,
+                                  color: context.color.textDefaultColor),
+                            )
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: BlocProvider.value(
+                            value: _chipFilterCubit,
+                            child: BlocBuilder<FetchSubCategoriesCubit,
+                                FetchSubCategoriesState>(
+                              builder: (context, state) {
+                                if (state is FetchSubCategoriesInProgress) {
+                                  return const Center(
+                                      child: CircularProgressIndicator());
+                                }
+                                if (state is FetchSubCategoriesSuccess) {
+                                  List<CategoryModel> displayCategories = [];
+                                  bool isMainCategory = false;
 
-                                  return InkWell(
-                                    onTap: () {
-                                      setModalState(() {
-                                        selectedCategory = cat;
-                                      });
-                                    },
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: isSelected
-                                            ? context.color.territoryColor
-                                                .withValues(alpha: 0.1)
-                                            : context.color.backgroundColor,
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(
+                                  if (parentId != 0) {
+                                    final parentModel = _findCategoryInTree(
+                                        state.categories, parentId);
+                                    if (parentModel != null &&
+                                        parentModel.children != null &&
+                                        parentModel.children!.isNotEmpty) {
+                                      displayCategories = parentModel.children!;
+                                      isMainCategory = false;
+                                    } else {
+                                      displayCategories = state.categories;
+                                      isMainCategory = true;
+                                    }
+                                  } else {
+                                    displayCategories = state.categories;
+                                    isMainCategory = true;
+                                  }
+
+                                  if (displayCategories.isEmpty) {
+                                    return Center(
+                                      child: Text(
+                                        "No subcategories available",
+                                        style: TextStyle(
+                                            color: context.color.textLightColor),
+                                      ),
+                                    );
+                                  }
+
+                                  if (isMainCategory) {
+                                    // Grid View for Main Categories
+                                    return GridView.builder(
+                                      controller: scrollController,
+                                      physics: const BouncingScrollPhysics(),
+                                      itemCount: displayCategories.length,
+                                      gridDelegate:
+                                          const SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 3,
+                                        mainAxisSpacing: 12,
+                                        crossAxisSpacing: 12,
+                                        childAspectRatio: 0.92,
+                                      ),
+                                      itemBuilder: (context, index) {
+                                        CategoryModel cat =
+                                            displayCategories[index];
+                                        bool isSelected =
+                                            selectedCategory?.id == cat.id;
+
+                                        return Material(
                                           color: isSelected
                                               ? context.color.territoryColor
-                                              : context.color.borderColor,
-                                          width: 1.5,
-                                        ),
-                                      ),
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          SizedBox(
-                                            height: 30,
-                                            width: 30,
-                                            child: UiUtils.imageType(
-                                              cat.url ?? "",
-                                              color: isSelected
-                                                  ? context.color.territoryColor
-                                                  : context.color.textDefaultColor,
+                                                  .withValues(alpha: 0.1)
+                                              : context.color.backgroundColor,
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          clipBehavior: Clip.antiAlias,
+                                          child: InkWell(
+                                            onTap: () {
+                                              setModalState(() {
+                                                selectedCategory = cat;
+                                              });
+                                            },
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                border: Border.all(
+                                                  color: isSelected
+                                                      ? context
+                                                          .color.territoryColor
+                                                      : context.color.borderColor,
+                                                  width: isSelected ? 1.5 : 1,
+                                                ),
+                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 4,
+                                                      vertical: 8),
+                                              child: Column(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  Container(
+                                                    width: 44,
+                                                    height: 44,
+                                                    padding:
+                                                        const EdgeInsets.all(8),
+                                                    decoration: BoxDecoration(
+                                                      shape: BoxShape.circle,
+                                                      color: isSelected
+                                                          ? context.color
+                                                              .territoryColor
+                                                              .withValues(
+                                                                  alpha: 0.15)
+                                                          : context.color
+                                                              .territoryColor
+                                                              .withValues(
+                                                                  alpha: 0.06),
+                                                    ),
+                                                    child: (cat.url != null &&
+                                                            cat.url!
+                                                                .trim()
+                                                                .isNotEmpty)
+                                                        ? UiUtils.imageType(
+                                                            cat.url!,
+                                                            fit: BoxFit.contain,
+                                                            color: isSelected
+                                                                ? context.color
+                                                                    .territoryColor
+                                                                : null,
+                                                          )
+                                                        : Icon(
+                                                            Icons
+                                                                .category_outlined,
+                                                            size: 22,
+                                                            color: context
+                                                                .color
+                                                                .territoryColor,
+                                                          ),
+                                                  ),
+                                                  const SizedBox(height: 6),
+                                                  Text(
+                                                    cat.name ?? "",
+                                                    textAlign: TextAlign.center,
+                                                    maxLines: 2,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: isSelected
+                                                          ? context.color
+                                                              .territoryColor
+                                                          : context.color
+                                                              .textDefaultColor,
+                                                      fontWeight: isSelected
+                                                          ? FontWeight.bold
+                                                          : FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
                                           ),
-                                          const SizedBox(height: 8),
-                                          Text(
+                                        );
+                                      },
+                                    );
+                                  }
+
+                                  // List View for Subcategories
+                                  return ListView.separated(
+                                    controller: scrollController,
+                                    physics: const BouncingScrollPhysics(),
+                                    itemCount: displayCategories.length,
+                                    separatorBuilder: (context, index) =>
+                                        const Divider(height: 1),
+                                    itemBuilder: (context, index) {
+                                      CategoryModel cat =
+                                          displayCategories[index];
+                                      bool isSelected =
+                                          selectedCategory?.id == cat.id;
+
+                                      return Material(
+                                        color: isSelected
+                                            ? context.color.territoryColor
+                                                .withValues(alpha: 0.08)
+                                            : Colors.transparent,
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                        clipBehavior: Clip.antiAlias,
+                                        child: ListTile(
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                  horizontal: 8, vertical: 4),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                          ),
+                                          leading: Container(
+                                            width: 40,
+                                            height: 40,
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: isSelected
+                                                  ? context.color.territoryColor
+                                                      .withValues(alpha: 0.15)
+                                                  : context.color.territoryColor
+                                                      .withValues(alpha: 0.06),
+                                            ),
+                                            child: (cat.url != null &&
+                                                    cat.url!.trim().isNotEmpty)
+                                                ? UiUtils.imageType(
+                                                    cat.url!,
+                                                    fit: BoxFit.contain,
+                                                    color: isSelected
+                                                        ? context.color
+                                                            .territoryColor
+                                                        : null,
+                                                  )
+                                                : Icon(
+                                                    Icons.category_outlined,
+                                                    size: 20,
+                                                    color: context
+                                                        .color.territoryColor,
+                                                  ),
+                                          ),
+                                          title: Text(
                                             cat.name ?? "",
-                                            textAlign: TextAlign.center,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
-                                              fontSize: 12,
+                                              fontSize: 14,
                                               color: isSelected
                                                   ? context.color.territoryColor
                                                   : context.color.textDefaultColor,
                                               fontWeight: isSelected
-                                                  ? FontWeight.w600
-                                                  : FontWeight.normal,
+                                                  ? FontWeight.bold
+                                                  : FontWeight.w500,
                                             ),
                                           ),
-                                        ],
-                                      ),
-                                    ),
+                                          trailing: isSelected
+                                              ? Icon(Icons.check_circle_rounded,
+                                                  color:
+                                                      context.color.territoryColor,
+                                                  size: 22)
+                                              : Icon(Icons.radio_button_unchecked,
+                                                  color:
+                                                      context.color.borderColor,
+                                                  size: 22),
+                                          onTap: () {
+                                            setModalState(() {
+                                              selectedCategory = cat;
+                                            });
+                                          },
+                                        ),
+                                      );
+                                    },
                                   );
-                                },
-                              ),
+                                }
+                                return const SizedBox.shrink();
+                              },
                             ),
-                          );
-                        }
-                        return Text("No options available");
-                      },
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SafeArea(
+                          top: false,
+                          child: UiUtils.buildButton(context, onPressed: () {
+                            if (selectedCategory != null) {
+                              Navigator.pop(context);
+                              _updateSelection(chainIndex, selectedCategory!);
+                            }
+                          },
+                              buttonTitle: "Show Results",
+                              textColor: context.color.secondaryColor,
+                              buttonColor: context.color.territoryColor,
+                              radius: 10),
+                        )
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  UiUtils.buildButton(context, onPressed: () {
-                    if (selectedCategory != null) {
-                      Navigator.pop(context);
-                      _updateSelection(chainIndex, selectedCategory!);
-                    }
-                  },
-                      buttonTitle: "Show Results",
-                      textColor: context.color.secondaryColor,
-                      buttonColor: context.color.territoryColor,
-                      radius: 10)
-                ],
-              ),
+                );
+              },
             );
           },
         );
@@ -604,112 +816,82 @@ class ItemsListState extends State<ItemsList> {
   }
 
   void _updateSelection(int chainIndex, CategoryModel newSelection) {
-    final oldId = _currentChain.length > chainIndex ? _currentChain[chainIndex].id : -1;
-    // If selection is same AND All Fields is NOT selected, then no change.
-    // If All Fields IS selected, we must proceed to deactivate it and restore this selection.
-    if (oldId == newSelection.id && !_isAllFieldsSelected) return;
-
     setState(() {
-      _isAllFieldsSelected = false; // Reset All Fields flag
+      _isAllFieldsSelected = false;
 
-      // 1. Save History for the OLD item being replaced
-      if (_currentChain.length > chainIndex) {
-         int currentOldId = _currentChain[chainIndex].id!;
-         // If there are children (tail), save them
-         if (_currentChain.length > chainIndex + 1) {
-            _selectionHistory[currentOldId] = List.from(_currentChain.sublist(chainIndex + 1));
-         }
-      }
-
-      // 2. Update the chain at this index
+      // Update the chain at this index
       if (_currentChain.length > chainIndex) {
         _currentChain[chainIndex] = newSelection;
       } else {
         _currentChain.add(newSelection);
       }
 
-      // 3. Truncate any existing children (since we changed the parent)
+      // Truncate any existing children
       if (_currentChain.length > chainIndex + 1) {
         _currentChain.removeRange(chainIndex + 1, _currentChain.length);
       }
 
-      // 4. Restore History for the NEW item (if we visited it before)
-      if (_selectionHistory.containsKey(newSelection.id)) {
-         _currentChain.addAll(_selectionHistory[newSelection.id]!);
-      }
-
-      // 5. Re-calculate categoryIds chain
-      // Note: We use widget.categoryIds[0] as the Root Base if chainIndex 0 starts from Level 1
+      // Re-calculate categoryIds chain
       List<String> newIds = [];
-      if (widget.categoryIds.isNotEmpty) newIds.add(widget.categoryIds[0]);
-      
-      // Add current chain IDs
-      for (var cat in _currentChain) {
-        newIds.add(cat.id.toString());
+      if (widget.categoryIds.isNotEmpty && widget.categoryIds.length > 1) {
+        newIds.add(widget.categoryIds[0]);
       }
-      // Note: If original widget.categoryIds had more depth, we are replacing it dynamically.
-      // But we must assume widget.categoryIds[0] is the only fixed Root Context.
-      // Actually, my previous logic `List<String> newIds = [_currentCategoryIds[0]];` 
-      // relied on `_currentCategoryIds[0]` being preserved.
-      // Here, `widget.categoryIds[0]` is safer/constant.
-      
-      // Let's stick to using widget.categoryIds[0] as ROOT.
-      // But verify if widget.categoryIds is empty (e.g. from Search? Not PropertyFilter).
-      // This flow is for PropertyFilter mostly.
-      
-       if (newIds.isEmpty && _currentChain.isNotEmpty) {
-           // Fallback if no root is passed? Should not happen in this flow.
-           // Maybe _currentChain[0] is root?
-           // No, Rent is Level 1.
-           // We'll stick to newIds logic.
-       }
-       
-       // Just to be safe, if we duplicated the Root ID?
-       // `widget.categoryIds` might be `[PropertyID, RentID...]`.
-       // `_currentChain` starts with Rent. 
-       // So `newIds` = `[PropertyID, RentID, ResID...]`. Correct.
-       
-       // Wait, what if widget.categoryIds comes as `[PropertyID]` only?
-       // `newIds` = `[PropertyID, RentID...]`. Correct.
-       
-       // What if `_currentChain` contains Property (Level 0)?
-       // No, `accumulatedModels` logic in PropertyScreen added Tab(Rent) as first item.
-       // So Chain starts at Level 1.
-       
-       _currentCategoryIds = newIds;
+      for (var cat in _currentChain) {
+        if (cat.id != null && !newIds.contains(cat.id.toString())) {
+          newIds.add(cat.id.toString());
+        }
+      }
+      _currentCategoryIds = newIds;
 
-      // 6. Trigger API refresh
-      // Fetch using the LAST item in the chain (Most specific filter)
+      int targetId = newSelection.id ?? int.tryParse(widget.categoryId) ?? 0;
+
       context.read<FetchItemFromCategoryCubit>().fetchItemFromCategory(
-          categoryId: _currentChain.last.id!,
-          search: searchController.text
-      );
+            categoryId: targetId,
+            search: searchController.text,
+            filter: filter,
+          );
     });
   }
 
-  Widget _buildChip({required String label, required bool isActive, VoidCallback? onTap}) {
+  Widget _buildChip(
+      {required String label,
+      required bool isActive,
+      bool showDropdown = true,
+      VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: context.color.primaryColor,
+          color: isActive
+              ? context.color.territoryColor.withValues(alpha: 0.12)
+              : context.color.primaryColor,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
               color: isActive
-                  ? context.color.borderColor
-                  : context.color.borderColor), // Same border for now or customize
+                  ? context.color.territoryColor
+                  : context.color.borderColor,
+              width: isActive ? 1.5 : 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(label,
                 style: TextStyle(
-                    color: context.color.textDefaultColor,
-                    fontWeight: isActive ? FontWeight.bold : FontWeight.normal)),
-            const SizedBox(width: 4),
-            Icon(Icons.keyboard_arrow_down,
-                size: 16, color: context.color.textDefaultColor)
+                    color: isActive
+                        ? context.color.territoryColor
+                        : context.color.textDefaultColor,
+                    fontSize: 13,
+                    fontWeight:
+                        isActive ? FontWeight.bold : FontWeight.normal)),
+            if (showDropdown) ...[
+              const SizedBox(width: 4),
+              Icon(Icons.keyboard_arrow_down,
+                  size: 16,
+                  color: isActive
+                      ? context.color.territoryColor
+                      : context.color.textDefaultColor),
+            ],
           ],
         ),
       ),
@@ -955,14 +1137,13 @@ class ItemsListState extends State<ItemsList> {
       ),
       isScrollControlled: true,
       builder: (BuildContext context) {
-        return Container(
-          decoration: BoxDecoration(
-            color: context.color.secondaryColor,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(8),
-              topRight: Radius.circular(8),
-            ),
+        return Material(
+          color: context.color.secondaryColor,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(8),
+            topRight: Radius.circular(8),
           ),
+          clipBehavior: Clip.antiAlias,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,

@@ -135,11 +135,27 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 radius: 8,
               ),
               if (_requestStatus != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(_requestStatus!)
-                      .size(context.font.small)
-                      .color(context.color.textLightColor),
+                Container(
+                  margin: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.amber.shade700),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.warning_amber_rounded,
+                          color: Colors.amber.shade900),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(_requestStatus!)
+                            .size(context.font.small)
+                            .color(context.color.textDefaultColor),
+                      ),
+                    ],
+                  ),
                 ),
             ],
           ),

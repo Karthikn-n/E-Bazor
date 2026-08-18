@@ -77,7 +77,7 @@ class FetchCountriesCubit extends Cubit<FetchCountriesState> {
     }
   }
 
-  Future<void> fetchCountriesMore() async {
+  Future<void> fetchCountriesMore({String? search}) async {
     try {
       if (state is FetchCountriesSuccess) {
         if ((state as FetchCountriesSuccess).isLoadingMore) {
@@ -86,17 +86,19 @@ class FetchCountriesCubit extends Cubit<FetchCountriesState> {
         emit((state as FetchCountriesSuccess).copyWith(isLoadingMore: true));
 
         DataOutput<CountriesModel> result = await _countriesRepository
-            .fetchCountries(page: (state as FetchCountriesSuccess).page + 1);
+            .fetchCountries(page: (state as FetchCountriesSuccess).page + 1, search: search);
 
         FetchCountriesSuccess countries = (state as FetchCountriesSuccess);
 
-        countries.countriesModel.addAll(result.modelList);
+        List<CountriesModel> updatedList =
+            List<CountriesModel>.from(countries.countriesModel)
+              ..addAll(result.modelList);
 
         emit(
           FetchCountriesSuccess(
             isLoadingMore: false,
             loadingMoreError: false,
-            countriesModel: countries.countriesModel,
+            countriesModel: updatedList,
             page: (state as FetchCountriesSuccess).page + 1,
             total: result.total,
           ),

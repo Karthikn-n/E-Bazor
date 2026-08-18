@@ -35,16 +35,29 @@ class CustomFieldModel {
   }
 
   factory CustomFieldModel.fromMap(Map<String, dynamic> map) {
+    int? parseRequired(dynamic req) {
+      if (req == null) return null;
+      if (req is bool) return req ? 1 : 0;
+      if (req is int) return req;
+      return int.tryParse(req.toString());
+    }
+
+    int? parseInt(dynamic val) {
+      if (val == null) return null;
+      if (val is int) return val;
+      return int.tryParse(val.toString());
+    }
+
     return CustomFieldModel(
-      id: map['id'] as int,
-      name: map['name'] as String,
-      type: map['type'] as String,
+      id: parseInt(map['id']),
+      name: map['name']?.toString(),
+      type: map['type']?.toString(),
       values: map['values'] as dynamic,
-      image: map['image'],
-      required: map['required'],
-      maxLength: map['max_length'],
-      minLength: map['min_length'],
-      value: map['value'],
+      image: map['image']?.toString(),
+      required: parseRequired(map['required'] ?? map['is_required']),
+      maxLength: parseInt(map['max_length']),
+      minLength: parseInt(map['min_length']),
+      value: map['value'] is List ? map['value'] : (map['value'] != null ? [map['value']] : null),
     );
   }
 
@@ -89,15 +102,28 @@ class VerificationFieldModel {
   }
 
   factory VerificationFieldModel.fromMap(Map<String, dynamic> map) {
+    int? parseRequired(dynamic req) {
+      if (req == null) return null;
+      if (req is bool) return req ? 1 : 0;
+      if (req is int) return req;
+      return int.tryParse(req.toString());
+    }
+
+    int? parseInt(dynamic val) {
+      if (val == null) return null;
+      if (val is int) return val;
+      return int.tryParse(val.toString());
+    }
+
     return VerificationFieldModel(
-      id: map['id'] as int,
-      name: map['name'] as String,
-      type: map['type'] as String,
+      id: parseInt(map['id']),
+      name: map['name']?.toString(),
+      type: map['type']?.toString(),
       values: map['values'] as dynamic,
-      required: map['is_required'],
-      maxLength: map['max_length'],
-      minLength: map['min_length'],
-      status: map['status'],
+      required: parseRequired(map['is_required'] ?? map['required']),
+      maxLength: parseInt(map['max_length']),
+      minLength: parseInt(map['min_length']),
+      status: map['status']?.toString(),
     );
   }
 

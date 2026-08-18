@@ -82,11 +82,9 @@ class LanguagesListScreen extends StatelessWidget {
 
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                child: Material(
+                  color: color,
+                  borderRadius: BorderRadius.circular(10),
                   child: ListTile(
                     onTap: () {
                       context
@@ -123,12 +121,6 @@ class LanguagesListScreen extends StatelessWidget {
                             .size(context.font.small)
                       ],
                     ),
-                    /*   subtitle: Text(setting[index]['name'])
-                          .color((language).language['code'] ==
-                                  setting[index]['code']
-                              ? context.color.buttonColor
-                              : context.color.textColorDark)
-                          .size(context.font.small)*/
                   ),
                 ),
               );

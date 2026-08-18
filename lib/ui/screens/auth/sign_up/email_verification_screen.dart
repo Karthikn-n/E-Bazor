@@ -8,6 +8,7 @@ import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/app_icon.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
+import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -165,7 +166,11 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
+    return AnnotatedRegion(
+      value: UiUtils.getSystemUiOverlayStyle(
+        context: context,
+        statusBarColor: context.color.backgroundColor,
+      ),
       child: Scaffold(
         appBar: AppBar(
           backgroundColor: context.color.backgroundColor,
@@ -174,44 +179,66 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
           surfaceTintColor: Colors.transparent,
         ),
         backgroundColor: context.color.backgroundColor,
-        body: SignupAuthListener(
-          emailSignupUsername: widget.username,
-          navigateToHomeOnSuccess: true,
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Flexible(child: SvgPicture.asset(AppIcons.verificationMail)),
-                Text('Verify your email')
-                    .size(context.font.extraLarge)
-                    .bold(weight: FontWeight.w600),
-                const SizedBox(height: 12),
-                Text(_statusMessage).centerAlign(),
-                const SizedBox(height: 28),
-                MaterialButton(
-                  onPressed: _isVerified ? null : _openEmailApp,
-                  minWidth: double.infinity,
-                  height: 46,
-                  color: context.color.territoryColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+        body: SafeArea(
+          child: SignupAuthListener(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(child: SvgPicture.asset(AppIcons.verificationMail)),
+                  Text('Verify your email')
+                      .size(context.font.extraLarge)
+                      .bold(weight: FontWeight.w600),
+                  const SizedBox(height: 12),
+                  Text(_statusMessage).centerAlign(),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.amber.shade700),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded,
+                            color: Colors.amber.shade900),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text(
+                            'Can’t find the email? Check your Spam or Junk folder.',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child:
-                      Text('Open email app').color(context.color.buttonColor),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: _isSending || _resendSeconds > 0
-                      ? null
-                      : _sendVerificationEmail,
-                  child: Text(
-                    _resendSeconds > 0
-                        ? 'Resend available in ${_resendSeconds}s'
-                        : 'Resend verification email',
+                  const SizedBox(height: 28),
+                  MaterialButton(
+                    onPressed: _isVerified ? null : _openEmailApp,
+                    minWidth: double.infinity,
+                    height: 46,
+                    color: context.color.territoryColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text('Check Email').color(context.color.buttonColor),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _isSending || _resendSeconds > 0
+                        ? null
+                        : _sendVerificationEmail,
+                    child: Text(
+                      _resendSeconds > 0
+                          ? 'Resend available in ${_resendSeconds}s'
+                          : 'Resend verification email',
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

@@ -354,6 +354,10 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
                   buttonTitle: "verifyMobileNumberLbl".translate(context),
                   radius: 10,
                   disabledColor: const Color.fromARGB(255, 104, 102, 106)),
+                
+                const SizedBox(
+                  height: 36,
+                ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -398,9 +402,9 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const SizedBox(height: 12),
         if (Constant.googleAuthentication == "1")
           UiUtils.buildButton(context,
+              outerPadding: EdgeInsets.symmetric(vertical: 6.0),
               prefixWidget: Padding(
                 padding: EdgeInsetsDirectional.only(end: 10.0),
                 child:

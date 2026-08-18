@@ -106,12 +106,11 @@ class _ItemCardState extends State<ItemCard> {
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
           onTap: () {
-            log(widget.item?.toJson().toString() ?? "");
-            // Navigator.pushNamed(
-            //   context,
-            //   Routes.adDetailsScreen,
-            //   arguments: {"model": widget.item},
-            // );
+            Navigator.pushNamed(
+              context,
+              Routes.adDetailsScreen,
+              arguments: {"model": widget.item},
+            );
           },
           child: Stack(
             children: [

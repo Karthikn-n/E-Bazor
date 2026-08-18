@@ -85,9 +85,10 @@ class StatesScreenState extends State<StatesScreen> {
   void pageScrollListen() {
     if (controller.isEndReached()) {
       if (context.read<FetchStatesCubit>().hasMoreData()) {
-        context
-            .read<FetchStatesCubit>()
-            .fetchStatesMore(countryId: widget.countryId);
+        context.read<FetchStatesCubit>().fetchStatesMore(
+              countryId: widget.countryId,
+              search: searchController.text,
+            );
       }
     }
   }
@@ -300,94 +301,108 @@ class StatesScreenState extends State<StatesScreen> {
             padding: const EdgeInsets.only(top: 17),
             child: Container(
               color: context.color.secondaryColor,
-              child: SingleChildScrollView(
-                controller: controller,
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    /// ---------- HEADER (UNCHANGED) ----------
-                    widget.from == "addItem"
-                        ? Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 18),
-                      child: Text(
-                        "${"chooseLbl".translate(context)} ${"state".translate(context)}",
-                      )
-                          .color(context.color.textDefaultColor)
-                          .size(context.font.normal)
-                          .bold(weight: FontWeight.w600),
-                    )
-                        : SizedBox.shrink(),
-
-                    /// ---------- POPULAR SEARCHES TITLE ----------
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      child: Row(
-                        children: [
-                          Icon(Icons.trending_up,
-                              size: 18,
-                              color: context.color.textDefaultColor),
-                          const SizedBox(width: 6),
-                          Text(
-                            "All States".translate(context),
-                          )
-                              .color(context.color.textDefaultColor)
-                              .size(context.font.normal)
-                              .bold(weight: FontWeight.w600),
-                        ],
-                      ),
-                    ),
-
-                    /// ---------- STATES CHIP UI ----------
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: state.statesModel.map((states) {
-                          bool isSelected = selectedState?.id == states.id;
-                          return InkWell(
-                            borderRadius: BorderRadius.circular(20),
-                            onTap: () {
-                              setState(() {
-                                selectedState = states;
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 8),
-                              decoration: BoxDecoration(
-                                borderRadius:
-                                BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: isSelected ? context.color.territoryColor : context.color.borderColor,
-                                ),
-                                color: isSelected ? context.color.territoryColor.withValues(alpha: 0.1) : context.color.secondaryColor,
-                              ),
-                              child: Text(
-                                states.name!,
-                              )
-                                  .color(isSelected ? context.color.territoryColor : context.color.textDefaultColor)
-                                  .size(context.font.small),
-                            ),
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (ScrollNotification scrollInfo) {
+                  if (scrollInfo.metrics.pixels >=
+                      scrollInfo.metrics.maxScrollExtent - 50) {
+                    if (context.read<FetchStatesCubit>().hasMoreData()) {
+                      context.read<FetchStatesCubit>().fetchStatesMore(
+                            countryId: widget.countryId,
+                            search: searchController.text,
                           );
-                        }).toList(),
-                      ),
-                    ),
+                    }
+                  }
+                  return false;
+                },
+                child: SingleChildScrollView(
+                  controller: controller,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      /// ---------- HEADER (UNCHANGED) ----------
+                      widget.from == "addItem"
+                          ? Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 18),
+                        child: Text(
+                          "${"chooseLbl".translate(context)} ${"state".translate(context)}",
+                        )
+                            .color(context.color.textDefaultColor)
+                            .size(context.font.normal)
+                            .bold(weight: FontWeight.w600),
+                      )
+                          : SizedBox.shrink(),
 
-                    if (state.isLoadingMore)
+                      /// ---------- POPULAR SEARCHES TITLE ----------
                       Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Center(
-                          child: UiUtils.progress(
-                            normalProgressColor:
-                            context.color.territoryColor,
-                          ),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        child: Row(
+                          children: [
+                            Icon(Icons.trending_up,
+                                size: 18,
+                                color: context.color.textDefaultColor),
+                            const SizedBox(width: 6),
+                            Text(
+                              "All States".translate(context),
+                            )
+                                .color(context.color.textDefaultColor)
+                                .size(context.font.normal)
+                                .bold(weight: FontWeight.w600),
+                          ],
                         ),
                       ),
-                  ],
+
+                      /// ---------- STATES CHIP UI ----------
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: state.statesModel.map((states) {
+                            bool isSelected = selectedState?.id == states.id;
+                            return InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () {
+                                setState(() {
+                                  selectedState = states;
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  borderRadius:
+                                  BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isSelected ? context.color.territoryColor : context.color.borderColor,
+                                  ),
+                                  color: isSelected ? context.color.territoryColor.withValues(alpha: 0.1) : context.color.secondaryColor,
+                                ),
+                                child: Text(
+                                  states.name!,
+                                )
+                                    .color(isSelected ? context.color.territoryColor : context.color.textDefaultColor)
+                                    .size(context.font.small),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+
+                      if (state.isLoadingMore)
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Center(
+                            child: UiUtils.progress(
+                              normalProgressColor:
+                              context.color.territoryColor,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),

@@ -78,7 +78,8 @@ class _CategoryListState extends State<SubCategoryScreenOne>
 
   @override
   Widget build(BuildContext context) {
-    if (widget.catId == 1 || widget.catName == "Property") {
+    if (widget.catName.toLowerCase() == "property" ||
+        widget.catName.toLowerCase() == "properties") {
       if (widget.categoryList.isNotEmpty) {
         return PropertyFilterScreen(
           categoryList: widget.categoryList,
@@ -227,25 +228,27 @@ class _CategoryListState extends State<SubCategoryScreenOne>
                             }
                           },
 
-                          leading: FittedBox(
-                            child: Container(
-                              width: 40,
-                              height: 40,
-                              clipBehavior: Clip.antiAlias,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: context.color.territoryColor.withValues(alpha: 0.1),
-                              ),
-                              child: ClipRRect(
-                                child: UiUtils.imageType(
-                                  category.url ?? "", // ✅ FIX
-                                  color: context.color.territoryColor,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
+                          leading: Container(
+                            width: 48,
+                            height: 48,
+                            padding: const EdgeInsets.all(9),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: context.color.territoryColor.withValues(alpha: 0.1),
                             ),
+                            child: (category.url != null && category.url!.trim().isNotEmpty)
+                                ? UiUtils.imageType(
+                                    category.url!,
+                                    color: category.url!.endsWith('.svg')
+                                        ? context.color.territoryColor
+                                        : null,
+                                    fit: BoxFit.contain,
+                                  )
+                                : Icon(
+                                    Icons.category_outlined,
+                                    size: 24,
+                                    color: context.color.territoryColor,
+                                  ),
                           ),
 
                           title: Text(
@@ -436,20 +439,27 @@ class _CategoryListState extends State<SubCategoryScreenOne>
                             });
                       }
                     },
-                    leading: FittedBox(
-                      child: Container(
-                          width: 40,
-                          height: 40,
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
-                              color: context.color.territoryColor
-                                  .withValues(alpha: 0.1)),
-                          child: UiUtils.imageType(
-                            category.url!,
-                            color: context.color.territoryColor,
-                            fit: BoxFit.cover,
-                          )),
+                    leading: Container(
+                      width: 48,
+                      height: 48,
+                      padding: const EdgeInsets.all(9),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: context.color.territoryColor.withValues(alpha: 0.1),
+                      ),
+                      child: (category.url != null && category.url!.trim().isNotEmpty)
+                          ? UiUtils.imageType(
+                              category.url!,
+                              color: category.url!.endsWith('.svg')
+                                  ? context.color.territoryColor
+                                  : null,
+                              fit: BoxFit.contain,
+                            )
+                          : Icon(
+                              Icons.category_outlined,
+                              size: 24,
+                              color: context.color.territoryColor,
+                            ),
                     ),
                     title: Text(
                       category.name!,

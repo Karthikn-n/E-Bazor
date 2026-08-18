@@ -9,11 +9,11 @@ import 'package:Ebozor/utils/login/lib/login_system.dart';
 class PhoneLogin extends LoginSystem {
   String? verificationId;
   String? _lastPhoneNumber;
+  DateTime? _codeSentAt;
   int _verificationAttempt = 0;
 
   void cancelVerification() {
     _verificationAttempt++;
-    verificationId = null;
   }
 
   @override
@@ -31,6 +31,10 @@ class PhoneLogin extends LoginSystem {
       final userCredential =
           await firebaseAuth.signInWithCredential(credential);
 
+      verificationId = null;
+      _codeSentAt = null;
+      forceResendingToken = null;
+
       AppLog.i('Phone login successful.', name: 'PhoneLogin');
       emit(MSuccess());
 
@@ -46,10 +50,27 @@ class PhoneLogin extends LoginSystem {
     emit(MOtpSendInProgress());
     final phoneNum =
         "+${(payload as PhoneLoginPayload).countryCode}${(payload as PhoneLoginPayload).phoneNumber}";
+    final codeSentAt = _codeSentAt;
+    final canReuseVerification = _lastPhoneNumber == phoneNum &&
+        verificationId != null &&
+        codeSentAt != null &&
+        DateTime.now().difference(codeSentAt) <
+            Duration(seconds: Constant.otpTimeOutSecond);
+
+    if (canReuseVerification) {
+      AppLog.i('Reusing active OTP session for the same phone number.',
+          name: 'PhoneLogin');
+      await super.requestVerification();
+      return;
+    }
+
     final attempt = ++_verificationAttempt;
-    if (_lastPhoneNumber != phoneNum) forceResendingToken = null;
+    if (_lastPhoneNumber != phoneNum) {
+      forceResendingToken = null;
+    }
     _lastPhoneNumber = phoneNum;
     verificationId = null;
+    _codeSentAt = null;
     // NOTE: phone number intentionally omitted from log to avoid leaking PII
     AppLog.i('requestVerification: calling verifyPhoneNumber',
         name: 'PhoneLogin');
@@ -65,6 +86,8 @@ class PhoneLogin extends LoginSystem {
           },
           verificationFailed: (FirebaseAuthException e) {
             if (attempt != _verificationAttempt) return;
+            verificationId = null;
+            _codeSentAt = null;
             AppLog.e('verificationFailed: ${e.code}',
                 error: e, name: 'PhoneLogin');
             emit(MFail(e));
@@ -75,6 +98,7 @@ class PhoneLogin extends LoginSystem {
             super.requestVerification();
             forceResendingToken = resendToken;
             this.verificationId = verificationId;
+            _codeSentAt = DateTime.now();
           },
           codeAutoRetrievalTimeout: (String verificationId) {
             if (attempt != _verificationAttempt) return;

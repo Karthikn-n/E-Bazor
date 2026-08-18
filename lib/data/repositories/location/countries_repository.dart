@@ -6,7 +6,7 @@ class CountriesRepository {
   Future<DataOutput<CountriesModel>> fetchCountries({required int page,String? search}) async {
     Map<String, dynamic> parameters = {
       Api.page: page,
-      if(search!=null) Api.search:search
+      if (search != null && search.trim().isNotEmpty) Api.search: search.trim()
     };
 
     Map<String, dynamic> response = await Api.get(

@@ -146,13 +146,29 @@ class UiUtils {
       String? blurHash,
       bool? showFullScreenImage,
       Color? color}) {
+    if (url.trim().isEmpty) {
+      return Container(
+        width: width,
+        height: height,
+        alignment: AlignmentDirectional.center,
+        child: SizedBox(
+          width: width,
+          height: height,
+          child: getSvg(
+            AppIcons.placeHolder,
+            width: width ?? 70,
+            height: height ?? 70,
+          ),
+        ),
+      );
+    }
     return SvgPicture.network(
       url,
       colorFilter:
           color != null ? ColorFilter.mode(color, BlendMode.srcIn) : null,
       width: width,
       height: height,
-      fit: fit!,
+      fit: fit ?? BoxFit.contain,
       placeholderBuilder: (context) {
         return Container(
             width: width,
@@ -513,6 +529,22 @@ class UiUtils {
 
   static Widget imageType(String url,
       {double? width, double? height, BoxFit? fit, Color? color}) {
+    if (url.trim().isEmpty) {
+      return Container(
+        width: width,
+        height: height,
+        alignment: AlignmentDirectional.center,
+        child: SizedBox(
+          width: width,
+          height: height,
+          child: getSvg(
+            AppIcons.placeHolder,
+            width: width ?? 70,
+            height: height ?? 70,
+          ),
+        ),
+      );
+    }
     String? extension = mime(url);
 
     if (extension == "image/svg+xml") {
@@ -694,7 +726,8 @@ extension FormatAmount on String {
 extension ScrollEndListen on ScrollController {
   ///It will check if scroll is at the bottom or not
   bool isEndReached() {
-    if (offset >= position.maxScrollExtent) {
+    if (!hasClients) return false;
+    if (offset >= (position.maxScrollExtent - 50)) {
       return true;
     }
     return false;

@@ -287,51 +287,64 @@ class _FeaturedAdsSubscriptionPlansItemState
   }
 
   Widget itemData(int index) {
+    bool isSelected = index == selectedIndex;
+    bool isActive = widget.modelList[index].isActive ?? false;
+
     return Padding(
-      padding: const EdgeInsets.only(top: 7.0),
+      padding: const EdgeInsets.only(top: 8.0),
       child: Stack(
         alignment: Alignment.topLeft,
         children: [
-          if (widget.modelList[index].isActive!)
+          if (isActive)
             Padding(
-              padding: EdgeInsetsDirectional.only(start: 13.0),
+              padding: const EdgeInsetsDirectional.only(start: 14.0),
               child: ClipPath(
                 clipper: CapShapeClipper(),
                 child: Container(
                   color: context.color.territoryColor,
                   width: MediaQuery.of(context).size.width / 3,
-                  height: 17,
-                  padding: EdgeInsets.only(top: 3),
+                  height: 18,
+                  padding: const EdgeInsets.only(top: 2),
                   child: Text('activePlanLbl'.translate(context))
                       .color(context.color.secondaryColor)
                       .centerAlign()
                       .bold(weight: FontWeight.w500)
-                      .size(12),
+                      .size(11),
                 ),
               ),
             ),
-          InkWell(
-            onTap: !widget.modelList[index].isActive!
-                ? () {
-                    setState(() {
-                      selectedIndex = index;
-                    });
-                  }
-                : null,
-            child: Container(
-              margin: EdgeInsets.only(top: 17),
-              padding: EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-              decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16.0),
-                  border: Border.all(
-                      color: widget.modelList[index].isActive! ||
-                              index == selectedIndex
-                          ? context.color.territoryColor
-                          : context.color.textDefaultColor.withValues(alpha: 0.1),
-                      width: 1.5)),
-              child: !widget.modelList[index].isActive!
-                  ? adsWidget(index)
-                  : activeAdsWidget(index),
+          Container(
+            margin: const EdgeInsets.only(top: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16.0),
+              border: Border.all(
+                color: isActive || isSelected
+                    ? context.color.territoryColor
+                    : context.color.textDefaultColor.withValues(alpha: 0.12),
+                width: isSelected ? 2.0 : 1.2,
+              ),
+              color: isSelected
+                  ? context.color.territoryColor.withValues(alpha: 0.05)
+                  : Colors.transparent,
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(16.0),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16.0),
+                onTap: !isActive
+                    ? () {
+                        setState(() {
+                          selectedIndex = index;
+                        });
+                      }
+                    : null,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                  child: !isActive ? adsWidget(index) : activeAdsWidget(index),
+                ),
+              ),
             ),
           ),
         ],

@@ -96,14 +96,12 @@ class Api {
 //
 
   static String stripeIntentAPI = "https://api.stripe.com/v1/payment_intents";
-  static String SubCategoryFilterScreen =
-      "http://143.110.251.34/api/get-category-filters?";
+  static String getCategoryFiltersApi = "get-category-filters";
 //api fun
   static String loginApi = "user-signup";
   static String updateProfileApi = "update-profile";
   static String getSliderApi = "get-slider";
   static String getCategoriesApi = "front_categories";
-  //  "get-categories";
   static String getItemApi = "get-item";
   static String getMyItemApi = "my-items";
   static String getNotificationListApi = "get-notification-list";
@@ -112,9 +110,7 @@ class Api {
   static String getPackageApi = "get-package";
   static String getLanguageApi = "get-languages";
   static String getPaymentSettingsApi = "get-payment-settings";
-  /////////
   static String getSystemSettingsApi = "get-system-settings";
-  ///////////////////////
   static String getFavoriteItemApi = "get-favourite-item";
   static String updateItemStatusApi = "update-item-status";
   static String getReportReasonsApi = "get-report-reasons";
@@ -136,6 +132,7 @@ class Api {
   static String getCitiesApi = "cities";
   static String getAreasApi = "areas";
   static String getBlogApi = "blogs";
+  static String getBlogTagsApi = "blog-tags";
   static String getFaqApi = "faq";
   static String getItemBuyerListApi = "item-buyer-list";
   static String getSellerApi = "get-seller";
@@ -274,6 +271,18 @@ class Api {
   static String platformType = "platform_type";
   static String sellerReviewId = "seller_review_id";
   static String reportReason = "report_reason";
+  static String slug = "slug";
+  static String categorySlug = "category_slug";
+  static String carMakeId = "carMakeId";
+  static String carModelId = "carModelId";
+  static String featuredSectionId = "featured_section_id";
+  static String featuredSectionSlug = "featured_section_slug";
+  static String radius = "radius";
+  static String latitude = "latitude";
+  static String longitude = "longitude";
+  static String areaId = "area_id";
+  static String limit = "limit";
+  static String offset = "offset";
 
   static Future<Map<String, dynamic>> post({
     required String url,

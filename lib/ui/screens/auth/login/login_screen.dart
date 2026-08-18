@@ -65,6 +65,7 @@ class LoginScreenState extends State<LoginScreen> {
   bool sendMailClicked = false;
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _passwordController = TextEditingController();
+  final FocusNode _emailMobileFocusNode = FocusNode();
 
   bool isObscure = true;
   late PhoneLoginPayload phoneLoginPayload = PhoneLoginPayload(
@@ -212,6 +213,7 @@ class LoginScreenState extends State<LoginScreen> {
     }
 
     _passwordController.dispose();
+    _emailMobileFocusNode.dispose();
     emailMobileTextController.dispose();
 
     super.dispose();
@@ -348,36 +350,8 @@ class LoginScreenState extends State<LoginScreen> {
                       context
                           .read<UserDetailsCubit>()
                           .fill(HiveUtils.getUserDetails());
-                      if (state.isProfileCompleted) {
-                        if (HiveUtils.getCityName() != null &&
-                            HiveUtils.getCityName() != "") {
-                          HelperUtils.killPreviousPages(
-                              context, Routes.main, {"from": "login"});
-                        } else {
-                          Navigator.of(context).pushNamedAndRemoveUntil(
-                              Routes.locationPermissionScreen,
-                              (route) => false);
-                        }
-                      } else {
-                        Navigator.of(context).pushNamedAndRemoveUntil(
-                          Routes.completeProfile,
-                          (route) => false,
-                          arguments: {
-                            "from": "login",
-                            "popToCurrent": false,
-                            "type": isMobileNumberField
-                                ? AuthenticationType.phone
-                                : AuthenticationType.email,
-                            "extraData": {
-                              "email": state.user.email ??
-                                  state.apiResponse['email'],
-                              "username": state.apiResponse['name'],
-                              "mobile": state.apiResponse['mobile'],
-                              "countryCode": countryCode
-                            }
-                          },
-                        );
-                      }
+                      Navigator.of(context).pushNamedAndRemoveUntil(
+                          Routes.locationPermissionScreen, (route) => false);
                     }
 
                     if (state is LoginFailure) {
@@ -480,6 +454,7 @@ class LoginScreenState extends State<LoginScreen> {
           height: 24,
         ),
         CustomTextFormField(
+            focusNode: _emailMobileFocusNode,
             controller: emailMobileTextController,
             fillColor: context.color.secondaryColor,
             borderColor: context.color.borderColor.darken(30),
@@ -491,12 +466,15 @@ class LoginScreenState extends State<LoginScreen> {
             onChange: (value) {
               bool isNumber = value.toString().contains(RegExp(r'^[0-9]+$'));
 
-              //isMobileNumberField = isNumber;
+              final wasMobileNumberField = isMobileNumberField;
               isMobileNumberField =
                   Constant.mobileAuthentication == "1" ? isNumber : false;
 
               numberOrEmail = value;
               setState(() {});
+              if (wasMobileNumberField != isMobileNumberField) {
+                _refreshIdentifierKeyboard();
+              }
             },
             keyboard: (Constant.mobileAuthentication == "1" &&
                     Constant.emailAuthentication == "1")
@@ -552,6 +530,13 @@ class LoginScreenState extends State<LoginScreen> {
             disabledColor: const Color.fromARGB(255, 104, 102, 106)),
       ],
     );
+  }
+
+  void _refreshIdentifierKeyboard() {
+    _emailMobileFocusNode.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _emailMobileFocusNode.requestFocus();
+    });
   }
 
   Widget buildLoginWidget() {

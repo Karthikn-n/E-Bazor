@@ -281,14 +281,13 @@ class _SignupScreenState extends CloudState<SignupScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const SizedBox(height: 12),
         if (Constant.googleAuthentication == "1")
           UiUtils.buildButton(context,
               prefixWidget: Padding(
-                padding: EdgeInsetsDirectional.only(end: 10.0),
-                child:
-                    UiUtils.getSvg(AppIcons.googleIcon, width: 22, height: 22),
+              padding: EdgeInsetsDirectional.only(end: 10.0),
+                child: UiUtils.getSvg(AppIcons.googleIcon, width: 22, height: 22),
               ),
+              outerPadding: EdgeInsets.symmetric(vertical: 6.0),
               showElevation: false,
               buttonColor: secondaryColor_,
               border: context.watch<AppThemeCubit>().state.appTheme !=

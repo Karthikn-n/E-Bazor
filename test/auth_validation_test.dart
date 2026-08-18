@@ -33,6 +33,24 @@ void main() {
       );
     });
 
+    test('captcha verification failure is hidden', () {
+      expect(
+        authenticationErrorMessage(
+          FirebaseAuthException(code: 'captcha-check-failed'),
+        ),
+        isEmpty,
+      );
+    });
+
+    test('unknown password-reset account is reported clearly', () {
+      expect(
+        authenticationErrorMessage(
+          FirebaseAuthException(code: 'user-not-found'),
+        ),
+        'User not found.',
+      );
+    });
+
     test('new login is reported as missing account', () {
       expect(
         authenticationErrorMessage(
@@ -42,12 +60,30 @@ void main() {
       );
     });
 
+    test('unknown phone login directs the user to signup', () {
+      expect(
+        authenticationErrorMessage(
+          const AuthenticationFlowException('phone-account-not-found'),
+        ),
+        'This mobile number is not registered. Please sign up first.',
+      );
+    });
+
     test('existing signup is reported as an existing account', () {
       expect(
         authenticationErrorMessage(
           const AuthenticationFlowException('account-already-exists'),
         ),
         'An account already exists. Please sign in instead.',
+      );
+    });
+
+    test('existing phone signup directs the user to login', () {
+      expect(
+        authenticationErrorMessage(
+          const AuthenticationFlowException('phone-account-already-exists'),
+        ),
+        'This mobile number is already registered. Please log in instead.',
       );
     });
 

@@ -22,6 +22,7 @@ import 'package:flutter_svg/svg.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:in_app_review/in_app_review.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -55,10 +56,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   bool isExpanded = false;
-
-/*  //bool isGuest = false;
-  String username = "";
-  String email = "";*/
+  String _appVersion = "";
 
   @override
   void initState() {
@@ -75,7 +73,21 @@ class _ProfileScreenState extends State<ProfileScreen>
           settings.getSetting(SystemSetting.demoMode) ?? false;
     }
 
+    _loadAppVersion();
     super.initState();
+  }
+
+  Future<void> _loadAppVersion() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _appVersion = "v${packageInfo.version}+${packageInfo.buildNumber}";
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading package info: $e");
+    }
   }
 
 /*  void userData() {
@@ -343,6 +355,27 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
                         ],
 
+                        if (_appVersion.isNotEmpty) ...[
+                          const SizedBox(height: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: context.color.territoryColor
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              "App $_appVersion",
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: context.color.territoryColor,
+                              ),
+                            ),
+                          ),
+                        ],
+
                         (state is FetchVerificationRequestInProgress ||
                                 state is FetchVerificationRequestInitial ||
                                 state is FetchVerificationRequestFail)
@@ -599,8 +632,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                       child: MaterialButton(
                         shape: RoundedRectangleBorder(
                           side: BorderSide(
-                            color:
-                                context.color.textDefaultColor.withValues(alpha: 0.3),
+                            color: context.color.textDefaultColor
+                                .withValues(alpha: 0.3),
                             width: 1.5,
                           ),
                           borderRadius: BorderRadius.circular(10),
@@ -927,6 +960,20 @@ class _ProfileScreenState extends State<ProfileScreen>
                       },
                     ),
                   ],
+                  if (_appVersion.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Center(
+                      child: Text(
+                        "${Constant.appName} $_appVersion",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.color.textDefaultColor
+                              .withValues(alpha: 0.45),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(
                     height: 20,
                   )
@@ -1073,7 +1120,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                       child: UiUtils.getSvg(svgImagePath,
                           height: 24,
                           width: 24,
-                          color: context.color.territoryColor)),
+                          color: context.color.territoryColor
+                          )),
                 ),
                 SizedBox(
                   width: 25.rw(context),
@@ -1223,10 +1271,9 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Future<void> signOut(AuthenticationType? type) async {
     if (type == AuthenticationType.google) {
-      _googleSignIn.signOut();
-    } else {
-      _auth.signOut();
+      await _googleSignIn.signOut();
     }
+    await _auth.signOut();
   }
 
   proceedToDeleteProfile() async {

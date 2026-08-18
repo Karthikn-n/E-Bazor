@@ -702,14 +702,8 @@ class UserProfileScreenState extends State<UserProfileScreen> {
         Future.delayed(
           Duration.zero,
           () {
-            if (HiveUtils.getCityName() != null &&
-                HiveUtils.getCityName() != "") {
-              HelperUtils.killPreviousPages(
-                  context, Routes.main, {"from": widget.from});
-            } else {
-              Navigator.of(context).pushNamedAndRemoveUntil(
-                  Routes.locationPermissionScreen, (route) => false);
-            }
+            Navigator.of(context).pushNamedAndRemoveUntil(
+                Routes.locationPermissionScreen, (route) => false);
           },
         );
       } else if (widget.from == "login" && widget.popToCurrent == true) {

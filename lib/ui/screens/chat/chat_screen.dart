@@ -449,7 +449,7 @@ class _ChatScreenState extends State<ChatScreen>
                     ),
                   ],
                   BottomAppBar(
-                    padding: const EdgeInsetsDirectional.all(15),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     elevation: 5,
                     color: context.color.secondaryColor,
                     child: Directionality(
@@ -467,6 +467,7 @@ class _ChatScreenState extends State<ChatScreen>
                               "${"thisItemIs".translate(context)} ${widget.status}")
                               .size(context.font.large))
                           : Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           BlocProvider(
                               create: (context) => UnblockUserCubit(),
@@ -577,11 +578,9 @@ class _ChatScreenState extends State<ChatScreen>
                             },
                           ),
 
-                          SizedBox(
-                            height: 8,
-                          ),
+                          const SizedBox(height: 4),
                           Container(
-                            margin: EdgeInsets.only(bottom: 10),
+                            margin: const EdgeInsets.only(bottom: 2),
                             child: Row(
                               children: [
                                 Expanded(

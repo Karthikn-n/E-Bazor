@@ -12,15 +12,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 class SignupAuthListener extends StatelessWidget {
   final Widget child;
   final ValueChanged<AuthenticationSuccess>? onEmailSuccess;
-  final String? emailSignupUsername;
-  final bool navigateToHomeOnSuccess;
 
   const SignupAuthListener({
     super.key,
     required this.child,
     this.onEmailSuccess,
-    this.emailSignupUsername,
-    this.navigateToHomeOnSuccess = false,
   });
 
   @override
@@ -93,40 +89,7 @@ class SignupAuthListener extends StatelessWidget {
     HiveUtils.setEmailVerificationPending(false);
     context.read<UserDetailsCubit>().fill(HiveUtils.getUserDetails());
 
-    if (navigateToHomeOnSuccess) {
-      HelperUtils.killPreviousPages(context, Routes.main, {'from': 'signup'});
-      return;
-    }
-
-    if (state.isProfileCompleted) {
-      if (HiveUtils.getCityName()?.isNotEmpty == true) {
-        HelperUtils.killPreviousPages(context, Routes.main, {'from': 'signup'});
-      } else {
-        Navigator.of(context).pushNamedAndRemoveUntil(
-            Routes.locationPermissionScreen, (route) => false);
-      }
-      return;
-    }
-
-    final authCubit = context.read<AuthenticationCubit>();
-    final phonePayload = authCubit.payload is PhoneLoginPayload
-        ? authCubit.payload as PhoneLoginPayload
-        : null;
     Navigator.of(context).pushNamedAndRemoveUntil(
-      Routes.completeProfile,
-      (route) => false,
-      arguments: {
-        'from': 'signup',
-        'popToCurrent': false,
-        'type': authCubit.type,
-        'extraData': {
-          'email': state.user.email ?? state.apiResponse['email'],
-          'username': emailSignupUsername ?? state.apiResponse['name'],
-          'mobile': state.apiResponse['mobile'],
-          'countryCode':
-              phonePayload == null ? null : '+${phonePayload.countryCode}',
-        },
-      },
-    );
+        Routes.locationPermissionScreen, (route) => false);
   }
 }

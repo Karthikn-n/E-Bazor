@@ -23,28 +23,17 @@ class Widgets {
     showDialog(
         context: context,
         barrierDismissible: false,
-        useSafeArea: true,
+        useSafeArea: false,
+        barrierColor: Colors.black.withValues(alpha: 0.3),
         builder: (BuildContext context) {
-          return AnnotatedRegion(
-            value: SystemUiOverlayStyle(
-              statusBarColor: Colors.black.withValues(alpha: 0),
-            ),
-            child: SafeArea(
-              child: PopScope(
-                canPop: false,
-                onPopInvokedWithResult: (didPop, result) {
-                  return;
-                },
-                child: Center(
-                  child: UiUtils.progress(
-                    normalProgressColor: context.color.territoryColor,
-                  ),
-                ),
-                /*onWillPop: () {
-                  return Future(
-                    () => false,
-                  );
-                },*/
+          return PopScope(
+            canPop: false,
+            onPopInvokedWithResult: (didPop, result) {
+              return;
+            },
+            child: Center(
+              child: UiUtils.progress(
+                normalProgressColor: context.color.territoryColor,
               ),
             ),
           );

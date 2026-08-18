@@ -1,5 +1,5 @@
-// ignore_for_file: public_member_api_docs, sort_constructors_first
 import 'dart:async';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/report/fetch_item_report_reason_list.dart';
@@ -110,6 +110,9 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   List<String> selectedFeaturedAdsOptions = [];
 
   bool isShowReportAds = true;
+  bool _showAllOverview = false;
+  bool _isDescriptionExpanded = false;
+  final Map<int, bool> _expandedFeatures = {};
   final PageController pageController = PageController();
   final List<String?> images = [];
   final Completer<GoogleMapController> _controller =
@@ -142,7 +145,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
 
   late bool isAddedByMe = (widget.model.user?.id != null
       ? widget.model.user!.id.toString()
-      : widget.model.userId) ==
+      : (widget.model.userId?.toString() ?? '')) ==
       HiveUtils.getUserId();
 
   bool isFeaturedWidget = true;
@@ -176,17 +179,19 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
         currentPage = pageController.page!.round();
       });
     });
-    context.read<FetchRelatedItemsCubit>().fetchRelatedItems(
-        categoryId: categoryId!,
-        city: HiveUtils.getCityName(),
-        areaId: HiveUtils.getAreaId(),
-        country: HiveUtils.getCountryName(),
-        state: HiveUtils.getStateName());
+    if (categoryId != null) {
+      context.read<FetchRelatedItemsCubit>().fetchRelatedItems(
+          categoryId: categoryId!,
+          city: HiveUtils.getCityName(),
+          areaId: HiveUtils.getAreaId(),
+          country: HiveUtils.getCountryName(),
+          state: HiveUtils.getStateName());
+    }
     _pageScrollController.addListener(_pageScroll);
   }
 
   void _pageScroll() {
-    if (_pageScrollController.isEndReached()) {
+    if (_pageScrollController.isEndReached() && categoryId != null) {
       if (context.read<FetchRelatedItemsCubit>().hasMoreData()) {
         context.read<FetchRelatedItemsCubit>().fetchRelatedItemsMore(
             categoryId: categoryId!,
@@ -272,7 +277,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   }*/
 
   void setItemClick() {
-    if (!isAddedByMe) {
+    if (!isAddedByMe && model.id != null) {
       context.read<ItemTotalClickCubit>().itemTotalClick(model.id!);
     }
   }
@@ -280,228 +285,760 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion(
-        value: SystemUiOverlayStyle(
-          statusBarColor: context.color.secondaryDetailsColor,
-        ),
-        child: Scaffold(
-          appBar: UiUtils.buildAppBar(
-            context,
-            backgroundColor: context.color.secondaryDetailsColor,
-            showBackButton: true,
-            actions: [
-
-
-              if (isAddedByMe &&
-                  (model.status != "sold out" &&
-                      model.status != "review" &&
-                      model.status != "inactive" &&
-                      model.status != "rejected"))
-                MultiBlocProvider(
-                  providers: [
-                    BlocProvider(
-                      create: (context) => DeleteItemCubit(),
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: context.color.secondaryDetailsColor,
+        extendBodyBehindAppBar: true,
+        bottomNavigationBar: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            child: bottomButtonWidget()),
+        body: MediaQuery.removePadding(
+          context: context,
+          removeTop: true,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                // Edge-to-Edge Image viewer under status bar
+                setImageViewer(),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (isAddedByMe) setLikesAndViewsCount(),
+                    // Price and status widget
+                    setPriceAndStatus(),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4.0, bottom: 2.0),
+                      child: Text(model.name ?? "")
+                          .size(context.font.large)
+                          .bold(weight: FontWeight.w700)
+                          .setMaxLines(lines: 2)
+                          .color(context.color.textDefaultColor),
                     ),
-                    BlocProvider(
-                      create: (context) => ChangeMyItemStatusCubit(),
-                    ),
+                    _buildKeyHighlights(),
+
+                    if (isAddedByMe) setRejectedReason(),
+
+                    if (Constant.isGoogleBannerAdsEnabled == "1") ...[
+                      Divider(
+                          thickness: 1,
+                          color: context.color.textDefaultColor.withValues(alpha: 0.1)),
+                      Container(
+                        alignment: AlignmentDirectional.center,
+                        child: AdBannerWidget(),
+                      ),
+                    ],
+
+                    if (isAddedByMe && model.isFeature != true) createFeaturesAds(),
+
+                    // Car / Item Overview (2-column key-value with Show More / Show Less)
+                    _buildOverviewSection(),
+
+                    // Description with Read More & Posted On date
+                    _buildDescriptionSection(),
+
+                    // Features (expandable accordion categories with checkmarks)
+                    _buildFeaturesSection(),
+
+                    // Make an offer button (if buyer)
+                    makeOfferButtonWidget(),
+
+                    // Location section with map preview
+                    _buildLocationSection(),
+
+                    // Seller details section with verified checkmark & view profile
+                    if (!isAddedByMe && model.user != null) _buildSellerSection(),
+
+                    if (Constant.isGoogleBannerAdsEnabled == "1") ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        alignment: AlignmentDirectional.center,
+                        child: AdBannerWidget(),
+                      ),
+                    ],
+
+                    // Report ad widget
+                    if (!isAddedByMe) _buildReportAdRow(),
+
+                    const SizedBox(height: 12),
+                    // Similar ads widget
+                    relatedAds(),
+                    const SizedBox(height: 20),
                   ],
-                  child: Builder(builder: (context) {
-                    return BlocListener<DeleteItemCubit, DeleteItemState>(
-                      listener: (context, deleteState) {
-                        if (deleteState is DeleteItemSuccess) {
-                          HelperUtils.showSnackBarMessage(context,
-                              "deleteItemSuccessMsg".translate(context));
-                          context.read<FetchMyItemsCubit>().deleteItem(model);
-                          Navigator.pop(context, "refresh");
-                        } else if (deleteState is DeleteItemFailure) {
-                          HelperUtils.showSnackBarMessage(
-                              context, deleteState.errorMessage);
-                        }
-                      },
-                      child: BlocListener<ChangeMyItemStatusCubit,
-                          ChangeMyItemStatusState>(
-                        listener: (context, changeState) {
-                          if (changeState is ChangeMyItemStatusSuccess) {
-                            HelperUtils.showSnackBarMessage(
-                                context, changeState.message);
-                            Navigator.pop(context, "refresh");
-                          } else if (changeState is ChangeMyItemStatusFailure) {
-                            HelperUtils.showSnackBarMessage(
-                                context, changeState.errorMessage);
-                          }
-                        },
-                        child: Padding(
-                          padding: EdgeInsetsDirectional.only(end: 30.0),
-                          child: Container(
-                            height: 24,
-                            width: 24,
-                            alignment: AlignmentDirectional.center,
-                            child: PopupMenuButton(
-                              color: context.color.territoryColor,
-                              offset: Offset(-12, 15),
-                              shape: const RoundedRectangleBorder(
-                                borderRadius: BorderRadius.only(
-                                  bottomLeft: Radius.circular(17),
-                                  bottomRight: Radius.circular(17),
-                                  topLeft: Radius.circular(17),
-                                  topRight: Radius.circular(0),
-                                ),
-                              ),
-                              child: SvgPicture.asset(
-                                AppIcons.more,
-                                width: 20,
-                                height: 20,
-                                fit: BoxFit.contain,
-                                colorFilter: ColorFilter.mode(
-                                    context.color.textDefaultColor,
-                                    BlendMode.srcIn),
-                              ),
-                              itemBuilder: (context) => [
-                                if (model.status == "active" ||
-                                    model.status == "approved")
-                                  PopupMenuItem(
-                                    onTap: () {
-                                      Future.delayed(Duration.zero, () {
-                                        /*if (Constant.isDemoModeOn) {
-                                          HelperUtils.showSnackBarMessage(
-                                              context,
-                                              UiUtils.getTranslatedLabel(
-                                                  context,
-                                                  "thisActionNotValidDemo"));
-                                          return;
-                                        }*/
-                                        context
-                                            .read<ChangeMyItemStatusCubit>()
-                                            .changeMyItemStatus(
-                                            id: model.id!,
-                                            status: 'inactive');
-                                      });
-                                    },
-                                    child: Text("deactivate".translate(context))
-                                        .color(context.color.buttonColor),
-                                  ),
-                                if (model.status == "active" ||
-                                    model.status == "approved")
-                                  PopupMenuItem(
-                                    child: Text("lblremove".translate(context))
-                                        .color(context.color.buttonColor),
-                                    onTap: () async {
-                                      var delete =
-                                      await UiUtils.showBlurredDialoge(
-                                        context,
-                                        dialoge: BlurredDialogBox(
-                                          title:"deleteBtnLbl".translate(context),
-                                          content: Text("deleteitemwarning".translate(context),
-                                          ),
-                                        ),
-                                      );
-                                      if (delete == true) {
-                                        Future.delayed(
-                                          Duration.zero,
-                                              () {
-                                            context
-                                                .read<DeleteItemCubit>()
-                                                .deleteItem(model.id!);
-                                          },
-                                        );
-                                      }
-                                    },
-                                  ),
-                              ],
-                            ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      )
+    );
+  }
+
+  Widget _buildKeyHighlights() {
+    List<Widget> chips = [];
+    if (model.customFields != null) {
+      for (var cf in model.customFields!) {
+        final nameLower = (cf.name ?? "").toLowerCase();
+        if (cf.value != null && cf.value!.isNotEmpty) {
+          final val = cf.value![0].toString();
+          if (nameLower.contains("year") || nameLower.contains("model")) {
+            chips.add(_specChip(Icons.calendar_today_outlined, val));
+          } else if (nameLower.contains("kilometer") ||
+              nameLower.contains("mileage") ||
+              nameLower.contains("km")) {
+            chips.add(_specChip(Icons.speed_outlined, "$val km"));
+          } else if (nameLower.contains("spec") ||
+              nameLower.contains("regional")) {
+            chips.add(_specChip(Icons.public_outlined, val));
+          }
+        }
+      }
+    }
+    if (chips.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, bottom: 6),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 6,
+        children: chips,
+      ),
+    );
+  }
+
+  Widget _specChip(IconData icon, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: context.color.borderColor.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon,
+              size: 14,
+              color: context.color.textDefaultColor.withValues(alpha: 0.65)),
+          const SizedBox(width: 5),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 13,
+              color: context.color.textDefaultColor.withValues(alpha: 0.8),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOverviewSection() {
+    if (model.customFields == null || model.customFields!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final overviewFields = model.customFields!.where((cf) {
+      if (cf.value == null || cf.value!.isEmpty) return false;
+      if (cf.value!.length > 1) return false;
+      return true;
+    }).toList();
+
+    if (overviewFields.isEmpty) return const SizedBox.shrink();
+
+    final displayedFields = _showAllOverview
+        ? overviewFields
+        : overviewFields.take(6).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 14),
+        Text(
+          "${model.category?.name != null ? "${model.category!.name!} " : ""}Overview",
+        ).bold(weight: FontWeight.w700).size(18),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: context.color.secondaryColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: context.color.borderColor.withValues(alpha: 0.4),
+            ),
+          ),
+          child: Column(
+            children: [
+              ...displayedFields.asMap().entries.map((entry) {
+                final cf = entry.value;
+                final isLast = entry.key == displayedFields.length - 1;
+                return Padding(
+                  padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: Text(
+                          cf.name ?? "",
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: context.color.textDefaultColor
+                                .withValues(alpha: 0.6),
                           ),
                         ),
                       ),
-                    );
-                  }),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 6,
+                        child: Text(
+                          cf.value != null && cf.value!.isNotEmpty
+                              ? cf.value!.join(', ')
+                              : "-",
+                          textAlign: TextAlign.end,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: context.color.textDefaultColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              if (overviewFields.length > 6) ...[
+                const Divider(height: 20),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () {
+                      setState(() {
+                        _showAllOverview = !_showAllOverview;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.max,
+                        children: [
+                          Text(
+                            _showAllOverview
+                                ? "Show Less".translate(context)
+                                : "Show More".translate(context),
+                            style: TextStyle(
+                              color: context.color.territoryColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Icon(
+                            _showAllOverview
+                                ? Icons.keyboard_arrow_up_rounded
+                                : Icons.keyboard_arrow_down_rounded,
+                            size: 20,
+                            color: context.color.territoryColor,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
+              ],
             ],
           ),
-          backgroundColor: context.color.secondaryDetailsColor,
-          bottomNavigationBar: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              child: bottomButtonWidget()),
-          body: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Padding(
-              padding: const EdgeInsets.all(13.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  // this is image widget
-                  setImageViewer(),
-                  if (isAddedByMe) setLikesAndViewsCount(),
-                  // this is price and status widget
-                  setPriceAndStatus(),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: Text(model.name!)
-                        .size(context.font.large)
-                        .setMaxLines(lines: 2)
-                        .color(context.color.textDefaultColor),
-                  ),
+        ),
+      ],
+    );
+  }
 
+  Widget _buildDescriptionSection() {
+    if (model.description == null || model.description!.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
 
-                  if (isAddedByMe) setRejectedReason(),
-                  if (model.address != null) setAddress(isDate: false),
-
-                  if (Constant.isGoogleBannerAdsEnabled == "1") ...[
-                    Divider(
-                        thickness: 1,
-                        color: context.color.textDefaultColor.withValues(alpha: 0.1)),
-                    Container(
-                      alignment: AlignmentDirectional.center,
-                      child: AdBannerWidget(), // Custom widget for banner ad
-                    ),
-                  ],
-
-                  if (isAddedByMe)
-                    if (!model.isFeature!) createFeaturesAds(),
-                  if (model.customFields!.isNotEmpty) customFields(),
-                  //detailsContainer Widget
-                  //Dynamic Ads here
-                  Divider(
-                      thickness: 1,
-                      color: context.color.textDefaultColor.withValues(alpha: 0.1)),
-                  // this is description widget
-                  setDescription(),
-
-                  // this is make an offer widget
-
-
-                  Divider(
-                      thickness: 1,
-                      color: context.color.textDefaultColor.withValues(alpha: 0.1)),
-                  makeOfferButtonWidget(),
-                  setLocation(),
-
-                  // this is seller details widget
-                  if (!isAddedByMe && model.user != null) setSellerDetails(),
-
-                  if (Constant.isGoogleBannerAdsEnabled == "1") ...[
-                    Divider(
-                        thickness: 1,
-                        color: context.color.textDefaultColor.withValues(alpha: 0.1)),
-                    Container(
-                      alignment: AlignmentDirectional.center,
-                      child: AdBannerWidget(), // Custom widget for banner ad
-                    ),
-                  ],
-
-                  // this is report ad widget
-                  if (!isAddedByMe) reportedAdsWidget(),
-                  /*if (model.isAlreadyReported != null &&
-                        model.isAlreadyReported!)
-                      setReportAd(),*/
-
-                  // this is similar ads widget
-                  relatedAds(),
-                  // const SizedBox(height: 15),
-                ],
-              ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Text("aboutThisItemLbl".translate(context))
+            .bold(weight: FontWeight.w700)
+            .size(18),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: context.color.secondaryColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: context.color.borderColor.withValues(alpha: 0.4),
             ),
           ),
-        ));
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                model.description ?? "",
+                maxLines: _isDescriptionExpanded ? null : 4,
+                overflow: _isDescriptionExpanded
+                    ? TextOverflow.visible
+                    : TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.5,
+                  color:
+                      context.color.textDefaultColor.withValues(alpha: 0.75),
+                ),
+              ),
+              if ((model.description?.length ?? 0) > 160) ...[
+                const SizedBox(height: 8),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () {
+                      setState(() {
+                        _isDescriptionExpanded = !_isDescriptionExpanded;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 4.0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _isDescriptionExpanded
+                                ? "Read Less".translate(context)
+                                : "Read More".translate(context),
+                            style: TextStyle(
+                              color: context.color.territoryColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            _isDescriptionExpanded
+                                ? Icons.keyboard_arrow_up_rounded
+                                : Icons.keyboard_arrow_down_rounded,
+                            size: 16,
+                            color: context.color.territoryColor,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              if (model.created != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  "Posted On: ${model.created!.formatDate(format: "d MMMM, yyyy")}",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: context.color.textDefaultColor
+                        .withValues(alpha: 0.45),
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFeaturesSection() {
+    if (model.customFields == null || model.customFields!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final featureFields = model.customFields!.where((cf) {
+      if (cf.value == null || cf.value!.isEmpty) return false;
+      return cf.value!.length > 1 ||
+          cf.name!.toLowerCase().contains("amenit") ||
+          cf.name!.toLowerCase().contains("feature") ||
+          cf.name!.toLowerCase().contains("safety") ||
+          cf.name!.toLowerCase().contains("comfort") ||
+          cf.name!.toLowerCase().contains("technology") ||
+          cf.name!.toLowerCase().contains("exterior") ||
+          cf.name!.toLowerCase().contains("interior") ||
+          cf.name!.toLowerCase().contains("entertainment");
+    }).toList();
+
+    if (featureFields.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Text("Features".translate(context))
+            .bold(weight: FontWeight.w700)
+            .size(18),
+        const SizedBox(height: 12),
+        ...featureFields.asMap().entries.map((entry) {
+          final index = entry.key;
+          final cf = entry.value;
+          final isExpanded = _expandedFeatures[index] ?? true;
+          final values = cf.value ?? [];
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: context.color.secondaryColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: context.color.borderColor.withValues(alpha: 0.4),
+              ),
+            ),
+            child: Column(
+              children: [
+                Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      setState(() {
+                        _expandedFeatures[index] = !isExpanded;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 14),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              cf.name ?? "Feature",
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: context.color.borderColor
+                                  .withValues(alpha: 0.35),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              "${values.length}",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: context.color.textDefaultColor,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Icon(
+                            isExpanded
+                                ? Icons.keyboard_arrow_up_rounded
+                                : Icons.keyboard_arrow_down_rounded,
+                            color: context.color.textDefaultColor,
+                            size: 22,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                if (isExpanded) ...[
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: values.map((val) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 5),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                Icons.check,
+                                size: 16,
+                                color: Colors.green,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  val.toString(),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: context.color.textDefaultColor,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        })]);
+    
+  }
+
+  Widget _buildLocationSection() {
+    final LatLng currentPosition =
+        LatLng(model.latitude ?? 0.0, model.longitude ?? 0.0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Text("locationLbl".translate(context))
+            .bold(weight: FontWeight.w700)
+            .size(18),
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.location_on_outlined,
+              size: 20,
+              color: context.color.territoryColor,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                model.address ?? "",
+                style: TextStyle(
+                  fontSize: 14,
+                  color: context.color.textDefaultColor
+                      .withValues(alpha: 0.8),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: SizedBox(
+            height: 190,
+            child: Stack(
+              children: [
+                GoogleMap(
+                  zoomControlsEnabled: false,
+                  myLocationButtonEnabled: false,
+                  compassEnabled: false,
+                  mapToolbarEnabled: false,
+                  liteModeEnabled: true,
+                  zoomGesturesEnabled: false,
+                  scrollGesturesEnabled: false,
+                  rotateGesturesEnabled: false,
+                  tiltGesturesEnabled: false,
+                  initialCameraPosition:
+                      CameraPosition(target: currentPosition, zoom: 14),
+                  mapType: MapType.normal,
+                  markers: {
+                    Marker(
+                      markerId: const MarkerId('currentPosition'),
+                      position: currentPosition,
+                    )
+                  },
+                ),
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: () {
+                      _navigateToGoogleMapScreen(context);
+                    },
+                    child: Container(
+                      color: Colors.transparent,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSellerSection() {
+    if (model.user == null) return const SizedBox.shrink();
+
+    final user = model.user!;
+    final isVerified = user.isVerified == 1;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.color.secondaryColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.color.borderColor.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            height: 54,
+            width: 54,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: context.color.territoryColor.withValues(alpha: 0.15),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(27),
+              child: user.profile != null && user.profile!.isNotEmpty
+                  ? UiUtils.getImage(user.profile!, fit: BoxFit.cover)
+                  : Center(
+                      child: Text(
+                        (user.name != null && user.name!.isNotEmpty)
+                            ? user.name![0].toUpperCase()
+                            : "U",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: context.color.territoryColor,
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        user.name ?? "",
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isVerified) ...[
+                      const SizedBox(width: 6),
+                      const Icon(
+                        Icons.verified,
+                        color: Colors.blue,
+                        size: 18,
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  "Owner",
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: context.color.textDefaultColor
+                        .withValues(alpha: 0.6),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                InkWell(
+                  onTap: () {
+                    Navigator.pushNamed(context, Routes.sellerProfileScreen,
+                        arguments: {
+                          "model": model.user!,
+                          "total": context
+                                  .read<FetchSellerRatingsCubit>()
+                                  .totalSellerRatings() ??
+                              0,
+                          "rating": context
+                              .read<FetchSellerRatingsCubit>()
+                              .sellerData()
+                              ?.averageRating
+                        });
+                  },
+                  child: const Text(
+                    "View Profile",
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.blue,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportAdRow() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: InkWell(
+        onTap: () {
+          UiUtils.checkUser(
+            onNotGuest: () {
+              _bottomSheet(model.id!);
+            },
+            context: context,
+          );
+        },
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: context.color.borderColor.withValues(alpha: 0.4),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.flag_outlined,
+                size: 18,
+                color:
+                    context.color.textDefaultColor.withValues(alpha: 0.7),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                "reportItem".translate(context),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: context.color.textDefaultColor
+                      .withValues(alpha: 0.8),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget reportedAdsWidget() {
@@ -784,13 +1321,17 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   }
 
   Widget customFields() {
+    if (model.customFields == null || model.customFields!.isEmpty) {
+      return const SizedBox.shrink();
+    }
     return Padding(
       padding: const EdgeInsets.only(top: 10.0),
       child: Wrap(
         children: [
           ...List.generate(model.customFields!.length, (index) {
-            if (model.customFields![index].value!.isNotEmpty) {
-              if (model.customFields![index].type != "textbox") {
+            final field = model.customFields![index];
+            if (field.value != null && field.value!.isNotEmpty) {
+              if (field.type != "textbox") {
                 return SizedBox(
                   width: (context.screenWidth / 2) - (sidePadding / 2) - 5,
                   child: Row(
@@ -803,32 +1344,29 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(5),
-                          /*border: Border.all(
-                                color: context.color.textLightColor, width: 0.5)*/
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(5),
                           child: UiUtils.imageType(
-                              model.customFields![index].image!,
+                              field.image ?? "",
                               fit: BoxFit.cover),
                         ),
                       ),
-                      SizedBox(width: 7),
+                      const SizedBox(width: 7),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Tooltip(
-                              message: model.customFields![index].name,
-                              child:
-                              Text((model.customFields?[index].name) ?? "")
+                              message: field.name ?? "",
+                              child: Text(field.name ?? "")
                                   .setMaxLines(lines: 1)
                                   .size(context.font.small)
                                   .color(context.color.textDefaultColor
                                   .withValues(alpha: 0.5)),
                             ),
-                            valueContent(model.customFields![index].value),
+                            valueContent(field.value),
                             const SizedBox(
                               height: 12,
                             )
@@ -839,15 +1377,16 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   ),
                 );
               } else {
-                return SizedBox();
+                return const SizedBox.shrink();
               }
             } else {
-              return SizedBox();
+              return const SizedBox.shrink();
             }
           }),
           ...List.generate(model.customFields!.length, (index) {
-            if (model.customFields![index].value!.isNotEmpty) {
-              if (model.customFields![index].type == "textbox") {
+            final field = model.customFields![index];
+            if (field.value != null && field.value!.isNotEmpty) {
+              if (field.type == "textbox") {
                 return SizedBox(
                   width: (context.screenWidth / 2) - (sidePadding / 2) - 5,
                   child: Row(
@@ -859,32 +1398,29 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(5),
-                          /*border: Border.all(
-                                color: context.color.textLightColor, width: 0.5)*/
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(5),
                           child: UiUtils.imageType(
-                              model.customFields![index].image!,
+                              field.image ?? "",
                               fit: BoxFit.cover),
                         ),
                       ),
-                      SizedBox(width: 7),
+                      const SizedBox(width: 7),
                       Expanded(
-                        //padding: EdgeInsetsDirectional.only(start: 7.0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Tooltip(
-                                message: model.customFields![index].name,
-                                child: Text((model.customFields?[index].name) ?? "")
+                                message: field.name ?? "",
+                                child: Text(field.name ?? "")
                                     .setMaxLines(lines: 1)
                                     .size(context.font.small)
                                     .color(context.color.textDefaultColor
                                     .withValues(alpha: 0.5)),
                               ),
-                              valueContent(model.customFields![index].value),
+                              valueContent(field.value),
                               const SizedBox(
                                 height: 12,
                               )
@@ -894,10 +1430,10 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   ),
                 );
               } else {
-                return SizedBox();
+                return const SizedBox.shrink();
               }
             } else {
-              return SizedBox();
+              return const SizedBox.shrink();
             }
           })
         ],
@@ -906,45 +1442,48 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   }
 
   Widget valueContent(List<dynamic>? value) {
-    if (((value![0].toString()).startsWith("http") ||
-        (value[0].toString()).startsWith("https"))) {
-      if ((value[0].toString()).toLowerCase().endsWith(".pdf")) {
+    if (value == null || value.isEmpty || value[0] == null) {
+      return const SizedBox.shrink();
+    }
+    String valStr = value[0].toString();
+    if (valStr.startsWith("http://") || valStr.startsWith("https://")) {
+      if (valStr.toLowerCase().endsWith(".pdf")) {
         // Render PDF link as clickable text
         return GestureDetector(
             onTap: () {
               Navigator.pushNamed(context, Routes.pdfViewerScreen,
-                  arguments: {"url": value[0]});
+                  arguments: {"url": valStr});
             },
             child: Padding(
               padding: const EdgeInsets.only(top: 5.0),
               child: UiUtils.getSvg(AppIcons.pdfIcon,
                   color: context.color.textColorDark),
             ));
-      } else if ((value[0]).toLowerCase().endsWith(".png") ||
-          (value[0]).toLowerCase().endsWith(".jpg") ||
-          (value[0]).toLowerCase().endsWith(".jpeg") ||
-          (value[0]).toLowerCase().endsWith(".svg")) {
+      } else if (valStr.toLowerCase().endsWith(".png") ||
+          valStr.toLowerCase().endsWith(".jpg") ||
+          valStr.toLowerCase().endsWith(".jpeg") ||
+          valStr.toLowerCase().endsWith(".svg")) {
         // Render image
         return InkWell(
           onTap: () {
             UiUtils.showFullScreenImage(
               context,
               provider: NetworkImage(
-                value[0],
+                valStr,
               ),
             );
           },
           child: Container(
               width: 50,
               height: 50,
-              margin: EdgeInsets.only(top: 2),
+              margin: const EdgeInsets.only(top: 2),
               decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
                   color: context.color.territoryColor.withValues(alpha: 0.1)),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: UiUtils.imageType(
-                  value[0],
+                  valStr,
                   color: context.color.territoryColor,
                   fit: BoxFit.cover,
                 ),
@@ -955,10 +1494,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
 
     // Default text if not a supported format or not a URL
     return Text(
-      value.length == 1 ? value[0].toString() : value.join(','),
-      //maxLines: 4,
-      //overflow: TextOverflow.ellipsis,
-      //softWrap: true,
+      value.length == 1 ? valStr : value.map((e) => e?.toString() ?? '').join(','),
     ).color(context.color.textDefaultColor);
   }
 
@@ -1547,22 +2083,24 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                         ),
                       ],
                       child: ChatScreen(
-                        profilePicture: widget.model.user!.profile ?? "",
-                        userName: widget.model.user!.name!,
-                        userId: widget.model.user!.id!.toString(),
+                        profilePicture: widget.model.user?.profile ?? "",
+                        userName: widget.model.user?.name ?? "",
+                        userId: widget.model.user?.id?.toString() ?? "",
                         from: "item",
-                        itemImage: widget.model.image!,
-                        itemId: widget.model.id.toString(),
-                        date: widget.model.created!,
-                        itemTitle: widget.model.name!,
-                        itemOfferId: state.data['id'],
-                        itemPrice: widget.model.price!,
-                        status: widget.model.status!,
+                        itemImage: widget.model.image ?? "",
+                        itemId: widget.model.id?.toString() ?? "",
+                        date: widget.model.created ?? "",
+                        itemTitle: widget.model.name ?? "",
+                        itemOfferId: state.data['id'] is int
+                            ? state.data['id']
+                            : int.tryParse(state.data['id'].toString()) ?? 0,
+                        itemPrice: widget.model.price ?? 0.0,
+                        status: widget.model.status ?? "",
                         buyerId: HiveUtils.getUserId(),
                         itemOfferPrice: state.data['amount'] != null
-                            ? double.parse(state.data['amount'])
+                            ? double.tryParse(state.data['amount'].toString())
                             : null,
-                        isPurchased: widget.model.isPurchased!,
+                        isPurchased: widget.model.isPurchased ?? 0,
                         alreadyReview: widget.model.review == null
                             ? false
                             : widget.model.review!.isEmpty
@@ -1581,8 +2119,45 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
               }
             },
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                if (widget.model.user?.mobile != null &&
+                    widget.model.user!.mobile!.trim().isNotEmpty &&
+                    widget.model.user?.showPersonalDetails != 0) ...[
+                  Expanded(
+                    child: SizedBox(
+                      height: 46,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final Uri launchUri = Uri(
+                            scheme: 'tel',
+                            path: widget.model.user!.mobile!,
+                          );
+                          if (await canLaunchUrl(launchUri)) {
+                            await launchUrl(launchUri);
+                          }
+                        },
+                        icon: const Icon(Icons.phone_outlined,
+                            color: Colors.red, size: 20),
+                        label: Text(
+                          "Call".translate(context),
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.red, width: 1.2),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
                 Expanded(
                   child: _buildButton("chat".translate(context), () {
                     UiUtils.checkUser(
@@ -1791,27 +2366,49 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
 
 //ImageView
   Widget setImageViewer() {
-    return Container(
-      height: 250.rh(context),
-      decoration: BoxDecoration(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(10))),
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      // decoration: BoxDecoration(borderRadius: BorderRadius.circular(20)),
-      child: ClipRRect(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(10)),
-        child: Stack(children: [
-          PageView.builder(
-            itemCount: images.length,
-            // Increase itemCount if videoLink is present
-            controller: pageController,
-            itemBuilder: (context, index) {
-              if (index == images.length - 1 &&
-                  model.videoLink != "" &&
-                  model.videoLink != null) {
-                return Stack(
-                  children: [
-                    // Thumbnail Image
-                    GestureDetector(
+    return SizedBox(
+      height: 320.rh(context),
+      width: double.infinity,
+      child: Stack(children: [
+        PageView.builder(
+          itemCount: images.length,
+          controller: pageController,
+          onPageChanged: (index) {
+            setState(() {
+              currentPage = index;
+            });
+          },
+          itemBuilder: (context, index) {
+            if (index == images.length - 1 &&
+                model.videoLink != "" &&
+                model.videoLink != null) {
+              return Stack(
+                children: [
+                  // Thumbnail Image
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) {
+                            return VideoViewScreen(
+                              videoUrl: model.videoLink ?? "",
+                              flickManager: flickManager,
+                            );
+                          },
+                        ),
+                      );
+                    },
+                    child: UiUtils.getImage(
+                      youtubeVideoThumbnail,
+                      fit: BoxFit.cover,
+                      height: 320.rh(context),
+                      width: double.maxFinite,
+                    ),
+                  ),
+                  // Play Button
+                  Positioned.fill(
+                    child: GestureDetector(
                       onTap: () {
                         Navigator.push(
                           context,
@@ -1825,225 +2422,353 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                           ),
                         );
                       },
-                      child: ClipRRect(
-                        borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(10)),
-                        child: UiUtils.getImage(
-                          youtubeVideoThumbnail,
-                          fit: BoxFit.cover,
-                          height: 250.rh(context),
-                          width: double.maxFinite,
-                        ),
-                      ),
-                    ),
-                    // Play Button
-                    Positioned.fill(
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) {
-                                return VideoViewScreen(
-                                  videoUrl: model.videoLink ?? "",
-                                  flickManager: flickManager,
-                                );
-                              },
+                      child: Container(
+                        color: Colors.transparent,
+                        child: Center(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.black.withValues(alpha: 0.5),
                             ),
-                          );
-                        },
-                        child: Container(
-                          color: Colors.transparent,
-                          child: Center(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.black.withValues(alpha: 0.5),
-                              ),
-                              padding: EdgeInsets.all(12),
-                              child: Icon(
-                                Icons.play_arrow,
-                                color: Colors.white,
-                                size: 25,
-                              ),
+                            padding: const EdgeInsets.all(12),
+                            child: const Icon(
+                              Icons.play_arrow,
+                              color: Colors.white,
+                              size: 25,
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ],
-                );
-
-                /*  if (model.videoLink!.contains("youtube.com"))
-                  return buildYouTubePlayer(model.videoLink!);
-                else
-                  return buildVideoPlayer(model.videoLink!);*/
-              } else {
-                // Display image
-                return ShaderMask(
-                  shaderCallback: (bounds) {
-                    return LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Color(0x00FFFFFF),
-                        Color(0x7F060606)
-
-                        /*Colors.black.withValues(alpha: 0.01),
-                        Colors.black.withValues(alpha: 0.30),
-                        Colors.black.withValues(alpha: 0.55)*/
-                      ],
-                    ).createShader(bounds);
-                    //TODO: change black color to some other app color if required
+                  ),
+                ],
+              );
+            } else {
+              // Display image directly without dark shade
+              return InkWell(
+                child: UiUtils.getImage(
+                  images[index]!,
+                  fit: BoxFit.cover,
+                  height: 320.rh(context),
+                  width: double.infinity,
+                ),
+                onTap: () {
+                  UiUtils.imageGallaryView(context,
+                      images: images, initalIndex: index);
+                },
+              );
+            }
+          },
+        ),
+        // Top Floating Back Button
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 8,
+          left: 14,
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.18),
+                    blurRadius: 6,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(Icons.arrow_back, color: Colors.black, size: 20),
+              ),
+            ),
+          ),
+        ),
+        // Top Floating More Button (if added by me)
+        if (isAddedByMe &&
+            (model.status != "sold out" &&
+                model.status != "review" &&
+                model.status != "inactive" &&
+                model.status != "rejected"))
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            right: 14,
+            child: MultiBlocProvider(
+              providers: [
+                BlocProvider(create: (context) => DeleteItemCubit()),
+                BlocProvider(create: (context) => ChangeMyItemStatusCubit()),
+              ],
+              child: Builder(builder: (context) {
+                return BlocListener<DeleteItemCubit, DeleteItemState>(
+                  listener: (context, deleteState) {
+                    if (deleteState is DeleteItemSuccess) {
+                      HelperUtils.showSnackBarMessage(
+                          context, "deleteItemSuccessMsg".translate(context));
+                      context.read<FetchMyItemsCubit>().deleteItem(model);
+                      Navigator.pop(context, "refresh");
+                    } else if (deleteState is DeleteItemFailure) {
+                      HelperUtils.showSnackBarMessage(
+                          context, deleteState.errorMessage);
+                    }
                   },
-                  blendMode: BlendMode.darken,
-                  child: InkWell(
-                    child: UiUtils.getImage(
-                      images[index]!,
-                      fit: BoxFit.cover,
-                      height: 250.rh(context),
-                    ),
-                    onTap: () {
-                      UiUtils.imageGallaryView(context,
-                          images: images, initalIndex: index);
+                  child: BlocListener<ChangeMyItemStatusCubit,
+                      ChangeMyItemStatusState>(
+                    listener: (context, changeState) {
+                      if (changeState is ChangeMyItemStatusSuccess) {
+                        HelperUtils.showSnackBarMessage(
+                            context, changeState.message);
+                        Navigator.pop(context, "refresh");
+                      } else if (changeState is ChangeMyItemStatusFailure) {
+                        HelperUtils.showSnackBarMessage(
+                            context, changeState.errorMessage);
+                      }
                     },
+                    child: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.18),
+                            blurRadius: 6,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: PopupMenuButton(
+                        icon: const Icon(Icons.more_vert,
+                            color: Colors.black, size: 20),
+                        padding: EdgeInsets.zero,
+                        color: context.color.territoryColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        itemBuilder: (context) => [
+                          if (model.status == "active" ||
+                              model.status == "approved")
+                            PopupMenuItem(
+                              onTap: () {
+                                Future.delayed(Duration.zero, () {
+                                  context
+                                      .read<ChangeMyItemStatusCubit>()
+                                      .changeMyItemStatus(
+                                          id: model.id!, status: 'inactive');
+                                });
+                              },
+                              child: Text("deactivate".translate(context))
+                                  .color(context.color.buttonColor),
+                            ),
+                          if (model.status == "active" ||
+                              model.status == "approved")
+                            PopupMenuItem(
+                              child: Text("lblremove".translate(context))
+                                  .color(context.color.buttonColor),
+                              onTap: () async {
+                                var delete =
+                                    await UiUtils.showBlurredDialoge(
+                                  context,
+                                  dialoge: BlurredDialogBox(
+                                    title: "deleteBtnLbl".translate(context),
+                                    content: Text(
+                                        "deleteitemwarning".translate(context)),
+                                  ),
+                                );
+                                if (delete == true) {
+                                  Future.delayed(Duration.zero, () {
+                                    context
+                                        .read<DeleteItemCubit>()
+                                        .deleteItem(model.id!);
+                                  });
+                                }
+                              },
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                 );
-              }
-            },
+              }),
+            ),
           ),
-          Align(
-            alignment: AlignmentDirectional.bottomCenter,
+        // Photo Counter Pill
+        if (images.isNotEmpty)
+          Positioned(
+            bottom: 14,
+            left: 14,
             child: Container(
-              margin: const EdgeInsets.only(bottom: 10),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(20),
+              ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  images.length,
-                  // Increase number of dots if videoLink is present
-                      (index) => buildDot(index),
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.photo_camera_outlined,
+                      color: Colors.white, size: 14),
+                  const SizedBox(width: 5),
+                  Text(
+                    "${currentPage + 1}/${images.length}",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        // Indicator Dots
+        Align(
+          alignment: AlignmentDirectional.bottomCenter,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                images.length,
+                (index) => buildDot(index),
+              ),
+            ),
+          ),
+        ),
+        if (widget.model.isFeature != null && widget.model.isFeature!)
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 55,
+            left: 14,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: context.color.territoryColor,
+                borderRadius: BorderRadius.circular(5),
+              ),
+              child: Text("featured".translate(context))
+                  .size(context.font.small)
+                  .color(context.color.backgroundColor),
+            ),
+          ),
+        // Floating Action Buttons (Like & Share over the border)
+        imageActionButtons(),
+      ]),
+    );
+  }
+
+  Widget imageActionButtons() {
+    return Positioned(
+      bottom: 10,
+      right: 14,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!isAddedByMe)
+            BlocBuilder<FavoriteCubit, FavoriteState>(
+              bloc: context.read<FavoriteCubit>(),
+              builder: (context, favState) {
+                bool isLike = context.select((FavoriteCubit cubit) =>
+                    cubit.isItemFavorite(model.id!));
+
+                return BlocConsumer<UpdateFavoriteCubit, UpdateFavoriteState>(
+                  bloc: context.read<UpdateFavoriteCubit>(),
+                  listener: (context, state) {
+                    if (state is UpdateFavoriteSuccess) {
+                      if (state.wasProcess) {
+                        context
+                            .read<FavoriteCubit>()
+                            .addFavoriteitem(state.item);
+                      } else {
+                        context
+                            .read<FavoriteCubit>()
+                            .removeFavoriteItem(state.item);
+                      }
+                    }
+                  },
+                  builder: (context, state) {
+                    return Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.18),
+                            blurRadius: 6,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () {
+                          UiUtils.checkUser(
+                              onNotGuest: () {
+                                context
+                                    .read<UpdateFavoriteCubit>()
+                                    .setFavoriteItem(
+                                  item: model,
+                                  type: isLike ? 0 : 1,
+                                );
+                              },
+                              context: context);
+                        },
+                        child: Center(
+                          child: state is UpdateFavoriteInProgress
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2),
+                                )
+                              : Icon(
+                                  isLike
+                                      ? Icons.favorite
+                                      : Icons.favorite_border,
+                                  color: isLike ? Colors.red : Colors.grey[700],
+                                  size: 20,
+                                ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          const SizedBox(width: 10),
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.18),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () {
+                HelperUtils.share(context, model.slug ?? "");
+              },
+              child: Center(
+                child: Icon(
+                  Icons.share_outlined,
+                  size: 20,
+                  color: Colors.grey[700],
                 ),
               ),
             ),
           ),
-          if (widget.model.isFeature != null)
-            if (widget.model.isFeature!)
-              setTopRowItem(
-                  alignment: AlignmentDirectional.topStart,
-                  marginVal: 15,
-                  cornerRadius: 5,
-                  backgroundColor: context.color.territoryColor,
-                  childWidget: Text("featured".translate(context))
-                      .size(context.font.small)
-                      .color(context.color.backgroundColor)),
-          imageActionButtons()
-        ]),
-      ),
-    );
-  }
-
-/*  Widget buildYouTubePlayer(String videoLink) {
-    // Implement YouTube video player widget here
-    // Example:
-    return YouTubePlayer(
-        controller: // your controller,
-      // other properties...
-    );
-  }
-
-  Widget buildVideoPlayer(String videoLink) {
-    // Implement normal video player widget here
-    // Example:
-    return VideoPlayer(
-      // Your video player initialization code...
-    );
-  }*/
-
-  Widget imageActionButtons() {
-    return Align(
-      alignment: AlignmentDirectional.bottomEnd,
-      child: Container(
-        margin: const EdgeInsetsDirectional.only(bottom: 10, end: 10),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!isAddedByMe)
-              BlocBuilder<FavoriteCubit, FavoriteState>(
-                bloc: context.read<FavoriteCubit>(),
-                builder: (context, favState) {
-                  bool isLike = context.select((FavoriteCubit cubit) =>
-                      cubit.isItemFavorite(model.id!));
-
-                  return BlocConsumer<UpdateFavoriteCubit, UpdateFavoriteState>(
-                    bloc: context.read<UpdateFavoriteCubit>(),
-                    listener: (context, state) {
-                      if (state is UpdateFavoriteSuccess) {
-                        if (state.wasProcess) {
-                          context
-                              .read<FavoriteCubit>()
-                              .addFavoriteitem(state.item);
-                        } else {
-                          context
-                              .read<FavoriteCubit>()
-                              .removeFavoriteItem(state.item);
-                        }
-                      }
-                    },
-                    builder: (context, state) {
-                      return Container(
-                          padding: const EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(30),
-                              color: context.color.backgroundColor),
-                          child: InkWell(
-                            onTap: () {
-                              UiUtils.checkUser(
-                                  onNotGuest: () {
-                                    context
-                                        .read<UpdateFavoriteCubit>()
-                                        .setFavoriteItem(
-                                      item: model,
-                                      type: isLike ? 0 : 1,
-                                    );
-                                  },
-                                  context: context);
-                            },
-                            child: state is UpdateFavoriteInProgress
-                                ? UiUtils.progress(
-                              height: 22,
-                              width: 22,
-                            )
-                                : UiUtils.getSvg(
-                                isLike ? AppIcons.like_fill : AppIcons.like,
-                                color: isLike ? context.color.territoryColor : context.color.textLightColor.withValues(alpha: 0.5),
-                                //color: context.color.textLightColor,
-                                width: 22,
-                                height: 22),
-                          ));
-                    },
-                  );
-                },
-              )
-            else
-              SizedBox.shrink(),
-            SizedBox(width: 10),
-            Container(
-              padding: const EdgeInsets.all(5),
-              decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(30),
-                  color: context.color.backgroundColor),
-              child: InkWell(
-                  onTap: () {
-                    HelperUtils.share(context, model.slug!);
-                  },
-                  child: Icon(
-                    Icons.share,
-                    size: 22,
-                    color: context.color.textLightColor.withValues(alpha: 0.5),
-                  )),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -2288,11 +3013,11 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
             flex: 3,
             child: Padding(
               padding: EdgeInsetsDirectional.only(start: 5.0),
-              child: Text(model.address!)
+              child: Text(model.address ?? "")
                   .color(context.color.textDefaultColor),
             ),
           ),
-          (isDate)
+          (isDate && model.created != null)
               ? Expanded(
               child: Text(model.created!.formatDate(format: "d MMM yyyy"))
                   .setMaxLines(lines: 1)
@@ -2379,7 +3104,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   }
 
   Widget setLocation() {
-    final LatLng currentPosition = LatLng(model.latitude!, model.longitude!);
+    final LatLng currentPosition = LatLng(model.latitude ?? 0.0, model.longitude ?? 0.0);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2714,15 +3439,15 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   Widget setSellerDetails() {
     return InkWell(
       onTap: () {
+        if (model.user == null) return;
         Navigator.pushNamed(context, Routes.sellerProfileScreen, arguments: {
           "model": model.user!,
           "total":
           context.read<FetchSellerRatingsCubit>().totalSellerRatings() ?? 0,
           "rating": context
               .read<FetchSellerRatingsCubit>()
-              .sellerData()!
-              .averageRating ??
-              null
+              .sellerData()
+              ?.averageRating
         });
       },
       child: Padding(
@@ -2731,12 +3456,12 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
           Container(
               height: 60.rh(context),
               width: 60.rw(context),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 shape: BoxShape.circle,
               ),
               child: ClipRRect(
                   borderRadius: BorderRadius.circular(30),
-                  child: model.user!.profile != null &&
+                  child: model.user?.profile != null &&
                       model.user!.profile != ""
                       ? UiUtils.getImage(model.user!.profile!, fit: BoxFit.fill)
                       : UiUtils.getSvg(
@@ -2750,7 +3475,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(model.user!.name!).bold().size(context.font.large),
+                    Text(model.user?.name ?? "").bold().size(context.font.large),
                     Text("Owner")
                         .size(context.font.small)
                         .bold(weight: FontWeight.w500)

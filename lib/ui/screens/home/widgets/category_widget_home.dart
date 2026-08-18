@@ -44,7 +44,7 @@ class CategoryWidgetHome extends StatelessWidget {
                 crossAxisCount: 3,
                 crossAxisSpacing: 10,
                 mainAxisSpacing: 10,
-                childAspectRatio: 0.95,
+                childAspectRatio: 0.8,
               ),
               itemBuilder: (context, index) {
 
@@ -54,8 +54,8 @@ class CategoryWidgetHome extends StatelessWidget {
                 // }
 
                 final category = state.categories[index];
-                print("BUILDING CATEGORY 👉 ${category.name} | ${category.url}");
-                print("IMAGE URL 👉 ${category.url}");
+                // print("BUILDING CATEGORY 👉 ${category.name} | ${category.url}");
+                // print("IMAGE URL 👉 ${category.url}");
 
                 return CategoryHomeCard(
 

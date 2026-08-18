@@ -49,6 +49,7 @@ class LoginScreenState extends State<SignUpMainScreen> {
   bool isMobileNumberField = false;
   String numberOrEmail = "";
   final _formKey = GlobalKey<FormState>();
+  final FocusNode _emailMobileFocusNode = FocusNode();
 
   late PhoneLoginPayload phoneLoginPayload = PhoneLoginPayload(
       emailMobileTextController.text, countryCode!,
@@ -160,6 +161,7 @@ class LoginScreenState extends State<SignUpMainScreen> {
     }
 
     emailMobileTextController.dispose();
+    _emailMobileFocusNode.dispose();
 
     super.dispose();
   }
@@ -258,6 +260,7 @@ class LoginScreenState extends State<SignUpMainScreen> {
           height: 24,
         ),
         CustomTextFormField(
+            focusNode: _emailMobileFocusNode,
             controller: emailMobileTextController,
             fillColor: context.color.secondaryColor,
             borderColor: context.color.borderColor.darken(30),
@@ -269,11 +272,15 @@ class LoginScreenState extends State<SignUpMainScreen> {
             onChange: (value) {
               bool isNumber = value.toString().contains(RegExp(r'^[0-9]+$'));
 
+              final wasMobileNumberField = isMobileNumberField;
               isMobileNumberField =
                   Constant.mobileAuthentication == "1" ? isNumber : false;
 
               numberOrEmail = value;
               setState(() {});
+              if (wasMobileNumberField != isMobileNumberField) {
+                _refreshIdentifierKeyboard();
+              }
             },
             keyboard: (Constant.mobileAuthentication == "1" &&
                     Constant.emailAuthentication == "1")
@@ -329,6 +336,13 @@ class LoginScreenState extends State<SignUpMainScreen> {
             disabledColor: const Color.fromARGB(255, 104, 102, 106)),
       ],
     );
+  }
+
+  void _refreshIdentifierKeyboard() {
+    _emailMobileFocusNode.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _emailMobileFocusNode.requestFocus();
+    });
   }
 
   Widget buildLoginWidget() {

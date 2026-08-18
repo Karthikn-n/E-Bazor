@@ -483,25 +483,28 @@ class _ItemListingSubscriptionPlansItemState
 
   Widget checkmarkPoint(BuildContext context, String text) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-
-        // width: context.screenWidth * 0.55,
         children: [
-          UiUtils.getSvg(
-            AppIcons.active_mark,
-            //(boolVariable) ? AppIcons.active_mark : AppIcons.deactive_mark,
+          SizedBox(
+            width: 18,
+            height: 18,
+            child: UiUtils.getSvg(
+              AppIcons.active_mark,
+              width: 18,
+              height: 18,
+            ),
           ),
-          //  const Icon(Icons.check_box_rounded, size: 25.0, color: Colors.cyan), //TODO: change it to given icon and fill according to status passed
-          SizedBox(width: 8.rw(context)),
+          const SizedBox(width: 10),
           Expanded(
-              child: Text(
-            text,
-            textAlign: TextAlign.start,
-          ).color(
-            context.color.textDefaultColor,
-          ))
+            child: Text(
+              text,
+              textAlign: TextAlign.start,
+            ).color(
+              context.color.textDefaultColor,
+            ),
+          ),
         ],
       ),
     );

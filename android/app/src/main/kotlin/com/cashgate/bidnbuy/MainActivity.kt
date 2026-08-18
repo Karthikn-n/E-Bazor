@@ -21,10 +21,15 @@ class MainActivity: FlutterFragmentActivity() {
             try {
                 val gmailIntent = packageManager
                     .getLaunchIntentForPackage("com.google.android.gm")
-                val emailIntent = gmailIntent ?: Intent.makeMainSelectorActivity(
+                val emailIntent = gmailIntent?.apply {
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    )
+                } ?: Intent.makeMainSelectorActivity(
                     Intent.ACTION_MAIN,
                     Intent.CATEGORY_APP_EMAIL
-                )
+                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 startActivity(emailIntent)
                 result.success(true)
             } catch (error: Exception) {

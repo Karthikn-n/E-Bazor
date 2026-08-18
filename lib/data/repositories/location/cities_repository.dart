@@ -8,7 +8,7 @@ class CitiesRepository {
     Map<String, dynamic> parameters = {
       Api.page: page,
       Api.stateId: stateId,
-      if(search!=null) Api.search:search
+      if (search != null && search.trim().isNotEmpty) Api.search: search.trim()
     };
 
     Map<String, dynamic> response = await Api.get(

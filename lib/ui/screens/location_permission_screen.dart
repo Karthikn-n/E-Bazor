@@ -181,60 +181,66 @@ class LocationPermissionScreenState extends State<LocationPermissionScreen>
       ),
       child: Scaffold(
         backgroundColor: context.color.backgroundColor,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                  height: 300,
-                  child: UiUtils.getSvg(AppIcons.locationAccessIcon)),
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                      height: 300,
+                      child: UiUtils.getSvg(AppIcons.locationAccessIcon)),
 
-              const SizedBox(height: 19),
-              Text(
-                "whatsYourLocation".translate(context),
-              ).size(context.font.extraLarge).bold(weight: FontWeight.w600),
-              const SizedBox(height: 14),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 10),
-                child: Text(
-                  'enjoyPersonalizedSellingAndBuyingLocationLbl'
-                      .translate(context),
-                )
-                    .size(context.font.larger)
-                    .color(context.color.textDefaultColor.withValues(alpha: 0.65))
-                    .centerAlign(),
+                  const SizedBox(height: 19),
+                  Text(
+                    "whatsYourLocation".translate(context),
+                  ).size(context.font.extraLarge).bold(weight: FontWeight.w600),
+                  const SizedBox(height: 14),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Text(
+                      'enjoyPersonalizedSellingAndBuyingLocationLbl'
+                          .translate(context),
+                    )
+                        .size(context.font.larger)
+                        .color(context.color.textDefaultColor.withValues(alpha: 0.65))
+                        .centerAlign(),
+                  ),
+                  const SizedBox(height: 58),
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12),
+                    child: UiUtils.buildButton(context,
+                        showElevation: false,
+                        buttonColor: context.color.territoryColor,
+                        textColor: context.color.secondaryColor, onPressed: () {
+                      // Check location permission when the button is pressed
+                      _getCurrentLocation();
+                    },
+                        radius: 8,
+                        height: 46,
+                        buttonTitle: "findMyLocation".translate(context)),
+                  ),
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12),
+                    child: UiUtils.buildButton(context,
+                        showElevation: false,
+                        buttonColor: context.color.backgroundColor,
+                        border: BorderSide(color: context.color.territoryColor),
+                        textColor: context.color.territoryColor, onPressed: () {
+                      Navigator.pushNamed(context, Routes.countriesScreen,
+                          arguments: {"from": "location"});
+                    },
+                        radius: 8,
+                        height: 46,
+                        buttonTitle: "otherLocation".translate(context)),
+                  ),
+                ],
               ),
-              const SizedBox(height: 58),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12),
-                child: UiUtils.buildButton(context,
-                    showElevation: false,
-                    buttonColor: context.color.territoryColor,
-                    textColor: context.color.secondaryColor, onPressed: () {
-                  // Check location permission when the button is pressed
-                  _getCurrentLocation();
-                },
-                    radius: 8,
-                    height: 46,
-                    buttonTitle: "findMyLocation".translate(context)),
-              ),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12),
-                child: UiUtils.buildButton(context,
-                    showElevation: false,
-                    buttonColor: context.color.backgroundColor,
-                    border: BorderSide(color: context.color.territoryColor),
-                    textColor: context.color.territoryColor, onPressed: () {
-                  Navigator.pushNamed(context, Routes.countriesScreen,
-                      arguments: {"from": "location"});
-                },
-                    radius: 8,
-                    height: 46,
-                    buttonTitle: "otherLocation".translate(context)),
-              ),
-            ],
+            ),
           ),
         ),
       ),

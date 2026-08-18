@@ -21,6 +21,9 @@ class GoogleLogin extends LoginSystem {
   Future<UserCredential?> login() async {
     try {
       emit(MProgress());
+      // Clear the cached Google account so an explicit button press always
+      // presents the account chooser instead of silently reusing it.
+      await _googleSignIn?.signOut();
       final googleSignIn = await _googleSignIn?.signIn();
       if (googleSignIn == null) {
         throw const GoogleSignInCancelledException();

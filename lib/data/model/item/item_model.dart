@@ -239,7 +239,14 @@ class ItemModel {
     city = json['city'];
     state = json['state'];
     country = json['country'];
-    isPurchased = json['is_purchased'];
+    if (json['is_purchased'] is int) {
+      isPurchased = json['is_purchased'];
+    } else if (json['is_purchased'] is bool) {
+      isPurchased = json['is_purchased'] == true ? 1 : 0;
+    } else if (json['is_purchased'] != null) {
+      isPurchased = int.tryParse(json['is_purchased'].toString());
+    }
+
     if (json['review'] != null) {
       review = <UserRatings>[];
       json['review'].forEach((v) {
@@ -263,6 +270,16 @@ class ItemModel {
       customFields = <CustomFieldModel>[];
       json['custom_fields'].forEach((v) {
         customFields!.add(CustomFieldModel.fromMap(v));
+      });
+    } else if (json['item_custom_field_values'] != null) {
+      customFields = <CustomFieldModel>[];
+      json['item_custom_field_values'].forEach((v) {
+        final cf = v['custom_field'];
+        if (cf != null && cf is Map<String, dynamic>) {
+          Map<String, dynamic> combined = Map<String, dynamic>.from(cf);
+          combined['value'] = v['value'];
+          customFields!.add(CustomFieldModel.fromMap(combined));
+        }
       });
     }
   }

@@ -111,7 +111,7 @@ class FilterRepository {
     try {
       log("🌐 [FILTER API REQ] → GET ${Constant.baseUrl}get-category-filters | params: {slug: $slug}");
       final response = await _dio.get(
-        "get-category-filters",
+        Api.getCategoryFiltersApi,
         queryParameters: {"slug": slug},
       );
 

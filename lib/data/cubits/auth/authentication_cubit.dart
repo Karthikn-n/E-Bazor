@@ -59,8 +59,12 @@ String authenticationErrorMessage(dynamic error) {
     switch (error.code) {
       case 'account-not-found':
         return 'No account found. Please sign up first.';
+      case 'phone-account-not-found':
+        return 'This mobile number is not registered. Please sign up first.';
       case 'account-already-exists':
         return 'An account already exists. Please sign in instead.';
+      case 'phone-account-already-exists':
+        return 'This mobile number is already registered. Please log in instead.';
       case 'email-not-verified':
         return 'Please verify your email before signing in.';
     }
@@ -70,7 +74,7 @@ String authenticationErrorMessage(dynamic error) {
       case 'email-already-in-use':
         return 'An account already exists. Please sign in instead.';
       case 'user-not-found':
-        return 'No account found. Please sign up first.';
+        return 'User not found.';
       case 'wrong-password':
       case 'invalid-credential':
         return 'No account matches these credentials. Check your email and password, or sign up first.';
@@ -84,8 +88,9 @@ String authenticationErrorMessage(dynamic error) {
         return 'Please enter a valid phone number.';
       case 'missing-client-identifier':
       case 'app-not-authorized':
-      case 'captcha-check-failed':
         return 'Phone verification is not configured for this app build. Please contact support.';
+      case 'captcha-check-failed':
+        return '';
       case 'operation-not-allowed':
         return 'Phone sign-in is not enabled. Please contact support.';
       case 'quota-exceeded':
@@ -167,15 +172,18 @@ class AuthenticationCubit extends Cubit<AuthenticationState> {
 
       if (intent == AuthenticationIntent.signIn && isNewUser) {
         await _deleteAccidentallyCreatedUser(credential.user!);
-        throw const AuthenticationFlowException('account-not-found');
+        throw AuthenticationFlowException(payloadData is PhoneLoginPayload
+            ? 'phone-account-not-found'
+            : 'account-not-found');
       }
 
-      if (payloadData is EmailLoginPayload &&
-          intent == AuthenticationIntent.signUp &&
+      if (intent == AuthenticationIntent.signUp &&
           !isNewUser &&
           !isUnverifiedEmailRecovery) {
         await FirebaseAuth.instance.signOut();
-        throw const AuthenticationFlowException('account-already-exists');
+        throw AuthenticationFlowException(payloadData is PhoneLoginPayload
+            ? 'phone-account-already-exists'
+            : 'account-already-exists');
       }
 
       if (payloadData is EmailLoginPayload &&

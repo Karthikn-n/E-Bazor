@@ -137,14 +137,13 @@ class SplashScreenState extends State<SplashScreen> {
         HiveUtils.isEmailVerificationPending()) {
       if (_verificationRecoveryRunning) return;
       _verificationRecoveryRunning = true;
-      final user = FirebaseAuth.instance.currentUser;
-      await user?.reload();
+      final user = await _reloadPendingVerificationUser();
       if (!mounted) return;
 
       if (user?.emailVerified == true) {
         _hasNavigated = true;
         context.read<LoginCubit>().loginWithUser(
-              user: FirebaseAuth.instance.currentUser!,
+              user: user!,
               type: AuthenticationType.email.name,
             );
         return;
@@ -158,13 +157,9 @@ class SplashScreenState extends State<SplashScreen> {
       Navigator.of(context).pushReplacementNamed(Routes.onboarding);
     } else if (HiveUtils.isUserAuthenticated()) {
       _hasNavigated = true;
-      final user = HiveUtils.getUserDetails();
-      if ((user.name?.isEmpty ?? true) || (user.email?.isEmpty ?? true)) {
-        Navigator.pushReplacementNamed(
-          context,
-          Routes.completeProfile,
-          arguments: {'from': 'login'},
-        );
+      if (!HiveUtils.isLocationFilled()) {
+        Navigator.of(context)
+            .pushReplacementNamed(Routes.locationPermissionScreen);
       } else {
         Navigator.of(context)
             .pushReplacementNamed(Routes.main, arguments: {'from': 'main'});
@@ -177,6 +172,17 @@ class SplashScreenState extends State<SplashScreen> {
       _hasNavigated = true;
       Navigator.of(context).pushReplacementNamed(Routes.login);
     }
+  }
+
+  Future<User?> _reloadPendingVerificationUser() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    for (var attempt = 0; attempt < 3 && user != null; attempt++) {
+      await user.reload();
+      user = FirebaseAuth.instance.currentUser;
+      if (user?.emailVerified == true) return user;
+      if (attempt < 2) await Future<void>.delayed(const Duration(seconds: 1));
+    }
+    return user;
   }
 
   @override
@@ -199,10 +205,7 @@ class SplashScreenState extends State<SplashScreen> {
           HiveUtils.setUserIsAuthenticated(true);
           context.read<UserDetailsCubit>().fill(HiveUtils.getUserDetails());
           Navigator.of(context).pushNamedAndRemoveUntil(
-            Routes.main,
-            (route) => false,
-            arguments: {'from': 'signup'},
-          );
+              Routes.locationPermissionScreen, (route) => false);
         } else if (state is LoginFailure) {
           HiveUtils.setEmailVerificationPending(false);
           Navigator.of(context).pushReplacementNamed(Routes.login);

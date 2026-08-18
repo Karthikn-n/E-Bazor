@@ -43,6 +43,7 @@ class CustomTextFormField extends StatelessWidget {
   final bool? isMobileRequired;
   final String? phoneCountryCode;
   final AutovalidateMode? autovalidateMode;
+  final FocusNode? focusNode;
 
   const CustomTextFormField({
     super.key,
@@ -71,11 +72,13 @@ class CustomTextFormField extends StatelessWidget {
     this.isMobileRequired = true,
     this.phoneCountryCode,
     this.autovalidateMode,
+    this.focusNode,
   });
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
+      focusNode: focusNode,
       controller: controller,
       inputFormatters: formaters,
       obscureText: obscureText ?? false,
