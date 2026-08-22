@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class CustomFieldModel {
   int? id;
   String? name;
@@ -63,19 +65,55 @@ class CustomFieldModel {
       return false;
     }
 
+    List? parseValue(Map<String, dynamic> m) {
+      dynamic val = m['value'];
+      if (val == null && m['custom_field_value'] != null && m['custom_field_value'] is Map) {
+        val = m['custom_field_value']['value'];
+      }
+      if (val == null && m['field_value'] != null) {
+        val = m['field_value'];
+      }
+      if (val == null) return null;
+
+      if (val is List) {
+        final flatList = [];
+        for (var item in val) {
+          if (item is String && item.trim().startsWith('[') && item.trim().endsWith(']')) {
+            try {
+              final decoded = jsonDecode(item.trim());
+              if (decoded is List) {
+                flatList.addAll(decoded);
+                continue;
+              }
+            } catch (_) {}
+          }
+          flatList.add(item);
+        }
+        return flatList;
+      }
+
+      if (val is String && val.trim().startsWith('[') && val.trim().endsWith(']')) {
+        try {
+          final decoded = jsonDecode(val.trim());
+          if (decoded is List) return decoded;
+        } catch (_) {}
+      }
+
+      return [val];
+    }
+
     return CustomFieldModel(
-      id: parseInt(map['id']),
-      name: map['name']?.toString(),
-      label: map['label']?.toString() ?? map['name']?.toString(),
+      id: parseInt(map['id'] ?? map['custom_field_id']),
+      name: (map['name'] ?? map['label_name'] ?? map['label'])?.toString(),
+      label: (map['label'] ?? map['label_name'] ?? map['name'])?.toString(),
       type: (map['field_type'] ?? map['type'])?.toString(),
-      values: (map['values'] ?? map['options']) as dynamic,
+      values:
+          (map['values'] ?? map['field_values'] ?? map['options']) as dynamic,
       image: map['image']?.toString(),
       required: parseRequired(map['required'] ?? map['is_required']),
       maxLength: parseInt(map['max_length']),
       minLength: parseInt(map['min_length']),
-      value: map['value'] is List
-          ? map['value']
-          : (map['value'] != null ? [map['value']] : null),
+      value: parseValue(map),
       isFieldMultiselect: parseMultiselect(map['is_field_multiselect'] ??
           map['is_multiselect'] ??
           map['is_multiple'] ??

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
@@ -146,20 +147,30 @@ class ItemRepository {
     }
   }
 
-  Future<DataOutput<ItemModel>> fetchItemFromItemId(int id) async {
+  Future<DataOutput<ItemModel>> fetchItemFromItemId(int id, {int? categoryId}) async {
     Map<String, dynamic> parameters = {
       Api.id: id,
     };
-
-
+    if (categoryId != null) {
+      parameters[Api.categoryId] = categoryId;
+    }
 
     Map<String, dynamic> response = await Api.get(
       url: Api.getItemApi,
       queryParameters: parameters,
     );
 
+    List rawList = [];
+    if (response['data'] is List) {
+      rawList = response['data'];
+    } else if (response['data'] is Map && response['data']['data'] is List) {
+      rawList = response['data']['data'];
+    } else if (response['data'] is Map) {
+      rawList = [response['data']];
+    }
+
     List<ItemModel> modelList =
-        (response['data'] as List).map((e) => ItemModel.fromJson(e)).toList();
+        rawList.map((e) => ItemModel.fromJson(Map<String, dynamic>.from(e))).toList();
 
     return DataOutput(total: modelList.length, modelList: modelList);
   }
@@ -174,8 +185,17 @@ class ItemRepository {
       queryParameters: parameters,
     );
 
+    List rawList = [];
+    if (response['data'] is List) {
+      rawList = response['data'];
+    } else if (response['data'] is Map && response['data']['data'] is List) {
+      rawList = response['data']['data'];
+    } else if (response['data'] is Map) {
+      rawList = [response['data']];
+    }
+
     List<ItemModel> modelList =
-        (response['data']['data'] as List).map((e) => ItemModel.fromJson(e)).toList();
+        rawList.map((e) => ItemModel.fromJson(Map<String, dynamic>.from(e))).toList();
 
     return DataOutput(total: modelList.length, modelList: modelList);
   }
@@ -241,13 +261,34 @@ class ItemRepository {
 
       parameters.remove('area');
 
-      // Add custom fields separately to the parameters
+      if (filter.categorySlug != null && filter.categorySlug!.isNotEmpty) {
+        parameters['category_slug'] = filter.categorySlug;
+      }
+
+      // Add custom fields / filters separately to the parameters
       if (filter.customFields != null) {
         filter.customFields!.forEach((key, value) {
+          if (value == null) return;
+          String paramKey = key;
+          if (!key.startsWith('filters[') &&
+              !key.startsWith('custom_fields[') &&
+              int.tryParse(key) == null) {
+            paramKey = "filters[$key]";
+          }
           if (value is List) {
-            parameters[key] = value.map((v) => v.toString()).join(',');
+            if (paramKey.startsWith("filters[")) {
+              parameters[paramKey] = jsonEncode(value);
+            } else {
+              parameters[paramKey] = value.map((v) => v.toString()).join(',');
+            }
+          } else if (value is Set) {
+            if (paramKey.startsWith("filters[")) {
+              parameters[paramKey] = jsonEncode(value.toList());
+            } else {
+              parameters[paramKey] = value.map((v) => v.toString()).join(',');
+            }
           } else {
-            parameters[key] = value.toString();
+            parameters[paramKey] = value.toString();
           }
         });
       }
@@ -413,25 +454,24 @@ class ItemRepository {
       Api.page: page,
     };
 
-    String? effCountry = (filter?.country != null && filter!.country!.isNotEmpty)
-        ? filter.country
-        : HiveUtils.getCountryName();
-    String? effState = (filter?.state != null && filter!.state!.isNotEmpty)
-        ? filter.state
-        : HiveUtils.getStateName();
-    String? effCity = (filter?.city != null && filter!.city!.isNotEmpty)
-        ? filter.city
-        : HiveUtils.getCityName();
-    int? effAreaId = filter?.areaId ?? HiveUtils.getAreaId();
-    int? effRadius = filter?.radius ?? HiveUtils.getNearbyRadius();
-    double? effLat = filter?.latitude ?? HiveUtils.getLatitude();
-    double? effLng = filter?.longitude ?? HiveUtils.getLongitude();
-
-    if (effRadius != null && effLat != null && effLng != null) {
-      parameters['latitude'] = effLat;
-      parameters['longitude'] = effLng;
-      parameters['radius'] = effRadius;
+    if (filter != null && filter.radius != null) {
+      if (filter.latitude != null && filter.longitude != null) {
+        parameters['latitude'] = filter.latitude;
+        parameters['longitude'] = filter.longitude;
+        parameters['radius'] = filter.radius;
+      }
     } else {
+      String? effCountry = (filter?.country != null && filter!.country!.isNotEmpty)
+          ? filter.country
+          : HiveUtils.getCountryName();
+      String? effState = (filter?.state != null && filter!.state!.isNotEmpty)
+          ? filter.state
+          : HiveUtils.getStateName();
+      String? effCity = (filter?.city != null && filter!.city!.isNotEmpty)
+          ? filter.city
+          : HiveUtils.getCityName();
+      int? effAreaId = filter?.areaId ?? HiveUtils.getAreaId();
+
       if (effCity != null && effCity.isNotEmpty) parameters['city'] = effCity;
       if (effState != null && effState.isNotEmpty) parameters['state'] = effState;
       if (effCountry != null && effCountry.isNotEmpty) parameters['country'] = effCountry;
@@ -451,12 +491,32 @@ class ItemRepository {
       if (filter.postedSince != null && filter.postedSince!.isNotEmpty) {
         parameters['posted_since'] = filter.postedSince;
       }
+      if (filter.categorySlug != null && filter.categorySlug!.isNotEmpty) {
+        parameters['category_slug'] = filter.categorySlug;
+      }
       if (filter.customFields != null && filter.customFields!.isNotEmpty) {
         filter.customFields!.forEach((key, value) {
+          if (value == null) return;
+          String paramKey = key;
+          if (!key.startsWith('filters[') &&
+              !key.startsWith('custom_fields[') &&
+              int.tryParse(key) == null) {
+            paramKey = "filters[$key]";
+          }
           if (value is List) {
-            parameters[key] = value.map((v) => v.toString()).join(',');
+            if (paramKey.startsWith("filters[")) {
+              parameters[paramKey] = jsonEncode(value);
+            } else {
+              parameters[paramKey] = value.map((v) => v.toString()).join(',');
+            }
+          } else if (value is Set) {
+            if (paramKey.startsWith("filters[")) {
+              parameters[paramKey] = jsonEncode(value.toList());
+            } else {
+              parameters[paramKey] = value.map((v) => v.toString()).join(',');
+            }
           } else {
-            parameters[key] = value.toString();
+            parameters[paramKey] = value.toString();
           }
         });
       }
@@ -472,11 +532,45 @@ class ItemRepository {
     return DataOutput(total: response['data']['total'] ?? 0, modelList: items);
   }
 
-  Future<List<MultipartFile>> _fileToMultipartFileList(List<File> files) async {
-    List<MultipartFile> multipartFileList = [];
-    for (File file in files) {
-      multipartFileList.add(await MultipartFile.fromFile(file.path));
+  Future<DataOutput<ItemModel>> fetchSimilarProducts({
+    required int categoryId,
+    required int itemId,
+  }) async {
+    try {
+      Map<String, dynamic> parameters = {
+        "category_id": categoryId,
+        "item_id": itemId,
+      };
+
+      Map<String, dynamic> response = await Api.post(
+        url: Api.getSimilarProductApi,
+        parameter: parameters,
+      );
+
+      List<ItemModel> itemList = [];
+      int total = 0;
+
+      if (response['data'] != null) {
+        final data = response['data'];
+        total = data['total_data'] ??
+            (data['items'] is List ? (data['items'] as List).length : 0);
+        if (data['items'] is List) {
+          itemList = (data['items'] as List)
+              .map((element) => ItemModel.fromJson(element))
+              .toList();
+        } else if (data['data'] is List) {
+          itemList = (data['data'] as List)
+              .map((element) => ItemModel.fromJson(element))
+              .toList();
+        }
+      }
+
+      return DataOutput(
+        total: total,
+        modelList: itemList,
+      );
+    } catch (e) {
+      rethrow;
     }
-    return multipartFileList;
   }
 }

@@ -80,7 +80,7 @@ class MMultiAuthentication {
     }
   }
 
-  requestVerification() {
+  void requestVerification() {
     systems.forEach((String key, LoginSystem value) async {
       //like assign the particular payload if key is matching to selected login system
       LoginSystem? selectedSystem;

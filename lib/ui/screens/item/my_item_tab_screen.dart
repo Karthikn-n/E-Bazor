@@ -763,155 +763,149 @@ class _MyItemTabState extends CloudState<MyItemTab> {
                                                       BlendMode.srcIn),
                                                 ),
                                                 itemBuilder: (context) => [
-                                                  if (!item.isFeature!)
-                                                    if (item.status ==
-                                                            "active" ||
-                                                        item.status ==
-                                                            "approved")
-                                                      PopupMenuItem(
-                                                        onTap: () {
-                                                          Future.delayed(
-                                                              Duration.zero,
-                                                              () {
-                                                            */ /* */ /*     if (Constant
-                                                              .isDemoModeOn) {
-                                                            HelperUtils
-                                                                .showSnackBarMessage(
-                                                                context,
-                                                                "thisActionNotValidDemo"
-                                                                    .translate(
-                                                                    context));
-                                                            return;
-                                                          }*/ /* */ /*
-                                                            context
-                                                                .read<
-                                                                    FetchUserPackageLimitCubit>()
-                                                                .fetchUserPackageLimit(
-                                                                    packageType:
-                                                                        "advertisement");
-                                                          });
-                                                        },
-                                                        child: Text("featureAd"
-                                                                .translate(
-                                                                    context))
-                                                            .color(context.color
-                                                                .buttonColor),
-                                                      ),
-                                                  if (item.status == "active" ||
-                                                      item.status ==
-                                                          "inactive" ||
-                                                      item.status == "approved")
-                                                    PopupMenuItem(
-                                                      onTap: () async {
-                                                        var soldOut = await UiUtils
-                                                            .showBlurredDialoge(
-                                                          context,
-                                                          dialoge:
-                                                              BlurredDialogBox(
-                                                            title:
-                                                                "confirmSoldOut"
-                                                                    .translate(
-                                                                        context),
-                                                            acceptButtonName:
-                                                                "comfirmBtnLbl"
-                                                                    .translate(
-                                                                        context),
-                                                            content: Text(
-                                                              "soldOutWarning"
-                                                                  .translate(
-                                                                      context),
-                                                            ),
-                                                          ),
-                                                        );
-                                                        if (soldOut == true) {
-                                                          Future.delayed(
-                                                            Duration.zero,
-                                                            () {
-                                                              context
-                                                                  .read<
-                                                                      ChangeMyItemStatusCubit>()
-                                                                  .changeMyItemStatus(
-                                                                      id: item
-                                                                          .id!,
-                                                                      status:
-                                                                          'sold out');
-                                                            },
-                                                          );
-                                                        }
-                                                        */ /* */ /* if (Constant
-                                                            .isDemoModeOn) {
-                                                          HelperUtils.showSnackBarMessage(
-                                                              context,
-                                                              "thisActionNotValidDemo"
-                                                                  .translate(
-                                                                      context));
-                                                          return;
-                                                        }*/ /* */ /*
-                                                      },
-                                                      child: Text("soldOut"
-                                                              .translate(
-                                                                  context))
-                                                          .color(context.color
-                                                              .buttonColor),
-                                                    ),
-                                                  if (item.status == "active" ||
-                                                      item.status == "approved")
-                                                    PopupMenuItem(
-                                                      onTap: () {
-                                                        Future.delayed(
-                                                            Duration.zero, () {
-                                                          */ /* */ /* if (Constant
-                                                            .isDemoModeOn) {
-                                                          HelperUtils.showSnackBarMessage(
-                                                              context,
-                                                              "thisActionNotValidDemo"
-                                                                  .translate(
-                                                                      context));
-                                                          return;
-                                                        }*/ /* */ /*
-                                                          context
-                                                              .read<
-                                                                  ChangeMyItemStatusCubit>()
-                                                              .changeMyItemStatus(
-                                                                  id: item.id!,
-                                                                  status:
-                                                                      'inactive');
-                                                        });
-                                                      },
-                                                      child: Text("deactivate"
-                                                              .translate(
-                                                                  context))
-                                                          .color(context.color
-                                                              .buttonColor),
-                                                    ),
-                                                  if (item.status == "active" ||
-                                                      item.status ==
-                                                          "inactive" ||
-                                                      item.status == "review" ||
-                                                      item.status == "approved")
-                                                    PopupMenuItem(
-                                                      child: Text("edit"
-                                                              .translate(
-                                                                  context))
-                                                          .color(context.color
-                                                              .buttonColor),
-                                                      onTap: () {
-                                                        addCloudData(
-                                                            "edit_request",
-                                                            item);
-                                                        addCloudData(
-                                                            "edit_from",
-                                                            widget
-                                                                .getItemsWithStatus);
-                                                        Navigator.pushNamed(
-                                                            context,
-                                                            Routes
-                                                                .addItemDetails,
-                                                            arguments: {
-                                                              "isEdit": true
-                                                            });
-                                                      },
-                                                    ),
+                                                   if (item.isFeature != true)
+                                                     if (item.status ==
+                                                             "active" ||
+                                                         item.status ==
+                                                             "approved")
+                                                       PopupMenuItem(
+                                                         onTap: () {
+                                                           Future.delayed(
+                                                               Duration.zero,
+                                                               () {
+                                                             context
+                                                                 .read<
+                                                                     FetchUserPackageLimitCubit>()
+                                                                 .fetchUserPackageLimit(
+                                                                     packageType:
+                                                                         "advertisement");
+                                                           });
+                                                         },
+                                                         child: Text("featureAd"
+                                                                 .translate(
+                                                                     context))
+                                                             .color(context.color
+                                                                 .buttonColor),
+                                                       ),
+                                                   if (item.status == "active" ||
+                                                       item.status ==
+                                                           "inactive" ||
+                                                       item.status == "approved")
+                                                     PopupMenuItem(
+                                                       onTap: () async {
+                                                         var soldOut = await UiUtils
+                                                             .showBlurredDialoge(
+                                                           context,
+                                                           dialoge:
+                                                               BlurredDialogBox(
+                                                             title:
+                                                                 "confirmSoldOut"
+                                                                     .translate(
+                                                                         context),
+                                                             acceptButtonName:
+                                                                 "comfirmBtnLbl"
+                                                                     .translate(
+                                                                         context),
+                                                             content: Text(
+                                                               "soldOutWarning"
+                                                                   .translate(
+                                                                       context),
+                                                             ),
+                                                           ),
+                                                         );
+                                                         if (soldOut == true) {
+                                                           Future.delayed(
+                                                             Duration.zero,
+                                                             () {
+                                                               context
+                                                                   .read<
+                                                                       ChangeMyItemStatusCubit>()
+                                                                   .changeMyItemStatus(
+                                                                       id: item
+                                                                           .id!,
+                                                                       status:
+                                                                           'sold out');
+                                                             },
+                                                           );
+                                                         }
+                                                       },
+                                                       child: Text("soldOut"
+                                                               .translate(
+                                                                   context))
+                                                           .color(context.color
+                                                               .buttonColor),
+                                                     ),
+                                                   // Live / Active items -> Mark as Inactive
+                                                   if (item.status == "active" ||
+                                                       item.status == "approved")
+                                                     PopupMenuItem(
+                                                       onTap: () {
+                                                         Future.delayed(
+                                                             Duration.zero, () {
+                                                           context
+                                                               .read<
+                                                                   ChangeMyItemStatusCubit>()
+                                                               .changeMyItemStatus(
+                                                                   id: item.id!,
+                                                                   status:
+                                                                       'inactive');
+                                                         });
+                                                       },
+                                                       child: Text("deactivate"
+                                                               .translate(
+                                                                   context))
+                                                           .color(context.color
+                                                               .buttonColor),
+                                                     ),
+                                                   // Inactive items -> Mark as Active
+                                                   if (item.status == "inactive")
+                                                     PopupMenuItem(
+                                                       onTap: () {
+                                                         Future.delayed(
+                                                             Duration.zero, () {
+                                                           context
+                                                               .read<
+                                                                   ChangeMyItemStatusCubit>()
+                                                               .changeMyItemStatus(
+                                                                   id: item.id!,
+                                                                   status:
+                                                                       'active');
+                                                         });
+                                                       },
+                                                       child: Text("activate"
+                                                               .translate(
+                                                                   context))
+                                                           .color(context.color
+                                                               .buttonColor),
+                                                     ),
+                                                   if (item.status == "active" ||
+                                                       item.status ==
+                                                           "inactive" ||
+                                                       item.status == "review" ||
+                                                       item.status == "approved")
+                                                     PopupMenuItem(
+                                                       child: Text("edit"
+                                                               .translate(
+                                                                   context))
+                                                           .color(context.color
+                                                               .buttonColor),
+                                                       onTap: () {
+                                                         addCloudData(
+                                                             "edit_request",
+                                                             item);
+                                                         addCloudData(
+                                                             "edit_from",
+                                                             widget
+                                                                 .getItemsWithStatus);
+                                                         Navigator.pushNamed(
+                                                             context,
+                                                             Routes
+                                                                 .addItemDetails,
+                                                             arguments: {
+                                                               "isEdit": true
+                                                             });
+                                                       },
+                                                     ),
                                                   PopupMenuItem(
                                                     child: Text("lblremove"
                                                             .translate(context))

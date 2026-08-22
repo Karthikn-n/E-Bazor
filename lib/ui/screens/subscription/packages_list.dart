@@ -9,7 +9,6 @@ import 'package:Ebozor/ui/screens/widgets/intertitial_ads_screen.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/payment/gatways/inAppPurchaseManager.dart';
-import 'package:Ebozor/utils/payment/gatways/stripe_service.dart';
 import 'package:Ebozor/data/cubits/subscription/assign_free_package_cubit.dart';
 import 'package:Ebozor/data/cubits/subscription/fetch_featured_subscription_packages_cubit.dart';
 import 'package:Ebozor/data/model/subscription_pacakage_model.dart';
@@ -211,9 +210,6 @@ class _SubscriptionPackageListScreenState
               AppSettings.phonePeStatus = state.phonePeStatus ?? 0;
 
               AppSettings.updatePaymentGateways();
-              if (AppSettings.stripePublishableKey.isNotEmpty) {
-                StripeService.initStripe(AppSettings.stripePublishableKey, "test");
-              }
             }
           },
           child: TabBarView(

@@ -150,8 +150,8 @@ class _LocationDetailsFormScreenState extends State<LocationDetailsFormScreen> {
       if (permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always) {
         Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-        );
+            locationSettings: LocationSettings(
+                accuracy: LocationAccuracy.high,));
 
         final target = LatLng(position.latitude, position.longitude);
         _updateLocation(target);
@@ -532,7 +532,7 @@ class _LocationDetailsFormScreenState extends State<LocationDetailsFormScreen> {
                     children: [
                       Switch(
                         value: _isDefault,
-                        activeColor: const Color(0xFFD31027),
+                        activeThumbColor: const Color(0xFFD31027),
                         onChanged: (val) => setState(() => _isDefault = val),
                       ),
                       const SizedBox(width: 8),

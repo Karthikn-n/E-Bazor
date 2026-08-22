@@ -66,7 +66,7 @@ class LocalAwsomeNotification {
     );
   }
 
-  createNotification({
+  Future<void> createNotification({
     required RemoteMessage notificationData,
     required bool isLocked,
   }) async {

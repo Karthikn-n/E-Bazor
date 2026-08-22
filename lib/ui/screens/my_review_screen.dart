@@ -34,7 +34,6 @@ class MyReviewScreen extends StatefulWidget {
   MyReviewScreenState createState() => MyReviewScreenState();
 
   static Route route(RouteSettings routeSettings) {
-    Map? arguments = routeSettings.arguments as Map?;
     return BlurredRouter(builder: (_) => MyReviewScreen());
   }
 }

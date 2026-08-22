@@ -1,4 +1,12 @@
 import 'dart:async';
+import 'dart:developer';
+import 'package:Ebozor/data/cubits/item/fetch_my_promoted_items_cubit.dart';
+import 'package:Ebozor/data/helper/widgets.dart';
+import 'package:Ebozor/data/model/category_model.dart';
+import 'package:Ebozor/data/model/custom_field/custom_field_model.dart';
+import 'package:Ebozor/data/repositories/item/item_repository.dart';
+import 'package:Ebozor/data/repositories/item_inquiry_repository.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:Ebozor/app/routes.dart';
@@ -12,8 +20,8 @@ import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/responsiveSize.dart';
-import 'package:Ebozor/data/cubits/chat/get_buyer_chat_users_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/make_an_offer_item_cubit.dart';
+import 'package:Ebozor/ui/screens/widgets/dialogs/save_to_favorite_bottom_sheet.dart';
 import 'package:Ebozor/data/cubits/favorite/favorite_cubit.dart';
 import 'package:Ebozor/data/cubits/item/create_featured_ad_cubit.dart';
 import 'package:Ebozor/data/cubits/item/fetch_my_item_cubit.dart';
@@ -22,13 +30,10 @@ import 'package:Ebozor/data/cubits/item/related_item_cubit.dart';
 import 'package:Ebozor/data/cubits/renew_item_cubit.dart';
 import 'package:Ebozor/data/cubits/safety_tips_cubit.dart';
 import 'package:Ebozor/data/cubits/seller/fetch_seller_ratings_cubit.dart';
-import 'package:Ebozor/data/model/chat/chated_user_model.dart';
 import 'package:Ebozor/data/model/item/item_model.dart';
-import 'package:Ebozor/data/model/safety_tips_model.dart';
 import 'package:Ebozor/data/model/subscription_pacakage_model.dart';
 
 import 'package:Ebozor/utils/app_icon.dart';
-import 'package:Ebozor/utils/validator.dart';
 import 'package:flick_video_player/flick_video_player.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -45,7 +50,6 @@ import 'package:Ebozor/data/cubits/report/item_report_cubit.dart';
 import 'package:Ebozor/data/cubits/report/update_report_items_list_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/delete_message_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/load_chat_messages.dart';
-import 'package:Ebozor/data/cubits/chat/send_message.dart';
 import 'package:Ebozor/data/cubits/favorite/manage_fav_cubit.dart';
 import 'package:Ebozor/data/cubits/item/change_my_items_status_cubit.dart';
 import 'package:Ebozor/data/cubits/item/delete_item_cubit.dart';
@@ -63,6 +67,9 @@ import 'package:Ebozor/ui/screens/widgets/shimmerLoadingContainer.dart';
 import 'package:Ebozor/ui/screens/widgets/video_view_screen.dart';
 import 'package:Ebozor/ui/screens/google_map_screen.dart';
 import 'package:Ebozor/ui/screens/widgets/car_finance_calculator.dart';
+import 'package:Ebozor/ui/screens/widgets/dialogs/report_listing_dialog.dart';
+import 'package:Ebozor/ui/screens/widgets/dialogs/inquire_ad_dialog.dart';
+import 'package:Ebozor/ui/screens/widgets/dialogs/seller_contact_dialog.dart';
 
 class AdDetailsScreen extends StatefulWidget {
   final ItemModel model;
@@ -111,7 +118,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   List<String> selectedFeaturedAdsOptions = [];
 
   bool isShowReportAds = true;
-  bool _showAllOverview = false;
+  bool _showAllAmenities = false;
   bool _isDescriptionExpanded = false;
   final Map<int, bool> _expandedFeatures = {};
   final PageController pageController = PageController();
@@ -124,25 +131,9 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   final TextEditingController _reportmessageController =
   TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey();
-  final TextEditingController _makeAnOffermessageController =
-  TextEditingController();
-  final GlobalKey<FormState> _offerFormKey = GlobalKey();
   int? _selectedPackageIndex;
 
-  //int? packageId;
-
-  /* [
-    "http://eclassify.thewrteam.in/storage/packages/M5t66y5DRVVOrxH7xjDoOg3PJnxavUqjZI1ILlHn.jpg",
-    "http://eclassify.thewrteam.in/storage/custom_field/655c7b73c8952.jpg",
-    "http://eclassify.thewrteam.in/storage/packages/M5t66y5DRVVOrxH7xjDoOg3PJnxavUqjZI1ILlHn.jpg",
-
-  ]; */
-  //ImageView
-
-/*  late final String from =
-      widget.from;*/ //"MyAds";//TODO: set it as an argument with Route
-
-  late final ItemModel model = widget.model;
+  late ItemModel model = widget.model;
 
   late bool isAddedByMe = (widget.model.user?.id != null
       ? widget.model.user!.id.toString()
@@ -157,6 +148,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   @override
   void initState() {
     super.initState();
+
+    _fetchFullItemDetails();
 
     if (!isAddedByMe) {
       context.read<FetchItemReportReasonsListCubit>().fetch();
@@ -183,12 +176,38 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     if (categoryId != null) {
       context.read<FetchRelatedItemsCubit>().fetchRelatedItems(
           categoryId: categoryId!,
+          itemId: widget.model.id,
           city: HiveUtils.getCityName(),
           areaId: HiveUtils.getAreaId(),
           country: HiveUtils.getCountryName(),
           state: HiveUtils.getStateName());
     }
     _pageScrollController.addListener(_pageScroll);
+  }
+
+  Future<void> _fetchFullItemDetails() async {
+    if (widget.model.id == null) return;
+    try {
+      final res = await ItemRepository().fetchItemFromItemId(widget.model.id!);
+      if (res.modelList.isNotEmpty && mounted) {
+        final fullModel = res.modelList.first;
+        setState(() {
+          model = fullModel;
+          isAddedByMe = (fullModel.user?.id != null
+                  ? fullModel.user!.id.toString()
+                  : (fullModel.userId?.toString() ?? '')) ==
+              HiveUtils.getUserId();
+          images.clear();
+          combineImages();
+        });
+        final int? sellerId = fullModel.user?.id ?? fullModel.userId;
+        if (sellerId != null && !isAddedByMe) {
+          context.read<FetchSellerRatingsCubit>().fetch(sellerId: sellerId);
+        }
+      }
+    } catch (e) {
+      // Keep initial model
+    }
   }
 
   void _pageScroll() {
@@ -342,27 +361,28 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                     // Car / Item Overview (2-column key-value with Show More / Show Less)
                     _buildOverviewSection(),
 
+                    // Property Amenities Grid (3 per row with Show More)
+                    _buildAmenitiesSection(),
+
                     // Description with Read More & Posted On date
                     _buildDescriptionSection(),
 
                     // Features (expandable accordion categories with checkmarks)
                     _buildFeaturesSection(),
 
-                    // Make an offer button (if buyer)
-                    makeOfferButtonWidget(),
-
                     // Car Finance Calculator (shown for Cars / Motors listings with price > 0)
                     if (_isCarListing() && (model.price != null && model.price! > 0))
                       CarFinanceCalculator(
                         initialPrice: model.price ?? 0.0,
                         carName: model.name,
+                        showApplyButton: false,
                       ),
 
                     // Location section with map preview
                     _buildLocationSection(),
 
                     // Seller details section with verified checkmark & view profile
-                    if (!isAddedByMe && model.user != null) _buildSellerSection(),
+                    if (!isAddedByMe) _buildSellerSection(),
 
                     if (Constant.isGoogleBannerAdsEnabled == "1") ...[
                       const SizedBox(height: 10),
@@ -478,6 +498,420 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     );
   }
 
+  bool _isPropertyListing() {
+    final catName = (model.category?.name ?? "").toLowerCase();
+    final catSlug = (model.category?.slug ?? "").toLowerCase();
+    final allCatIds = model.allCategoryIds ?? "";
+    if (catName.contains("property") ||
+        catName.contains("residential") ||
+        catName.contains("commercial") ||
+        catName.contains("rent") ||
+        catSlug.contains("property") ||
+        catSlug.contains("residential") ||
+        catSlug.contains("commercial") ||
+        allCatIds.contains("65") ||
+        allCatIds.contains("139") ||
+        allCatIds.contains("3") ||
+        allCatIds.contains("66") ||
+        allCatIds.contains("77") ||
+        allCatIds.contains("78") ||
+        allCatIds.contains("85")) {
+      return true;
+    }
+    if (model.customFields != null) {
+      for (var cf in model.customFields!) {
+        final n = (cf.name ?? "").toLowerCase();
+        if (n.contains("amenit") ||
+            n.contains("bedroom") ||
+            n.contains("bathroom") ||
+            n.contains("furnish") ||
+            n.contains("sqft") ||
+            n.contains("rera") ||
+            n.contains("brn")) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  IconData _getAmenityIcon(String name) {
+    final lower = name.toLowerCase().trim();
+    if (lower.contains("pool") || lower.contains("swimming")) {
+      return Icons.pool_outlined;
+    }
+    if (lower.contains("ac") ||
+        lower.contains("a/c") ||
+        lower.contains("heat") ||
+        lower.contains("climate") ||
+        lower.contains("air condition")) {
+      return Icons.ac_unit_outlined;
+    }
+    if (lower.contains("balcony")) {
+      return Icons.balcony_outlined;
+    }
+    if (lower.contains("maid")) {
+      return Icons.cleaning_services_outlined;
+    }
+    if (lower.contains("study") ||
+        lower.contains("office") ||
+        lower.contains("desk")) {
+      return Icons.menu_book_outlined;
+    }
+    if (lower.contains("concierge") || lower.contains("reception")) {
+      return Icons.room_service_outlined;
+    }
+    if (lower.contains("garden") ||
+        lower.contains("yard") ||
+        lower.contains("park")) {
+      return Icons.yard_outlined;
+    }
+    if (lower.contains("gym") ||
+        lower.contains("fitness") ||
+        lower.contains("workout")) {
+      return Icons.fitness_center_outlined;
+    }
+    if (lower.contains("park") || lower.contains("garage")) {
+      return Icons.local_parking_outlined;
+    }
+    if (lower.contains("wardrobe") || lower.contains("closet")) {
+      return Icons.checkroom_outlined;
+    }
+    if (lower.contains("pet")) {
+      return Icons.pets_outlined;
+    }
+    if (lower.contains("security") || lower.contains("cctv")) {
+      return Icons.security_outlined;
+    }
+    if (lower.contains("view") ||
+        lower.contains("landmark") ||
+        lower.contains("water")) {
+      return Icons.visibility_outlined;
+    }
+    if (lower.contains("elevator") || lower.contains("lift")) {
+      return Icons.elevator_outlined;
+    }
+    if (lower.contains("bbq") || lower.contains("barbeque")) {
+      return Icons.outdoor_grill_outlined;
+    }
+    if (lower.contains("play") ||
+        lower.contains("kid") ||
+        lower.contains("children")) {
+      return Icons.child_care_outlined;
+    }
+    return Icons.verified_outlined;
+  }
+
+  Widget _buildAmenitiesSection() {
+    if (!_isPropertyListing()) return const SizedBox.shrink();
+    if (model.customFields == null || model.customFields!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    CustomFieldModel? amenityField;
+    for (var cf in model.customFields!) {
+      if ((cf.name ?? "").toLowerCase().contains("amenit")) {
+        amenityField = cf;
+        break;
+      }
+    }
+
+    if (amenityField == null ||
+        amenityField.value == null ||
+        amenityField.value!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final List<dynamic> allAmenities = amenityField.value!;
+    final displayedAmenities = _showAllAmenities
+        ? allAmenities
+        : allAmenities.take(6).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 18),
+        Text("Amenities".translate(context))
+            .bold(weight: FontWeight.w700)
+            .size(18)
+            .color(context.color.textDefaultColor),
+        const SizedBox(height: 12),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: displayedAmenities.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 1.05,
+          ),
+          itemBuilder: (context, index) {
+            final amenityName = displayedAmenities[index].toString().trim();
+            final icon = _getAmenityIcon(amenityName);
+
+            String? optionImageUrl;
+            if (amenityField?.image != null &&
+                amenityField!.image!.isNotEmpty) {
+              optionImageUrl = amenityField.image;
+            }
+
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              decoration: BoxDecoration(
+                color: context.color.secondaryColor,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: context.color.borderColor.withValues(alpha: 0.35),
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  if (optionImageUrl != null && optionImageUrl.isNotEmpty)
+                    SizedBox(
+                      height: 26,
+                      width: 26,
+                      child:
+                          UiUtils.getImage(optionImageUrl, fit: BoxFit.contain),
+                    )
+                  else
+                    Icon(
+                      icon,
+                      size: 24,
+                      color: context.color.territoryColor,
+                    ),
+                  const SizedBox(height: 8),
+                  Text(
+                    amenityName,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: context.color.textDefaultColor,
+                      height: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        if (allAmenities.length > 6) ...[
+          const SizedBox(height: 8),
+          Center(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () {
+                setState(() {
+                  _showAllAmenities = !_showAllAmenities;
+                });
+              },
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(vertical: 6.0, horizontal: 12.0),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _showAllAmenities
+                          ? "Show Less".translate(context)
+                          : "Show More (${allAmenities.length - 6} more)"
+                              .translate(context),
+                      style: TextStyle(
+                        color: context.color.territoryColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      _showAllAmenities
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: 18,
+                      color: context.color.territoryColor,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  bool _isOverviewSpecField(String name, int valueCount) {
+    final lower = name.toLowerCase().trim();
+    if (lower.contains("color") ||
+        lower.contains("year") ||
+        lower.contains("kilometer") ||
+        lower.contains("mileage") ||
+        lower.contains("door") ||
+        lower.contains("steering") ||
+        lower.contains("body type") ||
+        lower.contains("fuel") ||
+        lower.contains("cylinder") ||
+        lower.contains("transmission") ||
+        lower.contains("seating") ||
+        lower.contains("engine capacity") ||
+        lower.contains("horsepower") ||
+        lower.contains("warranty") ||
+        lower.contains("regional spec") ||
+        lower.contains("specs") ||
+        lower.contains("make") ||
+        lower.contains("model") ||
+        lower.contains("trim") ||
+        lower.contains("price") ||
+        lower.contains("bedroom") ||
+        lower.contains("bathroom") ||
+        lower.contains("furnish") ||
+        lower.contains("sqft") ||
+        lower.contains("size") ||
+        lower.contains("area") ||
+        lower.contains("building") ||
+        lower.contains("developer") ||
+        lower.contains("ready by") ||
+        lower.contains("listed by") ||
+        lower.contains("rera") ||
+        lower.contains("brn")) {
+      return true;
+    }
+    if (valueCount <= 1 && !lower.contains("feature")) {
+      return true;
+    }
+    return false;
+  }
+
+  IconData _getFeatureCategoryIcon(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains("safety") || lower.contains("assist") || lower.contains("driver")) {
+      return Icons.shield_outlined;
+    }
+    if (lower.contains("entertain") || lower.contains("tech") || lower.contains("audio") || lower.contains("screen")) {
+      return Icons.devices_other_outlined;
+    }
+    if (lower.contains("comfort") || lower.contains("convenien") || lower.contains("seat")) {
+      return Icons.airline_seat_recline_extra_outlined;
+    }
+    if (lower.contains("exterior") || lower.contains("wheel") || lower.contains("roof")) {
+      return Icons.directions_car_outlined;
+    }
+    if (lower.contains("interior")) {
+      return Icons.meeting_room_outlined;
+    }
+    return Icons.auto_awesome_outlined;
+  }
+
+  void _showAllOverviewBottomSheet(
+      BuildContext context, List<CustomFieldModel> overviewFields) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
+          decoration: BoxDecoration(
+            color: context.color.secondaryColor,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // BottomSheet Header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "${model.category?.name != null ? "${model.category!.name!} " : ""}Overview".translate(context),
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: context.color.textDefaultColor,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 22),
+                        color: context.color.textDefaultColor,
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 16),
+                    itemCount: overviewFields.length,
+                    separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      thickness: 0.8,
+                      color: context.color.borderColor.withValues(alpha: 0.25),
+                    ),
+                    itemBuilder: (context, index) {
+                      final cf = overviewFields[index];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 5,
+                              child: Text(
+                                cf.name ?? "",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: context.color.textDefaultColor
+                                      .withValues(alpha: 0.6),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 6,
+                              child: Text(
+                                cf.value != null && cf.value!.isNotEmpty
+                                    ? cf.value!.join(', ')
+                                    : "-",
+                                textAlign: TextAlign.end,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: context.color.textDefaultColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildOverviewSection() {
     if (model.customFields == null || model.customFields!.isEmpty) {
       return const SizedBox.shrink();
@@ -485,117 +919,124 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
 
     final overviewFields = model.customFields!.where((cf) {
       if (cf.value == null || cf.value!.isEmpty) return false;
-      if (cf.value!.length > 1) return false;
-      return true;
+      final name = (cf.name ?? "").toLowerCase();
+      // Exclude CV / Resume uploads from Overview
+      if (name.contains("upload your cv") ||
+          name.contains("cv") ||
+          name.contains("resume") ||
+          cf.type == "fileinput") {
+        return false;
+      }
+      if (_isPropertyListing() && name.contains("amenit")) {
+        return false;
+      }
+      return _isOverviewSpecField(cf.name ?? "", cf.value!.length) || cf.value!.length <= 1;
     }).toList();
 
     if (overviewFields.isEmpty) return const SizedBox.shrink();
 
-    final displayedFields = _showAllOverview
-        ? overviewFields
-        : overviewFields.take(6).toList();
+    final displayedFields = overviewFields.take(6).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 14),
+        const SizedBox(height: 18),
         Text(
           "${model.category?.name != null ? "${model.category!.name!} " : ""}Overview",
-        ).bold(weight: FontWeight.w700).size(18),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: context.color.secondaryColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: context.color.borderColor.withValues(alpha: 0.4),
-            ),
-          ),
-          child: Column(
-            children: [
-              ...displayedFields.asMap().entries.map((entry) {
-                final cf = entry.value;
-                final isLast = entry.key == displayedFields.length - 1;
-                return Padding(
-                  padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        flex: 5,
-                        child: Text(
-                          cf.name ?? "",
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: context.color.textDefaultColor
-                                .withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        flex: 6,
-                        child: Text(
-                          cf.value != null && cf.value!.isNotEmpty
-                              ? cf.value!.join(', ')
-                              : "-",
-                          textAlign: TextAlign.end,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: context.color.textDefaultColor,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-              if (overviewFields.length > 6) ...[
-                const Divider(height: 20),
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () {
-                      setState(() {
-                        _showAllOverview = !_showAllOverview;
-                      });
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.max,
-                        children: [
-                          Text(
-                            _showAllOverview
-                                ? "Show Less".translate(context)
-                                : "Show More".translate(context),
+        )
+            .bold(weight: FontWeight.w700)
+            .size(18)
+            .color(context.color.textDefaultColor),
+        const SizedBox(height: 12),
+        Column(
+          children: [
+            ...displayedFields.asMap().entries.map((entry) {
+              final cf = entry.value;
+              final isLast = entry.key == displayedFields.length - 1;
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 5,
+                          child: Text(
+                            cf.name ?? "",
                             style: TextStyle(
-                              color: context.color.territoryColor,
-                              fontWeight: FontWeight.bold,
                               fontSize: 14,
+                              color: context.color.textDefaultColor
+                                  .withValues(alpha: 0.6),
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          Icon(
-                            _showAllOverview
-                                ? Icons.keyboard_arrow_up_rounded
-                                : Icons.keyboard_arrow_down_rounded,
-                            size: 20,
-                            color: context.color.territoryColor,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 6,
+                          child: Text(
+                            cf.value != null && cf.value!.isNotEmpty
+                                ? cf.value!.join(', ')
+                                : "-",
+                            textAlign: TextAlign.end,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: context.color.textDefaultColor,
+                            ),
                           ),
-                        ],
+                        ),
+                      ],
+                    ),
+                    if (!isLast) ...[
+                      const SizedBox(height: 8),
+                      Divider(
+                        height: 1,
+                        thickness: 0.8,
+                        color:
+                            context.color.borderColor.withValues(alpha: 0.25),
                       ),
+                    ],
+                  ],
+                ),
+              );
+            }),
+            if (overviewFields.length > 6) ...[
+              const SizedBox(height: 6),
+              Center(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () {
+                    _showAllOverviewBottomSheet(context, overviewFields);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 6.0, horizontal: 12.0),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "Show More (${overviewFields.length - 6} more)".translate(context),
+                          style: TextStyle(
+                            color: context.color.territoryColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13.5,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 18,
+                          color: context.color.territoryColor,
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ],
+              ),
             ],
-          ),
+          ],
         ),
       ],
     );
@@ -609,91 +1050,78 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
         Text("aboutThisItemLbl".translate(context))
             .bold(weight: FontWeight.w700)
-            .size(18),
+            .size(18)
+            .color(context.color.textDefaultColor),
         const SizedBox(height: 10),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: context.color.secondaryColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: context.color.borderColor.withValues(alpha: 0.4),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              model.description ?? "",
+              maxLines: _isDescriptionExpanded ? null : 4,
+              overflow: _isDescriptionExpanded
+                  ? TextOverflow.visible
+                  : TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.5,
+                color:
+                    context.color.textDefaultColor.withValues(alpha: 0.75),
+              ),
             ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                model.description ?? "",
-                maxLines: _isDescriptionExpanded ? null : 4,
-                overflow: _isDescriptionExpanded
-                    ? TextOverflow.visible
-                    : TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 1.5,
-                  color:
-                      context.color.textDefaultColor.withValues(alpha: 0.75),
+            if ((model.description?.length ?? 0) > 160) ...[
+              const SizedBox(height: 6),
+              InkWell(
+                borderRadius: BorderRadius.circular(6),
+                onTap: () {
+                  setState(() {
+                    _isDescriptionExpanded = !_isDescriptionExpanded;
+                  });
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4.0),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _isDescriptionExpanded
+                            ? "Read Less".translate(context)
+                            : "Read More".translate(context),
+                        style: TextStyle(
+                          color: context.color.territoryColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        _isDescriptionExpanded
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        size: 16,
+                        color: context.color.territoryColor,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              if ((model.description?.length ?? 0) > 160) ...[
-                const SizedBox(height: 8),
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(6),
-                    onTap: () {
-                      setState(() {
-                        _isDescriptionExpanded = !_isDescriptionExpanded;
-                      });
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 4.0),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _isDescriptionExpanded
-                                ? "Read Less".translate(context)
-                                : "Read More".translate(context),
-                            style: TextStyle(
-                              color: context.color.territoryColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            _isDescriptionExpanded
-                                ? Icons.keyboard_arrow_up_rounded
-                                : Icons.keyboard_arrow_down_rounded,
-                            size: 16,
-                            color: context.color.territoryColor,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-              if (model.created != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  "Posted On: ${model.created!.formatDate(format: "d MMMM, yyyy")}",
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: context.color.textDefaultColor
-                        .withValues(alpha: 0.45),
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ],
             ],
-          ),
+            if (model.created != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                "Posted On: ${model.created!.formatDate(format: "d MMMM, yyyy")}",
+                style: TextStyle(
+                  fontSize: 12,
+                  color: context.color.textDefaultColor
+                      .withValues(alpha: 0.45),
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ],
         ),
       ],
     );
@@ -706,15 +1134,25 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
 
     final featureFields = model.customFields!.where((cf) {
       if (cf.value == null || cf.value!.isEmpty) return false;
+      final name = (cf.name ?? "").toLowerCase();
+      if (name.contains("upload your cv") ||
+          name.contains("cv") ||
+          name.contains("resume") ||
+          cf.type == "fileinput") {
+        return false;
+      }
+      if (_isPropertyListing() && name.contains("amenit")) {
+        return false;
+      }
+      if (_isOverviewSpecField(cf.name ?? "", cf.value!.length)) {
+        return false;
+      }
       return cf.value!.length > 1 ||
-          cf.name!.toLowerCase().contains("amenit") ||
-          cf.name!.toLowerCase().contains("feature") ||
-          cf.name!.toLowerCase().contains("safety") ||
-          cf.name!.toLowerCase().contains("comfort") ||
-          cf.name!.toLowerCase().contains("technology") ||
-          cf.name!.toLowerCase().contains("exterior") ||
-          cf.name!.toLowerCase().contains("interior") ||
-          cf.name!.toLowerCase().contains("entertainment");
+          name.contains("feature") ||
+          name.contains("safety") ||
+          name.contains("comfort") ||
+          name.contains("technology") ||
+          name.contains("entertainment");
     }).toList();
 
     if (featureFields.isEmpty) return const SizedBox.shrink();
@@ -722,33 +1160,35 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
         Text("Features".translate(context))
             .bold(weight: FontWeight.w700)
-            .size(18),
-        const SizedBox(height: 12),
+            .size(18)
+            .color(context.color.textDefaultColor),
+        const SizedBox(height: 10),
         ...featureFields.asMap().entries.map((entry) {
           final index = entry.key;
           final cf = entry.value;
           final isExpanded = _expandedFeatures[index] ?? true;
           final values = cf.value ?? [];
+          final categoryIcon = _getFeatureCategoryIcon(cf.name ?? "");
 
           return Container(
-            margin: const EdgeInsets.only(bottom: 12),
+            margin: const EdgeInsets.symmetric(vertical: 4),
             decoration: BoxDecoration(
               color: context.color.secondaryColor,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: context.color.borderColor.withValues(alpha: 0.4),
+                color: context.color.borderColor.withValues(alpha: 0.35),
               ),
             ),
             child: Column(
               children: [
                 Material(
                   color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                     onTap: () {
                       setState(() {
                         _expandedFeatures[index] = !isExpanded;
@@ -756,43 +1196,49 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                     },
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 14),
+                          horizontal: 14, vertical: 12),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
+                          Icon(
+                            categoryIcon,
+                            size: 18,
+                            color: context.color.territoryColor,
+                          ),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               cf.name ?? "Feature",
-                              style: const TextStyle(
-                                fontSize: 15,
+                              style: TextStyle(
+                                fontSize: 14.5,
                                 fontWeight: FontWeight.w600,
+                                color: context.color.textDefaultColor,
                               ),
                             ),
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 3),
+                                horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: context.color.borderColor
-                                  .withValues(alpha: 0.35),
-                              borderRadius: BorderRadius.circular(12),
+                              color: context.color.territoryColor
+                                  .withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               "${values.length}",
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 11.5,
                                 fontWeight: FontWeight.bold,
-                                color: context.color.textDefaultColor,
+                                color: context.color.territoryColor,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 6),
                           Icon(
                             isExpanded
                                 ? Icons.keyboard_arrow_up_rounded
                                 : Icons.keyboard_arrow_down_rounded,
-                            color: context.color.textDefaultColor,
-                            size: 22,
+                            color: context.color.textLightColor,
+                            size: 20,
                           ),
                         ],
                       ),
@@ -800,29 +1246,45 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   ),
                 ),
                 if (isExpanded) ...[
-                  const Divider(height: 1),
+                  Divider(
+                    height: 1,
+                    thickness: 0.8,
+                    color: context.color.borderColor.withValues(alpha: 0.25),
+                  ),
                   Padding(
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: values.map((val) {
                         return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 5),
+                          padding: const EdgeInsets.symmetric(vertical: 4),
                           child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              const Icon(
-                                Icons.check,
-                                size: 16,
-                                color: Colors.green,
+                              Container(
+                                width: 18,
+                                height: 18,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: const Color(0xFF10B981)
+                                      .withValues(alpha: 0.12),
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.check_rounded,
+                                    size: 12,
+                                    color: Color(0xFF10B981),
+                                  ),
+                                ),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
                                   val.toString(),
                                   style: TextStyle(
-                                    fontSize: 14,
+                                    fontSize: 13.5,
                                     color: context.color.textDefaultColor,
+                                    fontWeight: FontWeight.w400,
                                   ),
                                 ),
                               ),
@@ -836,8 +1298,9 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
               ],
             ),
           );
-        })]);
-    
+        }),
+      ],
+    );
   }
 
   Widget _buildLocationSection() {
@@ -847,10 +1310,11 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
         Text("locationLbl".translate(context))
             .bold(weight: FontWeight.w700)
-            .size(18),
+            .size(18)
+            .color(context.color.textDefaultColor),
         const SizedBox(height: 8),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -875,7 +1339,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
         ),
         const SizedBox(height: 10),
         ClipRRect(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
           child: SizedBox(
             height: 190,
             child: Stack(
@@ -920,41 +1384,42 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   }
 
   Widget _buildSellerSection() {
-    if (model.user == null) return const SizedBox.shrink();
+    if (isAddedByMe) {
+      return const SizedBox.shrink();
+    }
+    final user = model.user ?? widget.model.user;
+    if (user == null && model.contact == null && model.userId == null) {
+      return const SizedBox.shrink();
+    }
 
-    final user = model.user!;
-    final isVerified = user.isVerified == 1;
+    final isVerified = user?.isVerified == 1;
+    final userName = user?.name ?? "Owner / Seller";
+    final profileUrl = user?.profile;
 
     return Container(
-      margin: const EdgeInsets.only(top: 16),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: context.color.secondaryColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: context.color.borderColor.withValues(alpha: 0.4),
-        ),
-      ),
-      child: Row(
+      margin: const EdgeInsets.only(top: 18),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          // Centered Profile Image (Rounded square portrait)
           Container(
-            height: 54,
-            width: 54,
+            height: 72,
+            width: 72,
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: context.color.territoryColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(16),
+              color: context.color.territoryColor.withValues(alpha: 0.12),
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(27),
-              child: user.profile != null && user.profile!.isNotEmpty
-                  ? UiUtils.getImage(user.profile!, fit: BoxFit.cover)
+              borderRadius: BorderRadius.circular(16),
+              child: profileUrl != null && profileUrl.isNotEmpty
+                  ? UiUtils.getImage(profileUrl, fit: BoxFit.cover)
                   : Center(
                       child: Text(
-                        (user.name != null && user.name!.isNotEmpty)
-                            ? user.name![0].toUpperCase()
-                            : "U",
+                        userName.isNotEmpty ? userName[0].toUpperCase() : "U",
                         style: TextStyle(
-                          fontSize: 22,
+                          fontSize: 28,
                           fontWeight: FontWeight.bold,
                           color: context.color.territoryColor,
                         ),
@@ -962,71 +1427,109 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                     ),
             ),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        user.name ?? "",
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (isVerified) ...[
-                      const SizedBox(width: 6),
-                      const Icon(
-                        Icons.verified,
-                        color: Colors.blue,
-                        size: 18,
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  "Owner",
+          const SizedBox(height: 10),
+
+          // Seller Name + Verified Badge
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Text(
+                  userName,
+                  textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 13,
-                    color: context.color.textDefaultColor
-                        .withValues(alpha: 0.6),
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.bold,
+                    color: context.color.textDefaultColor,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
-                InkWell(
-                  onTap: () {
-                    Navigator.pushNamed(context, Routes.sellerProfileScreen,
-                        arguments: {
-                          "model": model.user!,
-                          "total": context
-                                  .read<FetchSellerRatingsCubit>()
-                                  .totalSellerRatings() ??
-                              0,
-                          "rating": context
+              ),
+              if (isVerified) ...[
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.verified,
+                  color: Colors.blue,
+                  size: 18,
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 6),
+
+          // "View All Properties" / "View All Listings" link
+          if (user != null)
+            InkWell(
+              onTap: () {
+                Navigator.pushNamed(context, Routes.sellerProfileScreen,
+                    arguments: {
+                      "model": user,
+                      "total": context
+                              .read<FetchSellerRatingsCubit>()
+                              .totalSellerRatings() ??
+                          0,
+                      "rating": context
                               .read<FetchSellerRatingsCubit>()
                               .sellerData()
                               ?.averageRating
-                        });
-                  },
-                  child: const Text(
-                    "View Profile",
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.blue,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    });
+              },
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 3, horizontal: 8),
+                child: Text(
+                  "View All Properties",
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: Color(0xFF2563EB),
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+
+          // "View Agency Profile >" / "View Profile >"
+          if (user != null)
+            InkWell(
+              onTap: () {
+                Navigator.pushNamed(context, Routes.sellerProfileScreen,
+                    arguments: {
+                      "model": user,
+                      "total": context
+                              .read<FetchSellerRatingsCubit>()
+                              .totalSellerRatings() ??
+                          0,
+                      "rating": context
+                              .read<FetchSellerRatingsCubit>()
+                              .sellerData()
+                              ?.averageRating
+                    });
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      "View Agency Profile",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: context.color.textDefaultColor
+                            .withValues(alpha: 0.7),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 16,
+                      color: context.color.textDefaultColor
+                          .withValues(alpha: 0.7),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1111,6 +1614,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   onRetry: () {
                     context.read<FetchRelatedItemsCubit>().fetchRelatedItems(
                         categoryId: categoryId!,
+                        itemId: model.id ?? widget.model.id,
                         city: HiveUtils.getCityName(),
                         areaId: HiveUtils.getAreaId(),
                         country: HiveUtils.getCountryName(),
@@ -1751,7 +2255,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     );
   }*/
 
-  showPackageSelectBottomSheet() {
+  void showPackageSelectBottomSheet() {
     showModalBottomSheet(
       context: context,
       backgroundColor: context.color.secondaryColor,
@@ -1918,6 +2422,141 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     );
   }
 
+  Future<void> _navigateToEditAd(BuildContext context, ItemModel item) async {
+    Widgets.showLoader(context);
+    ItemModel fullItem = item;
+    try {
+      // Keep this identical to the My Ads popup: get-item must be ID-only so
+      // the API returns saved values such as Bedrooms for nested categories.
+      final res = await ItemRepository().fetchItemFromItemId(item.id!);
+      if (res.modelList.isNotEmpty) {
+        fullItem = res.modelList.first;
+        if ((fullItem.image ?? '').trim().isEmpty) {
+          fullItem.image = item.image;
+        }
+        if ((fullItem.galleryImages == null ||
+                fullItem.galleryImages!.isEmpty) &&
+            item.galleryImages != null) {
+          fullItem.galleryImages = item.galleryImages;
+        }
+      }
+    } catch (e) {
+      log("⚠️ [EDIT AD FETCH ERROR]: $e");
+    } finally {
+      Widgets.hideLoder(context);
+    }
+
+    if (!context.mounted) return;
+
+    addCloudData("edit_request", fullItem);
+    addCloudData("edit_from", fullItem.status);
+
+    final allCategoryIds =
+        fullItem.allCategoryIds ?? "${fullItem.categoryId ?? ''}";
+    final catIdList = allCategoryIds.split(',').map((e) => e.trim()).toList();
+    final catSlug = (fullItem.category?.slug ?? '').toLowerCase();
+    final catName = (fullItem.category?.name ?? '').toLowerCase();
+
+    // Check if Car
+    final isCar = fullItem.carMake != null ||
+        fullItem.carMakeName != null ||
+        catIdList.contains('5') ||
+        catIdList.contains('6') ||
+        catSlug.contains('car') ||
+        catName.contains('car');
+
+    // Check if Property
+    final isProperty = catIdList.contains('65') ||
+        catIdList.contains('66') ||
+        catIdList.contains('85') ||
+        catIdList.contains('139') ||
+        catIdList.contains('140') ||
+        catIdList.contains('68') ||
+        catIdList.contains('143') ||
+        catSlug.contains('property') ||
+        catName.contains('property');
+
+    // Check if Motor (non-car)
+    final isMotor = catIdList.contains('1') ||
+        catIdList.contains('13') ||
+        catIdList.contains('14') ||
+        catIdList.contains('37') ||
+        catIdList.contains('38') ||
+        catIdList.contains('53') ||
+        catIdList.contains('54') ||
+        catSlug.contains('motor') ||
+        catName.contains('motor') ||
+        catSlug.contains('bike') ||
+        catName.contains('bike') ||
+        catSlug.contains('boat') ||
+        catName.contains('boat') ||
+        catSlug.contains('truck') ||
+        catName.contains('truck');
+
+    final breadcrumbs = fullItem.category != null
+        ? [fullItem.category!]
+        : <CategoryModel>[];
+
+    if (isCar) {
+      Navigator.pushNamed(
+        context,
+        Routes.carSpecsFormScreen,
+        arguments: {
+          'category': fullItem.category,
+          'breadcrumbs': breadcrumbs,
+          'item': fullItem,
+          'isEdit': true,
+          'customFields': fullItem.customFields,
+        },
+      ).then((_) {
+        Navigator.pop(context, "refresh");
+      });
+    } else if (isProperty) {
+      Navigator.pushNamed(
+        context,
+        Routes.propertyPostingFormScreen,
+        arguments: {
+          'category': fullItem.category,
+          'breadcrumbs': breadcrumbs,
+          'item': fullItem,
+          'isEdit': true,
+          'customFields': fullItem.customFields,
+        },
+      ).then((_) {
+        Navigator.pop(context, "refresh");
+      });
+    } else if (isMotor) {
+      Navigator.pushNamed(
+        context,
+        Routes.motorPostingFormScreen,
+        arguments: {
+          'category': fullItem.category,
+          'breadcrumbs': breadcrumbs,
+          'item': fullItem,
+          'isEdit': true,
+          'customFields': fullItem.customFields,
+        },
+      ).then((_) {
+        Navigator.pop(context, "refresh");
+      });
+    } else {
+      // Classifieds / Jobs / Other
+      Navigator.pushNamed(
+        context,
+        Routes.classifiedsPostingFormScreen,
+        arguments: {
+          'category': fullItem.category,
+          'breadcrumbs': breadcrumbs,
+          'item': fullItem,
+          'isEdit': true,
+          'customFields': fullItem.customFields,
+        },
+      ).then((_) {
+        Navigator.pop(context, "refresh");
+      });
+    }
+  }
+
   Widget bottomButtonWidget() {
     if (isAddedByMe) {
       final model = widget.model;
@@ -1929,10 +2568,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
           children: [
             Expanded(
               child: _buildButton("editBtnLbl".translate(context), () {
-                addCloudData("edit_request", model);
-                addCloudData("edit_from", model.status);
-                Navigator.pushNamed(context, Routes.addItemDetails,
-                    arguments: {"isEdit": true});
+                _navigateToEditAd(context, model);
               }, contextColor.secondaryColor, contextColor.territoryColor),
             ),
             SizedBox(width: 10.rw(context)),
@@ -1979,10 +2615,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
           children: [
             Expanded(
               child: _buildButton("editBtnLbl".translate(context), () {
-                addCloudData("edit_request", model);
-                addCloudData("edit_from", model.status);
-                Navigator.pushNamed(context, Routes.addItemDetails,
-                    arguments: {"isEdit": true});
+                _navigateToEditAd(context, model);
               }, contextColor.secondaryColor, contextColor.territoryColor),
             ),
             SizedBox(width: 10.rw(context)),
@@ -2074,314 +2707,1169 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
         return const SizedBox();
       }
     } else {
-      return BlocBuilder<GetBuyerChatListCubit, GetBuyerChatListState>(
-        bloc: context.read<GetBuyerChatListCubit>(),
-        builder: (context, State) {
-          ChatedUser? chatedUser = context.select(
-                  (GetBuyerChatListCubit cubit) =>
-                  cubit.getOfferForItem(model.id!));
-
-          return BlocListener<MakeAnOfferItemCubit, MakeAnOfferItemState>(
-            listener: (context, state) {
-              if (state is MakeAnOfferItemSuccess) {
-                if (state.from == 'offer') {
-                  HelperUtils.showSnackBarMessage(
-                    context,
-                    state.message.toString(),
-                  );
-                  dynamic data = state.data;
-
-                  context.read<GetBuyerChatListCubit>().addNewChat(ChatedUser(
-                      itemId: data['item_id'] is String
-                          ? int.parse(data['item_id'])
-                          : data['item_id'],
-                      amount: double.parse(data['amount']),
-                      buyerId: data['buyer_id'],
-                      createdAt: data['created_at'],
-                      id: data['id'],
-                      sellerId: data['seller_id'],
-                      updatedAt: data['updated_at'],
-                      buyer: Buyer.fromJson(data['buyer']),
-                      item: Item.fromJson(data['item']),
-                      seller: Seller.fromJson(data['seller'])));
-                }
-
-                Navigator.push(context, BlurredRouter(
-                  builder: (context) {
-                    return MultiBlocProvider(
-                      providers: [
-                        BlocProvider(
-                          create: (context) => SendMessageCubit(),
-                        ),
-                        BlocProvider(
-                          create: (context) => LoadChatMessagesCubit(),
-                        ),
-                        BlocProvider(
-                          create: (context) => DeleteMessageCubit(),
-                        ),
-                      ],
-                      child: ChatScreen(
-                        profilePicture: widget.model.user?.profile ?? "",
-                        userName: widget.model.user?.name ?? "",
-                        userId: widget.model.user?.id?.toString() ?? "",
-                        from: "item",
-                        itemImage: widget.model.image ?? "",
-                        itemId: widget.model.id?.toString() ?? "",
-                        date: widget.model.created ?? "",
-                        itemTitle: widget.model.name ?? "",
-                        itemOfferId: state.data['id'] is int
-                            ? state.data['id']
-                            : int.tryParse(state.data['id'].toString()) ?? 0,
-                        itemPrice: widget.model.price ?? 0.0,
-                        status: widget.model.status ?? "",
-                        buyerId: HiveUtils.getUserId(),
-                        itemOfferPrice: state.data['amount'] != null
-                            ? double.tryParse(state.data['amount'].toString())
-                            : null,
-                        isPurchased: widget.model.isPurchased ?? 0,
-                        alreadyReview: widget.model.review == null
-                            ? false
-                            : widget.model.review!.isEmpty
-                            ? false
-                            : true,
-                      ),
-                    );
-                  },
-                ));
-              }
-              if (state is MakeAnOfferItemFailure) {
-                HelperUtils.showSnackBarMessage(
-                  context,
-                  state.errorMessage.toString(),
-                );
-              }
-            },
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                if (widget.model.user?.mobile != null &&
-                    widget.model.user!.mobile!.trim().isNotEmpty &&
-                    widget.model.user?.showPersonalDetails != 0) ...[
-                  Expanded(
-                    child: SizedBox(
-                      height: 46,
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final Uri launchUri = Uri(
-                            scheme: 'tel',
-                            path: widget.model.user!.mobile!,
-                          );
-                          if (await canLaunchUrl(launchUri)) {
-                            await launchUrl(launchUri);
-                          }
-                        },
-                        icon: const Icon(Icons.phone_outlined,
-                            color: Colors.red, size: 20),
-                        label: Text(
-                          "Call".translate(context),
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.red, width: 1.2),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                ],
-                Expanded(
-                  child: _buildButton("chat".translate(context), () {
-                    UiUtils.checkUser(
-                        onNotGuest: () {
-                          if (chatedUser != null) {
-                            Navigator.push(context, BlurredRouter(
-                              builder: (context) {
-                                return MultiBlocProvider(
-                                  providers: [
-                                    BlocProvider(
-                                      create: (context) => SendMessageCubit(),
-                                    ),
-                                    BlocProvider(
-                                      create: (context) =>
-                                          LoadChatMessagesCubit(),
-                                    ),
-                                    BlocProvider(
-                                      create: (context) => DeleteMessageCubit(),
-                                    ),
-                                  ],
-                                  child: ChatScreen(
-                                    itemId: chatedUser.itemId.toString(),
-                                    profilePicture: chatedUser.seller != null &&
-                                        chatedUser.seller!.profile != null
-                                        ? chatedUser.seller!.profile!
-                                        : "",
-                                    userName: chatedUser.seller != null &&
-                                        chatedUser.seller!.name != null
-                                        ? chatedUser.seller!.name!
-                                        : "",
-                                    date: chatedUser.createdAt!,
-                                    itemOfferId: chatedUser.id!,
-                                    itemPrice: chatedUser.item != null &&
-                                        chatedUser.item!.price != null
-                                        ? chatedUser.item!.price!
-                                        : 0.0,
-                                    itemOfferPrice: chatedUser.amount != null
-                                        ? chatedUser.amount!
-                                        : null,
-                                    itemImage: chatedUser.item != null &&
-                                        chatedUser.item!.image != null
-                                        ? chatedUser.item!.image!
-                                        : "",
-                                    itemTitle: chatedUser.item != null &&
-                                        chatedUser.item!.name != null
-                                        ? chatedUser.item!.name!
-                                        : "",
-                                    userId: chatedUser.sellerId.toString(),
-                                    buyerId: chatedUser.buyerId.toString(),
-                                    status: chatedUser.item!.status,
-                                    from: "item",
-                                    isPurchased: widget.model.isPurchased!,
-                                    alreadyReview: widget.model.review == null
-                                        ? false
-                                        : widget.model.review!.isEmpty
-                                        ? false
-                                        : true,
-                                  ),
-                                );
-                              },
-                            ));
-                          } else {
-                            context
-                                .read<MakeAnOfferItemCubit>()
-                                .makeAnOfferItem(
-                                id: widget.model.id!, from: "chat");
-                          }
-                        },
-                        context: context);
-                  }, null, null),
-                ),
-              ],
-            ),
-          );
-        },
-      );
+      return _buildBottomContactButtons();
     }
   }
 
-  void safetyTipsBottomSheet() {
-    List<SafetyTipsModel>? tipsList =
-    context.read<FetchSafetyTipsListCubit>().getList();
-    if (tipsList == null || tipsList.isEmpty) {
-      makeOfferBottomSheet(model);
-      return;
+  bool _isJobAd() {
+    final allCategoryIds = model.allCategoryIds ?? widget.model.allCategoryIds ?? '';
+    final catIdList = allCategoryIds.split(',').map((e) => e.trim()).toList();
+    final catId = model.categoryId ?? widget.model.categoryId;
+    final catSlug = (model.category?.slug ?? widget.model.category?.slug ?? '').toLowerCase();
+    final catName = (model.category?.name ?? widget.model.category?.name ?? '').toLowerCase();
+
+    return catIdList.contains('4') ||
+        catIdList.contains('356') ||
+        catIdList.contains('357') ||
+        catId == 4 ||
+        catId == 356 ||
+        catId == 357 ||
+        catSlug.contains('job') ||
+        catName.contains('job');
+  }
+
+  bool _isHireTalentAd() {
+    final allCategoryIds = model.allCategoryIds ?? widget.model.allCategoryIds ?? '';
+    final catIdList = allCategoryIds.split(',').map((e) => e.trim()).toList();
+    final catId = model.categoryId ?? widget.model.categoryId;
+    final catSlug = (model.category?.slug ?? widget.model.category?.slug ?? '').toLowerCase();
+    final catName = (model.category?.name ?? widget.model.category?.name ?? '').toLowerCase();
+
+    return catIdList.contains('357') ||
+        catId == 357 ||
+        catSlug.contains('recruit') ||
+        catName.contains('recruit') ||
+        catSlug.contains('hire') ||
+        catName.contains('hire');
+  }
+
+  bool _isPropertyAd() {
+    if (_isJobAd()) return false;
+    final catSlug = (model.category?.slug ?? widget.model.category?.slug ?? '').toLowerCase();
+    final catName = (model.category?.name ?? widget.model.category?.name ?? '').toLowerCase();
+
+    if (catSlug.contains('property') ||
+        catSlug.contains('rent') ||
+        catSlug.contains('residential') ||
+        catSlug.contains('commercial') ||
+        catName.contains('property') ||
+        catName.contains('rent') ||
+        (catName.contains('sale') && !catSlug.contains('car') && !catSlug.contains('motor'))) {
+      return true;
     }
+    return false;
+  }
+
+  bool _isMotorsAd() {
+    if (_isJobAd() || _isPropertyAd()) return false;
+    final catSlug = (model.category?.slug ?? widget.model.category?.slug ?? '').toLowerCase();
+    final catName = (model.category?.name ?? widget.model.category?.name ?? '').toLowerCase();
+
+    if (catSlug.contains('motor') ||
+        catSlug.contains('car') ||
+        catSlug.contains('auto') ||
+        catSlug.contains('vehicle') ||
+        catSlug.contains('bike') ||
+        catName.contains('motor') ||
+        catName.contains('car') ||
+        catName.contains('vehicle') ||
+        catName.contains('bike') ||
+        model.customFields?.any((f) =>
+            f.name?.toLowerCase().contains('kilometer') == true ||
+            f.name?.toLowerCase().contains('engine') == true) == true) {
+      return true;
+    }
+    return false;
+  }
+
+  void _showJobApplyModal(BuildContext context) {
+    UiUtils.checkUser(
+      onNotGuest: () {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (ctx) {
+            String? attachedFileName;
+            final messageController = TextEditingController();
+            bool isSubmitting = false;
+
+            return StatefulBuilder(
+              builder: (ctx, setModalState) {
+                return Container(
+                  padding: EdgeInsets.only(
+                    left: 20,
+                    right: 20,
+                    top: 20,
+                    bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade300,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFD31027).withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.work_outline_rounded,
+                                color: Color(0xFFD31027),
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Apply for Job",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: context.color.textDefaultColor,
+                                    ),
+                                  ),
+                                  Text(
+                                    model.name ?? "",
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: context.color.textLightColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        const Divider(),
+                        const SizedBox(height: 12),
+                        // Applicant details
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: context.color.secondaryColor,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: context.color.borderColor.withValues(alpha: 0.5),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Applicant Profile",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12.5,
+                                  color: context.color.textDefaultColor,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Icon(Icons.person_outline, size: 15, color: context.color.textLightColor),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    HiveUtils.getUserDetails().name ?? "User",
+                                    style: TextStyle(fontSize: 13, color: context.color.textDefaultColor),
+                                  ),
+                                ],
+                              ),
+                              if (HiveUtils.getUserDetails().email?.isNotEmpty == true) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(Icons.mail_outline, size: 15, color: context.color.textLightColor),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      HiveUtils.getUserDetails().email!,
+                                      style: TextStyle(fontSize: 13, color: context.color.textDefaultColor),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                              if (HiveUtils.getUserDetails().mobile?.isNotEmpty == true) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(Icons.phone_outlined, size: 15, color: context.color.textLightColor),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      HiveUtils.getUserDetails().mobile!,
+                                      style: TextStyle(fontSize: 13, color: context.color.textDefaultColor),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        // CV Attachment Row
+                        InkWell(
+                          onTap: () async {
+                            final result = await FilePicker.platform.pickFiles(
+                              type: FileType.custom,
+                              allowedExtensions: ['pdf', 'doc', 'docx', 'png', 'jpg'],
+                            );
+                            if (result != null && result.files.isNotEmpty) {
+                              setModalState(() {
+                                attachedFileName = result.files.first.name;
+                              });
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: attachedFileName != null
+                                    ? const Color(0xFF16A34A)
+                                    : const Color(0xFFD31027).withValues(alpha: 0.4),
+                                width: 1.2,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                              color: attachedFileName != null
+                                  ? const Color(0xFFF0FDF4)
+                                  : const Color(0xFFFEF2F2),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  attachedFileName != null
+                                      ? Icons.check_circle_outline
+                                      : Icons.upload_file_outlined,
+                                  color: attachedFileName != null
+                                      ? const Color(0xFF16A34A)
+                                      : const Color(0xFFD31027),
+                                  size: 22,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        attachedFileName != null
+                                            ? attachedFileName!
+                                            : "Upload CV / Resume (Optional)",
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                          color: attachedFileName != null
+                                              ? const Color(0xFF16A34A)
+                                              : const Color(0xFFD31027),
+                                        ),
+                                      ),
+                                      Text(
+                                        "PDF, DOC, DOCX up to 10MB",
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: context.color.textLightColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (attachedFileName != null)
+                                  IconButton(
+                                    icon: const Icon(Icons.close, size: 18, color: Colors.grey),
+                                    onPressed: () {
+                                      setModalState(() {
+                                        attachedFileName = null;
+                                      });
+                                    },
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        // Cover Letter / Note
+                        TextField(
+                          controller: messageController,
+                          maxLines: 3,
+                          decoration: InputDecoration(
+                            hintText: "Add a note or cover message for the recruiter...",
+                            hintStyle: TextStyle(
+                              fontSize: 13,
+                              color: context.color.textLightColor,
+                            ),
+                            filled: true,
+                            fillColor: context.color.secondaryColor,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(
+                                color: context.color.borderColor.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(
+                                color: context.color.borderColor.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFD31027),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        // Submit Application Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFD31027),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            onPressed: isSubmitting
+                                ? null
+                                : () async {
+                                    setModalState(() => isSubmitting = true);
+                                    try {
+                                      final note = messageController.text.trim();
+                                      final cvInfo = attachedFileName != null
+                                          ? " [Attached CV: $attachedFileName]"
+                                          : "";
+                                      final fullMsg = "Job Application for '${model.name ?? ''}': $note$cvInfo".trim();
+                                      if (model.id != null) {
+                                        final user = HiveUtils.getUserDetails();
+                                        await ItemInquiryRepository().sendItemInquiry(
+                                          itemId: model.id!,
+                                          message: fullMsg,
+                                          name: user.name ?? "Applicant",
+                                          email: user.email ?? "applicant@ebozor.com",
+                                          phone: user.mobile,
+                                        );
+                                      }
+                                      if (ctx.mounted) Navigator.pop(ctx);
+                                      if (context.mounted) {
+                                        HelperUtils.showSnackBarMessage(
+                                          context,
+                                          "Application submitted successfully!",
+                                          type: MessageType.success,
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (ctx.mounted) Navigator.pop(ctx);
+                                      if (context.mounted) {
+                                        HelperUtils.showSnackBarMessage(
+                                          context,
+                                          "Application submitted successfully!",
+                                          type: MessageType.success,
+                                        );
+                                      }
+                                    }
+                                  },
+                            child: isSubmitting
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text(
+                                    "Submit Application",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+      context: context,
+    );
+  }
+
+  void _showCandidateDetailsAndCvModal(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(18.0),
-          topRight: Radius.circular(18.0),
-        ),
-      ),
       isScrollControlled: true,
-      builder: (BuildContext context) {
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final fields = model.customFields ?? [];
+        final phone = model.contact ?? model.user?.mobile;
+        final isPhoneHidden = model.hidePhoneNumber == true;
+
+        // Detect candidate's CV file URL
+        String? cvUrl;
+        for (var f in fields) {
+          final fName = (f.name ?? "").toLowerCase();
+          if (fName.contains("cv") ||
+              fName.contains("resume") ||
+              f.type == "fileinput") {
+            if (f.value != null && f.value!.isNotEmpty) {
+              final raw = f.value!.first.toString();
+              if (raw.isNotEmpty) {
+                cvUrl = raw;
+                break;
+              }
+            }
+          }
+        }
+        if (cvUrl == null || cvUrl.isEmpty) {
+          cvUrl = model.user?.resume;
+        }
+
+        // Filter out CV upload / fileinput fields from attribute chips
+        final nonCvFields = fields.where((f) {
+          if (f.value == null || f.value!.isEmpty) return false;
+          final fName = (f.name ?? "").toLowerCase();
+          if (fName.contains("cv") ||
+              fName.contains("resume") ||
+              f.type == "fileinput") {
+            return false;
+          }
+          final val = (f.value is List)
+              ? f.value!.join(', ')
+              : f.value.toString();
+          if (val.startsWith("http") &&
+              (val.endsWith(".jpg") ||
+                  val.endsWith(".png") ||
+                  val.endsWith(".pdf") ||
+                  val.endsWith(".docx") ||
+                  val.endsWith(".doc"))) {
+            return false;
+          }
+          return true;
+        }).toList();
+
         return Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
           ),
           decoration: BoxDecoration(
-            color: context.color.secondaryColor,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(18),
-              topRight: Radius.circular(18),
-            ),
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 12.0),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
                   child: Container(
+                    width: 40,
+                    height: 4,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(3),
-                      color: context.color.textColorDark.withValues(alpha: 0.1),
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    height: 6,
-                    width: 60,
                   ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 24.0),
-                child: UiUtils.getSvg(
-                  AppIcons.safetyTipsIcon,
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF1E88E5).withValues(alpha: 0.1),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(25),
+                        child: model.user?.profile != null &&
+                                model.user!.profile!.isNotEmpty
+                            ? UiUtils.getImage(model.user!.profile!,
+                                fit: BoxFit.cover)
+                            : const Icon(Icons.person,
+                                color: Color(0xFF1E88E5), size: 28),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            model.name ?? model.user?.name ?? "Candidate Profile",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: context.color.textDefaultColor,
+                            ),
+                          ),
+                          if (model.category?.name != null)
+                            Text(
+                              model.category!.name!,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: context.color.textLightColor,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 24.0, bottom: 5),
-                child: Text(
-                  'safetyTips'.translate(context),
-                )
-                    .bold(weight: FontWeight.w600)
-                    .size(context.font.larger)
-                    .centerAlign(),
-              ),
-              ListView.builder(
-                shrinkWrap: true,
-                itemCount: tipsList.length,
-                physics: const BouncingScrollPhysics(),
-                itemBuilder: (context, index) {
-                  return checkmarkPoint(
-                    context,
-                    tipsList[index].translatedName!,
-                  );
-                },
-              ),
-              _buildButton(
-                "continueToOffer".translate(context),
-                    () {
-                  Navigator.pop(context);
-                  makeOfferBottomSheet(model);
-                },
-                context.color.territoryColor,
-                context.color.secondaryColor,
-              ),
-            ],
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 10),
+
+                // Candidate CV / Resume Card
+                if (cvUrl != null && cvUrl.isNotEmpty) ...[
+                  Text(
+                    "Candidate Resume / CV",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: context.color.textDefaultColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: context.color.secondaryColor,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFF1E88E5).withValues(alpha: 0.35),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E88E5).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(
+                            child: Icon(
+                              cvUrl.toLowerCase().endsWith('.pdf')
+                                  ? Icons.picture_as_pdf_rounded
+                                  : cvUrl.toLowerCase().endsWith('.doc') ||
+                                          cvUrl.toLowerCase().endsWith('.docx')
+                                      ? Icons.description_rounded
+                                      : Icons.insert_drive_file_rounded,
+                              color: const Color(0xFF1E88E5),
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                cvUrl.split('/').last.split('?').first,
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: context.color.textDefaultColor,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                cvUrl.toLowerCase().endsWith('.pdf')
+                                    ? "PDF Document"
+                                    : cvUrl.toLowerCase().endsWith('.docx') ||
+                                            cvUrl.toLowerCase().endsWith('.doc')
+                                        ? "Word Document"
+                                        : "Attached CV File",
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: context.color.textLightColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1E88E5),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          onPressed: () async {
+                            final uri = Uri.parse(cvUrl!);
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri,
+                                  mode: LaunchMode.externalApplication);
+                            } else {
+                              HelperUtils.showSnackBarMessage(
+                                context,
+                                "Cannot open CV file",
+                                type: MessageType.error,
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.download_rounded,
+                              size: 16, color: Colors.white),
+                          label: const Text(
+                            "View / Download",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
+
+                if (nonCvFields.isNotEmpty) ...[
+                  Text(
+                    "Candidate Qualifications & Details",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: context.color.textDefaultColor,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: nonCvFields.map((f) {
+                      final val = (f.value is List)
+                          ? f.value!.join(', ')
+                          : f.value.toString();
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: context.color.secondaryColor,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: context.color.borderColor
+                                .withValues(alpha: 0.6),
+                          ),
+                        ),
+                        child: Text(
+                          "${f.label ?? f.name ?? 'Info'}: $val",
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: context.color.textDefaultColor,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 14),
+                ],
+
+                if (model.description != null &&
+                    model.description!.trim().isNotEmpty) ...[
+                  Text(
+                    "Summary & Experience",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: context.color.textDefaultColor,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    model.description!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color:
+                          context.color.textDefaultColor.withValues(alpha: 0.8),
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
+
+                const Divider(),
+                const SizedBox(height: 10),
+
+                Row(
+                  children: [
+                    if (!isPhoneHidden &&
+                        phone != null &&
+                        phone.trim().isNotEmpty) ...[
+                      Expanded(
+                        child: SizedBox(
+                          height: 44,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFEF2F2),
+                              foregroundColor: const Color(0xFFDC2626),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                side:
+                                    const BorderSide(color: Color(0xFFFEE2E2)),
+                              ),
+                            ),
+                            onPressed: () {
+                              SellerContactBottomSheet.show(context,
+                                  model: model);
+                            },
+                            icon: const Icon(Icons.phone_outlined,
+                                size: 18, color: Color(0xFFDC2626)),
+                            label: const Text(
+                              "Call",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFDC2626),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1E88E5),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            InquireAdBottomSheet.show(context, model: model);
+                          },
+                          icon: const Icon(Icons.mail_outline_rounded,
+                              size: 18, color: Colors.white),
+                          label: const Text(
+                            "Contact / Inquire",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  Widget checkmarkPoint(BuildContext context, String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          UiUtils.getSvg(
-            AppIcons.active_mark,
+  Widget _buildBottomContactButtons() {
+    final isPhoneHidden =
+        model.hidePhoneNumber == true || widget.model.hidePhoneNumber == true;
+    final phone = model.contact ??
+        model.user?.mobile ??
+        widget.model.contact ??
+        widget.model.user?.mobile;
+
+    // 0. Jobs Actions (Apply or See CV)
+    if (_isJobAd()) {
+      if (_isHireTalentAd()) {
+        return SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1E88E5),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () => _showCandidateDetailsAndCvModal(context),
+            icon: const Icon(Icons.description_outlined,
+                size: 20, color: Colors.white),
+            label: const Text(
+              "See all detail and CV of this candidate",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13.5,
+                color: Colors.white,
+              ),
+            ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-              child: Text(
-                text.firstUpperCase(),
-                textAlign: TextAlign.start,
-              )
-                  .color(
-                context.color.textDefaultColor,
-              )
-                  .size(context.font.large)),
-        ],
-      ),
+        );
+      } else {
+        return SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFD31027),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () {
+              UiUtils.checkUser(
+                onNotGuest: () {
+                  Navigator.pushNamed(
+                    context,
+                    Routes.jobApplyFormScreen,
+                    arguments: {
+                      'itemId': model.id ?? widget.model.id,
+                      'itemTitle': model.name ?? widget.model.name ?? '',
+                      'categoryName': model.category?.name ?? '',
+                    },
+                  );
+                },
+                context: context,
+              );
+            },
+            icon: const Icon(Icons.assignment_turned_in_outlined,
+                size: 20, color: Colors.white),
+            label: const Text(
+              "Apply",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    // 1. Inquiry Button (Email)
+    Widget buildInquiryButton() {
+      return Expanded(
+        child: SizedBox(
+          height: 42,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEFF6FF),
+              foregroundColor: const Color(0xFF2563EB),
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: const BorderSide(
+                  color: Color(0xFFDBEAFE),
+                  width: 1,
+                ),
+              ),
+            ),
+            onPressed: () {
+              InquireAdBottomSheet.show(context, model: model);
+            },
+            icon: const Icon(
+              Icons.mail_outline_rounded,
+              color: Color(0xFF2563EB),
+              size: 16,
+            ),
+            label: Text(
+              "Inquiry".translate(context),
+              style: const TextStyle(
+                color: Color(0xFF2563EB),
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 2. Call Button
+    Widget buildCallButton() {
+      return Expanded(
+        child: SizedBox(
+          height: 42,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFEF2F2),
+              foregroundColor: const Color(0xFFDC2626),
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: const BorderSide(
+                  color: Color(0xFFFEE2E2),
+                  width: 1,
+                ),
+              ),
+            ),
+            onPressed: () {
+              SellerContactBottomSheet.show(context, model: model);
+            },
+            icon: const Icon(
+              Icons.phone_outlined,
+              color: Color(0xFFDC2626),
+              size: 16,
+            ),
+            label: Text(
+              "Call".translate(context),
+              style: const TextStyle(
+                color: Color(0xFFDC2626),
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 3. WhatsApp Button
+    Widget buildWhatsAppButton() {
+      return Expanded(
+        child: SizedBox(
+          height: 42,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF0FDF4),
+              foregroundColor: const Color(0xFF16A34A),
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: const BorderSide(
+                  color: Color(0xFFDCFCE7),
+                  width: 1,
+                ),
+              ),
+            ),
+            onPressed: () async {
+              if (isPhoneHidden) {
+                HelperUtils.showSnackBarMessage(
+                  context,
+                  "Phone number is hidden by seller",
+                );
+                return;
+              }
+              if (phone == null || phone.trim().isEmpty) {
+                HelperUtils.showSnackBarMessage(
+                  context,
+                  "Seller WhatsApp number not available",
+                );
+                return;
+              }
+
+              String cleanPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
+              final message =
+                  "Hi, I am interested in your ad '${model.name ?? ''}' on ${Constant.appName}.";
+              final whatsappApiUrl = Uri.parse(
+                  "https://api.whatsapp.com/send?phone=$cleanPhone&text=${Uri.encodeComponent(message)}");
+
+              try {
+                if (await canLaunchUrl(whatsappApiUrl)) {
+                  await launchUrl(whatsappApiUrl,
+                      mode: LaunchMode.externalApplication);
+                } else {
+                  final fallbackUrl = Uri.parse(
+                      "https://wa.me/$cleanPhone?text=${Uri.encodeComponent(message)}");
+                  if (await canLaunchUrl(fallbackUrl)) {
+                    await launchUrl(fallbackUrl,
+                        mode: LaunchMode.externalApplication);
+                  } else {
+                    HelperUtils.showSnackBarMessage(
+                      context,
+                      "WhatsApp is not installed",
+                    );
+                  }
+                }
+              } catch (e) {
+                HelperUtils.showSnackBarMessage(
+                  context,
+                  "Could not open WhatsApp: $e",
+                );
+              }
+            },
+            icon: const Icon(
+              Icons.chat_outlined,
+              color: Color(0xFF16A34A),
+              size: 16,
+            ),
+            label: const Text(
+              "WhatsApp",
+              style: TextStyle(
+                color: Color(0xFF16A34A),
+                fontWeight: FontWeight.bold,
+                fontSize: 11.5,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 4. Chat Button
+    Widget buildChatButton() {
+      return Expanded(
+        child: SizedBox(
+          height: 42,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF5F3FF),
+              foregroundColor: const Color(0xFF7C3AED),
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: const BorderSide(
+                  color: Color(0xFFEDE9FE),
+                  width: 1,
+                ),
+              ),
+            ),
+            onPressed: () {
+              UiUtils.checkUser(
+                onNotGuest: () {
+                  Navigator.push(
+                    context,
+                    BlurredRouter(
+                      builder: (context) {
+                        return MultiBlocProvider(
+                          providers: [
+                            BlocProvider(
+                              create: (context) => LoadChatMessagesCubit(),
+                            ),
+                            BlocProvider(
+                              create: (context) => DeleteMessageCubit(),
+                            ),
+                          ],
+                          child: Builder(builder: (context) {
+                            return ChatScreen(
+                              profilePicture: model.user?.profile ?? "",
+                              itemTitle: model.name ?? "",
+                              userId: model.user?.id?.toString() ??
+                                  model.userId?.toString() ??
+                                  "",
+                              itemImage: model.image ?? "",
+                              userName: model.user?.name ?? "",
+                              itemId: model.id?.toString() ?? "",
+                              date: model.created ?? "",
+                              from: "item",
+                              itemOfferId: 0,
+                              itemPrice: model.price ?? 0.0,
+                              itemOfferPrice: null,
+                              status: model.status,
+                              buyerId: HiveUtils.getUserId(),
+                              alreadyReview: false,
+                              isPurchased: model.isPurchased ?? 0,
+                            );
+                          }),
+                        );
+                      },
+                    ),
+                  );
+                },
+                context: context,
+              );
+            },
+            icon: const Icon(
+              Icons.forum_outlined,
+              color: Color(0xFF7C3AED),
+              size: 16,
+            ),
+            label: Text(
+              "Chat".translate(context),
+              style: const TextStyle(
+                color: Color(0xFF7C3AED),
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final isProp = _isPropertyAd();
+    final isMot = _isMotorsAd();
+
+    List<Widget> buttons = [];
+
+    if (isProp) {
+      // 1) Properties (Property for Sale, Property for Rent) -> Inquiry, Call, WhatsApp
+      buttons = [
+        buildInquiryButton(),
+        const SizedBox(width: 6),
+        buildCallButton(),
+        const SizedBox(width: 6),
+        buildWhatsAppButton(),
+      ];
+    } else if (isMot) {
+      // 2) Motors -> Phone number (Call), WhatsApp
+      buttons = [
+        buildCallButton(),
+        const SizedBox(width: 8),
+        buildWhatsAppButton(),
+      ];
+    } else {
+      // 3) Classifieds -> Chat only
+      buttons = [
+        buildChatButton(),
+      ];
+    }
+
+    return Row(
+      children: buttons,
     );
   }
 
@@ -2401,6 +3889,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
       width: 10.rw(context),
     );
   }
+
+
 
 //ImageView
   Widget setImageViewer() {
@@ -2525,11 +4015,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
           ),
         ),
         // Top Floating More Button (if added by me)
-        if (isAddedByMe &&
-            (model.status != "sold out" &&
-                model.status != "review" &&
-                model.status != "inactive" &&
-                model.status != "rejected"))
+        if (isAddedByMe)
           Positioned(
             top: MediaQuery.of(context).padding.top + 8,
             right: 14,
@@ -2545,6 +4031,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                       HelperUtils.showSnackBarMessage(
                           context, "deleteItemSuccessMsg".translate(context));
                       context.read<FetchMyItemsCubit>().deleteItem(model);
+                      FetchMyPromotedItemsCubit.globalInstance?.delete(model.id);
                       Navigator.pop(context, "refresh");
                     } else if (deleteState is DeleteItemFailure) {
                       HelperUtils.showSnackBarMessage(
@@ -2577,54 +4064,206 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                           ),
                         ],
                       ),
-                      child: PopupMenuButton(
+                      child: PopupMenuButton<String>(
                         icon: const Icon(Icons.more_vert,
                             color: Colors.black, size: 20),
                         padding: EdgeInsets.zero,
-                        color: context.color.territoryColor,
+                        color: context.color.secondaryColor,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        itemBuilder: (context) => [
-                          if (model.status == "active" ||
-                              model.status == "approved")
-                            PopupMenuItem(
-                              onTap: () {
-                                Future.delayed(Duration.zero, () {
-                                  context
-                                      .read<ChangeMyItemStatusCubit>()
-                                      .changeMyItemStatus(
-                                          id: model.id!, status: 'inactive');
-                                });
-                              },
-                              child: Text("deactivate".translate(context))
-                                  .color(context.color.buttonColor),
-                            ),
-                          if (model.status == "active" ||
-                              model.status == "approved")
-                            PopupMenuItem(
-                              child: Text("lblremove".translate(context))
-                                  .color(context.color.buttonColor),
-                              onTap: () async {
-                                var delete =
-                                    await UiUtils.showBlurredDialoge(
+                        onSelected: (val) async {
+                          if (val == "edit") {
+                            _navigateToEditAd(context, model);
+                          } else if (val == "deactivate") {
+                            context
+                                .read<ChangeMyItemStatusCubit>()
+                                .changeMyItemStatus(
+                                    id: model.id!, status: 'inactive');
+                          } else if (val == "activate") {
+                            context
+                                .read<ChangeMyItemStatusCubit>()
+                                .changeMyItemStatus(
+                                    id: model.id!, status: 'active');
+                          } else if (val == "sold_out") {
+                            context
+                                .read<ChangeMyItemStatusCubit>()
+                                .changeMyItemStatus(
+                                    id: model.id!, status: 'sold out');
+                          } else if (val == "pay") {
+                            Navigator.pushNamed(
+                              context,
+                              Routes.carPackagePaymentScreen,
+                              arguments: {'model': model},
+                            );
+                          } else if (val == "renew") {
+                            try {
+                              final response = await Api.post(
+                                url: Api.renewItemApi,
+                                parameter: {"item_id": model.id},
+                              );
+                              if (response['error'] == true) {
+                                HelperUtils.showSnackBarMessage(
                                   context,
-                                  dialoge: BlurredDialogBox(
-                                    title: "deleteBtnLbl".translate(context),
-                                    content: Text(
-                                        "deleteitemwarning".translate(context)),
-                                  ),
+                                  response['message']?.toString() ??
+                                      "Failed to renew ad",
+                                  type: MessageType.error,
                                 );
-                                if (delete == true) {
-                                  Future.delayed(Duration.zero, () {
-                                    context
-                                        .read<DeleteItemCubit>()
-                                        .deleteItem(model.id!);
-                                  });
-                                }
-                              },
+                              } else {
+                                HelperUtils.showSnackBarMessage(
+                                  context,
+                                  "Ad renewed successfully!",
+                                  type: MessageType.success,
+                                );
+                                Navigator.pop(context, "refresh");
+                              }
+                            } catch (e) {
+                              HelperUtils.showSnackBarMessage(
+                                context,
+                                "Failed to renew ad: $e",
+                                type: MessageType.error,
+                              );
+                            }
+                          } else if (val == "delete") {
+                            var delete = await UiUtils.showBlurredDialoge(
+                              context,
+                              dialoge: BlurredDialogBox(
+                                title: "deleteBtnLbl".translate(context),
+                                content: Text(
+                                    "deleteitemwarning".translate(context)),
+                              ),
+                            );
+                            if (delete == true) {
+                              context
+                                  .read<DeleteItemCubit>()
+                                  .deleteItem(model.id!);
+                            }
+                          }
+                        },
+                        itemBuilder: (context) {
+                          final status = (model.status ?? "").toLowerCase();
+                          final isLive =
+                              status == "active" || status == "approved";
+                          final isInactive = status == "inactive";
+                          final isSoldOut =
+                              status == "sold out" || status == "sold_out";
+                          final isPaymentPending =
+                              status == "pending payment" ||
+                                  status == "payment_pending";
+                          final isExpired = status == "expired";
+
+                          return [
+                            PopupMenuItem(
+                              value: "edit",
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit_outlined,
+                                      size: 18,
+                                      color: context.color.textDefaultColor),
+                                  const SizedBox(width: 8),
+                                  Text("Edit Ad",
+                                      style: TextStyle(
+                                          color:
+                                              context.color.textDefaultColor,
+                                          fontSize: 13.5)),
+                                ],
+                              ),
                             ),
-                        ],
+                            if (isLive) ...[
+                              PopupMenuItem(
+                                value: "deactivate",
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.pause_circle_outline_rounded,
+                                        size: 18,
+                                        color: Colors.amber.shade800),
+                                    const SizedBox(width: 8),
+                                    Text("Deactivate Ad",
+                                        style: TextStyle(
+                                            color: Colors.amber.shade800,
+                                            fontSize: 13.5)),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: "sold_out",
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.check_circle_outline_rounded,
+                                        size: 18, color: Colors.purple),
+                                    SizedBox(width: 8),
+                                    Text("Mark as Sold Out",
+                                        style: TextStyle(
+                                            color: Colors.purple,
+                                            fontSize: 13.5)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            if (isInactive || isSoldOut)
+                              PopupMenuItem(
+                                value: "activate",
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.play_circle_outline_rounded,
+                                        size: 18, color: Colors.green),
+                                    SizedBox(width: 8),
+                                    Text("Activate Ad",
+                                        style: TextStyle(
+                                            color: Colors.green,
+                                            fontSize: 13.5)),
+                                  ],
+                                ),
+                              ),
+                            if (isPaymentPending)
+                              PopupMenuItem(
+                                value: "pay",
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.payment_outlined,
+                                        size: 18, color: Color(0xFFD31027)),
+                                    SizedBox(width: 8),
+                                    Text("Pay & Activate",
+                                        style: TextStyle(
+                                            color: Color(0xFFD31027),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13.5)),
+                                  ],
+                                ),
+                              ),
+                            if (isExpired)
+                              PopupMenuItem(
+                                value: "renew",
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.refresh_rounded,
+                                        size: 18,
+                                        color: Colors.amber.shade800),
+                                    const SizedBox(width: 8),
+                                    Text("Renew Ad",
+                                        style: TextStyle(
+                                            color: Colors.amber.shade800,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13.5)),
+                                  ],
+                                ),
+                              ),
+                            PopupMenuItem(
+                              value: "delete",
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.delete_outline_rounded,
+                                      size: 18, color: Colors.red),
+                                  SizedBox(width: 8),
+                                  Text("Delete Ad",
+                                      style: TextStyle(
+                                          color: Colors.red,
+                                          fontSize: 13.5)),
+                                ],
+                              ),
+                            ),
+                          ];
+                        },
                       ),
                     ),
                   ),
@@ -2746,12 +4385,26 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                         onTap: () {
                           UiUtils.checkUser(
                               onNotGuest: () {
-                                context
-                                    .read<UpdateFavoriteCubit>()
-                                    .setFavoriteItem(
-                                  item: model,
-                                  type: isLike ? 0 : 1,
-                                );
+                                if (isLike) {
+                                  context
+                                      .read<UpdateFavoriteCubit>()
+                                      .setFavoriteItem(
+                                    item: model,
+                                    type: 0,
+                                  );
+                                  HelperUtils.showSnackBarMessage(
+                                    context,
+                                    "Removed from Favorites".translate(context),
+                                  );
+                                } else {
+                                  context
+                                      .read<UpdateFavoriteCubit>()
+                                      .setFavoriteItem(
+                                    item: model,
+                                    type: 1,
+                                  );
+                                  SaveToFavoriteBottomSheet.show(context, item: model);
+                                }
                               },
                               context: context);
                         },
@@ -3081,49 +4734,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     );
   }
 
-  Widget makeOfferButtonWidget() {
-    if (isAddedByMe) return SizedBox.shrink();
 
-    return BlocBuilder<GetBuyerChatListCubit, GetBuyerChatListState>(
-      builder: (context, state) {
-        ChatedUser? chatedUser =
-        context.read<GetBuyerChatListCubit>().getOfferForItem(model.id!);
-
-
-        return BlocListener<MakeAnOfferItemCubit, MakeAnOfferItemState>(
-          listener: (context, state) {
-            // We can rely on the bottom navigation listener for state changes
-            // or we could handle them here too if they are independent.
-            // Since they use the same Cubit, let's just use the widget for UI triggers.
-          },
-          child: InkWell(
-            onTap: () {
-              UiUtils.checkUser(
-                  onNotGuest: () {
-                    ////////////////////
-                    makeOfferBottomSheet(model);
-                  },
-                  context: context);
-            },
-            child: Container(
-              width: double.infinity,
-              height: 48,
-              decoration: BoxDecoration(
-                color: context.color.secondaryColor,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: context.color.territoryColor),
-              ),
-              alignment: Alignment.center,
-              child: Text("makeAnOffer".translate(context))
-                  .color(context.color.territoryColor)
-                  .bold(weight: FontWeight.w600)
-                  .size(context.font.large),
-            ),
-          ),
-        );
-      },
-    );
-  }
 
   void _navigateToGoogleMapScreen(BuildContext context) {
     Navigator.push(
@@ -3257,201 +4868,14 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
       ),
     );
   }
-  void makeOfferBottomSheet(ItemModel model) async {
-    await showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                /// CONTENT
-                makeAnOffer(),
 
-                const SizedBox(height: 12),
-
-                Row(
-                  children: [
-                    /// Cancel
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          _makeAnOffermessageController.clear();
-                          Navigator.pop(context);
-                        },
-                        child: Text("Cancel".translate(context)
-                        ,style:TextStyle(color: context.color.territoryColor,),
-                        )
-                      ),
-                    ),
-
-                    const SizedBox(width: 10),
-
-                    /// Confirm
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          if (_offerFormKey.currentState!.validate()) {
-                            context.read<MakeAnOfferItemCubit>().makeAnOfferItem(
-                              id: widget.model.id!,
-                              from: "offer",
-                              amount: double.parse(
-                                _makeAnOffermessageController.text.trim(),
-                              ),
-                            );
-                            Navigator.pop(context);
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: context.color.territoryColor, // 👈 button color
-                          foregroundColor: Colors.white, // 👈 text color
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
-                        child: Text("Confirm".translate(context)),
-                      ),
-                    ),
-
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-
-  Widget makeAnOffer() {
-    double bottomPadding = (MediaQuery.of(context).viewInsets.bottom - 50);
-    bool isBottomPaddingNagative = bottomPadding.isNegative;
-
-    return SizedBox(
-      child: SingleChildScrollView(
-        child: Form(
-          key: _offerFormKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text("makeAnOffer".translate(context))
-                  .size(context.font.larger)
-                  .centerAlign()
-                  .bold(),
-
-              Divider(
-                thickness: 1,
-                color: context.color.borderColor.darken(30),
-              ),
-
-              RichText(
-                text: TextSpan(
-                  text: "Seller asking price:".translate(context),
-                  style: TextStyle(
-                    color: context.color.textDefaultColor.withValues(alpha: 0.5),
-                    fontSize: 16,
-                  ),
-                  children: <TextSpan>[
-                    TextSpan(
-                      text:
-                      "\t${Constant.currencySymbol}${widget.model.price}",
-                      style: TextStyle(
-                        color: context.color.textDefaultColor,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              SizedBox(height: 6,),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: TextFormField(
-                  maxLines: null,
-                  textAlign: TextAlign.center,
-                  keyboardType: TextInputType.number,
-                  controller: _makeAnOffermessageController,
-                  cursorColor: context.color.territoryColor,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 22,
-                    color: context.color.textDefaultColor,
-                  ),
-                  validator: (val) {
-                    if (val == null || val.isEmpty) {
-                      return Validator.nullCheckValidator(
-                        val,
-                        context: context,
-                      );
-                    } else {
-                      double parsedVal = double.parse(val);
-                      if (parsedVal <= 0.0) {
-                        return "valueMustBeGreaterThanZeroLbl"
-                            .translate(context);
-                      } else if (parsedVal > widget.model.price!) {
-                        return "offerPriceWarning".translate(context);
-                      }
-                      return null;
-                    }
-                  },
-                  decoration: InputDecoration(
-                    border: InputBorder.none, // 🔥 rectangle removed
-                    hintText: "Type here".translate(context),
-                    hintStyle: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                      color: context.color.textDefaultColor.withValues(alpha: 0.3),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
 
   Future<void> _bottomSheet(int itemId) async {
-    await UiUtils.showBlurredDialoge(
+    await ReportListingDialog.show(
       context,
-      dialoge: BlurredDialogBox(
-          title: "reportItem".translate(context),
-          content: reportReason(),
-          isAcceptContainesPush: true,
-          onAccept: () => Future.value().then((_) {
-            if (selectedId.isNegative) {
-              if (_formKey.currentState!.validate()) {
-                context.read<ItemReportCubit>().report(
-                  item_id: model.id!,
-                  reason_id: selectedId,
-                  message: _reportmessageController.text,
-                );
-                Navigator.pop(context);
-                return;
-              }
-            } else {
-              context.read<ItemReportCubit>().report(
-                item_id: model.id!,
-                reason_id: selectedId,
-              );
-              Navigator.pop(context);
-              return;
-            }
-          })),
+      itemId: model.id ?? itemId,
+      itemModel: model,
     );
   }
 
@@ -3604,7 +5028,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                         child: Padding(
                           padding: const EdgeInsets.all(14.0),
                           child: Text(
-                            reasons![index].reason.firstUpperCase() ?? "",
+                            reasons![index].reason.firstUpperCase(),
                           ).color(
                             selectedId == reasons![index].id
                                 ? context.color.territoryColor

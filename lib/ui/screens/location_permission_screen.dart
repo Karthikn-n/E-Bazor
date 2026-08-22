@@ -142,7 +142,8 @@ class LocationPermissionScreenState extends State<LocationPermissionScreen>
   Future<void> _getCurrentLocationAndNavigate() async {
     try {
       Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
+            locationSettings: LocationSettings(
+                accuracy: LocationAccuracy.high,));
 
       List<Placemark> placemarks = await placemarkFromCoordinates(
         position.latitude,

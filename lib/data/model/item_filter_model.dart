@@ -4,6 +4,7 @@ class ItemFilterModel {
   final String? maxPrice;
   final String? minPrice;
   final String? categoryId;
+  final String? categorySlug;
   final String? postedSince;
   final String? city;
   final String? state;
@@ -19,6 +20,7 @@ class ItemFilterModel {
     this.maxPrice,
     this.minPrice,
     this.categoryId,
+    this.categorySlug,
     this.postedSince,
     this.city,
     this.state,
@@ -34,7 +36,10 @@ class ItemFilterModel {
   ItemFilterModel copyWith({
     String? maxPrice,
     String? minPrice,
+    bool clearMaxPrice = false,
+    bool clearMinPrice = false,
     String? categoryId,
+    String? categorySlug,
     String? postedSince,
     String? city,
     String? state,
@@ -47,9 +52,10 @@ class ItemFilterModel {
     Map<String, dynamic>? customFields,
   }) {
     return ItemFilterModel(
-      maxPrice: maxPrice ?? this.maxPrice,
-      minPrice: minPrice ?? this.minPrice,
+      maxPrice: clearMaxPrice ? null : maxPrice ?? this.maxPrice,
+      minPrice: clearMinPrice ? null : minPrice ?? this.minPrice,
       categoryId: categoryId ?? this.categoryId,
+      categorySlug: categorySlug ?? this.categorySlug,
       postedSince: postedSince ?? this.postedSince,
       city: city ?? this.city,
       state: state ?? this.state,
@@ -68,6 +74,8 @@ class ItemFilterModel {
       'max_price': maxPrice,
       'min_price': minPrice,
       'category_id': categoryId,
+      if (categorySlug != null && categorySlug!.isNotEmpty)
+        'category_slug': categorySlug,
       'posted_since': postedSince,
       'city': city,
       'state': state,
@@ -82,13 +90,14 @@ class ItemFilterModel {
 
   factory ItemFilterModel.fromMap(Map<String, dynamic> map) {
     return ItemFilterModel(
-      city: map['city'].toString(),
-      state: map['state'].toString(),
-      country: map['country'].toString(),
-      maxPrice: map['max_price'].toString(),
-      minPrice: map['min_price'].toString(),
-      categoryId: map['category_id'].toString(),
-      postedSince: map['posted_since'].toString(),
+      city: map['city']?.toString(),
+      state: map['state']?.toString(),
+      country: map['country']?.toString(),
+      maxPrice: map['max_price']?.toString(),
+      minPrice: map['min_price']?.toString(),
+      categoryId: map['category_id']?.toString(),
+      categorySlug: map['category_slug']?.toString(),
+      postedSince: map['posted_since']?.toString(),
       area: map['area']?.toString(),
       radius:
           map['radius'] != null ? int.tryParse(map['radius'].toString()) : null,
@@ -136,6 +145,7 @@ class ItemFilterModel {
     return other.maxPrice == maxPrice &&
         other.minPrice == minPrice &&
         other.categoryId == categoryId &&
+        other.categorySlug == categorySlug &&
         other.postedSince == postedSince &&
         other.city == city &&
         other.state == state &&
@@ -153,6 +163,7 @@ class ItemFilterModel {
     return maxPrice.hashCode ^
         minPrice.hashCode ^
         categoryId.hashCode ^
+        categorySlug.hashCode ^
         postedSince.hashCode ^
         city.hashCode ^
         state.hashCode ^

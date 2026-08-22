@@ -122,7 +122,7 @@ class CustomFieldDropdown extends CustomField {
                     return null;
                   },
 
-                  value: selected?.isEmpty == true ? null : selected,
+                  initialValue: selected?.isEmpty == true ? null : selected,
                   dropdownColor: context.color.secondaryColor,
                   isExpanded: true,
                   //padding: const EdgeInsets.symmetric(vertical: 5),

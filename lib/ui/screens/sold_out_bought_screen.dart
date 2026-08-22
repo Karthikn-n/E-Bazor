@@ -196,9 +196,7 @@ class _SoldOutBoughtScreenState extends State<SoldOutBoughtScreen> {
                                   ),
                                 ),
                           title: Text(model.name!),
-                          trailing: Radio(
-                            activeColor: context.color.territoryColor,
-                            value: index,
+                          trailing: RadioGroup(
                             groupValue: _selectedBuyerIndex,
                             onChanged: (int? value) {
                               setState(() {
@@ -206,6 +204,10 @@ class _SoldOutBoughtScreenState extends State<SoldOutBoughtScreen> {
                                 userId = model.id;
                               });
                             },
+                            child: Radio(
+                              activeColor: context.color.territoryColor,
+                              value: index,
+                            ),
                           ),
                         ),
                       );

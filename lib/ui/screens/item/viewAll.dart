@@ -27,10 +27,12 @@ class SectionItemsScreen extends StatefulWidget {
   });
 
   static Route route(RouteSettings routeSettings) {
-    Map arguments = routeSettings.arguments as Map;
+    Map? arguments = routeSettings.arguments as Map?;
     return BlurredRouter(
       builder: (_) => SectionItemsScreen(
-          title: arguments['title'], sectionId: arguments['sectionId']),
+        title: arguments?['title'] ?? "",
+        sectionId: arguments?['sectionId'] ?? "",
+      ),
     );
   }
 
@@ -118,7 +120,10 @@ class _SectionItemsScreenState extends State<SectionItemsScreen> {
                         shrinkWrap: true,
                         itemBuilder: (context, index) {
                           ItemModel item = state.items[index];
-                          return InkWell(
+                          return ItemHorizontalCard(
+                            item: item,
+                            showLikeButton: true,
+                            additionalImageWidth: 8,
                             onTap: () {
                               Navigator.pushNamed(
                                 context,
@@ -128,11 +133,6 @@ class _SectionItemsScreenState extends State<SectionItemsScreen> {
                                 },
                               );
                             },
-                            child: ItemHorizontalCard(
-                              item: item,
-                              showLikeButton: true,
-                              additionalImageWidth: 8,
-                            ),
                           );
                         },
                       ),

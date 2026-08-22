@@ -7,8 +7,10 @@ import 'package:Ebozor/data/cubits/item/search_item_cubit.dart';
 import 'package:Ebozor/data/model/category_model.dart';
 import 'package:Ebozor/data/model/item/item_model.dart';
 import 'package:Ebozor/data/model/item_filter_model.dart';
+import 'package:Ebozor/data/repositories/category_repository.dart';
 import 'package:Ebozor/ui/screens/home/widgets/item_horizontal_card.dart';
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
+import 'package:Ebozor/ui/screens/widgets/bottom_sheets/save_search_bottom_sheet.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/no_internet.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
 import 'package:Ebozor/ui/screens/widgets/shimmerLoadingContainer.dart';
@@ -16,20 +18,22 @@ import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_keys.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
-import 'package:Ebozor/utils/app_icon.dart';
 import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
+import 'package:Ebozor/data/cubits/saved_search/fetch_saved_searches_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hive_flutter/adapters.dart';
 
 class SearchScreen extends StatefulWidget {
   final bool autoFocus;
+  final String? initialQuery;
 
   const SearchScreen({
     super.key,
     required this.autoFocus,
+    this.initialQuery,
   });
 
   static Route route(RouteSettings settings) {
@@ -47,6 +51,7 @@ class SearchScreen extends StatefulWidget {
         ],
         child: SearchScreen(
           autoFocus: arguments?['autoFocus'] ?? false,
+          initialQuery: arguments?['query'] ?? arguments?['search'],
         ),
       ),
     );
@@ -69,16 +74,30 @@ class SearchScreenState extends State<SearchScreen>
   Timer? _searchDelay;
   ItemFilterModel? filter;
   List<CategoryModel> categoryList = [];
+  List<Map<String, dynamic>> _bannerSuggestions = [];
+  bool _isLoadingSuggestions = false;
+  bool _isOpeningSuggestion = false;
 
   @override
   void initState() {
     super.initState();
     Constant.itemFilter = null;
-    searchController = TextEditingController();
+    searchController = TextEditingController(text: widget.initialQuery ?? "");
     context.read<FetchPopularItemsCubit>().fetchPopularItems();
+    if (HiveUtils.isUserAuthenticated()) {
+      context.read<FetchSavedSearchesCubit>().fetchSavedSearches();
+    }
 
     searchScrollController.addListener(_pageScrollListen);
     popularScrollController.addListener(_pagePopularScrollListen);
+
+    if (widget.initialQuery != null && widget.initialQuery!.trim().isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _fetchBannerSuggestions(widget.initialQuery!.trim());
+        }
+      });
+    }
   }
 
   @override
@@ -112,28 +131,48 @@ class SearchScreenState extends State<SearchScreen>
   void _onSearchChanged(String value) {
     _searchDelay?.cancel();
     _searchDelay = Timer(const Duration(milliseconds: 400), () {
-      _executeSearch(value);
+      _fetchBannerSuggestions(value);
     });
     setState(() {});
   }
 
-  void _executeSearch(String query) {
+  Future<void> _fetchBannerSuggestions(String query) async {
     final trimmedQuery = query.trim();
-    if (trimmedQuery.isNotEmpty) {
-      if (previousSearchQuery != trimmedQuery) {
-        context.read<SearchItemCubit>().searchItem(
-              trimmedQuery,
-              page: 1,
-              filter: filter ?? _getLocationFilter(),
-            );
-        previousSearchQuery = trimmedQuery;
-        _insertSearchQuery(trimmedQuery);
-      }
-    } else {
+    if (trimmedQuery.isEmpty) {
       previousSearchQuery = "";
-      context.read<SearchItemCubit>().clearSearch();
+      if (mounted) {
+        setState(() {
+          _bannerSuggestions = [];
+          _isLoadingSuggestions = false;
+        });
+      }
+      return;
     }
-    setState(() {});
+    if (mounted) setState(() => _isLoadingSuggestions = true);
+    try {
+      final response = await Api.get(
+        url: Api.searchBannerSuggestionApi,
+        queryParameters: {'search': trimmedQuery},
+      );
+      if (!mounted || searchController.text.trim() != trimmedQuery) return;
+      final rawSuggestions = response['data'];
+      setState(() {
+        _bannerSuggestions = rawSuggestions is List
+            ? rawSuggestions
+                .whereType<Map>()
+                .map((item) => Map<String, dynamic>.from(item))
+                .toList()
+            : [];
+        _isLoadingSuggestions = false;
+      });
+    } catch (_) {
+      if (mounted && searchController.text.trim() == trimmedQuery) {
+        setState(() {
+          _bannerSuggestions = [];
+          _isLoadingSuggestions = false;
+        });
+      }
+    }
   }
 
   ItemFilterModel _getLocationFilter() {
@@ -142,9 +181,6 @@ class SearchScreenState extends State<SearchScreen>
       areaId: HiveUtils.getAreaId(),
       country: HiveUtils.getCountryName(),
       state: HiveUtils.getStateName(),
-      radius: HiveUtils.getNearbyRadius(),
-      latitude: HiveUtils.getLatitude(),
-      longitude: HiveUtils.getLongitude(),
     );
   }
 
@@ -273,7 +309,7 @@ class SearchScreenState extends State<SearchScreen>
                   textAlignVertical: TextAlignVertical.center,
                   onSubmitted: (value) {
                     searchFocusNode.unfocus();
-                    _executeSearch(value);
+                    _fetchBannerSuggestions(value);
                   },
                   style: TextStyle(
                     color: context.color.textDefaultColor,
@@ -311,7 +347,7 @@ class SearchScreenState extends State<SearchScreen>
                             ),
                             onPressed: () {
                               searchController.clear();
-                              _executeSearch("");
+                              _fetchBannerSuggestions("");
                             },
                           )
                         : null,
@@ -360,13 +396,15 @@ class SearchScreenState extends State<SearchScreen>
                       height: 44,
                       decoration: BoxDecoration(
                         color: _hasActiveFilters
-                            ? context.color.territoryColor.withValues(alpha: 0.12)
+                            ? context.color.territoryColor
+                                .withValues(alpha: 0.12)
                             : context.color.backgroundColor,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: _hasActiveFilters
                               ? context.color.territoryColor
-                              : context.color.borderColor.withValues(alpha: 0.6),
+                              : context.color.borderColor
+                                  .withValues(alpha: 0.6),
                           width: 1,
                         ),
                       ),
@@ -376,7 +414,8 @@ class SearchScreenState extends State<SearchScreen>
                           size: 20,
                           color: _hasActiveFilters
                               ? context.color.territoryColor
-                              : context.color.textDefaultColor.withValues(alpha: 0.8),
+                              : context.color.textDefaultColor
+                                  .withValues(alpha: 0.8),
                         ),
                       ),
                     ),
@@ -587,7 +626,8 @@ class SearchScreenState extends State<SearchScreen>
                   InkWell(
                     onTap: _clearBoxData,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 2),
                       child: Text(
                         "clear".translate(context),
                         style: TextStyle(
@@ -613,7 +653,7 @@ class SearchScreenState extends State<SearchScreen>
                         TextPosition(offset: searchController.text.length),
                       );
                       searchFocusNode.unfocus();
-                      _executeSearch(item.name!);
+                      _fetchBannerSuggestions(item.name!);
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -624,7 +664,8 @@ class SearchScreenState extends State<SearchScreen>
                         color: context.color.backgroundColor,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: context.color.borderColor.withValues(alpha: 0.6),
+                          color:
+                              context.color.borderColor.withValues(alpha: 0.6),
                         ),
                       ),
                       child: Row(
@@ -739,14 +780,16 @@ class SearchScreenState extends State<SearchScreen>
           if (state.searchedItems.isEmpty) {
             return Center(
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       Icons.search_off_rounded,
                       size: 64,
-                      color: context.color.textLightColor.withValues(alpha: 0.5),
+                      color:
+                          context.color.textLightColor.withValues(alpha: 0.5),
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -779,7 +822,8 @@ class SearchScreenState extends State<SearchScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -862,7 +906,8 @@ class SearchScreenState extends State<SearchScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                   child: Row(
                     children: [
                       Icon(
@@ -925,46 +970,431 @@ class SearchScreenState extends State<SearchScreen>
     );
   }
 
+  Widget? _buildFloatingBottomBar() {
+    final bool hasQueryOrFilter =
+        searchController.text.trim().isNotEmpty || _hasActiveFilters;
+    if (!hasQueryOrFilter) return null;
+
+    final city = HiveUtils.getCityName() ?? "Dubai";
+    final country = HiveUtils.getCountryName() ?? "United Arab Emirates";
+    final locationStr = "$city, $country";
+    final query = searchController.text.trim();
+
+    String queryParams = "";
+    if (query.isNotEmpty) {
+      queryParams += "search=${Uri.encodeComponent(query)}";
+    }
+    if (city.isNotEmpty) {
+      if (queryParams.isNotEmpty) queryParams += "&";
+      queryParams += "city=${Uri.encodeComponent(city)}";
+    }
+    if (filter?.categoryId != null && filter!.categoryId!.isNotEmpty) {
+      if (queryParams.isNotEmpty) queryParams += "&";
+      queryParams += "category_id=${filter!.categoryId}";
+    }
+    final apiSearchUrl = "${Api.getItemApi}?$queryParams";
+    final catIdInt =
+        filter?.categoryId != null ? int.tryParse(filter!.categoryId!) : null;
+
+    String suggestedTitle;
+    if (query.isNotEmpty) {
+      suggestedTitle = "$query in $city";
+    } else {
+      suggestedTitle = "Search in $city";
+    }
+
+    return BlocBuilder<FetchSavedSearchesCubit, FetchSavedSearchesState>(
+      builder: (context, savedSearchState) {
+        final matchedSearch =
+            context.read<FetchSavedSearchesCubit>().findSavedSearch(
+                  query: query,
+                  categoryId: catIdInt,
+                  apiSearchUrl: apiSearchUrl,
+                );
+        final bool isAlreadySaved = matchedSearch != null;
+
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: context.color.secondaryColor,
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(
+              color: context.color.borderColor.withValues(alpha: 0.7),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.16),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              // Filter Button
+              InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  Navigator.pushNamed(
+                    context,
+                    Routes.filterScreen,
+                    arguments: {
+                      "update": _getFilterValue,
+                      "from": "search",
+                      "categoryList": categoryList,
+                    },
+                  ).then((value) {
+                    if (value == true) {
+                      setState(() {});
+                      context.read<SearchItemCubit>().searchItem(
+                            searchController.text,
+                            page: 1,
+                            filter: filter,
+                          );
+                    }
+                  });
+                },
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.tune_rounded,
+                        size: 17,
+                        color: _hasActiveFilters
+                            ? context.color.territoryColor
+                            : context.color.textDefaultColor,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        "Filter",
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: _hasActiveFilters
+                              ? FontWeight.bold
+                              : FontWeight.w600,
+                          color: _hasActiveFilters
+                              ? context.color.territoryColor
+                              : context.color.textDefaultColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              Container(
+                height: 18,
+                width: 1,
+                color: context.color.borderColor.withValues(alpha: 0.6),
+              ),
+
+              // Save Search / Saved Button
+              InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  SaveSearchBottomSheet.show(
+                    context,
+                    isAlreadySaved: isAlreadySaved,
+                    savedSearchId: matchedSearch?.id,
+                    initialTitle:
+                        isAlreadySaved ? matchedSearch.title : suggestedTitle,
+                    categoryId: catIdInt,
+                    apiSearchUrl: apiSearchUrl,
+                    location: locationStr,
+                    initialNotification: matchedSearch?.notification ?? true,
+                    initialSubscribeEmail:
+                        matchedSearch?.subscribeEmail ?? false,
+                  );
+                },
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isAlreadySaved
+                            ? Icons.bookmark_rounded
+                            : Icons.bookmark_add_outlined,
+                        size: 17,
+                        color: context.color.territoryColor,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isAlreadySaved ? "Saved" : "Save Search",
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: context.color.territoryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openBannerSuggestion(Map<String, dynamic> suggestion) async {
+    final route = suggestion['route'] is Map
+        ? Map<String, dynamic>.from(suggestion['route'] as Map)
+        : const <String, dynamic>{};
+    final category = suggestion['category'] is Map
+        ? Map<String, dynamic>.from(suggestion['category'] as Map)
+        : const <String, dynamic>{};
+    final categorySlug =
+        (route['category_slug'] ?? category['slug'])?.toString().trim() ?? '';
+    final categoryId = int.tryParse(
+        category['id']?.toString() ?? route['category_id']?.toString() ?? '');
+    final categoryName =
+        (category['name'] ?? route['propertyType'] ?? 'Items').toString();
+    final suggestionName =
+        (suggestion['translated_name'] ?? suggestion['name'] ?? '').toString();
+    if (categorySlug.isEmpty || categoryId == null) return;
+
+    setState(() => _isOpeningSuggestion = true);
+    FilterCategory? configuration;
+    try {
+      configuration = await FilterRepository().getFilters(categorySlug);
+    } catch (_) {
+      configuration = null;
+    }
+    if (!mounted) return;
+
+    final selectedCategory = CategoryModel(
+      id: categoryId,
+      name: categoryName,
+      slug: categorySlug,
+      children: [],
+      subcategoriesCount: 0,
+    );
+    final appliedFilter = ItemFilterModel(
+      categoryId: categoryId.toString(),
+      categorySlug: categorySlug,
+      city: HiveUtils.getCityName(),
+      areaId: HiveUtils.getAreaId(),
+      state: HiveUtils.getStateName(),
+      country: HiveUtils.getCountryName(),
+    );
+    _insertSearchQuery(suggestionName);
+    setState(() => _isOpeningSuggestion = false);
+    Navigator.pushNamed(
+      context,
+      Routes.itemsList,
+      arguments: {
+        'catID': categoryId.toString(),
+        'catName': categoryName,
+        'categoryIds': [categoryId.toString()],
+        'selectedCategoryChain': [selectedCategory],
+        'appliedFilter': appliedFilter,
+        'filterConfiguration': configuration,
+        'search': suggestionName,
+      },
+    );
+  }
+
+  PreferredSizeWidget _buildSuggestionAppBar() {
+    return AppBar(
+      backgroundColor: context.color.secondaryColor,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      leading: IconButton(
+        onPressed: () => Navigator.pop(context),
+        icon: Icon(
+          Icons.arrow_back_rounded,
+          color: context.color.textDefaultColor,
+        ),
+      ),
+      titleSpacing: 0,
+      title: Container(
+        height: 48,
+        margin: const EdgeInsetsDirectional.only(end: 16),
+        decoration: BoxDecoration(
+          color: context.color.secondaryColor,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: context.color.territoryColor.withValues(alpha: 0.65),
+            width: 1.4,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: context.color.territoryColor.withValues(alpha: 0.12),
+              blurRadius: 10,
+            ),
+          ],
+        ),
+        child: TextField(
+          autofocus: widget.autoFocus,
+          controller: searchController,
+          focusNode: searchFocusNode,
+          onChanged: _onSearchChanged,
+          textInputAction: TextInputAction.none,
+          onSubmitted: (_) => searchFocusNode.requestFocus(),
+          style: TextStyle(
+            color: context.color.textDefaultColor,
+            fontSize: 16,
+          ),
+          decoration: InputDecoration(
+            hintText: 'What are you looking for?',
+            border: InputBorder.none,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+            suffixIcon: searchController.text.isEmpty
+                ? null
+                : IconButton(
+                    onPressed: () {
+                      searchController.clear();
+                      _fetchBannerSuggestions('');
+                      searchFocusNode.requestFocus();
+                    },
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: context.color.textLightColor,
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBannerSuggestionBody() {
+    final query = searchController.text.trim();
+    if (query.isEmpty) {
+      return Center(
+        child: Text(
+          'Start typing to see suggestions',
+          style: TextStyle(color: context.color.textLightColor, fontSize: 14),
+        ),
+      );
+    }
+    if (_isLoadingSuggestions) {
+      return Center(child: UiUtils.progress());
+    }
+    if (_bannerSuggestions.isEmpty) {
+      return Center(
+        child: Text(
+          'No suggestions found',
+          style: TextStyle(color: context.color.textLightColor, fontSize: 14),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 8),
+          child: Text(
+            'Suggestions',
+            style: TextStyle(
+              color: context.color.textDefaultColor,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Expanded(
+          child: ListView.separated(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: _bannerSuggestions.length,
+            separatorBuilder: (_, __) => Divider(
+              height: 1,
+              color: context.color.borderColor.withValues(alpha: 0.45),
+            ),
+            itemBuilder: (context, index) {
+              final suggestion = _bannerSuggestions[index];
+              final category = suggestion['category'] is Map
+                  ? Map<String, dynamic>.from(suggestion['category'] as Map)
+                  : const <String, dynamic>{};
+              final title =
+                  (suggestion['translated_name'] ?? suggestion['name'] ?? '')
+                      .toString();
+              final subtitle =
+                  (category['translated_name'] ?? category['name'] ?? '')
+                      .toString();
+              return Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _openBannerSuggestion(suggestion),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: context.color.textDefaultColor,
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              if (subtitle.isNotEmpty) ...[
+                                const SizedBox(height: 5),
+                                Text(
+                                  subtitle,
+                                  style: TextStyle(
+                                    color: context.color.textLightColor,
+                                    fontSize: 13.5,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: context.color.textDefaultColor,
+                          size: 26,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
-
     return PopScope(
       canPop: true,
-      onPopInvokedWithResult: (didPop, result) {
-        Constant.itemFilter = null;
-      },
+      onPopInvokedWithResult: (_, __) => Constant.itemFilter = null,
       child: Scaffold(
         backgroundColor: context.color.backgroundColor,
-        appBar: _buildAppBar(),
-        body: Column(
+        appBar: _buildSuggestionAppBar(),
+        body: Stack(
           children: [
-            _buildActiveFilterBar(),
-            Expanded(
-              child: SingleChildScrollView(
-                controller: (searchController.text.isNotEmpty || _hasActiveFilters)
-                    ? searchScrollController
-                    : popularScrollController,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Recent Searches (shown when query is empty and no filters are active)
-                    if (searchController.text.isEmpty && !_hasActiveFilters)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: _buildHistoryItemList(),
-                      ),
-
-                    // Results or Popular listings
-                    if (searchController.text.isNotEmpty || _hasActiveFilters)
-                      _buildSearchResultsWidget()
-                    else
-                      _buildPopularItemsWidget(),
-                  ],
+            _buildBannerSuggestionBody(),
+            if (_isOpeningSuggestion)
+              Positioned.fill(
+                child: ColoredBox(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  child: Center(child: UiUtils.progress()),
                 ),
               ),
-            ),
           ],
         ),
       ),

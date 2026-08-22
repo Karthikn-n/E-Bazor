@@ -11,6 +11,7 @@ import 'package:Ebozor/data/cubits/chat/send_message.dart';
 import 'package:Ebozor/data/cubits/company_cubit.dart';
 import 'package:Ebozor/data/cubits/custom_field/fetch_custom_fields_cubit.dart';
 import 'package:Ebozor/data/cubits/favorite/favorite_cubit.dart';
+import 'package:Ebozor/data/cubits/favorite/favorite_listings_cubit.dart';
 import 'package:Ebozor/data/cubits/favorite/manage_fav_cubit.dart';
 import 'package:Ebozor/data/cubits/fetch_blogs_cubit.dart';
 import 'package:Ebozor/data/cubits/fetch_item_buyer_cubit.dart';
@@ -69,6 +70,8 @@ import 'package:Ebozor/data/cubits/seller/fetch_seller_item_cubit.dart';
 import 'package:Ebozor/data/cubits/seller/fetch_seller_ratings_cubit.dart';
 import 'package:Ebozor/data/cubits/seller/send_verification_field_cubit.dart';
 import 'package:Ebozor/data/cubits/subscription/fetch_featured_subscription_packages_cubit.dart';
+import 'package:Ebozor/data/cubits/saved_search/fetch_saved_searches_cubit.dart';
+import 'package:Ebozor/data/cubits/saved_search/save_search_cubit.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:nested/nested.dart';
 
@@ -78,6 +81,7 @@ import 'package:nested/nested.dart';
 class RegisterCubits {
   List<SingleChildWidget> providers = [
     BlocProvider(create: (context) => FavoriteCubit(FavoriteRepository())),
+    BlocProvider(create: (context) => FavoriteListingsCubit(FavoriteRepository())),
     BlocProvider(create: (context) => UpdateFavoriteCubit(FavoriteRepository())),
     BlocProvider(create: (context) => AuthCubit()),
     BlocProvider(create: (context) => LoginCubit()),
@@ -148,5 +152,7 @@ class RegisterCubits {
     BlocProvider(create: (context) => FetchMyRatingsCubit()),
     BlocProvider(create: (context) => AddMyItemReviewReportCubit()),
     BlocProvider(create: (context) => RenewItemCubit()),
+    BlocProvider(create: (context) => SaveSearchCubit()),
+    BlocProvider(create: (context) => FetchSavedSearchesCubit()),
   ];
 }

@@ -11,7 +11,6 @@ import 'package:Ebozor/data/model/notification_data.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
-import 'package:Ebozor/utils/responsiveSize.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/ui/screens/widgets/intertitial_ads_screen.dart';
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';

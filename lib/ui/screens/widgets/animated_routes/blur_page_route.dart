@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 ///This router will be show blurred transations
 ///this will provide fade transiton also.
 ///this is also being use to show background blur dialoge boxes
-class BlurredRouter extends PageRoute<void> {
+class BlurredRouter<T> extends PageRoute<T> {
   final double? sigmaX;
   final double? sigmaY;
   final bool? barrierDismiss;

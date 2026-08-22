@@ -2,9 +2,7 @@
 
 import 'dart:io';
 
-import 'package:Ebozor/app/app_theme.dart';
 import 'package:Ebozor/data/cubits/chat/send_message.dart';
-import 'package:Ebozor/data/cubits/system/app_theme_cubit.dart';
 import 'package:Ebozor/ui/screens/chat/chat_screen.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
@@ -190,7 +188,7 @@ class ChatMessageState extends State<ChatMessage>
     super.build(context);
 
     final bool isMe = widget.senderId.toString() == HiveUtils.getUserId();
-    final bool isDark = context.watch<AppThemeCubit>().state.appTheme == AppTheme.dark;
+    // final bool isDark = context.watch<AppThemeCubit>().state.appTheme == AppTheme.dark;
 
     return GestureDetector(
       onLongPress: () {

@@ -49,7 +49,8 @@ class CarPackagePaymentScreen extends StatefulWidget {
 }
 
 class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
-  final SubscriptionRepository _subscriptionRepository = SubscriptionRepository();
+  final SubscriptionRepository _subscriptionRepository =
+      SubscriptionRepository();
 
   // Dynamic pricing state loaded from API
   double _standardAdPrice = 1438.0;
@@ -65,8 +66,6 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
   SubscriptionPackageModel? _featured14Pkg;
   List<SubscriptionPackageModel> _allAvailablePackages = [];
 
-  bool _isLoadingPackages = true;
-
   // Selected add-ons
   String? _selectedPremiumAddon; // null, 'premium_7', 'premium_14'
   String? _selectedFeaturedAddon; // null, 'featured_7', 'featured_14'
@@ -75,7 +74,6 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
   double _discountPercent = 0.0;
   String? _appliedPromoCode;
   bool _isProcessingPayment = false;
-  String? _selectedGateway = "stripe";
 
   @override
   void initState() {
@@ -131,9 +129,11 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
           if (listingPackagesOutput.modelList.isNotEmpty) {
             _baseListingPackage = listingPackagesOutput.modelList.first;
             log("📦 [BASE PACKAGE] Found base listing package ID: ${_baseListingPackage?.id}, Name: ${_baseListingPackage?.name}");
-            if (_baseListingPackage?.finalPrice != null && _baseListingPackage!.finalPrice! > 0) {
+            if (_baseListingPackage?.finalPrice != null &&
+                _baseListingPackage!.finalPrice! > 0) {
               _standardAdPrice = _baseListingPackage!.finalPrice!;
-            } else if (_baseListingPackage?.price != null && _baseListingPackage!.price! > 0) {
+            } else if (_baseListingPackage?.price != null &&
+                _baseListingPackage!.price! > 0) {
               _standardAdPrice = _baseListingPackage!.price!;
             }
           }
@@ -162,15 +162,10 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
               }
             }
           }
-
-          _isLoadingPackages = false;
         });
       }
     } catch (e) {
       log("⚠️ [PACKAGES API WARN] Using fallback package pricing: $e");
-      if (mounted) {
-        setState(() => _isLoadingPackages = false);
-      }
     }
   }
 
@@ -212,34 +207,36 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
         _discountPercent = 0.10;
         _appliedPromoCode = code;
       });
-    if (code == "VIP20" || code == "PROMO20") {
-      setState(() {
-        _discountPercent = 0.20;
-        _appliedPromoCode = code;
-      });
-      HelperUtils.showSnackBarMessage(
-        context,
-        "VIP promo code applied! 20% discount",
-        type: MessageType.success,
-      );
-    } else if (code == "EBOZOR10" || code == "WELCOME10" || code == "PROMO10") {
-      setState(() {
-        _discountPercent = 0.10;
-        _appliedPromoCode = code;
-      });
-      HelperUtils.showSnackBarMessage(
-        context,
-        "Promo code '$code' applied! 10% discount",
-        type: MessageType.success,
-      );
-    } else {
-      HelperUtils.showSnackBarMessage(
-        context,
-        "Invalid or expired promo code",
-        type: MessageType.error,
-      );
+      if (code == "VIP20" || code == "PROMO20") {
+        setState(() {
+          _discountPercent = 0.20;
+          _appliedPromoCode = code;
+        });
+        HelperUtils.showSnackBarMessage(
+          context,
+          "VIP promo code applied! 20% discount",
+          type: MessageType.success,
+        );
+      } else if (code == "EBOZOR10" ||
+          code == "WELCOME10" ||
+          code == "PROMO10") {
+        setState(() {
+          _discountPercent = 0.10;
+          _appliedPromoCode = code;
+        });
+        HelperUtils.showSnackBarMessage(
+          context,
+          "Promo code '$code' applied! 10% discount",
+          type: MessageType.success,
+        );
+      } else {
+        HelperUtils.showSnackBarMessage(
+          context,
+          "Invalid or expired promo code",
+          type: MessageType.error,
+        );
+      }
     }
-  }
   }
 
   Future<String?> _showPaymentGatewayBottomSheet() async {
@@ -259,7 +256,8 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
           builder: (context, setModalState) {
             return SafeArea(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 decoration: BoxDecoration(
                   color: context.color.secondaryColor,
                   borderRadius: const BorderRadius.only(
@@ -274,7 +272,8 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
                       child: Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(3),
-                          color: context.color.textDefaultColor.withValues(alpha: 0.15),
+                          color: context.color.textDefaultColor
+                              .withValues(alpha: 0.15),
                         ),
                         height: 5,
                         width: 48,
@@ -302,7 +301,8 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
                     // Stripe Only Card Tile
                     Container(
                       decoration: BoxDecoration(
-                        color: context.color.territoryColor.withValues(alpha: 0.08),
+                        color: context.color.territoryColor
+                            .withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color: context.color.territoryColor,
@@ -310,7 +310,8 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
                         ),
                       ),
                       child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 4),
                         leading: Container(
                           width: 40,
                           height: 40,
@@ -319,7 +320,8 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Center(
-                            child: Icon(Icons.credit_card_rounded, color: Color(0xFF635BFF), size: 24),
+                            child: Icon(Icons.credit_card_rounded,
+                                color: Color(0xFF635BFF), size: 24),
                           ),
                         ),
                         title: Text(
@@ -384,9 +386,6 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
       },
     );
 
-    if (selected != null) {
-      setState(() => _selectedGateway = selected);
-    }
     return selected;
   }
 
@@ -415,7 +414,9 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
         for (final item in items) {
           if (item['id'] == itemId) {
             final status = (item['status'] ?? "").toString().toLowerCase();
-            if (status == "approved" || status == "active" || status == "live") {
+            if (status == "approved" ||
+                status == "active" ||
+                status == "live") {
               log("💳 [PAYMENT VERIFY] Server confirmed payment for item $itemId — status: $status");
               return true;
             }
@@ -446,7 +447,9 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
       log("💳 [STRIPE] Initializing Stripe with key: ${AppSettings.stripePublishableKey}");
       await StripeService.initStripe(
         AppSettings.stripePublishableKey,
-        AppSettings.stripeCurrency.isNotEmpty ? AppSettings.stripeCurrency : "AED",
+        AppSettings.stripeCurrency.isNotEmpty
+            ? AppSettings.stripeCurrency
+            : "AED",
       );
 
       // Determine real dynamic package ID and add-on package IDs
@@ -458,12 +461,14 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
       List<int> addonIds = [];
       if (_selectedPremiumAddon == 'premium_7' && _premium7Pkg?.id != null) {
         addonIds.add(_premium7Pkg!.id!);
-      } else if (_selectedPremiumAddon == 'premium_14' && _premium14Pkg?.id != null) {
+      } else if (_selectedPremiumAddon == 'premium_14' &&
+          _premium14Pkg?.id != null) {
         addonIds.add(_premium14Pkg!.id!);
       }
       if (_selectedFeaturedAddon == 'featured_7' && _featured7Pkg?.id != null) {
         addonIds.add(_featured7Pkg!.id!);
-      } else if (_selectedFeaturedAddon == 'featured_14' && _featured14Pkg?.id != null) {
+      } else if (_selectedFeaturedAddon == 'featured_14' &&
+          _featured14Pkg?.id != null) {
         addonIds.add(_featured14Pkg!.id!);
       }
 
@@ -488,15 +493,17 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
       log("💳 [PAYMENT INTENT RES] Received response: $response");
 
       if (response['error'] == true) {
-        final errMsg = response['message']?.toString() ?? 'Unable to create payment intent';
+        final errMsg = response['message']?.toString() ??
+            'Unable to create payment intent';
         throw errMsg;
       }
 
       // API returns: { data: { payment_intent: { id, payment_gateway_response: { client_secret } } } }
       final responseData = response['data'];
-      final paymentIntentData = (responseData is Map && responseData.containsKey('payment_intent'))
-          ? responseData['payment_intent']
-          : responseData;
+      final paymentIntentData =
+          (responseData is Map && responseData.containsKey('payment_intent'))
+              ? responseData['payment_intent']
+              : responseData;
 
       dynamic gatewayResp;
       if (paymentIntentData is Map) {
@@ -517,7 +524,9 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
         context: context,
         merchantDisplayName: Constant.appName,
         amount: _totalAmount.toString(),
-        currency: AppSettings.stripeCurrency.isNotEmpty ? AppSettings.stripeCurrency : "AED",
+        currency: AppSettings.stripeCurrency.isNotEmpty
+            ? AppSettings.stripeCurrency
+            : "AED",
         clientSecret: clientSecret,
         paymentIntentId: paymentIntentId,
       );
@@ -561,10 +570,7 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
         widget.postingData?.price ??
         double.tryParse(widget.genericAdData?['price']?.toString() ?? '0') ??
         0.0;
-    final city = widget.model?.city ??
-        widget.postingData?.specs.emirate ??
-        widget.genericAdData?['city'] ??
-        "Dubai";
+    final city = widget.model?.city ?? widget.genericAdData?['city'] ?? "Dubai";
     final imagePath = widget.model?.image ??
         ((widget.postingData != null &&
                 widget.postingData!.imageFiles.isNotEmpty)
@@ -589,8 +595,10 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
       FetchMyPromotedItemsCubit.globalInstance?.fetchMyPromotedItems();
       myAdsCubitReference[""]?.addItem(createdItem);
       myAdsCubitReference[""]?.fetchMyItems(getItemsWithStatus: "");
-      myAdsCubitReference["approved"]?.fetchMyItems(getItemsWithStatus: "approved");
-      myAdsCubitReference["inactive"]?.fetchMyItems(getItemsWithStatus: "inactive");
+      myAdsCubitReference["approved"]
+          ?.fetchMyItems(getItemsWithStatus: "approved");
+      myAdsCubitReference["inactive"]
+          ?.fetchMyItems(getItemsWithStatus: "inactive");
       context.read<FetchMyPromotedItemsCubit>().addItem(createdItem);
       context.read<FetchMyPromotedItemsCubit>().fetchMyPromotedItems();
     } catch (_) {}
@@ -627,7 +635,8 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
               Expanded(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -688,7 +697,8 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
                   child: ElevatedButton(
                     onPressed: _isProcessingPayment ? null : _handlePay,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD31027), // Modern red brand CTA
+                      backgroundColor:
+                          const Color(0xFFD31027), // Modern red brand CTA
                       disabledBackgroundColor:
                           const Color(0xFFD31027).withValues(alpha: 0.6),
                       shape: RoundedRectangleBorder(
@@ -1166,12 +1176,13 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
                     hintText: "Discount code",
                     hintStyle: TextStyle(
                       fontSize: 13,
-                      color: context.color.textLightColor.withValues(alpha: 0.7),
+                      color:
+                          context.color.textLightColor.withValues(alpha: 0.7),
                     ),
                     filled: true,
                     fillColor: context.color.backgroundColor,
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide(
@@ -1198,8 +1209,8 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 18, vertical: 13),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
                 ),
                 child: const Text(
                   "Apply",
@@ -1301,58 +1312,6 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildStepHeader(BuildContext context,
-      {required int currentStep, required int totalSteps}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        color: context.color.secondaryColor,
-        border: Border(
-          bottom: BorderSide(
-            color: context.color.borderColor.withValues(alpha: 0.4),
-          ),
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Step $currentStep of $totalSteps: Package & Payment",
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: context.color.territoryColor,
-                ),
-              ),
-              Text(
-                "Final Step",
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: context.color.territoryColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: currentStep / totalSteps,
-              backgroundColor:
-                  context.color.borderColor.withValues(alpha: 0.3),
-              valueColor:
-                  AlwaysStoppedAnimation<Color>(context.color.territoryColor),
-              minHeight: 6,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

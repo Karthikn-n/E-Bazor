@@ -9,7 +9,6 @@ import 'package:Ebozor/ui/screens/widgets/errors/no_internet.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
 import 'package:Ebozor/ui/screens/widgets/shimmerLoadingContainer.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
-import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_keys.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
@@ -146,8 +145,10 @@ class CountriesScreenState extends State<CountriesScreen> {
       } else if (permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always) {
         Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 8),
+          locationSettings: LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: const Duration(seconds: 8),
+          ),
         );
 
         List<Placemark> placemarks = await placemarkFromCoordinates(

@@ -6,7 +6,47 @@ import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+
+class CarFinanceCalculation {
+  final double downPayment;
+  final double financedAmount;
+  final double totalInterest;
+  final double totalLoanAmount;
+  final double monthlyPayment;
+
+  const CarFinanceCalculation({
+    required this.downPayment,
+    required this.financedAmount,
+    required this.totalInterest,
+    required this.totalLoanAmount,
+    required this.monthlyPayment,
+  });
+
+  factory CarFinanceCalculation.calculate({
+    required double carPrice,
+    required double downPaymentPercent,
+    required double annualInterestRate,
+    required int loanPeriodYears,
+  }) {
+    final downPayment = carPrice * downPaymentPercent / 100;
+    final financedAmount =
+        (carPrice - downPayment).clamp(0, double.infinity).toDouble();
+    final totalInterest =
+        financedAmount * annualInterestRate / 100 * loanPeriodYears;
+    final totalLoanAmount = financedAmount + totalInterest;
+    final months = loanPeriodYears * 12;
+
+    return CarFinanceCalculation(
+      downPayment: downPayment,
+      financedAmount: financedAmount,
+      totalInterest: totalInterest,
+      totalLoanAmount: totalLoanAmount,
+      monthlyPayment: months > 0 ? totalLoanAmount / months : 0,
+    );
+  }
+}
 
 class CarFinanceCalculator extends StatefulWidget {
   final double initialPrice;
@@ -15,6 +55,7 @@ class CarFinanceCalculator extends StatefulWidget {
   final int? carMakeId;
   final int? carModelId;
   final int? carTrimId;
+  final bool showApplyButton;
 
   const CarFinanceCalculator({
     super.key,
@@ -24,6 +65,7 @@ class CarFinanceCalculator extends StatefulWidget {
     this.carMakeId,
     this.carModelId,
     this.carTrimId,
+    this.showApplyButton = true,
   });
 
   @override
@@ -31,47 +73,107 @@ class CarFinanceCalculator extends StatefulWidget {
 }
 
 class _CarFinanceCalculatorState extends State<CarFinanceCalculator> {
+  static const double _minCarPrice = 15000;
+  static const double _maxCarPrice = 1000000;
   late double _carPrice;
-  double _downPaymentPercent = 20.0; // Standard 20% in UAE
-  double _interestRate = 3.5; // Standard 3.5%
-  int _loanPeriodYears = 3; // Default 3 years
+  double _downPaymentPercent = 10;
+  double _interestRate = 1;
+  int _loanPeriodYears = 1;
   bool _isSubmittingFinance = false;
+  late final TextEditingController _priceController;
+  late final TextEditingController _downPaymentController;
+  late final TextEditingController _interestController;
 
   late final NumberFormat _formatter = NumberFormat("#,##0", "en_US");
 
   @override
   void initState() {
     super.initState();
-    _carPrice = widget.initialPrice > 0 ? widget.initialPrice : 50000.0;
+    _carPrice = widget.initialPrice.clamp(_minCarPrice, _maxCarPrice);
+    _priceController =
+        TextEditingController(text: _carPrice.round().toString());
+    _downPaymentController = TextEditingController(
+      text: _downPaymentPercent.round().toString(),
+    );
+    _interestController = TextEditingController(
+      text: _interestRate.toStringAsFixed(1),
+    );
   }
 
   @override
   void didUpdateWidget(covariant CarFinanceCalculator oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.initialPrice != widget.initialPrice && widget.initialPrice > 0) {
-      _carPrice = widget.initialPrice;
+    if (oldWidget.initialPrice != widget.initialPrice &&
+        widget.initialPrice > 0) {
+      _carPrice = widget.initialPrice.clamp(_minCarPrice, _maxCarPrice);
+      _priceController.text = _carPrice.round().toString();
     }
   }
 
-  // Reverse engineered flat loan calculation
-  double get _downPaymentAmount => _carPrice * (_downPaymentPercent / 100);
+  CarFinanceCalculation get _calculation => CarFinanceCalculation.calculate(
+        carPrice: _carPrice,
+        downPaymentPercent: _downPaymentPercent,
+        annualInterestRate: _interestRate,
+        loanPeriodYears: _loanPeriodYears,
+      );
 
-  double get _principalAmount => (_carPrice - _downPaymentAmount).clamp(0, double.infinity);
+  double get _downPaymentAmount => _calculation.downPayment;
+  double get _totalInterest => _calculation.totalInterest;
+  double get _totalLoanAmount => _calculation.totalLoanAmount;
+  double get _monthlyPayment => _calculation.monthlyPayment;
 
-  double get _totalInterest =>
-      _principalAmount * (_interestRate / 100) * _loanPeriodYears;
-
-  double get _totalLoanAmount => _principalAmount + _totalInterest;
-
-  double get _monthlyPayment {
-    final months = _loanPeriodYears * 12;
-    if (months <= 0) return 0;
-    return _totalLoanAmount / months;
+  void _updatePrice(String value) {
+    final parsed = double.tryParse(value);
+    if (parsed != null && parsed >= _minCarPrice && parsed <= _maxCarPrice) {
+      setState(() => _carPrice = parsed);
+    }
   }
 
-  double get _maxPriceRange {
-    final base = widget.initialPrice > 0 ? widget.initialPrice : 100000.0;
-    return (base * 2.5).clamp(100000.0, 3000000.0);
+  void _commitPrice() {
+    final parsed = double.tryParse(_priceController.text) ?? _carPrice;
+    setState(() {
+      _carPrice = parsed.clamp(_minCarPrice, _maxCarPrice);
+      _priceController.text = _carPrice.round().toString();
+    });
+  }
+
+  void _updateDownPayment(String value) {
+    final parsed = double.tryParse(value);
+    if (parsed != null && parsed >= 0 && parsed <= 80) {
+      setState(() => _downPaymentPercent = parsed.roundToDouble());
+    }
+  }
+
+  void _commitDownPayment() {
+    final parsed =
+        double.tryParse(_downPaymentController.text) ?? _downPaymentPercent;
+    setState(() {
+      _downPaymentPercent = parsed.clamp(0, 80).roundToDouble();
+      _downPaymentController.text = _downPaymentPercent.round().toString();
+    });
+  }
+
+  void _updateInterest(String value) {
+    final parsed = double.tryParse(value);
+    if (parsed != null && parsed >= 1 && parsed <= 10) {
+      setState(() => _interestRate = (parsed * 10).round() / 10);
+    }
+  }
+
+  void _commitInterest() {
+    final parsed = double.tryParse(_interestController.text) ?? _interestRate;
+    setState(() {
+      _interestRate = (parsed.clamp(1, 10) * 10).round() / 10;
+      _interestController.text = _interestRate.toStringAsFixed(1);
+    });
+  }
+
+  @override
+  void dispose() {
+    _priceController.dispose();
+    _downPaymentController.dispose();
+    _interestController.dispose();
+    super.dispose();
   }
 
   Future<void> _applyForCarFinance() async {
@@ -98,10 +200,14 @@ class _CarFinanceCalculatorState extends State<CarFinanceCalculator> {
       final payload = {
         "user_id": userId,
         if (user.name != null && user.name!.isNotEmpty) "user_name": user.name,
-        if (user.mobile != null && user.mobile!.isNotEmpty) "user_number": user.mobile,
-        if (user.email != null && user.email!.isNotEmpty) "user_email": user.email,
-        if (widget.carName != null && widget.carName!.isNotEmpty) "car_name": widget.carName,
-        if (widget.carYear != null && widget.carYear!.isNotEmpty) "car_year": widget.carYear,
+        if (user.mobile != null && user.mobile!.isNotEmpty)
+          "user_number": user.mobile,
+        if (user.email != null && user.email!.isNotEmpty)
+          "user_email": user.email,
+        if (widget.carName != null && widget.carName!.isNotEmpty)
+          "car_name": widget.carName,
+        if (widget.carYear != null && widget.carYear!.isNotEmpty)
+          "car_year": widget.carYear,
         if (widget.carMakeId != null) "car_make_id": widget.carMakeId,
         if (widget.carModelId != null) "car_model_id": widget.carModelId,
         if (widget.carTrimId != null) "car_trim_id": widget.carTrimId,
@@ -125,18 +231,23 @@ class _CarFinanceCalculatorState extends State<CarFinanceCalculator> {
 
       if (mounted) {
         if (response['error'] == true) {
-          final msg = response['message']?.toString() ?? "Failed to submit finance request";
-          HelperUtils.showSnackBarMessage(context, msg, type: MessageType.error);
+          final msg = response['message']?.toString() ??
+              "Failed to submit finance request";
+          HelperUtils.showSnackBarMessage(context, msg,
+              type: MessageType.error);
         } else {
-          final msg = response['message']?.toString() ?? "Car finance inquiry submitted! A representative will contact you.";
+          final msg = response['message']?.toString() ??
+              "Car finance inquiry submitted! A representative will contact you.";
           showDialog(
             context: context,
             builder: (dialogCtx) => AlertDialog(
               backgroundColor: context.color.secondaryColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               title: Row(
                 children: [
-                  const Icon(Icons.check_circle_rounded, color: Colors.green, size: 24),
+                  const Icon(Icons.check_circle_rounded,
+                      color: Colors.green, size: 24),
                   const SizedBox(width: 8),
                   Text(
                     "Inquiry Submitted",
@@ -171,16 +282,27 @@ class _CarFinanceCalculatorState extends State<CarFinanceCalculator> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text("Monthly Payment", style: TextStyle(fontSize: 12.5, color: context.color.textLightColor)),
-                            Text("AED ${_formatter.format(_monthlyPayment.round())}", style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                            Text("Monthly Payment",
+                                style: TextStyle(
+                                    fontSize: 12.5,
+                                    color: context.color.textLightColor)),
+                            Text(
+                                "AED ${_formatter.format(_monthlyPayment.round())}",
+                                style: const TextStyle(
+                                    fontSize: 13, fontWeight: FontWeight.bold)),
                           ],
                         ),
                         const SizedBox(height: 6),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text("Loan Tenure", style: TextStyle(fontSize: 12.5, color: context.color.textLightColor)),
-                            Text("$_loanPeriodYears Years", style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                            Text("Loan Tenure",
+                                style: TextStyle(
+                                    fontSize: 12.5,
+                                    color: context.color.textLightColor)),
+                            Text("$_loanPeriodYears Years",
+                                style: const TextStyle(
+                                    fontSize: 13, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ],
@@ -191,7 +313,10 @@ class _CarFinanceCalculatorState extends State<CarFinanceCalculator> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(dialogCtx),
-                  child: Text("Done", style: TextStyle(color: context.color.territoryColor, fontWeight: FontWeight.bold)),
+                  child: Text("Done",
+                      style: TextStyle(
+                          color: context.color.territoryColor,
+                          fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -273,6 +398,26 @@ class _CarFinanceCalculatorState extends State<CarFinanceCalculator> {
 
           // Control 4: Loan Period (Years)
           _buildLoanPeriodControl(),
+          if (widget.showApplyButton) ...[
+            const SizedBox(height: 22),
+            FilledButton(
+              onPressed: _isSubmittingFinance ? null : _applyForCarFinance,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+                backgroundColor: Colors.red,
+              ),
+              child: _isSubmittingFinance
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Apply for Car Finance'),
+            ),
+          ],
         ],
       ),
     );
@@ -361,6 +506,70 @@ class _CarFinanceCalculatorState extends State<CarFinanceCalculator> {
     );
   }
 
+  Widget _editableNumberField({
+    required TextEditingController controller,
+    required ValueChanged<String> onChanged,
+    required VoidCallback onCommit,
+    String? prefix,
+    String? suffix,
+    bool allowDecimal = false,
+    double width = 132,
+  }) {
+    return SizedBox(
+      width: width,
+      child: TextFormField(
+        controller: controller,
+        textAlign: TextAlign.end,
+        keyboardType: TextInputType.numberWithOptions(
+          decimal: allowDecimal,
+        ),
+        inputFormatters: [
+          if (allowDecimal)
+            FilteringTextInputFormatter.allow(RegExp(r'^\d{0,2}(\.\d?)?$'))
+          else
+            FilteringTextInputFormatter.digitsOnly,
+        ],
+        onChanged: onChanged,
+        onFieldSubmitted: (_) => onCommit(),
+        onTapOutside: (_) {
+          onCommit();
+          FocusManager.instance.primaryFocus?.unfocus();
+        },
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: context.color.textDefaultColor,
+        ),
+        decoration: InputDecoration(
+          prefixText: prefix,
+          suffixText: suffix,
+          isDense: true,
+          filled: true,
+          fillColor: context.color.backgroundColor,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 9,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: context.color.borderColor),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: context.color.borderColor),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(
+              color: context.color.territoryColor,
+              width: 1.4,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildCarPriceControl() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -376,55 +585,33 @@ class _CarFinanceCalculatorState extends State<CarFinanceCalculator> {
                 color: context.color.textDefaultColor,
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(
-                color: context.color.backgroundColor,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: context.color.borderColor.withValues(alpha: 0.6),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    "AED ",
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: context.color.textLightColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    _formatter.format(_carPrice.round()),
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: context.color.textDefaultColor,
-                    ),
-                  ),
-                ],
-              ),
+            _editableNumberField(
+              controller: _priceController,
+              prefix: 'AED ',
+              onChanged: _updatePrice,
+              onCommit: _commitPrice,
+              width: 150,
             ),
           ],
         ),
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
-            activeTrackColor: Colors.black87,
-            inactiveTrackColor: Colors.grey.shade300,
-            thumbColor: Colors.black87,
+            activeTrackColor: context.color.territoryColor,
+            inactiveTrackColor: context.color.borderColor,
+            thumbColor: context.color.territoryColor,
             trackHeight: 3,
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
             overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
           ),
           child: Slider(
-            value: _carPrice.clamp(5000.0, _maxPriceRange),
-            min: 5000.0,
-            max: _maxPriceRange,
+            value: _carPrice,
+            min: _minCarPrice,
+            max: _maxCarPrice,
+            divisions: 985,
             onChanged: (val) {
               setState(() {
-                _carPrice = (val / 1000).round() * 1000.0;
+                _carPrice = val;
+                _priceController.text = _carPrice.round().toString();
               });
             },
           ),
@@ -440,62 +627,46 @@ class _CarFinanceCalculatorState extends State<CarFinanceCalculator> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            const Text(
+              'Down Payment Percentage',
+              style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold),
+            ),
+            _editableNumberField(
+              controller: _downPaymentController,
+              suffix: String.fromCharCode(37),
+              onChanged: _updateDownPayment,
+              onCommit: _commitDownPayment,
+              width: 82,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
             Text(
-              "Down Payment",
+              "Amount",
               style: TextStyle(
                 fontSize: 14.5,
                 fontWeight: FontWeight.bold,
                 color: context.color.textDefaultColor,
               ),
             ),
-            Container(
-              decoration: BoxDecoration(
-                color: context.color.backgroundColor,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: context.color.borderColor.withValues(alpha: 0.6),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                    child: Text(
-                      "AED ${_formatter.format(_downPaymentAmount.round())}",
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: context.color.textDefaultColor,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    width: 1,
-                    height: 22,
-                    color: context.color.borderColor.withValues(alpha: 0.6),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                    child: Text(
-                      "${_downPaymentPercent.round()} %",
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: context.color.textDefaultColor,
-                      ),
-                    ),
-                  ),
-                ],
+            Text(
+              "AED ${_formatter.format(_downPaymentAmount.round())}",
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: context.color.textDefaultColor,
               ),
             ),
           ],
         ),
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
-            activeTrackColor: Colors.black87,
-            inactiveTrackColor: Colors.grey.shade300,
-            thumbColor: Colors.black87,
+            activeTrackColor: context.color.territoryColor,
+            inactiveTrackColor: context.color.borderColor,
+            thumbColor: context.color.territoryColor,
             trackHeight: 3,
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
             overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
@@ -508,6 +679,7 @@ class _CarFinanceCalculatorState extends State<CarFinanceCalculator> {
             onChanged: (val) {
               setState(() {
                 _downPaymentPercent = val;
+                _downPaymentController.text = val.round().toString();
               });
             },
           ),
@@ -523,51 +695,38 @@ class _CarFinanceCalculatorState extends State<CarFinanceCalculator> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              "Interest Rate",
-              style: TextStyle(
-                fontSize: 14.5,
-                fontWeight: FontWeight.bold,
-                color: context.color.textDefaultColor,
-              ),
+            const Text(
+              'Interest Rate',
+              style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-              decoration: BoxDecoration(
-                color: context.color.backgroundColor,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: context.color.borderColor.withValues(alpha: 0.6),
-                ),
-              ),
-              child: Text(
-                "${_interestRate.toStringAsFixed(1)} %",
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: context.color.textDefaultColor,
-                ),
-              ),
+            _editableNumberField(
+              controller: _interestController,
+              suffix: String.fromCharCode(37),
+              allowDecimal: true,
+              onChanged: _updateInterest,
+              onCommit: _commitInterest,
+              width: 82,
             ),
           ],
         ),
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
-            activeTrackColor: Colors.black87,
-            inactiveTrackColor: Colors.grey.shade300,
-            thumbColor: Colors.black87,
+            activeTrackColor: context.color.territoryColor,
+            inactiveTrackColor: context.color.borderColor,
+            thumbColor: context.color.territoryColor,
             trackHeight: 3,
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
             overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
           ),
           child: Slider(
-            value: _interestRate.clamp(1.0, 15.0),
+            value: _interestRate,
             min: 1.0,
-            max: 15.0,
-            divisions: 140,
+            max: 10.0,
+            divisions: 90,
             onChanged: (val) {
               setState(() {
                 _interestRate = (val * 10).round() / 10.0;
+                _interestController.text = _interestRate.toStringAsFixed(1);
               });
             },
           ),
@@ -617,7 +776,7 @@ class _CarFinanceCalculatorState extends State<CarFinanceCalculator> {
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: isSelected
-                            ? Colors.black87
+                            ? context.color.territoryColor
                             : context.color.borderColor.withValues(alpha: 0.6),
                         width: isSelected ? 1.8 : 1.0,
                       ),
@@ -626,7 +785,8 @@ class _CarFinanceCalculatorState extends State<CarFinanceCalculator> {
                       "$year",
                       style: TextStyle(
                         fontSize: 14,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.w500,
                         color: isSelected
                             ? context.color.textDefaultColor
                             : context.color.textLightColor,

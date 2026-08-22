@@ -1,3 +1,4 @@
+import 'package:Ebozor/ui/screens/home/widgets/jobs_bottom_sheet.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -7,8 +8,6 @@ import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/category/fetch_category_cubit.dart';
 import 'package:Ebozor/data/model/category_model.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
-import 'package:Ebozor/utils/constant.dart';
-import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/category.dart';
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
@@ -29,20 +28,21 @@ class CategoryList extends StatefulWidget {
   }
 }
 
-class _CategoryListState extends State<CategoryList>
-    with TickerProviderStateMixin {
+class _CategoryListState extends State<CategoryList> {
   final ScrollController _pageScrollController = ScrollController();
 
   @override
   void initState() {
-    _pageScrollController.addListener(() {
-      if (_pageScrollController.isEndReached()) {
-        if (context.read<FetchCategoryCubit>().hasMoreData()) {
-          context.read<FetchCategoryCubit>().fetchCategoriesMore();
-        }
-      }
-    });
+    _pageScrollController.addListener(pageScrollListen);
     super.initState();
+  }
+
+  void pageScrollListen() {
+    if (_pageScrollController.isEndReached()) {
+      if (context.read<FetchCategoryCubit>().hasMoreData()) {
+        context.read<FetchCategoryCubit>().fetchCategoriesMore();
+      }
+    }
   }
 
   @override
@@ -96,30 +96,35 @@ class _CategoryListState extends State<CategoryList>
                           if (widget.from == Routes.filterScreen) {
                             Navigator.pop(context, category);
                           } else {
-                            if (state.categories[index].children!.isEmpty) {
-                              Constant.itemFilter = null;
-                              HelperUtils.goToNextPage(
-                                Routes.itemsList,
+                            const filterCategoryIds = [65, 68, 139, 143];
+                            if (filterCategoryIds.contains(category.id) ||
+                                (category.name != null &&
+                                    (category.name!.toLowerCase().contains("property") ||
+                                        category.name!.toLowerCase().contains("properties")))) {
+                              Navigator.pushNamed(
                                 context,
-                                false,
-                                args: {
-                                  'catID': category.id.toString(),
-                                  'catName': category.name,
-                                  "categoryIds": [category.id.toString()]
-                                },
+                                Routes.filterpage,
+                                arguments: category,
                               );
+                            } else if (category.id == 4 ||
+                                (category.name != null &&
+                                    category.name!.toLowerCase() == 'jobs') ||
+                                (category.slug != null &&
+                                    category.slug!.toLowerCase() == 'jobs')) {
+                              JobsBottomSheet.show(context, jobsCategory: category);
                             } else {
                               Navigator.pushNamed(
-                                  context, Routes.subCategoryScreen,
-                                  arguments: {
-                                    "categoryList":
-                                        state.categories[index].children,
-                                    "catName": state.categories[index].name,
-                                    "catId": state.categories[index].id,
-                                    "categoryIds": [
-                                      state.categories[index].id.toString()
-                                    ]
-                                  }); //pass current index category id & name here
+                                context,
+                                Routes.subCategoryScreen,
+                                arguments: {
+                                  "categoryList": category.children ?? [],
+                                  "catName": category.name ?? "",
+                                  "catId": category.id ?? 0,
+                                  "categoryIds": [
+                                    category.id.toString(),
+                                  ],
+                                },
+                              );
                             }
                           }
                         },

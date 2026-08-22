@@ -11,6 +11,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/app/app_theme.dart';
+import 'package:Ebozor/ui/screens/widgets/dialogs/save_to_favorite_bottom_sheet.dart';
 import 'package:Ebozor/data/repositories/favourites_repository.dart';
 import 'package:Ebozor/data/cubits/favorite/favorite_cubit.dart';
 import 'package:Ebozor/data/cubits/favorite/manage_fav_cubit.dart';
@@ -74,12 +75,19 @@ class ItemHorizontalCard extends StatelessWidget {
                       onTap: () {
                         UiUtils.checkUser(
                             onNotGuest: () {
+                              if (isLike) {
+                                context
+                                    .read<UpdateFavoriteCubit>()
+                                    .setFavoriteItem(
+                                      item: item,
+                                      type: 0,
+                                    );
+                                return;
+                              }
                               context
                                   .read<UpdateFavoriteCubit>()
-                                  .setFavoriteItem(
-                                    item: item,
-                                    type: isLike ? 0 : 1,
-                                  );
+                                  .setFavoriteItem(item: item, type: 1);
+                              SaveToFavoriteBottomSheet.show(context, item: item);
                             },
                             context: context);
                       },

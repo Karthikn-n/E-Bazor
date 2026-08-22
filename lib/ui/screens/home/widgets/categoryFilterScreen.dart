@@ -117,18 +117,31 @@ class _CategoryFilterScreenState extends State<CategoryFilterScreen>
                                   widget.categoryList
                                       .add(state.categories[index]);
 
-                                  if (state.categories[index].children
-                                          ?.isNotEmpty ??
-                                      false) {
+                                  const filterCategoryIds = [65, 68, 139, 143];
+                                  final cat = state.categories[index];
+
+                                  if (filterCategoryIds.contains(cat.id) ||
+                                      (cat.name != null &&
+                                          (cat.name!.toLowerCase().contains("property") ||
+                                              cat.name!.toLowerCase().contains("properties")))) {
                                     Navigator.pushNamed(
-                                        context, Routes.subCategoryFilterScreen,
-                                        arguments: {
-                                          "model":
-                                              state.categories[index].children,
-                                          "selection": widget.categoryList,
-                                        });
+                                      context,
+                                      Routes.filterpage,
+                                      arguments: cat,
+                                    );
+                                  } else if (cat.children?.isNotEmpty ?? false) {
+                                    Navigator.pushNamed(
+                                      context,
+                                      Routes.subCategoryScreen,
+                                      arguments: {
+                                        "categoryList": cat.children,
+                                        "catName": cat.name,
+                                        "catId": cat.id,
+                                        "categoryIds": [cat.id.toString()],
+                                      },
+                                    );
                                   } else {
-                                    Navigator.pop(context);
+                                    Navigator.pop(context, cat);
                                   }
                                 },
                                 leading: Container(

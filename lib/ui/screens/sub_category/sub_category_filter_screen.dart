@@ -20,16 +20,50 @@ import 'package:Ebozor/utils/constant.dart';
 
 class FiltersPage extends StatefulWidget {
   final CategoryModel category;
+  final ItemFilterModel? initialFilter;
+  final bool isFromItemsList;
+  final FilterCategory? initialFilterConfiguration;
 
-  const FiltersPage({super.key, required this.category});
+  const FiltersPage({
+    super.key,
+    required this.category,
+    this.initialFilter,
+    this.isFromItemsList = false,
+    this.initialFilterConfiguration,
+  });
 
   static Route route(RouteSettings settings) {
-    final category = settings.arguments as CategoryModel;
+    CategoryModel category;
+    ItemFilterModel? initialFilter;
+    bool isFromItemsList = false;
+    FilterCategory? initialFilterConfiguration;
+
+    if (settings.arguments is CategoryModel) {
+      category = settings.arguments as CategoryModel;
+    } else if (settings.arguments is Map) {
+      final args = settings.arguments as Map;
+      category = args['category'] as CategoryModel? ??
+          CategoryModel(
+            id: int.tryParse(args['catID']?.toString() ?? '65') ?? 65,
+            name: args['catName']?.toString() ?? 'Properties',
+          );
+      initialFilter = args['appliedFilter'] as ItemFilterModel?;
+      isFromItemsList = args['isFromItemsList'] == true;
+      initialFilterConfiguration =
+          args['filterConfiguration'] as FilterCategory?;
+    } else {
+      category = CategoryModel(id: 65, name: "Properties");
+    }
 
     return MaterialPageRoute(
       builder: (context) => BlocProvider(
         create: (context) => FilterCubit(FilterRepository()),
-        child: FiltersPage(category: category),
+        child: FiltersPage(
+          category: category,
+          initialFilter: initialFilter,
+          isFromItemsList: isFromItemsList,
+          initialFilterConfiguration: initialFilterConfiguration,
+        ),
       ),
     );
   }
@@ -49,7 +83,7 @@ class _FiltersPageState extends State<FiltersPage> {
   int _selectedPropertyType = 0;
 
   // Sub-category index
-  int _selectedCategory = 0;
+  int _selectedCategory = -1;
 
   // Price Range
   final TextEditingController _priceMinController =
@@ -106,15 +140,82 @@ class _FiltersPageState extends State<FiltersPage> {
       _selectedTab = 0; // Default Rent
     }
 
-    final initialSlug = (widget.category.children != null &&
-            widget.category.children!.isNotEmpty)
-        ? (widget.category.children!.first.slug ?? "residential")
-        : (widget.category.slug ?? "residential");
+    final selectedCategorySlug = widget.initialFilter?.categorySlug;
+    final initialSlug =
+        widget.initialFilterConfiguration?.slug?.isNotEmpty == true
+            ? widget.initialFilterConfiguration!.slug!
+            : (selectedCategorySlug != null && selectedCategorySlug.isNotEmpty)
+                ? selectedCategorySlug
+                : ((widget.category.children != null &&
+                        widget.category.children!.isNotEmpty)
+                    ? (widget.category.children!.first.slug ?? "residential")
+                    : (widget.category.slug ?? "residential"));
+
+    if (widget.category.children != null) {
+      final propertyTypeIndex = widget.category.children!.indexWhere(
+        (category) => category.slug == initialSlug,
+      );
+      if (propertyTypeIndex >= 0) _selectedPropertyType = propertyTypeIndex;
+    }
+    if (widget.initialFilterConfiguration != null &&
+        selectedCategorySlug != null) {
+      final categoryIndex = widget.initialFilterConfiguration!.children
+          .indexWhere((category) => category.slug == selectedCategorySlug);
+      if (categoryIndex >= 0) _selectedCategory = categoryIndex;
+    }
 
     selectedSlug = initialSlug;
     cubit.fetchFilters(initialSlug);
 
-    _locationController.text = HiveUtils.getCityName() ?? "";
+    _locationController.text = widget.initialFilter?.city?.isNotEmpty == true
+        ? widget.initialFilter!.city!
+        : (HiveUtils.getCityName() ?? "");
+
+    if (widget.initialFilter?.minPrice != null &&
+        widget.initialFilter!.minPrice!.isNotEmpty) {
+      _priceMinController.text = widget.initialFilter!.minPrice!;
+    }
+    if (widget.initialFilter?.maxPrice != null &&
+        widget.initialFilter!.maxPrice!.isNotEmpty) {
+      _priceMaxController.text = widget.initialFilter!.maxPrice!;
+    }
+
+    if (widget.initialFilter?.customFields != null) {
+      widget.initialFilter!.customFields!.forEach((k, v) {
+        if (v == null) return;
+        String cleanKey = k;
+        if (k.startsWith('filters[') && k.endsWith(']')) {
+          cleanKey = k.substring(8, k.length - 1);
+        }
+        if (v is List) {
+          _selectedFilters[cleanKey] = List<String>.from(
+            v.map((e) => e.toString()),
+          );
+        } else if (v is Set) {
+          _selectedFilters[cleanKey] =
+              Set<String>.from(v.map((e) => e.toString()));
+        } else {
+          _selectedFilters[cleanKey] = v.toString();
+        }
+      });
+    }
+    for (final filterDefinition
+        in widget.initialFilterConfiguration?.filters ?? const <FilterItem>[]) {
+      final name = filterDefinition.name;
+      if (name == null || filterDefinition.values.isEmpty) continue;
+      final value = _selectedFilters[name];
+      if (filterDefinition.multiSelect) {
+        if (value is Iterable) {
+          _selectedFilters[name] =
+              Set<String>.from(value.map((item) => item.toString()));
+        } else if (value != null && value.toString().isNotEmpty) {
+          _selectedFilters[name] = <String>{value.toString()};
+        }
+      } else if (value is Iterable) {
+        final values = value.map((item) => item.toString()).toList();
+        _selectedFilters[name] = values.isEmpty ? '' : values.first;
+      }
+    }
 
     _priceMinController.addListener(_onFilterChanged);
     _priceMaxController.addListener(_onFilterChanged);
@@ -180,7 +281,7 @@ class _FiltersPageState extends State<FiltersPage> {
         String activeCategorySlug = selectedSlug;
         final filterState = cubit.state;
         if (filterState is FilterLoaded) {
-          if (_selectedCategory > 0 &&
+          if (_selectedCategory >= 0 &&
               _selectedCategory < filterState.data.children.length) {
             final childSlug = filterState.data.children[_selectedCategory].slug;
             if (childSlug != null &&
@@ -302,7 +403,9 @@ class _FiltersPageState extends State<FiltersPage> {
       }
 
       Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.best,
+        ),
       );
 
       List<Placemark> placemarks = await placemarkFromCoordinates(
@@ -336,7 +439,7 @@ class _FiltersPageState extends State<FiltersPage> {
     setState(() {
       _selectedTab = 0;
       _selectedPropertyType = 0;
-      _selectedCategory = 0;
+      _selectedCategory = -1;
       _priceMinController.clear();
       _priceMaxController.clear();
       _locationController.text = HiveUtils.getCityName() ?? "";
@@ -364,9 +467,10 @@ class _FiltersPageState extends State<FiltersPage> {
   void _applyFiltersAndNavigate() {
     String activeCategoryId = widget.category.id.toString();
     String activeCategoryName = widget.category.name ?? "Properties";
+    String activeCategorySlug = selectedSlug;
     final filterState = cubit.state;
     if (filterState is FilterLoaded) {
-      if (_selectedCategory > 0 &&
+      if (_selectedCategory >= 0 &&
           _selectedCategory < filterState.data.children.length) {
         final child = filterState.data.children[_selectedCategory];
         if (child.slug != null &&
@@ -374,6 +478,7 @@ class _FiltersPageState extends State<FiltersPage> {
             !child.slug!.endsWith('-all')) {
           activeCategoryId = child.id.toString();
           activeCategoryName = child.name ?? activeCategoryName;
+          activeCategorySlug = child.slug!;
         }
       }
     }
@@ -385,13 +490,13 @@ class _FiltersPageState extends State<FiltersPage> {
       } else if (val is List<String> && val.isNotEmpty) {
         customFieldFilterMap[key] = val;
       } else if (val is String && val.isNotEmpty) {
-        customFieldFilterMap[key] = [val];
+        customFieldFilterMap[key] = val;
       }
     });
 
     _filterTextControllers.forEach((key, controller) {
       if (controller.text.trim().isNotEmpty) {
-        customFieldFilterMap[key] = [controller.text.trim()];
+        customFieldFilterMap[key] = controller.text.trim();
       }
     });
 
@@ -409,6 +514,7 @@ class _FiltersPageState extends State<FiltersPage> {
 
     ItemFilterModel appliedFilter = ItemFilterModel(
       categoryId: activeCategoryId,
+      categorySlug: activeCategorySlug,
       minPrice: _priceMinController.text.trim().isNotEmpty &&
               _priceMinController.text.trim() != '0'
           ? _priceMinController.text.trim()
@@ -440,6 +546,19 @@ class _FiltersPageState extends State<FiltersPage> {
       categoryIds.add(activeCategoryId);
     }
 
+    if (widget.isFromItemsList && Navigator.canPop(context)) {
+      Navigator.pop(context, {
+        "catID": activeCategoryId,
+        "catName": activeCategoryName,
+        "categoryIds": categoryIds,
+        "selectedCategoryChain": categoryChain,
+        "appliedFilter": appliedFilter,
+        "filterConfiguration":
+            filterState is FilterLoaded ? filterState.data : null,
+      });
+      return;
+    }
+
     Navigator.pushNamed(
       context,
       Routes.itemsList,
@@ -449,6 +568,8 @@ class _FiltersPageState extends State<FiltersPage> {
         "categoryIds": categoryIds,
         "selectedCategoryChain": categoryChain,
         "appliedFilter": appliedFilter,
+        "filterConfiguration":
+            filterState is FilterLoaded ? filterState.data : null,
       },
     );
   }
@@ -539,7 +660,7 @@ class _FiltersPageState extends State<FiltersPage> {
                 if (_selectedTab != i) {
                   setState(() {
                     _selectedTab = i;
-                    _selectedCategory = 0;
+                    _selectedCategory = -1;
                     _selectedPropertyType = 0;
                     _selectedFilters.clear();
                     _filterTextControllers.clear();
@@ -677,7 +798,7 @@ class _FiltersPageState extends State<FiltersPage> {
                   if (_selectedPropertyType != i) {
                     setState(() {
                       _selectedPropertyType = i;
-                      _selectedCategory = 0;
+                      _selectedCategory = -1;
                     });
                     final slug = item.slug ?? "residential";
                     selectedSlug = slug;
@@ -850,14 +971,13 @@ class _FiltersPageState extends State<FiltersPage> {
     double maxLimit = 100000,
   }) {
     double currentMin = double.tryParse(minController.text.trim()) ?? 0;
-    double currentMax =
-        double.tryParse(maxController.text.trim()) ?? maxLimit;
+    double currentMax = double.tryParse(maxController.text.trim()) ?? maxLimit;
     if (currentMin < 0) currentMin = 0;
     if (currentMax > maxLimit) currentMax = maxLimit;
     if (currentMax < currentMin) currentMax = currentMin;
 
-    final sliderRange = _rangeSliderValues[fieldKey] ??
-        RangeValues(currentMin, currentMax);
+    final sliderRange =
+        _rangeSliderValues[fieldKey] ?? RangeValues(currentMin, currentMax);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1034,6 +1154,14 @@ class _FiltersPageState extends State<FiltersPage> {
 
       final minC = _rangeMinControllers[filterName]!;
       final maxC = _rangeMaxControllers[filterName]!;
+      final initialValue = _selectedFilters.remove(filterName);
+      if (initialValue is Iterable) {
+        final values = initialValue.map((e) => e.toString()).toList();
+        if (minC.text.isEmpty && values.isNotEmpty) minC.text = values.first;
+        if (maxC.text.isEmpty && values.length > 1) maxC.text = values[1];
+      } else if (initialValue != null && minC.text.isEmpty) {
+        minC.text = initialValue.toString();
+      }
 
       return _buildRangeInputs(
         fieldKey: filterName,
@@ -1050,6 +1178,15 @@ class _FiltersPageState extends State<FiltersPage> {
       _filterTextControllers.putIfAbsent(
           filterName, () => TextEditingController());
       final controller = _filterTextControllers[filterName]!;
+      final initialValue = _selectedFilters.remove(filterName);
+      if (controller.text.isEmpty && initialValue != null) {
+        if (initialValue is Iterable) {
+          final values = initialValue.map((e) => e.toString()).toList();
+          if (values.isNotEmpty) controller.text = values.first;
+        } else {
+          controller.text = initialValue.toString();
+        }
+      }
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1099,9 +1236,16 @@ class _FiltersPageState extends State<FiltersPage> {
 
     // Multi-select filter (e.g. Amenities, Listed By, Regional Specs, etc.)
     if (filter.multiSelect) {
-      if (!_selectedFilters.containsKey(filterName) ||
-          _selectedFilters[filterName] is! Set<String>) {
-        _selectedFilters[filterName] = <String>{};
+      final initialValue = _selectedFilters[filterName];
+      if (initialValue is! Set<String>) {
+        if (initialValue is Iterable) {
+          _selectedFilters[filterName] =
+              Set<String>.from(initialValue.map((e) => e.toString()));
+        } else if (initialValue != null && initialValue.toString().isNotEmpty) {
+          _selectedFilters[filterName] = <String>{initialValue.toString()};
+        } else {
+          _selectedFilters[filterName] = <String>{};
+        }
       }
       final selectedSet = _selectedFilters[filterName] as Set<String>;
 
@@ -1136,7 +1280,15 @@ class _FiltersPageState extends State<FiltersPage> {
     }
 
     // Single-select filter (e.g. Bedrooms, Bathrooms, Furnishing, Rent is paid)
-    final selectedVal = _selectedFilters[filterName] as String?;
+    final initialValue = _selectedFilters[filterName];
+    final String? selectedVal;
+    if (initialValue is Iterable) {
+      final values = initialValue.map((e) => e.toString()).toList();
+      selectedVal = values.isEmpty ? null : values.first;
+    } else {
+      selectedVal = initialValue?.toString();
+    }
+    _selectedFilters[filterName] = selectedVal ?? '';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1220,10 +1372,8 @@ class _FiltersPageState extends State<FiltersPage> {
   }
 
   Widget _buildShowResultsButton() {
-    final countFormatted = _resultCount
-        .toString()
-        .replaceAllMapped(
-            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},');
+    final countFormatted = _resultCount.toString().replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},');
 
     return Container(
       width: double.infinity,

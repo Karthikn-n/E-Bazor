@@ -1,7 +1,5 @@
-import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/seller/fetch_verification_request_cubit.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
-import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:flutter/material.dart';

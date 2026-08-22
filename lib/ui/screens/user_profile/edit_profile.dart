@@ -45,14 +45,14 @@ class UserProfileScreen extends StatefulWidget {
   State<UserProfileScreen> createState() => UserProfileScreenState();
 
   static Route route(RouteSettings routeSettings) {
-    Map arguments = routeSettings.arguments as Map;
+    Map? arguments = routeSettings.arguments as Map?;
     return BlurredRouter(
       builder: (_) => UserProfileScreen(
-        from: arguments['from'] as String,
-        popToCurrent: arguments['popToCurrent'] as bool?,
-        type: arguments['type'],
-        navigateToHome: arguments['navigateToHome'] as bool?,
-        extraData: arguments['extraData'],
+        from: (arguments?['from'] as String?) ?? "profile",
+        popToCurrent: arguments?['popToCurrent'] as bool?,
+        type: (arguments?['type'] as AuthenticationType?) ?? AuthenticationType.email,
+        navigateToHome: arguments?['navigateToHome'] as bool?,
+        extraData: arguments?['extraData'],
       ),
     );
   }
@@ -453,7 +453,7 @@ class UserProfileScreenState extends State<UserProfileScreen> {
                 .size(context.font.large),
           ),
           CupertinoSwitch(
-            activeColor: context.color.territoryColor,
+            activeTrackColor: context.color.territoryColor,
             value: isNotificationsEnabled,
             onChanged: (value) {
               isNotificationsEnabled = value;
@@ -488,7 +488,7 @@ class UserProfileScreenState extends State<UserProfileScreen> {
                 .size(context.font.large),
           ),
           CupertinoSwitch(
-            activeColor: context.color.territoryColor,
+            activeTrackColor: context.color.territoryColor,
             value: isPersonalDetailShow,
             onChanged: (value) {
               isPersonalDetailShow = value;
@@ -656,7 +656,7 @@ class UserProfileScreenState extends State<UserProfileScreen> {
     }
   }
 
-  profileupdateprocess() async {
+  Future<void> profileupdateprocess() async {
     setState(() {
       isLoading = true;
     });
@@ -765,7 +765,7 @@ class UserProfileScreenState extends State<UserProfileScreen> {
         });
   }
 
-  _imgFromGallery(ImageSource imageSource) async {
+  Future<void> _imgFromGallery(ImageSource imageSource) async {
     CropImage.init(context);
 
     final pickedFile = await ImagePicker().pickImage(source: imageSource);

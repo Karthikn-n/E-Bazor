@@ -42,7 +42,14 @@ class ItemModel {
   String? state;
   String? country;
   int? isPurchased;
+  bool? hidePhoneNumber;
   List<UserRatings>? review;
+  int? carMake;
+  int? carModel;
+  int? carTrim;
+  String? carMakeName;
+  String? carModelName;
+  String? carTrimName;
 
   double? get latitude => _latitude;
 
@@ -107,7 +114,14 @@ class ItemModel {
       this.state,
       this.country,
       this.review,
-      this.isPurchased}) {
+      this.isPurchased,
+      this.hidePhoneNumber,
+      this.carMake,
+      this.carModel,
+      this.carTrim,
+      this.carMakeName,
+      this.carModelName,
+      this.carTrimName}) {
     this.latitude = latitude;
     this.longitude = longitude;
   }
@@ -239,6 +253,10 @@ class ItemModel {
     city = json['city'];
     state = json['state'];
     country = json['country'];
+    hidePhoneNumber = json['hide_phone_number'] == true ||
+        json['hide_phone_number'] == 1 ||
+        json['hide_phone_number'] == '1' ||
+        json['hide_phone_number'] == 'true';
     if (json['is_purchased'] is int) {
       isPurchased = json['is_purchased'];
     } else if (json['is_purchased'] is bool) {
@@ -246,6 +264,25 @@ class ItemModel {
     } else if (json['is_purchased'] != null) {
       isPurchased = int.tryParse(json['is_purchased'].toString());
     }
+
+    if (json['car_make'] is int) {
+      carMake = json['car_make'];
+    } else if (json['car_make'] != null) {
+      carMake = int.tryParse(json['car_make'].toString());
+    }
+    if (json['car_model'] is int) {
+      carModel = json['car_model'];
+    } else if (json['car_model'] != null) {
+      carModel = int.tryParse(json['car_model'].toString());
+    }
+    if (json['car_trim'] is int) {
+      carTrim = json['car_trim'];
+    } else if (json['car_trim'] != null) {
+      carTrim = int.tryParse(json['car_trim'].toString());
+    }
+    carMakeName = json['car_make_name']?.toString();
+    carModelName = json['car_model_name']?.toString();
+    carTrimName = json['car_trim_name']?.toString();
 
     if (json['review'] != null) {
       review = <UserRatings>[];
@@ -266,21 +303,31 @@ class ItemModel {
         itemOffers!.add(ItemOffers.fromJson(v));
       });
     }
-    if (json['custom_fields'] != null) {
+    if (json['custom_fields'] is List && (json['custom_fields'] as List).isNotEmpty) {
       customFields = <CustomFieldModel>[];
-      json['custom_fields'].forEach((v) {
-        customFields!.add(CustomFieldModel.fromMap(v));
-      });
-    } else if (json['item_custom_field_values'] != null) {
-      customFields = <CustomFieldModel>[];
-      json['item_custom_field_values'].forEach((v) {
-        final cf = v['custom_field'];
-        if (cf != null && cf is Map<String, dynamic>) {
-          Map<String, dynamic> combined = Map<String, dynamic>.from(cf);
-          combined['value'] = v['value'];
-          customFields!.add(CustomFieldModel.fromMap(combined));
+      for (final v in (json['custom_fields'] as List)) {
+        if (v is Map<String, dynamic>) {
+          customFields!.add(CustomFieldModel.fromMap(v));
+        } else if (v is Map) {
+          customFields!.add(CustomFieldModel.fromMap(Map<String, dynamic>.from(v)));
         }
-      });
+      }
+    } else if (json['item_custom_field_values'] is List &&
+        (json['item_custom_field_values'] as List).isNotEmpty) {
+      customFields = <CustomFieldModel>[];
+      for (final v in (json['item_custom_field_values'] as List)) {
+        if (v is Map) {
+          final cf = v['custom_field'];
+          if (cf != null && cf is Map) {
+            Map<String, dynamic> combined = Map<String, dynamic>.from(cf);
+            combined['value'] = v['value'];
+            combined['id'] = v['custom_field_id'] ?? combined['id'];
+            customFields!.add(CustomFieldModel.fromMap(combined));
+          }
+        }
+      }
+    } else {
+      customFields = <CustomFieldModel>[];
     }
   }
 
@@ -339,6 +386,12 @@ class ItemModel {
     if (customFields != null) {
       data['custom_fields'] = customFields!.map((v) => v.toMap()).toList();
     }
+    if (carMake != null) data['car_make'] = carMake;
+    if (carModel != null) data['car_model'] = carModel;
+    if (carTrim != null) data['car_trim'] = carTrim;
+    if (carMakeName != null) data['car_make_name'] = carMakeName;
+    if (carModelName != null) data['car_model_name'] = carModelName;
+    if (carTrimName != null) data['car_trim_name'] = carTrimName;
     return data;
   }
 
@@ -355,6 +408,7 @@ class User {
   String? email;
   String? type;
   String? profile;
+  String? resume;
   String? fcmId;
   String? firebaseId;
   int? status;
@@ -364,6 +418,10 @@ class User {
   String? updatedAt;
   int? showPersonalDetails;
   int? isVerified;
+  int? reviewsCount;
+  dynamic averageRating;
+  int? overallCount;
+  String? countryCode;
 
   User(
       {this.id,
@@ -372,6 +430,7 @@ class User {
       this.email,
       this.type,
       this.profile,
+      this.resume,
       this.fcmId,
       this.firebaseId,
       this.status,
@@ -380,7 +439,11 @@ class User {
       this.createdAt,
       this.updatedAt,
       this.isVerified,
-      this.showPersonalDetails});
+      this.showPersonalDetails,
+      this.reviewsCount,
+      this.averageRating,
+      this.overallCount,
+      this.countryCode});
 
   User.fromJson(Map<String, dynamic> json) {
     id = json['id'];
@@ -389,6 +452,7 @@ class User {
     email = json['email'];
     type = json['type'];
     profile = json['profile'];
+    resume = json['resume'];
     fcmId = json['fcm_id'];
     firebaseId = json['firebase_id'];
     status = json['status'];
@@ -398,6 +462,10 @@ class User {
     updatedAt = json['updated_at'];
     isVerified = json['is_verified'];
     showPersonalDetails = json['show_personal_details'];
+    reviewsCount = json['reviews_count'];
+    averageRating = json['average_rating'];
+    overallCount = json['overall_count'];
+    countryCode = json['country_code'];
   }
 
   Map<String, dynamic> toJson() {
@@ -408,6 +476,7 @@ class User {
     data['email'] = email;
     data['type'] = type;
     data['profile'] = profile;
+    data['resume'] = resume;
     data['fcm_id'] = fcmId;
     data['firebase_id'] = firebaseId;
     data['status'] = status;
@@ -417,6 +486,10 @@ class User {
     data['updated_at'] = updatedAt;
     data['is_verified'] = isVerified;
     data['show_personal_details'] = showPersonalDetails;
+    data['reviews_count'] = reviewsCount;
+    data['average_rating'] = averageRating;
+    data['overall_count'] = overallCount;
+    data['country_code'] = countryCode;
     return data;
   }
 }

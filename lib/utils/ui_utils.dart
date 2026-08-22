@@ -45,7 +45,7 @@ class UiUtils {
     );
   }
 
-  static checkUser(
+  static void checkUser(
       {required Function() onNotGuest, required BuildContext context}) {
     if (!HiveUtils.isUserAuthenticated()) {
       _loginBox(context);
@@ -54,7 +54,7 @@ class UiUtils {
     }
   }
 
-  static _loginBox(BuildContext context) {
+  static void _loginBox(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: false,
@@ -273,7 +273,7 @@ class UiUtils {
         statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark);
   }
 
-  static setDefaultLocationValue(
+  static void setDefaultLocationValue(
       {required bool isCurrent,
       required bool isHomeUpdate,
       required BuildContext context}) {

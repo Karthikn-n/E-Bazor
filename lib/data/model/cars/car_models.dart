@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:Ebozor/data/model/category_model.dart';
+import 'package:Ebozor/data/model/custom_field/custom_field_model.dart';
 
 class CarMake {
   final int id;
@@ -18,7 +19,9 @@ class CarMake {
 
   factory CarMake.fromJson(Map<String, dynamic> json) {
     return CarMake(
-      id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
+      id: json['id'] is int
+          ? json['id']
+          : int.tryParse(json['id'].toString()) ?? 0,
       name: json['name']?.toString() ?? '',
       image: json['image']?.toString(),
       activeStatus: json['active_status'] is int
@@ -59,7 +62,9 @@ class CarModelItem {
 
   factory CarModelItem.fromJson(Map<String, dynamic> json) {
     return CarModelItem(
-      id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
+      id: json['id'] is int
+          ? json['id']
+          : int.tryParse(json['id'].toString()) ?? 0,
       name: json['name']?.toString() ?? '',
       carMakeId: json['car_make_id'] is int
           ? json['car_make_id']
@@ -94,7 +99,9 @@ class CarTrim {
 
   factory CarTrim.fromJson(Map<String, dynamic> json) {
     return CarTrim(
-      id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
+      id: json['id'] is int
+          ? json['id']
+          : int.tryParse(json['id'].toString()) ?? 0,
       name: json['name']?.toString() ?? '',
       carModelId: json['car_model_id'] is int
           ? json['car_model_id']
@@ -114,21 +121,22 @@ class CarTrim {
   String toString() => name;
 }
 
-/// Holds all vehicle specs collected in Screen 1 ("Tell us about your car")
+/// Carries core listing values and dashboard-defined fields between car screens.
 class CarSpecsData {
   final CategoryModel? category;
   final List<CategoryModel>? breadcrumbs;
   final String emirate;
-  final CarMake? make;
-  final CarModelItem? model;
+  final CarMake make;
+  final CarModelItem model;
   final CarTrim? trim;
-  final String? customTrim;
-  final String regionalSpecs;
-  final int year;
-  final int kilometers;
-  final String bodyType;
   final double price;
   final String phoneNumber;
+  final bool showPhoneNumber;
+  final Map<String, List<String>> customFields;
+  final Map<String, String> customFieldLabels;
+  final List<CustomFieldModel> remainingCustomFields;
+  final bool isEdit;
+  final dynamic item;
 
   CarSpecsData({
     this.category,
@@ -137,77 +145,34 @@ class CarSpecsData {
     required this.make,
     required this.model,
     this.trim,
-    this.customTrim,
-    required this.regionalSpecs,
-    required this.year,
-    required this.kilometers,
-    required this.bodyType,
     required this.price,
     required this.phoneNumber,
+    this.showPhoneNumber = true,
+    this.customFields = const {},
+    this.customFieldLabels = const {},
+    this.remainingCustomFields = const [],
+    this.isEdit = false,
+    this.item,
   });
 
-  String get displayName {
-    final makeStr = make?.name ?? '';
-    final modelStr = model?.name ?? '';
-    final trimStr = trim?.name ?? customTrim ?? '';
-    return '$year $makeStr $modelStr ${trimStr.isNotEmpty ? trimStr : ''}'.trim();
-  }
-
-  String get effectiveTrim => trim?.name ?? customTrim ?? 'Base';
+  String get displayName => [make.name, model.name, trim?.name]
+      .whereType<String>()
+      .where((value) => value.trim().isNotEmpty)
+      .join(' ');
 }
 
-/// Holds complete data from Screen 2 ("You're almost there!")
+/// Holds the core fields collected on the final car posting screen.
 class CarPostingData {
   final CarSpecsData specs;
   final List<File> imageFiles;
   final String title;
   final String description;
-  final String interiorColor;
-  final String exteriorColor;
-  final String warranty;
-  final String fuelType;
-  final String doors;
-  final String cylinders;
-  final String transmission;
-  final String seatingCapacity;
-  final String horsepower;
-  final String steeringSide;
-  final String engineCapacity;
-  final List<String> driverAssistance;
-  final List<String> entertainmentTech;
-  final List<String> comfortConvenience;
-  final List<String> exteriorFeatures;
-  final String locationNeighbourhood;
-  final String? locationBuildingStreet;
-  final String? locationApartmentVilla;
-  final String locationLabel;
-  final String locationAddress;
 
   CarPostingData({
     required this.specs,
     required this.imageFiles,
     required this.title,
     required this.description,
-    required this.interiorColor,
-    required this.exteriorColor,
-    required this.warranty,
-    required this.fuelType,
-    required this.doors,
-    required this.cylinders,
-    required this.transmission,
-    required this.seatingCapacity,
-    required this.horsepower,
-    required this.steeringSide,
-    required this.engineCapacity,
-    required this.driverAssistance,
-    required this.entertainmentTech,
-    required this.comfortConvenience,
-    required this.exteriorFeatures,
-    required this.locationNeighbourhood,
-    this.locationBuildingStreet,
-    this.locationApartmentVilla,
-    required this.locationLabel,
-    required this.locationAddress,
   });
 
   double get price => specs.price;

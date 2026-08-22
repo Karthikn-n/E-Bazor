@@ -57,6 +57,10 @@ class FetchMyPromotedItemsCubit extends Cubit<FetchMyPromotedItemsState> {
   final ItemRepository _itemRepository = ItemRepository();
   String? _currentStatus;
 
+  void resetState() {
+    emit(FetchMyPromotedItemsInitial());
+  }
+
   Future<void> fetchMyPromotedItems({String? status}) async {
     try {
       _currentStatus = status;
@@ -153,6 +157,40 @@ class FetchMyPromotedItemsCubit extends Cubit<FetchMyPromotedItemsState> {
       var index = items.indexWhere((element) => element.id == model.id);
       if (index != -1) {
         items[index] = model;
+      }
+
+      emit((state as FetchMyPromotedItemsSuccess).copyWith(itemModel: items));
+    }
+  }
+
+  void updateItemStatus(int itemId, String newStatus) {
+    if (state is FetchMyPromotedItemsSuccess) {
+      List<ItemModel> items =
+          List<ItemModel>.from((state as FetchMyPromotedItemsSuccess).itemModel);
+
+      var index = items.indexWhere((element) => element.id == itemId);
+      if (index != -1) {
+        final currentTabStatus = _currentStatus;
+        if (currentTabStatus != null && currentTabStatus.isNotEmpty) {
+          // If in a filtered tab and item no longer matches filter, remove from that tab list
+          if ((currentTabStatus == "approved" || currentTabStatus == "active") &&
+              newStatus != "approved" &&
+              newStatus != "active") {
+            items.removeAt(index);
+          } else if (currentTabStatus == "inactive" && newStatus != "inactive") {
+            items.removeAt(index);
+          } else if (currentTabStatus == "pending payment" &&
+              newStatus != "pending payment") {
+            items.removeAt(index);
+          } else if (currentTabStatus == "review" && newStatus != "review") {
+            items.removeAt(index);
+          } else {
+            items[index].status = newStatus;
+          }
+        } else {
+          // In All Ads tab: update status in place!
+          items[index].status = newStatus;
+        }
       }
 
       emit((state as FetchMyPromotedItemsSuccess).copyWith(itemModel: items));

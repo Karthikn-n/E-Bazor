@@ -12,6 +12,7 @@ import 'package:Ebozor/ui/screens/auth/sign_up/signup_screen.dart';
 import 'package:Ebozor/ui/screens/chat/blocked_user_list_screen.dart';
 
 import 'package:Ebozor/ui/screens/favorite_screen.dart';
+import 'package:Ebozor/ui/screens/favorite/favorite_collection_items_screen.dart';
 
 import 'package:Ebozor/ui/screens/item/add_item_screen/add_item_details.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/cars/car_specs_form_screen.dart';
@@ -21,6 +22,11 @@ import 'package:Ebozor/ui/screens/item/add_item_screen/motors/motor_posting_form
 import 'package:Ebozor/ui/screens/item/add_item_screen/common_title_input_screen.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/property/property_posting_form_screen.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/classifieds/classifieds_posting_form_screen.dart';
+import 'package:Ebozor/ui/screens/jobs/job_home_screen.dart';
+import 'package:Ebozor/ui/screens/jobs/job_search_screen.dart';
+import 'package:Ebozor/ui/screens/jobs/my_job_applications_screen.dart';
+import 'package:Ebozor/ui/screens/jobs/my_job_profile_screen.dart';
+import 'package:Ebozor/ui/screens/jobs/job_apply_form_screen.dart';
 import 'package:Ebozor/ui/screens/location/user_address_list_screen.dart';
 import 'package:Ebozor/ui/screens/location/location_details_form_screen.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/confirm_location_screen.dart';
@@ -37,6 +43,10 @@ import 'package:Ebozor/ui/screens/location_permission_screen.dart';
 import 'package:Ebozor/ui/screens/my_review_screen.dart';
 import 'package:Ebozor/ui/screens/sold_out_bought_screen.dart';
 import 'package:Ebozor/ui/screens/user_profile/edit_profile.dart';
+import 'package:Ebozor/ui/screens/user_profile/saved_searches_screen.dart';
+import 'package:Ebozor/ui/screens/user_profile/account_settings_screen.dart';
+import 'package:Ebozor/ui/screens/user_profile/security_screen.dart';
+import 'package:Ebozor/ui/screens/help_me_buy/help_me_buy_screen.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:Ebozor/ui/screens/advertisement/my_advertisment_screen.dart';
@@ -68,6 +78,10 @@ import 'package:Ebozor/ui/screens/settings/profile_setting.dart';
 import 'package:Ebozor/ui/screens/subscription/packages_list.dart';
 
 import 'package:Ebozor/ui/screens/subscription/transaction_history_screen.dart';
+import 'package:Ebozor/ui/screens/motors_services/motors_service_screen.dart';
+import 'package:Ebozor/ui/screens/motors_services/motors_service_request_screen.dart';
+import 'package:Ebozor/ui/screens/motors_services/motors_inspection_checkout_screen.dart';
+import 'package:Ebozor/ui/screens/motors_services/car_inspection_history_screen.dart';
 
 import 'package:Ebozor/ui/screens/filter_screen.dart';
 import 'package:Ebozor/ui/screens/main_activity.dart';
@@ -109,6 +123,7 @@ class Routes {
   static const subscriptionScreen = 'subscriptionScreen';
   static const maintenanceMode = '/maintenanceMode';
   static const favoritesScreen = '/favoritescreen';
+  static const favoriteCollectionItemsScreen = '/favoriteCollectionItemsScreen';
   static const promotedItemsScreen = '/promotedItemsScreen';
   static const mostLikedItemsScreen = '/mostLikedItemsScreen';
   static const mostViewedItemsScreen = '/mostViewedItemsScreen';
@@ -168,8 +183,22 @@ class Routes {
   static const classifiedsPostingFormScreen = '/classifiedsPostingFormScreen';
   static const userAddressListScreen = '/userAddressListScreen';
   static const locationDetailsFormScreen = '/locationDetailsFormScreen';
+  static const motorsServiceScreen = '/motorsServiceScreen';
+  static const motorsServiceRequestScreen = '/motorsServiceRequestScreen';
+  static const motorsInspectionCheckoutScreen =
+      '/motorsInspectionCheckoutScreen';
+  static const carInspectionHistoryScreen = '/carInspectionHistoryScreen';
+  static const savedSearchesScreen = '/savedSearchesScreen';
   static const sectionWiseItemsScreen = '/sectionWiseItemsScreen';
   static const blockedUserListScreen = '/blockedUserListScreen';
+  static const accountSettingsScreen = '/accountSettingsScreen';
+  static const securityScreen = '/securityScreen';
+  static const jobHomeScreen = '/jobHomeScreen';
+  static const jobSearchScreen = '/jobSearchScreen';
+  static const myJobApplicationsScreen = '/myJobApplicationsScreen';
+  static const myJobProfileScreen = '/myJobProfileScreen';
+  static const jobApplyFormScreen = '/jobApplyFormScreen';
+  static const helpMeBuyScreen = '/helpMeBuyScreen';
   static const payStackWebViewScreen = '/payStackWebViewScreen';
 
   // static const myItemsScreen = '/myItemsScreen';
@@ -273,6 +302,9 @@ class Routes {
       case favoritesScreen:
         return FavoriteScreen.route(routeSettings);
 
+      case favoriteCollectionItemsScreen:
+        return FavoriteCollectionItemsScreen.route(routeSettings);
+
       case transactionHistory:
         return TransactionHistory.route(routeSettings);
       case blockedUserListScreen:
@@ -358,6 +390,32 @@ class Routes {
         return UserAddressListScreen.route(routeSettings);
       case locationDetailsFormScreen:
         return LocationDetailsFormScreen.route(routeSettings);
+      case motorsServiceScreen:
+        return MotorsServiceScreen.route(routeSettings);
+      case motorsServiceRequestScreen:
+        return MotorsServiceRequestScreen.route(routeSettings);
+      case motorsInspectionCheckoutScreen:
+        return MotorsInspectionCheckoutScreen.route(routeSettings);
+      case carInspectionHistoryScreen:
+        return CarInspectionHistoryScreen.route(routeSettings);
+      case savedSearchesScreen:
+        return SavedSearchesScreen.route(routeSettings);
+      case accountSettingsScreen:
+        return AccountSettingsScreen.route(routeSettings);
+      case securityScreen:
+        return SecurityScreen.route(routeSettings);
+      case jobHomeScreen:
+        return JobHomeScreen.route(routeSettings);
+      case jobSearchScreen:
+        return JobSearchScreen.route(routeSettings);
+      case myJobApplicationsScreen:
+        return MyJobApplicationsScreen.route(routeSettings);
+      case myJobProfileScreen:
+        return MyJobProfileScreen.route(routeSettings);
+      case jobApplyFormScreen:
+        return JobApplyFormScreen.route(routeSettings);
+      case helpMeBuyScreen:
+        return HelpMeBuyScreen.route(routeSettings);
 
       /*case payStackWebViewScreen:
         return PaystackWebView.route(routeSettings);*/

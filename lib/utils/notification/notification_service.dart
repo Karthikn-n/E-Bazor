@@ -1,7 +1,6 @@
 // ignore_for_file: file_names
 
 import 'dart:async';
-import 'dart:developer';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/model/chat/chat_message_modal.dart';
 import 'package:Ebozor/ui/screens/chat/chat_audio/widgets/chat_widget.dart';
@@ -38,7 +37,7 @@ class NotificationService {
   static late StreamSubscription<RemoteMessage> foregroundStream;
   static late StreamSubscription<RemoteMessage> onMessageOpen;
 
-  static requestPermission() async {}
+  static Future<void> requestPermission() async {}
 
 /*  static int? getPrice(dynamic price) {
     if (price == null || price.toString().trim().isEmpty) {
@@ -79,7 +78,7 @@ class NotificationService {
 
 
   //chat notification
-  static handleNotification(RemoteMessage? message, [BuildContext? context]) {
+  static void handleNotification(RemoteMessage? message, [BuildContext? context]) {
     var notificationType = message?.data['type'] ?? "";
 
     print("@notificaiton data is ${message?.data}****${notificationType}");
@@ -187,7 +186,7 @@ class NotificationService {
     }
   }
 
-  static init(context) {
+  static void init(context) {
     localNotification.init(context);
     requestPermission();
     registerListeners(context);
@@ -199,7 +198,7 @@ class NotificationService {
     handleNotification(message);
   }
 
-  static forgroundNotificationHandler(BuildContext context) async {
+  static Future<void> forgroundNotificationHandler(BuildContext context) async {
     foregroundStream =
         FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       print("foreground notification***${message.toString()}");
@@ -207,7 +206,7 @@ class NotificationService {
     });
   }
 
-  static terminatedStateNotificationHandler(BuildContext context) {
+  static Future<void> terminatedStateNotificationHandler(BuildContext context) async {
     FirebaseMessaging.instance.getInitialMessage().then(
       (RemoteMessage? message) {
         if (message == null) {

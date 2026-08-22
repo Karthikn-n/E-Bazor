@@ -2,7 +2,6 @@ import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 class Widgets {
   static bool isLoadingShowing = false;

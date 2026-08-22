@@ -13,6 +13,7 @@ class PropertyFilterScreen extends StatefulWidget {
   final String catName;
   final int catId;
   final List<String> categoryIds;
+  final String? from;
 
   const PropertyFilterScreen({
     super.key,
@@ -20,6 +21,7 @@ class PropertyFilterScreen extends StatefulWidget {
     required this.catName,
     required this.catId,
     required this.categoryIds,
+    this.from,
   });
 
   @override
@@ -491,6 +493,16 @@ class _PropertyFilterScreenState extends State<PropertyFilterScreen> {
     // Determine the "final" category to show in the header or as main context
     // Usually the most specific one.
     CategoryModel targetCat = _selectedSubCategory ?? _selectedPropertyType ?? _currentTabCategory ?? widget.categoryList[0];
+
+    if (widget.from == "itemsList") {
+      Navigator.pop(context, {
+        'catID': targetCat.id.toString(),
+        'catName': targetCat.name,
+        "categoryIds": accumulatedIds,
+        "selectedCategoryChain": accumulatedModels,
+      });
+      return;
+    }
 
     Navigator.pushNamed(context, Routes.itemsList, arguments: {
       'catID': targetCat.id.toString(),

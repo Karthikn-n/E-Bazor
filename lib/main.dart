@@ -11,7 +11,6 @@ import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/notification/notification_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 

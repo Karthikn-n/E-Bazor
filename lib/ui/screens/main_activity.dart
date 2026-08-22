@@ -25,7 +25,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:Ebozor/utils/app_icon.dart';
 
-import 'package:Ebozor/data/cubits/subscription/fetch_user_package_limit_cubit.dart';
 
 import 'package:Ebozor/data/model/item/item_model.dart';
 import 'package:Ebozor/data/model/system_settings_model.dart';
@@ -35,11 +34,10 @@ import 'package:Ebozor/utils/errorFilter.dart';
 
 import 'package:Ebozor/utils/helper_utils.dart';
 
-import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/ui/screens/home/search_screen.dart';
-import 'package:Ebozor/ui/screens/advertisement/my_advertisment_screen.dart';
 import 'package:Ebozor/ui/screens/user_profile/profile_screen.dart';
 import 'package:Ebozor/ui/screens/chat/chat_list_screen.dart';
+import 'package:Ebozor/ui/screens/favorite_screen.dart';
 import 'package:Ebozor/ui/screens/home/home_screen.dart';
 import 'package:Ebozor/ui/screens/widgets/blurred_dialoge_box.dart';
 
@@ -77,10 +75,12 @@ class MainActivity extends StatefulWidget {
   State<MainActivity> createState() => MainActivityState();
 
   static Route route(RouteSettings routeSettings) {
-    Map arguments = routeSettings.arguments as Map;
+    Map? arguments = routeSettings.arguments as Map?;
     globalKey = GlobalKey<MainActivityState>();
     return BlurredRouter(
-        builder: (_) => MainActivity(key: globalKey, from: arguments['from'] as String));
+        builder: (_) => MainActivity(
+            key: globalKey,
+            from: (arguments?['from'] as String?) ?? "main"));
   }
 }
 
@@ -324,8 +324,8 @@ class MainActivityState extends State<MainActivity>
 
   late List<Widget> pages = [
     HomeScreen(from: widget.from),
+    const FavoriteScreen(),
     ChatListScreen(),
-    const MyAdvertisementScreen(),
     const ProfileScreen(),
   ];
 
@@ -391,13 +391,6 @@ class MainActivityState extends State<MainActivity>
     addHistory(index);
 
     if (index == currtab) {
-      /* var xIndex = index;
-
-      if (xIndex == 3) {
-        xIndex = 2;
-      } else if (xIndex == 4) {
-        xIndex = 3;
-      }*/
       if (index < controllerList.length && controllerList[index].hasClients) {
         controllerList[index].animateTo(0,
             duration: const Duration(milliseconds: 200),
@@ -414,14 +407,11 @@ class MainActivityState extends State<MainActivity>
       }
     }
     searchbody = {};
-    if (index == 1 || index == 2) {
+    if (index == 1 || index == 2 || index == 3) {
       UiUtils.checkUser(
           onNotGuest: () {
             currtab = index;
             pageCntrlr.jumpToPage(currtab);
-            if (index == 2) {
-              MyAdvertisementScreen.refreshCallback?.call();
-            }
             setState(
               () {},
             );
@@ -510,81 +500,52 @@ class MainActivityState extends State<MainActivity>
 
             buildBottomNavigationbarItem(
               index: 1,
-              title: "message".translate(context).isNotEmpty
-                  ? "message".translate(context)
-                  : "Chats",
-              outlineAsset: AppIcons.chatNavPng,
-              filledAsset: AppIcons.chatNavFilledPng,
+              title: "favorites".translate(context).isNotEmpty
+                  ? "favorites".translate(context)
+                  : "Favorites",
+              outlineIcon: Icons.favorite_border_rounded,
+              filledIcon: Icons.favorite_rounded,
             ),
 
             /// CENTER BUTTON
-            BlocListener<FetchUserPackageLimitCubit,
-                FetchUserPackageLimitState>(
-              listener: (context, state) {
-                if (state is FetchUserPackageLimitFailure) {
-                  UiUtils.noPackageAvailableDialog(context);
-                }
-                if (state is FetchUserPackageLimitInSuccess) {
-                  Navigator.pushNamed(
-                    context,
-                    Routes.selectCategoryScreen,
-                    arguments: <String, dynamic>{},
-                  );
-                }
+            InkWell(
+              borderRadius: BorderRadius.circular(30),
+              onTap: () {
+                UiUtils.checkUser(
+                  context: context,
+                  onNotGuest: () {
+                    Navigator.pushNamed(
+                      context,
+                      Routes.selectCategoryScreen,
+                      arguments: <String, dynamic>{},
+                    );
+                  },
+                );
               },
-              child: BlocBuilder<FetchUserPackageLimitCubit,
-                  FetchUserPackageLimitState>(
-                builder: (context, state) {
-                  return InkWell(
-                    borderRadius: BorderRadius.circular(30),
-                    onTap: () {
-                      UiUtils.checkUser(
-                        context: context,
-                        onNotGuest: () {
-                          context
-                              .read<FetchUserPackageLimitCubit>()
-                              .fetchUserPackageLimit(
-                            packageType: "item_listing",
-                          );
-                        },
-                      );
-                    },
-                    child: Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: context.color.territoryColor,
-                      ),
-                      child: Center(
-                        child: state is FetchUserPackageLimitInProgress
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(
-                                Icons.add_rounded,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                      ),
-                    ),
-                  );
-                },
+              child: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: context.color.territoryColor,
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.add_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
               ),
             ),
 
             buildBottomNavigationbarItem(
               index: 2,
-              title: "myAdsTab".translate(context).isNotEmpty
-                  ? "myAdsTab".translate(context)
-                  : "My Ads",
-              outlineAsset: AppIcons.adsNavPng,
-              filledAsset: AppIcons.adsNavFilledPng,
+              title: "message".translate(context).isNotEmpty
+                  ? "message".translate(context)
+                  : "Chats",
+              outlineAsset: AppIcons.chatNavPng,
+              filledAsset: AppIcons.chatNavFilledPng,
             ),
 
             buildBottomNavigationbarItem(
@@ -604,8 +565,10 @@ class MainActivityState extends State<MainActivity>
   Widget buildBottomNavigationbarItem({
     required int index,
     required String title,
-    required String outlineAsset,
-    required String filledAsset,
+    String? outlineAsset,
+    String? filledAsset,
+    IconData? outlineIcon,
+    IconData? filledIcon,
   }) {
     final isSelected = currtab == index;
 
@@ -626,15 +589,23 @@ class MainActivityState extends State<MainActivity>
                   width: 24,
                   height: 24,
                   child: Center(
-                    child: Image.asset(
-                      isSelected ? filledAsset : outlineAsset,
-                      color: isSelected
-                          ? context.color.territoryColor
-                          : context.color.textColorDark.withValues(alpha: 0.55),
-                      width: 22,
-                      height: 22,
-                      fit: BoxFit.contain,
-                    ),
+                    child: outlineIcon != null
+                        ? Icon(
+                            isSelected ? (filledIcon ?? outlineIcon) : outlineIcon,
+                            color: isSelected
+                                ? context.color.territoryColor
+                                : context.color.textColorDark.withValues(alpha: 0.55),
+                            size: 22,
+                          )
+                        : Image.asset(
+                            isSelected ? filledAsset! : outlineAsset!,
+                            color: isSelected
+                                ? context.color.territoryColor
+                                : context.color.textColorDark.withValues(alpha: 0.55),
+                            width: 22,
+                            height: 22,
+                            fit: BoxFit.contain,
+                          ),
                   ),
                 ),
                 const SizedBox(height: 3),

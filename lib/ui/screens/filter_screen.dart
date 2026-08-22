@@ -8,11 +8,8 @@ import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
-import 'package:Ebozor/utils/responsiveSize.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
-import 'package:Ebozor/utils/app_icon.dart';
 
 import 'package:Ebozor/data/cubits/custom_field/fetch_custom_fields_cubit.dart';
 
@@ -86,11 +83,41 @@ class FilterScreenState extends State<FilterScreen> {
 
   late List<CategoryModel> categoryList = widget.categoryList ?? [];
 
-    double _minPrice = 0;
-  double _maxPrice = 1000000; // Default max, can be adjusted
+  // Default max, can be adjusted
   RangeValues _priceRangeValues = const RangeValues(0, 1000000);
 
+  bool get isJobs {
+    if (widget.categoryIds != null) {
+      if (widget.categoryIds!.contains("4") ||
+          widget.categoryIds!.contains("356") ||
+          widget.categoryIds!.contains("357")) {
+        return true;
+      }
+    }
+    if (selectedCategories.contains("4") ||
+        selectedCategories.contains("356") ||
+        selectedCategories.contains("357")) {
+      return true;
+    }
+    if (categoryList.isNotEmpty) {
+      for (var cat in categoryList) {
+        final name = (cat.name ?? "").toLowerCase();
+        final id = cat.id?.toString() ?? "";
+        if (id == "4" ||
+            id == "356" ||
+            id == "357" ||
+            name.contains("job") ||
+            name.contains("recruit") ||
+            name.contains("talent")) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   bool get isProperty {
+    if (isJobs) return false;
     if (categoryList.isNotEmpty) {
       for (var cat in categoryList) {
         if (cat.name != null &&
@@ -127,7 +154,7 @@ class FilterScreenState extends State<FilterScreen> {
   }
 
 
-  setCategories() {
+  void setCategories() {
     if (widget.categoryIds != null && widget.categoryIds!.isNotEmpty) {
       selectedCategories.addAll(widget.categoryIds!);
     }
@@ -141,7 +168,7 @@ class FilterScreenState extends State<FilterScreen> {
     }
   }
 
-  getCustomFieldsData() {
+  void getCustomFieldsData() {
     if (Constant.itemFilter == null) {
       AbstractField.fieldsData.clear();
     }
@@ -413,7 +440,9 @@ class FilterScreenState extends State<FilterScreen> {
                 const SizedBox(
                   height: 15,
                 ),
-                Text('budgetLbl'.translate(context))
+                Text(isJobs
+                        ? "Expected Monthly Salary (AED)"
+                        : 'budgetLbl'.translate(context))
                     .bold(weight: FontWeight.w600)
                     .color(context.color.textDefaultColor),
                 const SizedBox(height: 15),
@@ -425,7 +454,7 @@ class FilterScreenState extends State<FilterScreen> {
                 const SizedBox(height: 5),
                 postedSinceOption(context),
                 const SizedBox(height: 15),
-             //   customFields()
+                customFields()
               ],
             ),
           ),
@@ -957,7 +986,7 @@ class FilterScreenState extends State<FilterScreen> {
     );
   }
 
-  postedSinceUpdate(String value) {
+  void postedSinceUpdate(String value) {
     setState(() {
       postedOn = value;
     });

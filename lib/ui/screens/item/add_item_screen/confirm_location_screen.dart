@@ -111,7 +111,7 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
     }
   }
 
-  preFillLocationWhileEdit() async {
+  Future<void> preFillLocationWhileEdit() async {
     if (widget.isEdit!) {
       ItemModel itemModel = getCloudData('edit_request') as ItemModel;
 
@@ -148,7 +148,8 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
       ].where((part) => part != null && part.isNotEmpty).join(', ');
       if (currentLocation == "") {
         Position position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.high);
+            locationSettings: LocationSettings(
+                accuracy: LocationAccuracy.high,));
         _cameraPosition = CameraPosition(
           target: LatLng(position.latitude, position.longitude),
           zoom: 14.4746,
@@ -187,7 +188,7 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
     setState(() {});
   }
 
-  getLocationFromLatitudeLongitude({LatLng? latLng}) async {
+  Future<void> getLocationFromLatitudeLongitude({LatLng? latLng}) async {
     try {
       await setLocaleIdentifier("en_US");
       Placemark? placeMark = (await placemarkFromCoordinates(
@@ -326,11 +327,11 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
 
                   if (widget.isEdit == true) {
                     context.read<ManageItemCubit>().manage(ManageItemType.edit,
-                        cloudData, widget.mainImage, widget.otherImage!);
+                        cloudData, widget.mainImage, widget.otherImage);
                     return;
                   } else {
                     context.read<ManageItemCubit>().manage(ManageItemType.add,
-                        cloudData, widget.mainImage!, widget.otherImage!);
+                        cloudData, widget.mainImage!, widget.otherImage ?? []);
                     return;
                   }
                 } catch (e, st) {
@@ -539,10 +540,9 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
                             ),
                           ),
                           onTap: () async {
-                            Position position =
-                                await Geolocator.getCurrentPosition(
-                              desiredAccuracy: LocationAccuracy.high,
-                            );
+                            Position position = await Geolocator.getCurrentPosition(
+                                locationSettings: LocationSettings(
+                                    accuracy: LocationAccuracy.high));
 
                             _cameraPosition = CameraPosition(
                               target:

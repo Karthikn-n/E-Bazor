@@ -97,7 +97,8 @@ class Api {
 
   static String stripeIntentAPI = "https://api.stripe.com/v1/payment_intents";
   static String getCategoryFiltersApi = "get-category-filters";
-  static String getCategoryChildrenByParentApi = "get-category-children-by-parent";
+  static String getCategoryChildrenByParentApi =
+      "get-category-children-by-parent";
   static String getParentCategoryListApi = "get-parent-category-list";
   static String getParentCategoriesApi = "get-parent-categories";
   static String getCategoryTreeBySlugApi = "get-category-tree-by-slug";
@@ -114,12 +115,29 @@ class Api {
   static String updateProfileApi = "update-profile";
   static String getSliderApi = "get-slider";
   static String getFrontCategoriesApi = "front_categories";
+  static String getPopularJobApi = "get-popular-job";
+  static String getJobCategoryHomeApi = "categoryhome";
+  static String getJobTypeCountApi = "job-type-count";
+  static String getJobQualificationCountApi = "job-qualification-count";
+  static String searchBannerSuggestionApi = "search-banner-suggestion";
+  static String getSimilarProductApi = "get-similar-product";
+  static String addHelpMeBuyApi = "add-helpme-buy";
+  static String getMyJobApplicationApi = "get-my-job-application";
+  static String getJobApplicationInfoApi = "get-job-application-info";
+  static String addJobApplicationInfoApi = "add-job-application-info";
+  static String addUserDetailApi = "add-user-detail";
+  static String getUserDetailApi = "get-user-detail";
+  static String getApplyInfoApi = "get-apply-info";
   static String getItemApi = "get-item";
   static String getMyItemApi = "my-items";
   static String getMyItemsCountApi = "my-items-count";
   static String getNotificationListApi = "get-notification-list";
   static String deleteUserApi = "delete-user";
+  static String getDevicesApi = "get-devices";
+  static String logoutDeviceApi = "logout-device";
   static String manageFavouriteApi = "manage-favourite";
+  static String getFavouriteListingApi = "get-favourite-listing";
+  static String favouriteListingApi = "favourite-listing";
   static String getPackageApi = "get-package";
   static String getLanguageApi = "get-languages";
   static String getPaymentSettingsApi = "get-payment-settings";
@@ -128,8 +146,11 @@ class Api {
   static String updateItemStatusApi = "update-item-status";
   static String getReportReasonsApi = "get-report-reasons";
   static String addReportsApi = "add-reports";
+  static String adReportApi = "ad-report";
+  static String sendItemInquiryApi = "send-item-inquiry";
   static String getCustomFieldsApi = "get-customfields";
-  static String getCustomFieldsByCategoryIdApi = "get-customfields-by-category-id";
+  static String getCustomFieldsByCategoryIdApi =
+      "get-customfields-by-category-id";
   static String getFeaturedSectionApi = "get-featured-section";
   static String updateItemApi = "update-item";
   static String addItemApi = "add-item";
@@ -165,6 +186,12 @@ class Api {
   static String getCategoriesApi = "get-categories";
   static String getHomeCategoriesApi = "get-home-categories";
   static String carFinanceApi = "car-finance";
+  static String carInspectionApi = "car-inspection";
+  static String savedSearchApi = "saved-search";
+  static String editSavedSearchApi = "edit-saved-search";
+  static String deleteSavedSearchApi = "delete-saved-search";
+  static String getCarInspectionApi = "get-car-inspection";
+  static String carEvaluationsApi = "car-evaluations";
 
 //Chat module apis
   static String sendMessageApi = "send-message";
@@ -314,6 +341,11 @@ class Api {
   static String areaId = "area_id";
   static String limit = "limit";
   static String offset = "offset";
+  static String searchUrl = "search_url";
+  static String apiSearchUrl = "api_search_url";
+  static String subscribeEmail = "subscribe_email";
+  static String location = "location";
+  static String parentCategoryId = "parent_category_id";
 
   static Future<Map<String, dynamic>> post({
     required String url,
@@ -399,10 +431,14 @@ class Api {
           data['error_message']?.toString() ??
           data['details']?.toString();
       if (data['errors'] is Map) {
-        final errs = (data['errors'] as Map).values.map((v) {
-          if (v is List) return v.join(", ");
-          return v.toString();
-        }).where((v) => v.isNotEmpty).join("; ");
+        final errs = (data['errors'] as Map)
+            .values
+            .map((v) {
+              if (v is List) return v.join(", ");
+              return v.toString();
+            })
+            .where((v) => v.isNotEmpty)
+            .join("; ");
         if (errs.isNotEmpty) {
           serverMsg = serverMsg != null ? "$serverMsg ($errs)" : errs;
         }
@@ -450,10 +486,10 @@ class Api {
       final Dio dio = _dio();
       dio.interceptors.add(NetworkRequestInterseptor());
 
-      final response =
-          await dio.delete(((useBaseUrl ?? true) ? Constant.baseUrl : "") + url,
-              queryParameters: queryParameters,
-              options: Options(headers: headers()));
+      final response = await dio.delete(
+          ((useBaseUrl ?? true) ? Constant.baseUrl : "") + url,
+          queryParameters: queryParameters,
+          options: Options(headers: headers()));
 
       if (response.data['error'] == true) {
         throw ApiException(response.data['message'].toString());
@@ -508,4 +544,3 @@ class Api {
     }
   }
 }
-

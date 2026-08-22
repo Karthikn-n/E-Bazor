@@ -143,8 +143,25 @@ class _AddItemDetailsState extends CloudState<AddItemDetails> {
       print("///////////////////");
       print("categoryIDs in filte screen:$ids");
       print("///////////////////");
-      selectedCategoryList = ids;
-      adPhoneNumberController.text = HiveUtils.getUserDetails().mobile ?? "";
+      final savedCode = HiveUtils.getCountryCode();
+      final countryCode = savedCode != null && savedCode.isNotEmpty
+          ? (savedCode.startsWith('+') ? savedCode : '+$savedCode')
+          : '+971';
+      final user = HiveUtils.getUserDetails();
+      final userMobile = user.mobile?.trim() ?? '';
+      if (userMobile.isNotEmpty) {
+        if (userMobile.startsWith('+')) {
+          adPhoneNumberController.text = userMobile;
+        } else if (savedCode != null &&
+            savedCode.isNotEmpty &&
+            !userMobile.startsWith(savedCode.replaceAll('+', ''))) {
+          adPhoneNumberController.text = '$countryCode $userMobile';
+        } else {
+          adPhoneNumberController.text = userMobile;
+        }
+      } else {
+        adPhoneNumberController.text = countryCode;
+      }
       adTitleController.addListener(() {
         // Check if the default language is English
         String languageCode = HiveUtils.getLanguage()['code'].toString();
@@ -240,12 +257,19 @@ class _AddItemDetailsState extends CloudState<AddItemDetails> {
                       );
                       return;
                     }
+                    final editCategoryId = item?.categoryId ??
+                        item?.category?.id ??
+                        (item?.allCategoryIds != null
+                            ? int.tryParse(item!.allCategoryIds!.split(',').last)
+                            : null);
+
                     addCloudData("item_details", {
                       "name": adTitleController.text,
                       "slug": adSlugController.text,
                       "description": adDescriptionController.text,
-                      if (widget.isEdit != true)
-                        "category_id": selectedCategoryList.last,
+                      "category_id": widget.isEdit == true
+                          ? editCategoryId
+                          : (selectedCategoryList.isNotEmpty ? selectedCategoryList.last : editCategoryId),
                       if (widget.isEdit == true) "id": item?.id,
                       "price": adPriceController.text,
                       "contact": adPhoneNumberController.text,
@@ -253,10 +277,8 @@ class _AddItemDetailsState extends CloudState<AddItemDetails> {
                       if (widget.isEdit == true)
                         "delete_item_image_id": deleteItemImageList.join(','),
                       "all_category_ids": widget.isEdit == true
-                          ? item!.allCategoryIds
+                          ? item?.allCategoryIds
                           : selectedCategoryList.join(',')
-                      /*"image": _pickTitleImage.pickedFile,
-                      "gallery_images": galleryImages,*/
                     });
                     screenStack++;
                     if (context.read<FetchCustomFieldsCubit>().isEmpty()!) {
@@ -264,14 +286,15 @@ class _AddItemDetailsState extends CloudState<AddItemDetails> {
                         "name": adTitleController.text,
                         "slug": adSlugController.text,
                         "description": adDescriptionController.text,
-                        if (widget.isEdit != true)
-                          "category_id": selectedCategoryList.last,
+                        "category_id": widget.isEdit == true
+                            ? editCategoryId
+                            : (selectedCategoryList.isNotEmpty ? selectedCategoryList.last : editCategoryId),
                         if (widget.isEdit == true) "id": item?.id,
                         "price": adPriceController.text,
                         "contact": adPhoneNumberController.text,
                         "video_link": adAdditionalDetailsController.text,
                         "all_category_ids": widget.isEdit == true
-                            ? item!.allCategoryIds
+                            ? item?.allCategoryIds
                             : selectedCategoryList.join(','),
                         if (widget.isEdit == true)
                           "delete_item_image_id": deleteItemImageList.join(',')

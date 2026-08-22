@@ -23,12 +23,16 @@ import 'package:Ebozor/utils/cloudState/cloud_state.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
+import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/dynamic_custom_fields_form.dart';
+import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/posting_form_shared.dart';
 
 class ClassifiedsPostingFormScreen extends StatefulWidget {
   final CategoryModel? category;
   final List<CategoryModel>? breadcrumbs;
   final String? initialTitle;
   final List<CustomFieldModel>? customFields;
+  final bool isEdit;
+  final ItemModel? item;
 
   const ClassifiedsPostingFormScreen({
     super.key,
@@ -36,6 +40,8 @@ class ClassifiedsPostingFormScreen extends StatefulWidget {
     this.breadcrumbs,
     this.initialTitle,
     this.customFields,
+    this.isEdit = false,
+    this.item,
   });
 
   static Route route(RouteSettings settings) {
@@ -47,6 +53,8 @@ class ClassifiedsPostingFormScreen extends StatefulWidget {
         breadcrumbs: arguments?['breadcrumbs'] ?? arguments?['breadCrumbItems'],
         initialTitle: arguments?['initialTitle'],
         customFields: arguments?['customFields'],
+        isEdit: arguments?['isEdit'] ?? false,
+        item: arguments?['item'],
       ),
     );
   }
@@ -60,97 +68,111 @@ class _ClassifiedsPostingFormScreenState
     extends CloudState<ClassifiedsPostingFormScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // Standard Form Controllers
   late final TextEditingController _titleController;
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _youtubeUrlController = TextEditingController();
+  bool _showPhoneNumber = true;
 
-  // Dynamic Custom Fields State
-  List<CustomFieldModel> _dynamicCustomFields = [];
-  final Map<int, dynamic> _customFieldValues = {};
-  final Map<int, TextEditingController> _customFieldControllers = {};
-  final Map<String, int> _fieldNameToId = {};
   bool _isLoadingDynamicFields = true;
+  final DynamicCustomFieldsController _adminFieldsController =
+      DynamicCustomFieldsController();
 
-  // Fallback Standard Classifieds Fields
-  String? _selectedUsage;
-  String? _selectedWarranty;
-  String? _selectedCondition;
-  String? _selectedAge;
-
-  final List<String> _usageOptions = [
-    "Brand New",
-    "Used (like new)",
-    "Used (normal wear)",
-    "Used (needs repair)"
-  ];
-  final List<String> _warrantyOptions = ["Yes", "No", "Under Warranty"];
-  final List<String> _conditionOptions = [
-    "Flawless",
-    "Good Condition",
-    "Fair",
-    "Refurbished"
-  ];
-  final List<String> _ageOptions = [
-    "Brand New",
-    "0-1 month",
-    "1-6 months",
-    "6-12 months",
-    "1-2 years",
-    "2+ years"
-  ];
-
-  // Images
   final List<File> _selectedImages = [];
+  final List<String> _existingNetworkImages = [];
   final ImagePicker _picker = ImagePicker();
-
   // Location / Google Maps
-  LatLng _currentLocationLatLng = const LatLng(25.2048, 55.2708); // Dubai Default
-  String _selectedAddress = "Downtown Dubai, Dubai, United Arab Emirates";
-  String _selectedLocationName = "Dubai";
+  PostingLocationData _location = const PostingLocationData.dubai();
   GoogleMapController? _mapController;
   bool _isLocating = false;
 
-  bool get _isPetsCategory {
-    final catName = widget.category?.name?.toLowerCase() ?? "";
-    final catSlug = widget.category?.slug?.toLowerCase() ?? "";
-    final breadcrumbMatch = widget.breadcrumbs?.any((b) {
-          final n = (b.name ?? "").toLowerCase();
-          final s = (b.slug ?? "").toLowerCase();
-          return n.contains("pet") || s.contains("pet");
-        }) ??
-        false;
-    return catName.contains("pet") ||
-        catSlug.contains("pet") ||
-        breadcrumbMatch;
+  bool get _isClassifiedsAd {
+    final categories = <CategoryModel>[
+      ...?widget.breadcrumbs,
+      if (widget.category != null) widget.category!,
+    ];
+    return categories.any((category) {
+      final slug = category.slug?.trim().toLowerCase() ?? '';
+      final name = category.name?.trim().toLowerCase() ?? '';
+      return category.id == 2 ||
+          slug.contains('classif') ||
+          name.contains('classified');
+    });
   }
 
   @override
   void initState() {
     super.initState();
     final prefilled = widget.initialTitle ??
+        widget.item?.name ??
         getCloudData("prefilled_listing_title")?.toString() ??
         "";
     _titleController = TextEditingController(text: prefilled);
 
+    final savedCode = HiveUtils.getCountryCode();
+    final countryCode = savedCode != null && savedCode.isNotEmpty
+        ? (savedCode.startsWith('+') ? savedCode : '+$savedCode')
+        : '+971';
     final user = HiveUtils.getUserDetails();
-    if (user.mobile != null && user.mobile!.isNotEmpty) {
-      _phoneController.text = user.mobile!;
-    } else {
-      _phoneController.text = "+971";
-    }
+    final userMobile = user.mobile?.trim() ?? '';
 
-    if (!_isPetsCategory) {
-      if (widget.customFields != null && widget.customFields!.isNotEmpty) {
-        _populateDynamicCustomFields(widget.customFields!);
+    if (userMobile.isNotEmpty) {
+      if (userMobile.startsWith('+')) {
+        _phoneController.text = userMobile;
+      } else if (savedCode != null &&
+          savedCode.isNotEmpty &&
+          !userMobile.startsWith(savedCode.replaceAll('+', ''))) {
+        _phoneController.text = '$countryCode $userMobile';
       } else {
-        _fetchDynamicCustomFields();
+        _phoneController.text = userMobile;
       }
     } else {
-      _isLoadingDynamicFields = false;
+      _phoneController.text = countryCode;
     }
+
+    final item = widget.item;
+    if (item != null) {
+      _titleController.text = item.name ?? "";
+      _descriptionController.text = item.description ?? "";
+      if (item.price != null && item.price! > 0) {
+        _priceController.text = (item.price! % 1 == 0)
+            ? item.price!.toInt().toString()
+            : item.price.toString();
+      }
+      if (item.contact != null && item.contact.toString().isNotEmpty) {
+        _phoneController.text = item.contact.toString();
+      }
+      _youtubeUrlController.text = item.videoLink ?? "";
+      _showPhoneNumber = item.hidePhoneNumber != 1 && item.hidePhoneNumber != true;
+      if (item.latitude != null && item.longitude != null) {
+        _location = PostingLocationData(
+          coordinates: LatLng(item.latitude!, item.longitude!),
+          city: item.city ?? 'Dubai',
+          state: item.state ?? item.city ?? 'Dubai',
+          country: item.country ?? 'United Arab Emirates',
+          address: item.address ?? item.city ?? 'Dubai',
+          area: item.area ?? item.address ?? item.city ?? 'Dubai',
+        );
+      }
+      if (item.image != null && item.image!.trim().isNotEmpty) {
+        _existingNetworkImages.add(item.image!.trim());
+      }
+      if (item.galleryImages != null) {
+        for (final g in item.galleryImages!) {
+          final gUrl = g.image?.trim();
+          if (gUrl != null && gUrl.isNotEmpty && !_existingNetworkImages.contains(gUrl)) {
+            _existingNetworkImages.add(gUrl);
+          }
+        }
+      }
+    }
+
+    final existingFields = widget.item?.customFields ?? widget.customFields;
+    if (existingFields != null && existingFields.isNotEmpty) {
+      _populateDynamicCustomFields(existingFields);
+    }
+    _fetchDynamicCustomFields();
   }
 
   @override
@@ -160,68 +182,20 @@ class _ClassifiedsPostingFormScreenState
     _priceController.dispose();
     _phoneController.dispose();
     _youtubeUrlController.dispose();
-    for (var ctrl in _customFieldControllers.values) {
-      ctrl.dispose();
-    }
+    _adminFieldsController.dispose();
     _mapController?.dispose();
     super.dispose();
   }
 
-  bool _isFieldApplicable(CustomFieldModel field) {
-    final raw = (field.name ?? "").toLowerCase().trim();
-    if (raw.isEmpty) return false;
-
-    final currentCat = widget.category;
-    if (currentCat == null) return true;
-
-    final catSlug = (currentCat.slug ?? "").toLowerCase().replaceAll('-', '');
-    final catName = (currentCat.name ?? "").toLowerCase().replaceAll(' ', '').replaceAll('&', '');
-
-    // Sibling category exclusions
-    if (raw.startsWith('dvd') && !catSlug.contains('dvd') && !catName.contains('dvd')) {
-      return false;
-    }
-    if (raw.startsWith('tv') && !catSlug.contains('tv') && !catName.contains('tv') && !catName.contains('television')) {
-      return false;
-    }
-    if (raw.startsWith('camera') && !catSlug.contains('camera') && !catName.contains('camera')) {
-      return false;
-    }
-    if (raw.startsWith('laptop') && !catSlug.contains('laptop') && !catName.contains('laptop') && !catName.contains('computer')) {
-      return false;
-    }
-    if (raw.startsWith('mobile') && !catSlug.contains('mobile') && !catSlug.contains('phone') && !catName.contains('mobile') && !catName.contains('phone')) {
-      return false;
-    }
-    if (raw.startsWith('audio') || raw.startsWith('homeaudio') || raw.startsWith('speaker')) {
-      if (!catSlug.contains('audio') && !catSlug.contains('speaker') && !catSlug.contains('turntable') &&
-          !catName.contains('audio') && !catName.contains('speaker') && !catName.contains('turntable')) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   void _populateDynamicCustomFields(List<CustomFieldModel> fieldsList) {
-    _dynamicCustomFields = fieldsList.where(_isFieldApplicable).toList();
-    for (var field in _dynamicCustomFields) {
-      if (field.id != null) {
-        final normName = (field.name ?? "").toLowerCase().trim();
-        _fieldNameToId[normName] = field.id!;
-
-        // Initialize text controller if text/number field
-        final type = (field.type ?? "").toLowerCase();
-        if (type == "textbox" || type == "number" || type == "textarea") {
-          _customFieldControllers[field.id!] = TextEditingController();
-        }
-      }
-    }
+    _adminFieldsController.replaceFields(fieldsList);
     _isLoadingDynamicFields = false;
   }
 
   Future<void> _fetchDynamicCustomFields() async {
     try {
       final catId = widget.category?.id ??
+          widget.item?.categoryId ??
           (widget.breadcrumbs != null && widget.breadcrumbs!.isNotEmpty
               ? widget.breadcrumbs!.last.id
               : 2);
@@ -231,6 +205,24 @@ class _ClassifiedsPostingFormScreenState
           await customFieldsRepo.getCustomFieldsByCategoryId(catId);
 
       if (mounted) {
+        final existingFields = widget.item?.customFields ?? widget.customFields;
+        if (existingFields != null && existingFields.isNotEmpty) {
+          final existingMapById = <int, CustomFieldModel>{};
+          final existingMapByName = <String, CustomFieldModel>{};
+          for (final cf in existingFields) {
+            if (cf.id != null) existingMapById[cf.id!] = cf;
+            final n = (cf.name ?? cf.label ?? '').trim().toLowerCase();
+            if (n.isNotEmpty) existingMapByName[n] = cf;
+          }
+          for (final f in fieldsList) {
+            final n = (f.name ?? f.label ?? '').trim().toLowerCase();
+            if (f.id != null && existingMapById.containsKey(f.id!)) {
+              f.value = existingMapById[f.id!]!.value;
+            } else if (n.isNotEmpty && existingMapByName.containsKey(n)) {
+              f.value = existingMapByName[n]!.value;
+            }
+          }
+        }
         setState(() {
           _populateDynamicCustomFields(fieldsList);
         });
@@ -257,117 +249,6 @@ class _ClassifiedsPostingFormScreenState
     }
   }
 
-  String _formatFieldLabel(String rawName) {
-    String name = rawName.trim();
-    if (name.isEmpty) return "Field";
-
-    // Known friendly dictionary mappings
-    final Map<String, String> knownMappings = {
-      'connectivitytech': 'Connectivity Technology',
-      'connectivityteche': 'Connectivity Technology',
-      'connectivity': 'Connectivity',
-      'compatible': 'Compatible Devices',
-      'compatibility': 'Device Compatibility',
-      'feature': 'Special Features',
-      'features': 'Special Features',
-      'speakersub': 'Speaker Type',
-      'speakertype': 'Speaker Type',
-      'usage': 'Usage',
-      'condition': 'Condition',
-      'warranty': 'Warranty',
-      'age': 'Age',
-      'brand': 'Brand',
-      'color': 'Color',
-      'model': 'Model',
-      'storage': 'Storage Capacity',
-      'ram': 'RAM Memory',
-      'screensize': 'Screen Size',
-      'simtype': 'SIM Type',
-      'resolution': 'Resolution',
-      'operatingsystem': 'Operating System',
-      'battery': 'Battery Capacity',
-      'camera': 'Camera Specs',
-      'processor': 'Processor',
-      'graphicscard': 'Graphics Card',
-      'material': 'Material',
-      'type': 'Type',
-    };
-
-    // Remove category prefixes
-    List<String> parts = name.split('_').where((p) => p.isNotEmpty).toList();
-    while (parts.length > 1) {
-      final first = parts.first.toLowerCase();
-      if (first.contains('homeaudio') ||
-          first.contains('turntable') ||
-          first.contains('speakersub') ||
-          first.contains('dvdhome') ||
-          first.contains('dvd') ||
-          first.contains('electronics') ||
-          first.contains('mobile') ||
-          first.contains('classified') ||
-          first.contains('property') ||
-          first.contains('motor')) {
-        parts.removeAt(0);
-      } else {
-        break;
-      }
-    }
-
-    String cleanedKey = parts.join('').toLowerCase().replaceAll(' ', '');
-    if (knownMappings.containsKey(cleanedKey)) {
-      return knownMappings[cleanedKey]!;
-    }
-    if (parts.isNotEmpty && knownMappings.containsKey(parts.last.toLowerCase())) {
-      return knownMappings[parts.last.toLowerCase()]!;
-    }
-
-    String formatted = parts.join(' ');
-    formatted = formatted.replaceAllMapped(
-        RegExp(r'([a-z])([A-Z])'), (m) => '${m[1]} ${m[2]}');
-    return formatted
-        .split(' ')
-        .where((w) => w.isNotEmpty)
-        .map((w) => w[0].toUpperCase() + w.substring(1).toLowerCase())
-        .join(' ');
-  }
-
-  Future<void> _openFullMapPicker() async {
-    final result = await Navigator.pushNamed(
-      context,
-      Routes.locationMapScreen,
-      arguments: {
-        "from": "addItem",
-        "latitude": _currentLocationLatLng.latitude,
-        "longitude": _currentLocationLatLng.longitude,
-      },
-    );
-
-    if (result is Map) {
-      final lat = result['latitude'] as double?;
-      final lng = result['longitude'] as double?;
-      final area = result['area'] as String?;
-      final city = result['city'] as String?;
-      final state = result['state'] as String?;
-      final country = result['country'] as String?;
-
-      if (lat != null && lng != null) {
-        setState(() {
-          _currentLocationLatLng = LatLng(lat, lng);
-          final locTitle = area?.isNotEmpty == true
-              ? area!
-              : (city?.isNotEmpty == true ? city! : "Selected Location");
-          _selectedLocationName = locTitle;
-          final parts = [area, city, state, country]
-              .where((s) => s != null && s.isNotEmpty)
-              .toList();
-          _selectedAddress = parts.isNotEmpty
-              ? parts.join(", ")
-              : "$locTitle, United Arab Emirates";
-        });
-      }
-    }
-  }
-
   Future<void> _getCurrentLocation() async {
     setState(() => _isLocating = true);
     try {
@@ -379,11 +260,15 @@ class _ClassifiedsPostingFormScreenState
       if (permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always) {
         Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
         );
 
         final target = LatLng(position.latitude, position.longitude);
-        _currentLocationLatLng = target;
+        if (mounted) {
+          setState(() => _location = _location.copyWith(coordinates: target));
+        }
         _mapController?.animateCamera(CameraUpdate.newLatLngZoom(target, 15));
 
         List<Placemark> placemarks = await placemarkFromCoordinates(
@@ -395,7 +280,9 @@ class _ClassifiedsPostingFormScreenState
           Placemark place = placemarks.first;
           final locTitle = place.subLocality?.isNotEmpty == true
               ? place.subLocality!
-              : (place.locality?.isNotEmpty == true ? place.locality! : "My Location");
+              : (place.locality?.isNotEmpty == true
+                  ? place.locality!
+                  : "My Location");
           final addr = [
             place.street,
             place.subLocality,
@@ -405,8 +292,20 @@ class _ClassifiedsPostingFormScreenState
           ].where((e) => e != null && e.isNotEmpty).join(", ");
 
           setState(() {
-            _selectedLocationName = locTitle;
-            _selectedAddress = addr.isNotEmpty ? addr : "Dubai, UAE";
+            _location = PostingLocationData(
+              coordinates: target,
+              area: locTitle,
+              city: place.locality?.trim().isNotEmpty == true
+                  ? place.locality!.trim()
+                  : _location.city,
+              state: place.administrativeArea?.trim().isNotEmpty == true
+                  ? place.administrativeArea!.trim()
+                  : _location.state,
+              country: place.country?.trim().isNotEmpty == true
+                  ? place.country!.trim()
+                  : _location.country,
+              address: addr.isNotEmpty ? addr : _location.address,
+            );
           });
         }
       }
@@ -427,10 +326,22 @@ class _ClassifiedsPostingFormScreenState
       return;
     }
 
-    if (_selectedImages.isEmpty) {
+    final isEditMode = widget.isEdit || widget.item != null;
+
+    if (!isEditMode && _selectedImages.isEmpty && _existingNetworkImages.isEmpty) {
       HelperUtils.showSnackBarMessage(
         context,
         "Please upload at least 1 image",
+        type: MessageType.warning,
+      );
+      return;
+    }
+
+    final customFieldError = _adminFieldsController.validate();
+    if (customFieldError != null) {
+      HelperUtils.showSnackBarMessage(
+        context,
+        customFieldError,
         type: MessageType.warning,
       );
       return;
@@ -447,59 +358,23 @@ class _ClassifiedsPostingFormScreenState
     }
 
     final categoryId = widget.category?.id ??
+        widget.item?.categoryId ??
         (widget.breadcrumbs != null && widget.breadcrumbs!.isNotEmpty
             ? widget.breadcrumbs!.last.id
             : 2);
 
-    final allCategoryIds = widget.breadcrumbs != null &&
-            widget.breadcrumbs!.isNotEmpty
-        ? widget.breadcrumbs!
-            .map((b) => b.id)
-            .where((id) => id != null)
-            .join(',')
-        : "$categoryId";
+    final allCategoryIds =
+        widget.breadcrumbs != null && widget.breadcrumbs!.isNotEmpty
+            ? widget.breadcrumbs!
+                .map((b) => b.id)
+                .where((id) => id != null)
+                .join(',')
+            : (widget.item?.allCategoryIds ?? "$categoryId");
 
-    final Map<String, dynamic> mergedCustomFields = {};
-
-    // 1. Collect from dynamic custom fields
-    for (var field in _dynamicCustomFields) {
-      if (field.id == null) continue;
-      final fid = field.id!;
-      final type = (field.type ?? "").toLowerCase();
-
-      if (type == "textbox" || type == "number" || type == "textarea") {
-        final val = _customFieldControllers[fid]?.text.trim();
-        if (val != null && val.isNotEmpty) {
-          mergedCustomFields["$fid"] = [val];
-        }
-      } else {
-        final val = _customFieldValues[fid];
-        if (val != null) {
-          mergedCustomFields["$fid"] = val is List ? val : [val.toString()];
-        }
-      }
-    }
-
-    // 2. Add fallback Classifieds fields if selected and available
-    final fallbackMap = {
-      'usage': _selectedUsage,
-      'warranty': _selectedWarranty,
-      'condition': _selectedCondition,
-      'age': _selectedAge,
-    };
-
-    fallbackMap.forEach((key, val) {
-      if (val != null && val.isNotEmpty) {
-        final id = _fieldNameToId[key] ??
-            _fieldNameToId[key.replaceAll('_', ' ')] ??
-            _fieldNameToId["classified_$key"];
-        if (id != null) {
-          mergedCustomFields["$id"] = [val];
-        }
-      }
-    });
+    final mergedCustomFields = _adminFieldsController.toSubmissionMap();
 
     final itemDetails = <String, dynamic>{
+      if (isEditMode && widget.item?.id != null) 'id': widget.item!.id,
       'name': _titleController.text.trim(),
       'slug': _titleController.text
           .trim()
@@ -510,14 +385,9 @@ class _ClassifiedsPostingFormScreenState
       'price': (price % 1 == 0) ? price.toInt() : price,
       'description': _descriptionController.text.trim(),
       'contact': _phoneController.text.trim(),
-      if (_youtubeUrlController.text.trim().isNotEmpty)
-        'video_link': _youtubeUrlController.text.trim(),
-      'country': 'United Arab Emirates',
-      'state': 'Dubai',
-      'city': 'Dubai',
-      'latitude': _currentLocationLatLng.latitude,
-      'longitude': _currentLocationLatLng.longitude,
-      'address': _selectedAddress,
+      'hide_phone_number': _showPhoneNumber ? 0 : 1,
+      if (_isClassifiedsAd) 'video_link': _youtubeUrlController.text.trim(),
+      ..._location.toItemDetails(),
     };
 
     if (mergedCustomFields.isNotEmpty) {
@@ -525,14 +395,59 @@ class _ClassifiedsPostingFormScreenState
     }
 
     Widgets.showLoader(context);
+
+    if (isEditMode) {
+      try {
+        itemDetails.addAll(
+          await _adminFieldsController.toFileSubmissionMap(),
+        );
+        final mainImg =
+            _selectedImages.isNotEmpty ? _selectedImages.first : null;
+        final otherImgs = _selectedImages.length > 1
+            ? _selectedImages.sublist(1)
+            : null;
+        await ItemRepository().editItem(itemDetails, mainImg, otherImgs);
+      } catch (e) {
+        log("Classifieds edit API error: $e");
+        Widgets.hideLoder(context);
+        if (mounted) {
+          HelperUtils.showSnackBarMessage(
+            context,
+            "Failed to update ad: $e",
+            type: MessageType.error,
+          );
+        }
+        return;
+      } finally {
+        Widgets.hideLoder(context);
+      }
+
+      if (!mounted) return;
+
+      HelperUtils.showSnackBarMessage(
+        context,
+        "Ad updated successfully!",
+        type: MessageType.success,
+      );
+      try {
+        MyAdvertisementScreen.refreshCallback?.call();
+        FetchMyPromotedItemsCubit.globalInstance?.fetchMyPromotedItems();
+      } catch (_) {}
+      Navigator.of(context).popUntil(
+          (route) => route.settings.name == Routes.myAdvertisment || route.isFirst);
+      return;
+    }
+
     ItemModel? createdItemModel;
     try {
+      itemDetails.addAll(
+        await _adminFieldsController.toFileSubmissionMap(),
+      );
       final mainImg = _selectedImages.first;
-      final otherImgs = _selectedImages.length > 1
-          ? _selectedImages.sublist(1)
-          : <File>[];
-      createdItemModel = await ItemRepository()
-          .createItem(itemDetails, mainImg, otherImgs);
+      final otherImgs =
+          _selectedImages.length > 1 ? _selectedImages.sublist(1) : <File>[];
+      createdItemModel =
+          await ItemRepository().createItem(itemDetails, mainImg, otherImgs);
     } catch (e) {
       log("Classifieds create API log error: $e");
       Widgets.hideLoder(context);
@@ -548,6 +463,7 @@ class _ClassifiedsPostingFormScreenState
 
     Widgets.hideLoder(context);
 
+    // ignore: unnecessary_null_comparison
     if (createdItemModel == null) {
       if (mounted) {
         HelperUtils.showSnackBarMessage(
@@ -577,10 +493,10 @@ class _ClassifiedsPostingFormScreenState
 
   @override
   Widget build(BuildContext context) {
-    final breadcrumbText = widget.breadcrumbs != null &&
-            widget.breadcrumbs!.isNotEmpty
-        ? widget.breadcrumbs!.map((b) => b.name ?? "").join(" > ")
-        : (widget.category?.name ?? "Classifieds");
+    final breadcrumbText =
+        widget.breadcrumbs != null && widget.breadcrumbs!.isNotEmpty
+            ? widget.breadcrumbs!.map((b) => b.name ?? "").join(" > ")
+            : (widget.category?.name ?? "Classifieds");
 
     return AnnotatedRegion(
       value: UiUtils.getSystemUiOverlayStyle(
@@ -635,12 +551,13 @@ class _ClassifiedsPostingFormScreenState
                   const SizedBox(height: 20),
 
                   // 1. Title
-                  _buildFieldLabel("Title *"),
+                  const PostingFieldLabel("Title *"),
                   _buildTextField(
                     controller: _titleController,
                     hint: "Item title",
-                    validator: (val) =>
-                        val == null || val.trim().isEmpty ? "Title is required" : null,
+                    validator: (val) => val == null || val.trim().isEmpty
+                        ? "Title is required"
+                        : null,
                   ),
                   const SizedBox(height: 18),
 
@@ -648,7 +565,7 @@ class _ClassifiedsPostingFormScreenState
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildFieldLabel("Description *"),
+                      const PostingFieldLabel("Description *"),
                       Text(
                         "${_descriptionController.text.length}/16000",
                         style: TextStyle(
@@ -660,181 +577,80 @@ class _ClassifiedsPostingFormScreenState
                   ),
                   _buildTextField(
                     controller: _descriptionController,
-                    hint: "Describe the item features, condition, brand, and usage...",
+                    hint:
+                        "Describe the item features, condition, brand, and usage...",
                     maxLines: 4,
                     onChanged: (_) => setState(() {}),
-                    validator: (val) =>
-                        val == null || val.trim().isEmpty ? "Description is required" : null,
+                    validator: (val) => val == null || val.trim().isEmpty
+                        ? "Description is required"
+                        : null,
                   ),
                   const SizedBox(height: 18),
 
-                  // 3. Add Pictures Button & Previews
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: OutlinedButton.icon(
-                      onPressed: _pickImages,
-                      icon: const Icon(Icons.camera_alt_outlined, color: Color(0xFFD31027)),
-                      label: Text(
-                        _selectedImages.isEmpty
-                            ? "Add Pictures"
-                            : "Add More Pictures (${_selectedImages.length} selected)",
-                        style: const TextStyle(
-                          color: Color(0xFFD31027),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFFD31027), width: 1.5),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
+                  // 3. Pictures
+                  PostingPicturesSection(
+                    images: _selectedImages,
+                    existingImages: _existingNetworkImages,
+                    onAdd: _pickImages,
+                    onRemove: (index) =>
+                        setState(() => _selectedImages.removeAt(index)),
+                    onRemoveExisting: (index) =>
+                        setState(() => _existingNetworkImages.removeAt(index)),
                   ),
-                  if (_selectedImages.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 84,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        itemCount: _selectedImages.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (context, idx) {
-                          return Stack(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: Image.file(
-                                  _selectedImages[idx],
-                                  width: 84,
-                                  height: 84,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                              Positioned(
-                                top: 2,
-                                right: 2,
-                                child: GestureDetector(
-                                  onTap: () => setState(() => _selectedImages.removeAt(idx)),
-                                  child: Container(
-                                    decoration: const BoxDecoration(
-                                      color: Colors.black54,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    padding: const EdgeInsets.all(2),
-                                    child: const Icon(Icons.close, size: 14, color: Colors.white),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
+                  const SizedBox(height: 18),
+                  if (_isClassifiedsAd) ...[
+                    PostingMediaLinksSection(
+                      youtubeController: _youtubeUrlController,
                     ),
+                    const SizedBox(height: 18),
                   ],
-                  const SizedBox(height: 18),
-
                   // 4. Price
-                  _buildFieldLabel("Price *"),
+                  const PostingFieldLabel("Price *"),
                   _buildTextField(
                     controller: _priceController,
                     hint: "e.g. 150",
                     keyboardType: TextInputType.number,
                     suffixText: "AED",
-                    validator: (val) =>
-                        val == null || val.trim().isEmpty ? "Price is required" : null,
+                    validator: (val) => val == null || val.trim().isEmpty
+                        ? "Price is required"
+                        : null,
                   ),
                   const SizedBox(height: 18),
 
                   // 5. Phone Number
-                  _buildFieldLabel("Phone number *"),
+                  const PostingFieldLabel("Phone number *"),
                   _buildTextField(
                     controller: _phoneController,
                     hint: "+971",
                     keyboardType: TextInputType.phone,
-                    validator: (val) =>
-                        val == null || val.trim().isEmpty ? "Phone number is required" : null,
+                    validator: (val) => val == null || val.trim().isEmpty
+                        ? "Phone number is required"
+                        : null,
+                  ),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text("Show phone number on the ad"),
+                    value: _showPhoneNumber,
+                    onChanged: (value) =>
+                        setState(() => _showPhoneNumber = value),
                   ),
                   const SizedBox(height: 18),
 
-                  // 6. YouTube URL
-                  _buildFieldLabel("YouTube URL (Optional)"),
-                  _buildTextField(
-                    controller: _youtubeUrlController,
-                    hint: "https://youtube.com/watch?v=...",
+                  DynamicCustomFieldsForm(
+                    controller: _adminFieldsController,
+                    isLoading: _isLoadingDynamicFields,
                   ),
-                  const SizedBox(height: 20),
-
-                  // 7. Dynamic Category Custom Fields (Hidden for Pets)
-                  if (!_isPetsCategory) ...[
-                    if (_isLoadingDynamicFields)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Center(child: CircularProgressIndicator()),
-                      )
-                    else ...[
-                      ..._dynamicCustomFields.map((field) {
-                        return _buildDynamicCustomFieldWidget(field);
-                      }),
-                    ],
-
-                    // Fallback Standard Classifieds fields if not provided dynamically
-                    if (!_dynamicCustomFields.any((f) =>
-                        (f.name ?? "").toLowerCase().contains("usage"))) ...[
-                      _buildFieldLabel("Usage *"),
-                      _buildDropdownField(
-                        hint: "Required*",
-                        value: _selectedUsage,
-                        options: _usageOptions,
-                        onChanged: (val) => setState(() => _selectedUsage = val),
-                      ),
-                      const SizedBox(height: 18),
-                    ],
-
-                    if (!_dynamicCustomFields.any((f) =>
-                        (f.name ?? "").toLowerCase().contains("warranty"))) ...[
-                      _buildFieldLabel("Warranty"),
-                      _buildDropdownField(
-                        hint: "<Optional>",
-                        value: _selectedWarranty,
-                        options: _warrantyOptions,
-                        onChanged: (val) => setState(() => _selectedWarranty = val),
-                      ),
-                      const SizedBox(height: 18),
-                    ],
-
-                    if (!_dynamicCustomFields.any((f) =>
-                        (f.name ?? "").toLowerCase().contains("condition"))) ...[
-                      _buildFieldLabel("Condition *"),
-                      _buildDropdownField(
-                        hint: "Required*",
-                        value: _selectedCondition,
-                        options: _conditionOptions,
-                        onChanged: (val) => setState(() => _selectedCondition = val),
-                      ),
-                      const SizedBox(height: 18),
-                    ],
-
-                    if (!_dynamicCustomFields.any((f) =>
-                        (f.name ?? "").toLowerCase().contains("age"))) ...[
-                      _buildFieldLabel("Age *"),
-                      _buildDropdownField(
-                        hint: "Required*",
-                        value: _selectedAge,
-                        options: _ageOptions,
-                        onChanged: (val) => setState(() => _selectedAge = val),
-                      ),
-                      const SizedBox(height: 18),
-                    ],
-                  ],
 
                   const SizedBox(height: 6),
 
                   // 8. Location Section
-                  _buildLocationSection(context),
+                  PostingLocationSection(
+                    location: _location,
+                    onChanged: (value) => setState(() => _location = value),
+                    onUseCurrentLocation: _getCurrentLocation,
+                    isLocating: _isLocating,
+                    onMapCreated: (controller) => _mapController = controller,
+                  ),
                   const SizedBox(height: 28),
 
                   // 9. Next / Submit Button
@@ -866,20 +682,6 @@ class _ClassifiedsPostingFormScreenState
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFieldLabel(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: context.color.textDefaultColor,
         ),
       ),
     );
@@ -924,292 +726,10 @@ class _ClassifiedsPostingFormScreenState
             fontWeight: FontWeight.bold,
             color: context.color.territoryColor,
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           border: InputBorder.none,
         ),
-      ),
-    );
-  }
-
-  Widget _buildDropdownField({
-    required String hint,
-    required String? value,
-    required List<String> options,
-    required ValueChanged<String?> onChanged,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: context.color.secondaryColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: context.color.borderColor.withValues(alpha: 0.6),
-        ),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: options.contains(value) ? value : null,
-          isExpanded: true,
-          hint: Text(
-            hint,
-            style: TextStyle(
-              fontSize: 14,
-              color: context.color.textLightColor.withValues(alpha: 0.7),
-            ),
-          ),
-          icon: Icon(Icons.keyboard_arrow_down_rounded,
-              color: context.color.textLightColor),
-          items: options.map((opt) {
-            return DropdownMenuItem<String>(
-              value: opt,
-              child: Text(
-                opt,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: context.color.textDefaultColor,
-                ),
-              ),
-            );
-          }).toList(),
-          onChanged: onChanged,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDynamicCustomFieldWidget(CustomFieldModel field) {
-    final rawName = field.name ?? "";
-    final label = _formatFieldLabel(rawName);
-    final type = (field.type ?? "").toLowerCase();
-    final isRequired = field.required == 1;
-    final displayLabel = isRequired ? "$label *" : label;
-    final fid = field.id ?? 0;
-
-    // Check if field has option values
-    List<String> options = [];
-    if (field.values is List && (field.values as List).isNotEmpty) {
-      options = (field.values as List)
-          .map((e) => e.toString().trim())
-          .where((e) => e.isNotEmpty)
-          .toList();
-    }
-
-    if (options.isNotEmpty || type == "dropdown" || type == "radiobox") {
-      final currentVal = _customFieldValues[fid]?.toString();
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildFieldLabel(displayLabel),
-            _buildDropdownField(
-              hint: isRequired ? "Required*" : "<Optional>",
-              value: currentVal,
-              options: options,
-              onChanged: (val) {
-                setState(() {
-                  _customFieldValues[fid] = val;
-                });
-              },
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (type == "number") {
-      final ctrl = _customFieldControllers[fid] ?? TextEditingController();
-      _customFieldControllers[fid] = ctrl;
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildFieldLabel(displayLabel),
-            _buildTextField(
-              controller: ctrl,
-              hint: isRequired ? "Enter $label (Required)" : "Enter $label",
-              keyboardType: TextInputType.number,
-              validator: isRequired
-                  ? (val) => val == null || val.trim().isEmpty
-                      ? "$label is required"
-                      : null
-                  : null,
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Default text field
-    final ctrl = _customFieldControllers[fid] ?? TextEditingController();
-    _customFieldControllers[fid] = ctrl;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildFieldLabel(displayLabel),
-          _buildTextField(
-            controller: ctrl,
-            hint: isRequired ? "Enter $label (Required)" : "Enter $label",
-            validator: isRequired
-                ? (val) => val == null || val.trim().isEmpty
-                    ? "$label is required"
-                    : null
-                : null,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLocationSection(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.color.secondaryColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: context.color.borderColor.withValues(alpha: 0.8),
-        ),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.location_on_rounded,
-                    size: 18,
-                    color: context.color.territoryColor,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    _selectedLocationName,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: context.color.textDefaultColor,
-                    ),
-                  ),
-                ],
-              ),
-              InkWell(
-                onTap: _getCurrentLocation,
-                child: Row(
-                  children: [
-                    if (_isLocating)
-                      const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    else
-                      Icon(Icons.my_location_rounded,
-                          size: 15, color: context.color.territoryColor),
-                    const SizedBox(width: 4),
-                    Text(
-                      "Locate Me",
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.bold,
-                        color: context.color.territoryColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _selectedAddress,
-            style: TextStyle(
-              fontSize: 12.5,
-              color: context.color.textLightColor,
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Live Google Map Widget with tap to open full map
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SizedBox(
-              height: 170,
-              width: double.infinity,
-              child: Stack(
-                children: [
-                  GoogleMap(
-                    key: ValueKey(
-                        "${_currentLocationLatLng.latitude}_${_currentLocationLatLng.longitude}"),
-                    initialCameraPosition: CameraPosition(
-                      target: _currentLocationLatLng,
-                      zoom: 14,
-                    ),
-                    markers: {
-                      Marker(
-                        markerId: const MarkerId("classifieds_loc"),
-                        position: _currentLocationLatLng,
-                        infoWindow: InfoWindow(
-                          title: _selectedLocationName,
-                          snippet: _selectedAddress,
-                        ),
-                      ),
-                    },
-                    zoomControlsEnabled: false,
-                    myLocationButtonEnabled: false,
-                    mapToolbarEnabled: false,
-                    onTap: (_) => _openFullMapPicker(),
-                  ),
-                  Positioned(
-                    bottom: 8,
-                    right: 8,
-                    child: InkWell(
-                      onTap: _openFullMapPicker,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: context.color.secondaryColor,
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.15),
-                              blurRadius: 4,
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.fullscreen_rounded,
-                              size: 16,
-                              color: context.color.textDefaultColor,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              "Full Map",
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.bold,
-                                color: context.color.textDefaultColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

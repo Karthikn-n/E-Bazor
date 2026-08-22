@@ -1,30 +1,22 @@
 import 'dart:developer';
 
 import 'package:Ebozor/app/routes.dart';
-import 'package:Ebozor/data/cubits/category/fetch_category_cubit.dart';
 import 'package:Ebozor/data/repositories/category_repository.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/app_icon.dart';
 import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
-import 'package:Ebozor/utils/helper_utils.dart';
-import 'package:Ebozor/utils/sliver_grid_delegate_with_fixed_cross_axis_count_and_fixed_height.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/data/model/category_model.dart';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shimmer/shimmer.dart';
 
-import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/cloudState/cloud_state.dart';
 import 'package:Ebozor/utils/touch_manager.dart';
-import 'package:Ebozor/data/cubits/category/fetch_sub_categories_cubit.dart';
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/no_data_found.dart';
-import 'package:Ebozor/ui/screens/widgets/errors/no_internet.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
-import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/category.dart';
 import 'package:Ebozor/data/helper/widgets.dart';
 import 'package:Ebozor/data/repositories/custom_fields_repository.dart';
 import 'package:Ebozor/data/model/custom_field/custom_field_model.dart';
@@ -155,23 +147,22 @@ class _SelectCategoryScreenState extends CloudState<SelectCategoryScreen> {
                       borderRadius: BorderRadius.circular(16),
                       onTap: () {
                         Navigator.pop(bottomSheetContext);
-                        addCloudData("breadCrumb", [jobsCategory]);
-                        Navigator.pushNamed(
+                        _openJobsBranch(
                           context,
-                          Routes.selectNestedCategoryScreen,
-                          arguments: {
-                            "current": jobsCategory,
-                            "breadcrumbs": [jobsCategory],
-                          },
+                          jobsCategory,
+                          categoryId: 356,
+                          displayName: "I'm hiring",
                         );
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 20),
                         decoration: BoxDecoration(
                           color: context.color.secondaryColor,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: context.color.territoryColor.withValues(alpha: 0.4),
+                            color: context.color.territoryColor
+                                .withValues(alpha: 0.4),
                             width: 1.5,
                           ),
                         ),
@@ -182,7 +173,8 @@ class _SelectCategoryScreenState extends CloudState<SelectCategoryScreen> {
                               width: 52,
                               height: 52,
                               decoration: BoxDecoration(
-                                color: context.color.territoryColor.withValues(alpha: 0.1),
+                                color: context.color.territoryColor
+                                    .withValues(alpha: 0.1),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
@@ -222,23 +214,22 @@ class _SelectCategoryScreenState extends CloudState<SelectCategoryScreen> {
                       borderRadius: BorderRadius.circular(16),
                       onTap: () {
                         Navigator.pop(bottomSheetContext);
-                        addCloudData("breadCrumb", [jobsCategory]);
-                        Navigator.pushNamed(
+                        _openJobsBranch(
                           context,
-                          Routes.selectNestedCategoryScreen,
-                          arguments: {
-                            "current": jobsCategory,
-                            "breadcrumbs": [jobsCategory],
-                          },
+                          jobsCategory,
+                          categoryId: 357,
+                          displayName: "I want a job",
                         );
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 20),
                         decoration: BoxDecoration(
                           color: context.color.secondaryColor,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: context.color.territoryColor.withValues(alpha: 0.4),
+                            color: context.color.territoryColor
+                                .withValues(alpha: 0.4),
                             width: 1.5,
                           ),
                         ),
@@ -249,7 +240,8 @@ class _SelectCategoryScreenState extends CloudState<SelectCategoryScreen> {
                               width: 52,
                               height: 52,
                               decoration: BoxDecoration(
-                                color: context.color.territoryColor.withValues(alpha: 0.1),
+                                color: context.color.territoryColor
+                                    .withValues(alpha: 0.1),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
@@ -287,6 +279,41 @@ class _SelectCategoryScreenState extends CloudState<SelectCategoryScreen> {
             ],
           ),
         );
+      },
+    );
+  }
+
+  void _openJobsBranch(
+    BuildContext context,
+    CategoryModel jobsCategory, {
+    required int categoryId,
+    required String displayName,
+  }) {
+    CategoryModel? apiCategory;
+    for (final child in jobsCategory.children ?? const <CategoryModel>[]) {
+      if (child.id == categoryId) {
+        apiCategory = child;
+        break;
+      }
+    }
+    final selectedCategory = CategoryModel(
+      id: categoryId,
+      name: displayName,
+      url: apiCategory?.url,
+      slug: apiCategory?.slug,
+      description: apiCategory?.description,
+      children: apiCategory?.children,
+      subcategoriesCount: apiCategory?.subcategoriesCount,
+      parentCategoryId: jobsCategory.id,
+    );
+    final breadcrumbs = [jobsCategory, selectedCategory];
+    addCloudData("breadCrumb", breadcrumbs);
+    Navigator.pushNamed(
+      context,
+      Routes.selectNestedCategoryScreen,
+      arguments: {
+        "current": selectedCategory,
+        "breadcrumbs": breadcrumbs,
       },
     );
   }
@@ -372,7 +399,8 @@ class _SelectCategoryScreenState extends CloudState<SelectCategoryScreen> {
                         child: Center(
                           child: Text(
                             "No categories found",
-                            style: TextStyle(color: context.color.textLightColor),
+                            style:
+                                TextStyle(color: context.color.textLightColor),
                           ),
                         ),
                       );
@@ -412,13 +440,14 @@ class _SelectCategoryScreenState extends CloudState<SelectCategoryScreen> {
                                 SizedBox(
                                   width: 42,
                                   height: 42,
-                                  child: (cat.url != null && cat.url!.isNotEmpty)
+                                  child: (cat.url != null &&
+                                          cat.url!.isNotEmpty)
                                       ? UiUtils.imageType(
                                           cat.url!,
                                           fit: BoxFit.contain,
-                                          color: cat.url!.endsWith('.svg')
-                                              ? context.color.territoryColor
-                                              : null,
+                                          // color: cat.url!.endsWith('.svg')
+                                          //     ? context.color.territoryColor
+                                          //     : null,
                                         )
                                       : Icon(
                                           Icons.category_outlined,
@@ -552,7 +581,8 @@ class _SelectNestedCategoryState extends CloudState<SelectNestedCategory> {
       }
     }
 
-    if (widget.current.children != null && widget.current.children!.isNotEmpty) {
+    if (widget.current.children != null &&
+        widget.current.children!.isNotEmpty) {
       _subCategoriesFuture = Future.value(widget.current.children!);
     } else {
       _subCategoriesFuture = _categoryRepository.fetchCategoryChildrenByParent(
@@ -787,7 +817,9 @@ class _SelectNestedCategoryState extends CloudState<SelectNestedCategory> {
                               await Future.delayed(
                                 const Duration(milliseconds: 5),
                                 () {
-                                  for (int i = 0; i < breadCrumbData.length; i++) {
+                                  for (int i = 0;
+                                      i < breadCrumbData.length;
+                                      i++) {
                                     Navigator.pop(context);
                                   }
                                 },
@@ -802,7 +834,8 @@ class _SelectNestedCategoryState extends CloudState<SelectNestedCategory> {
                           ...breadCrumbData.asMap().entries.map((entry) {
                             final index = entry.key;
                             final item = entry.value;
-                            final isNotLast = (breadCrumbData.length - 1) != index;
+                            final isNotLast =
+                                (breadCrumbData.length - 1) != index;
 
                             return Row(
                               mainAxisSize: MainAxisSize.min,
@@ -820,7 +853,8 @@ class _SelectNestedCategoryState extends CloudState<SelectNestedCategory> {
                                       ),
                                 ),
                                 if (isNotLast)
-                                  const Text(" > ").color(context.color.territoryColor)
+                                  const Text(" > ")
+                                      .color(context.color.territoryColor)
                               ],
                             );
                           }),
@@ -833,7 +867,8 @@ class _SelectNestedCategoryState extends CloudState<SelectNestedCategory> {
                     child: FutureBuilder<List<CategoryModel>>(
                       future: _subCategoriesFuture,
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
                           return shimmerEffect();
                         }
                         if (snapshot.hasError) {
@@ -871,7 +906,8 @@ class _SelectNestedCategoryState extends CloudState<SelectNestedCategory> {
                                 alignment: AlignmentDirectional.centerStart,
                                 width: double.infinity,
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14),
                                   child: Row(
                                     children: [
                                       Expanded(
@@ -885,7 +921,8 @@ class _SelectNestedCategoryState extends CloudState<SelectNestedCategory> {
                                         height: 32,
                                         decoration: BoxDecoration(
                                           color: context.color.primaryColor,
-                                          borderRadius: BorderRadius.circular(10),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
                                         ),
                                         child: Icon(
                                           Icons.arrow_forward_ios_sharp,

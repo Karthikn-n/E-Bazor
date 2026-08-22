@@ -53,22 +53,44 @@ class FetchRelatedItemsCubit extends Cubit<FetchRelatedItemsState> {
 
   final ItemRepository _itemRepository = ItemRepository();
 
-  Future<void> fetchRelatedItems(
-      {required int categoryId,
-      String? country,
-      String? state,
-      String? city,
-      int? areaId}) async {
+  Future<void> fetchRelatedItems({
+    required int categoryId,
+    int? itemId,
+    String? country,
+    String? state,
+    String? city,
+    int? areaId,
+  }) async {
     try {
       emit(FetchRelatedItemsInProgress());
 
-      DataOutput<ItemModel> result = await _itemRepository.fetchItemFromCatId(
+      DataOutput<ItemModel> result;
+      if (itemId != null) {
+        try {
+          result = await _itemRepository.fetchSimilarProducts(
+            categoryId: categoryId,
+            itemId: itemId,
+          );
+        } catch (_) {
+          result = await _itemRepository.fetchItemFromCatId(
+            categoryId: categoryId,
+            page: 1,
+            areaId: areaId,
+            city: city,
+            country: country,
+            state: state,
+          );
+        }
+      } else {
+        result = await _itemRepository.fetchItemFromCatId(
           categoryId: categoryId,
           page: 1,
           areaId: areaId,
           city: city,
           country: country,
-          state: state);
+          state: state,
+        );
+      }
 
       emit(
         FetchRelatedItemsSuccess(

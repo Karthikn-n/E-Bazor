@@ -1,9 +1,9 @@
+import 'dart:developer';
 import 'package:Ebozor/app/routes.dart';
-import 'package:Ebozor/data/cubits/delete_advertisment_cubit.dart';
 import 'package:Ebozor/data/cubits/item/fetch_my_promoted_items_cubit.dart';
-import 'package:Ebozor/data/cubits/utility/item_edit_global.dart';
+import 'package:Ebozor/data/model/category_model.dart';
 import 'package:Ebozor/data/model/item/item_model.dart';
-import 'package:Ebozor/data/repositories/advertisement_repository.dart';
+import 'package:Ebozor/data/helper/widgets.dart';
 import 'package:Ebozor/data/repositories/item/item_repository.dart';
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/no_internet.dart';
@@ -13,10 +13,8 @@ import 'package:Ebozor/ui/screens/widgets/shimmerLoadingContainer.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/cloudState/cloud_state.dart';
-import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
-import 'package:Ebozor/utils/string_extenstion.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -56,6 +54,7 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
     "live": 0,
     "payment_pending": 0,
     "under_review": 0,
+    "inactive": 0,
     "drafts": 0,
     "rejected": 0,
     "expired": 0,
@@ -68,8 +67,9 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
   final List<Map<String, String>> _tabs = [
     {"label": "All Ads", "key": "all_ads", "status": ""},
     {"label": "Live", "key": "live", "status": "approved"},
-    {"label": "Payment Pending", "key": "payment_pending", "status": "inactive"},
+    {"label": "Payment Pending", "key": "payment_pending", "status": "pending payment"},
     {"label": "Under Review", "key": "under_review", "status": "review"},
+    {"label": "Inactive", "key": "inactive", "status": "inactive"},
     {"label": "Drafts", "key": "drafts", "status": "drafts"},
     {"label": "Rejected", "key": "rejected", "status": "rejected"},
     {"label": "Expired", "key": "expired", "status": "expired"},
@@ -333,6 +333,51 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
     }
   }
 
+  Future<void> _updateItemStatus(
+      BuildContext context, ItemModel item, String newStatus) async {
+    if (item.id == null) return;
+    try {
+      HelperUtils.showSnackBarMessage(
+        context,
+        "Updating ad status...",
+        type: MessageType.warning,
+      );
+      final response = await ItemRepository().changeMyItemStatus(
+        itemId: item.id!,
+        status: newStatus,
+      );
+      if (response['error'] == true) {
+        final msg = response['message']?.toString() ?? "Failed to update status";
+        if (mounted) {
+          HelperUtils.showSnackBarMessage(
+            context,
+            msg,
+            type: MessageType.error,
+          );
+        }
+        return;
+      }
+      if (mounted) {
+        // Silently update item in cubit without full shimmer reload
+        context.read<FetchMyPromotedItemsCubit>().updateItemStatus(item.id!, newStatus);
+        _fetchCounts();
+        HelperUtils.showSnackBarMessage(
+          context,
+          "Ad status updated to '${newStatus.firstUpperCase()}'",
+          type: MessageType.success,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        HelperUtils.showSnackBarMessage(
+          context,
+          "Failed to update status: $e",
+          type: MessageType.error,
+        );
+      }
+    }
+  }
+
   void _confirmDeleteAd(BuildContext context, ItemModel item) {
     showDialog(
       context: context,
@@ -552,12 +597,18 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
               ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(vertical: 4),
                 itemCount: state.itemModel.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                separatorBuilder: (_, __) => Divider(
+                  height: 1,
+                  thickness: 0.8,
+                  indent: 106,
+                  endIndent: 16,
+                  color: context.color.borderColor.withValues(alpha: 0.35),
+                ),
                 itemBuilder: (context, index) {
                   final item = state.itemModel[index];
-                  return _buildAdCard(context, item);
+                  return _buildAdTile(context, item);
                 },
               ),
               if (state.isLoadingMore)
@@ -609,14 +660,150 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
     );
   }
 
-  Widget _buildAdCard(BuildContext context, ItemModel item) {
+  Future<void> _navigateToEditAd(BuildContext context, ItemModel item) async {
+    Widgets.showLoader(context);
+    ItemModel fullItem = item;
+    try {
+      // The API omits saved custom-field values for some nested categories
+      // when category_id is supplied. The web edit flow also fetches by ID only.
+      final res = await ItemRepository().fetchItemFromItemId(item.id!);
+      if (res.modelList.isNotEmpty) {
+        fullItem = res.modelList.first;
+        if ((fullItem.image ?? '').trim().isEmpty) {
+          fullItem.image = item.image;
+        }
+        if ((fullItem.galleryImages == null ||
+                fullItem.galleryImages!.isEmpty) &&
+            item.galleryImages != null) {
+          fullItem.galleryImages = item.galleryImages;
+        }
+      }
+    } catch (e) {
+      log("⚠️ [EDIT AD FETCH ERROR]: $e");
+    } finally {
+      Widgets.hideLoder(context);
+    }
+
+    if (!context.mounted) return;
+
+    addCloudData("edit_request", fullItem);
+    addCloudData("edit_from", fullItem.status);
+
+    final allCategoryIds = fullItem.allCategoryIds ?? "${fullItem.categoryId ?? ''}";
+    final catIdList = allCategoryIds.split(',').map((e) => e.trim()).toList();
+    final catSlug = (fullItem.category?.slug ?? '').toLowerCase();
+    final catName = (fullItem.category?.name ?? '').toLowerCase();
+
+    // Check if Car
+    final isCar = fullItem.carMake != null ||
+        fullItem.carMakeName != null ||
+        catIdList.contains('5') ||
+        catIdList.contains('6') ||
+        catSlug.contains('car') ||
+        catName.contains('car');
+
+    // Check if Property
+    final isProperty = catIdList.contains('65') ||
+        catIdList.contains('66') ||
+        catIdList.contains('85') ||
+        catIdList.contains('139') ||
+        catIdList.contains('140') ||
+        catIdList.contains('68') ||
+        catIdList.contains('143') ||
+        catSlug.contains('property') ||
+        catName.contains('property');
+
+    // Check if Motor (non-car)
+    final isMotor = catIdList.contains('1') ||
+        catIdList.contains('13') ||
+        catIdList.contains('14') ||
+        catIdList.contains('37') ||
+        catIdList.contains('38') ||
+        catIdList.contains('53') ||
+        catIdList.contains('54') ||
+        catSlug.contains('motor') ||
+        catName.contains('motor') ||
+        catSlug.contains('bike') ||
+        catName.contains('bike') ||
+        catSlug.contains('boat') ||
+        catName.contains('boat') ||
+        catSlug.contains('truck') ||
+        catName.contains('truck');
+
+    final breadcrumbs = fullItem.category != null ? [fullItem.category!] : <CategoryModel>[];
+
+    if (isCar) {
+      Navigator.pushNamed(
+        context,
+        Routes.carSpecsFormScreen,
+        arguments: {
+          'category': fullItem.category,
+          'breadcrumbs': breadcrumbs,
+          'item': fullItem,
+          'isEdit': true,
+          'customFields': fullItem.customFields,
+        },
+      ).then((_) {
+        MyAdvertisementScreen.refreshCallback?.call();
+      });
+    } else if (isProperty) {
+      Navigator.pushNamed(
+        context,
+        Routes.propertyPostingFormScreen,
+        arguments: {
+          'category': fullItem.category,
+          'breadcrumbs': breadcrumbs,
+          'item': fullItem,
+          'isEdit': true,
+          'customFields': fullItem.customFields,
+        },
+      ).then((_) {
+        MyAdvertisementScreen.refreshCallback?.call();
+      });
+    } else if (isMotor) {
+      Navigator.pushNamed(
+        context,
+        Routes.motorPostingFormScreen,
+        arguments: {
+          'category': fullItem.category,
+          'breadcrumbs': breadcrumbs,
+          'item': fullItem,
+          'isEdit': true,
+          'customFields': fullItem.customFields,
+        },
+      ).then((_) {
+        MyAdvertisementScreen.refreshCallback?.call();
+      });
+    } else {
+      // Classifieds / Jobs / Other
+      Navigator.pushNamed(
+        context,
+        Routes.classifiedsPostingFormScreen,
+        arguments: {
+          'category': fullItem.category,
+          'breadcrumbs': breadcrumbs,
+          'item': fullItem,
+          'isEdit': true,
+          'customFields': fullItem.customFields,
+        },
+      ).then((_) {
+        MyAdvertisementScreen.refreshCallback?.call();
+      });
+    }
+  }
+
+  Widget _buildAdTile(BuildContext context, ItemModel item) {
     final statusStr = (item.status ?? "").toLowerCase();
     final isLive = statusStr == "approved" ||
         statusStr == "live" ||
         statusStr == "1" ||
         statusStr == "active";
-    final isPaymentPending = statusStr == "inactive" ||
-        statusStr == "pending payment" ||
+    final isInactive = statusStr == "inactive" ||
+        statusStr == "0" ||
+        statusStr == "deactive" ||
+        statusStr == "deactivated";
+    final isSoldOut = statusStr == "sold out" || statusStr == "sold_out";
+    final isPaymentPending = statusStr == "pending payment" ||
         statusStr == "payment_pending" ||
         statusStr == "pending";
     final isReview = statusStr == "review" || statusStr == "under_review";
@@ -631,6 +818,14 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
       badgeBg = Colors.green.withValues(alpha: 0.12);
       badgeFg = Colors.green;
       badgeLabel = "Live";
+    } else if (isSoldOut) {
+      badgeBg = Colors.purple.withValues(alpha: 0.12);
+      badgeFg = Colors.purple.shade700;
+      badgeLabel = "Sold Out";
+    } else if (isInactive) {
+      badgeBg = Colors.blueGrey.withValues(alpha: 0.14);
+      badgeFg = Colors.blueGrey.shade700;
+      badgeLabel = "Inactive";
     } else if (isPaymentPending) {
       badgeBg = Colors.orange.withValues(alpha: 0.14);
       badgeFg = Colors.orange.shade800;
@@ -654,313 +849,346 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
     }
 
     final isSelected = item.id != null && _selectedItemIds.contains(item.id);
+    final specsSnippet = _extractSpecsSnippet(item);
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onLongPress: () {
-        if (!_isSelectionMode && item.id != null) {
-          _enterSelectionMode(item.id!);
-        }
-      },
-      onTap: () {
-        if (_isSelectionMode && item.id != null) {
-          _toggleSelection(item.id!);
-        } else {
-          Navigator.pushNamed(
-            context,
-            Routes.adDetailsScreen,
-            arguments: {'model': item},
-          );
-        }
-      },
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: context.color.secondaryColor,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isSelected
-                    ? context.color.territoryColor
-                    : context.color.borderColor.withValues(alpha: 0.45),
-                width: isSelected ? 1.5 : 1.0,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Thumbnail Image
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        width: 96,
-                        height: 96,
-                        color: context.color.backgroundColor,
-                        child: UiUtils.getImage(
-                          item.image ?? "",
-                          fit: BoxFit.cover,
-                          width: 96,
-                          height: 96,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-
-                    // Content
-                    Expanded(
-                      child: SizedBox(
-                        height: 96,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            // Status Badge, Views & Action Menu
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: badgeBg,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    badgeLabel,
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: badgeFg,
-                                    ),
-                                  ),
-                                ),
-                                const Spacer(),
-                                if (item.views != null && !_isSelectionMode) ...[
-                                  Icon(
-                                    Icons.visibility_outlined,
-                                    size: 13,
-                                    color: context.color.textLightColor,
-                                  ),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    "${item.views}",
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: context.color.textLightColor,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 2),
-                                ],
-                                if (!_isSelectionMode)
-                                  PopupMenuButton<String>(
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                    icon: Icon(
-                                      Icons.more_vert_rounded,
-                                      size: 18,
-                                      color: context.color.textLightColor,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12)),
-                                    color: context.color.secondaryColor,
-                                    onSelected: (val) {
-                                      if (val == "view") {
-                                        Navigator.pushNamed(
-                                          context,
-                                          Routes.adDetailsScreen,
-                                          arguments: {'model': item},
-                                        );
-                                      } else if (val == "pay") {
-                                        Navigator.pushNamed(
-                                          context,
-                                          Routes.carPackagePaymentScreen,
-                                          arguments: {'model': item},
-                                        );
-                                      } else if (val == "renew") {
-                                        _renewExpiredAd(context, item);
-                                      } else if (val == "delete") {
-                                        _confirmDeleteAd(context, item);
-                                      }
-                                    },
-                                    itemBuilder: (ctx) => [
-                                      PopupMenuItem(
-                                        value: "view",
-                                        height: 36,
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.visibility_outlined,
-                                                size: 16,
-                                                color: context
-                                                    .color.textDefaultColor),
-                                            const SizedBox(width: 8),
-                                            Text("View Details",
-                                                style: TextStyle(
-                                                    fontSize: 13,
-                                                    color: context
-                                                        .color.textDefaultColor)),
-                                          ],
-                                        ),
-                                      ),
-                                      if (isPaymentPending)
-                                        PopupMenuItem(
-                                          value: "pay",
-                                          height: 36,
-                                          child: Row(
-                                            children: const [
-                                              Icon(Icons.payment_outlined,
-                                                  size: 16,
-                                                  color: Color(0xFFD31027)),
-                                              SizedBox(width: 8),
-                                              Text("Pay & Activate",
-                                                  style: TextStyle(
-                                                      fontSize: 13,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: Color(0xFFD31027))),
-                                            ],
-                                          ),
-                                        ),
-                                      if (isExpired)
-                                        PopupMenuItem(
-                                          value: "renew",
-                                          height: 36,
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.refresh_rounded,
-                                                  size: 16,
-                                                  color: Colors.amber.shade800),
-                                              const SizedBox(width: 8),
-                                              Text("Renew Ad",
-                                                  style: TextStyle(
-                                                      fontSize: 13,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: Colors.amber.shade800)),
-                                            ],
-                                          ),
-                                        ),
-                                      PopupMenuItem(
-                                        value: "delete",
-                                        height: 36,
-                                        child: Row(
-                                          children: const [
-                                            Icon(Icons.delete_outline_rounded,
-                                                size: 16, color: Colors.red),
-                                            SizedBox(width: 8),
-                                            Text("Delete Ad",
-                                                style: TextStyle(
-                                                    fontSize: 13,
-                                                    color: Colors.red,
-                                                    fontWeight: FontWeight.w600)),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                              ],
-                            ),
-
-                            // Title
-                            Text(
-                              item.name?.firstUpperCase() ?? "",
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w600,
-                                color: context.color.textDefaultColor,
-                              ),
-                            ),
-
-                            // Price & Date
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  _formatPrice(item.price),
-                                  style: TextStyle(
-                                    fontSize: 15.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: context.color.territoryColor,
-                                  ),
-                                ),
-                                if (item.created != null)
-                                  Text(
-                                    item.created.toString().formatDate(),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: context.color.textLightColor,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
+    return Material(
+      color: isSelected
+          ? context.color.territoryColor.withValues(alpha: 0.08)
+          : context.color.secondaryColor,
+      child: InkWell(
+        onLongPress: () {
+          if (!_isSelectionMode && item.id != null) {
+            _enterSelectionMode(item.id!);
+          }
+        },
+        onTap: () {
+          if (_isSelectionMode && item.id != null) {
+            _toggleSelection(item.id!);
+          } else {
+            Navigator.pushNamed(
+              context,
+              Routes.adDetailsScreen,
+              arguments: {'model': item},
+            );
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Selection Checkbox
+                  if (_isSelectionMode) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(top: 24, right: 10),
+                      child: Icon(
+                        isSelected
+                            ? Icons.check_circle_rounded
+                            : Icons.radio_button_unchecked_rounded,
+                        color: isSelected
+                            ? context.color.territoryColor
+                            : context.color.borderColor,
+                        size: 22,
                       ),
                     ),
                   ],
-                ),
 
-                // If ad is in Payment Pending, show Pay Now CTA button
-                if (isPaymentPending && !_isSelectionMode) ...[
-                  const SizedBox(height: 10),
-                  Divider(
-                      height: 1,
-                      color: context.color.borderColor.withValues(alpha: 0.4)),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          "Ad is inactive pending package payment",
+                  // Thumbnail Image Tile
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      width: 78,
+                      height: 78,
+                      color: context.color.backgroundColor,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          UiUtils.getImage(
+                            item.image ?? "",
+                            fit: BoxFit.cover,
+                            width: 78,
+                            height: 78,
+                          ),
+                          if (item.isFeature == true)
+                            Positioned(
+                              top: 3,
+                              left: 3,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 4, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: context.color.territoryColor,
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                child: const Text(
+                                  "Featured",
+                                  style: TextStyle(
+                                    fontSize: 8.5,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Information Column
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Status Badge + Views + Popup Menu
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: badgeBg,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                badgeLabel,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: badgeFg,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            if (item.views != null && !_isSelectionMode) ...[
+                              Icon(
+                                Icons.visibility_outlined,
+                                size: 13,
+                                color: context.color.textLightColor,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                "${item.views}",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: context.color.textLightColor,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                            ],
+                            if (!_isSelectionMode)
+                              PopupMenuButton<String>(
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                icon: Icon(
+                                  Icons.more_vert_rounded,
+                                  size: 18,
+                                  color: context.color.textLightColor,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                color: context.color.secondaryColor,
+                                onSelected: (val) {
+                                  if (val == "view") {
+                                    Navigator.pushNamed(
+                                      context,
+                                      Routes.adDetailsScreen,
+                                      arguments: {'model': item},
+                                    );
+                                  } else if (val == "edit") {
+                                    _navigateToEditAd(context, item);
+                                  } else if (val == "deactivate") {
+                                    _updateItemStatus(
+                                        context, item, "inactive");
+                                  } else if (val == "sold_out") {
+                                    _updateItemStatus(
+                                        context, item, "sold out");
+                                  } else if (val == "activate") {
+                                    _updateItemStatus(
+                                        context, item, "active");
+                                  } else if (val == "pay") {
+                                    Navigator.pushNamed(
+                                        context,
+                                        Routes.carPackagePaymentScreen,
+                                        arguments: {'model': item},
+                                      );
+                                  } else if (val == "renew") {
+                                    _renewExpiredAd(context, item);
+                                  } else if (val == "delete") {
+                                    _confirmDeleteAd(context, item);
+                                  }
+                                },
+                                itemBuilder: (ctx) => [
+                                  _buildMenuItem(
+                                    context,
+                                    "view",
+                                    Icons.visibility_outlined,
+                                    "View Details",
+                                    context.color.textDefaultColor,
+                                  ),
+                                  if (isLive || isInactive || isSoldOut || isReview)
+                                    _buildMenuItem(
+                                      context,
+                                      "edit",
+                                      Icons.edit_outlined,
+                                      "Edit Ad",
+                                      context.color.textDefaultColor,
+                                    ),
+                                  if (isLive) ...[
+                                    _buildMenuItem(
+                                      context,
+                                      "deactivate",
+                                      Icons.pause_circle_outline_rounded,
+                                      "Deactivate Ad",
+                                      Colors.amber.shade800,
+                                    ),
+                                    _buildMenuItem(
+                                      context,
+                                      "sold_out",
+                                      Icons.check_circle_outline_rounded,
+                                      "Mark as Sold Out",
+                                      Colors.purple,
+                                    ),
+                                  ],
+                                  if (isInactive || isSoldOut)
+                                    _buildMenuItem(
+                                      context,
+                                      "activate",
+                                      Icons.play_circle_outline_rounded,
+                                      "Activate Ad",
+                                      Colors.green,
+                                    ),
+                                  if (isPaymentPending)
+                                    _buildMenuItem(
+                                      context,
+                                      "pay",
+                                      Icons.payment_outlined,
+                                      "Pay & Activate",
+                                      const Color(0xFFD31027),
+                                      bold: true,
+                                    ),
+                                  if (isExpired)
+                                    _buildMenuItem(
+                                      context,
+                                      "renew",
+                                      Icons.refresh_rounded,
+                                      "Renew Ad",
+                                      Colors.amber.shade800,
+                                      bold: true,
+                                    ),
+                                  _buildMenuItem(
+                                    context,
+                                    "delete",
+                                    Icons.delete_outline_rounded,
+                                    "Delete Ad",
+                                    Colors.red,
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+
+                        // Title
+                        Text(
+                          item.name?.firstUpperCase() ?? "",
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 11.5,
-                            color: context.color.textLightColor,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: context.color.textDefaultColor,
+                          ),
+                        ),
+
+                        // Specs / Category snippet
+                        if (specsSnippet.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            specsSnippet,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: context.color.textLightColor,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 4),
+
+                        // Price & Date Row
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _formatPrice(item.price),
+                              style: TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.bold,
+                                color: context.color.territoryColor,
+                              ),
+                            ),
+                            if (item.created != null)
+                              Text(
+                                item.created.toString().formatDate(),
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  color: context.color.textLightColor,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              // Inline Action for Payment Pending
+              if (isPaymentPending && !_isSelectionMode) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          "Ad inactive pending payment",
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.orange.shade900,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
                       InkWell(
                         onTap: () {
                           Navigator.pushNamed(
                             context,
                             Routes.carPackagePaymentScreen,
-                            arguments: {
-                              'model': item,
-                            },
+                            arguments: {'model': item},
                           );
                         },
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(6),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 6),
+                              horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: const Color(0xFFD31027),
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFD31027)
-                                    .withValues(alpha: 0.25),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
+                            borderRadius: BorderRadius.circular(6),
                           ),
                           child: const Text(
                             "Pay Now",
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 11,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
@@ -969,52 +1197,44 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                       ),
                     ],
                   ),
-                ],
+                ),
+              ],
 
-                // If ad is Expired, show Renew CTA button
-                if (isExpired && !_isSelectionMode) ...[
-                  const SizedBox(height: 10),
-                  Divider(
-                      height: 1,
-                      color: context.color.borderColor.withValues(alpha: 0.4)),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // Inline Action for Expired
+              if (isExpired && !_isSelectionMode) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
                     children: [
                       Expanded(
                         child: Text(
-                          "This ad has expired. Renew to make it live again",
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          "Ad expired",
                           style: TextStyle(
-                            fontSize: 11.5,
-                            color: context.color.textLightColor,
+                            fontSize: 11,
+                            color: Colors.amber.shade900,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
                       InkWell(
                         onTap: () => _renewExpiredAd(context, item),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(6),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 6),
+                              horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.amber.shade700,
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.amber.shade700
-                                    .withValues(alpha: 0.25),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
+                            color: Colors.amber.shade800,
+                            borderRadius: BorderRadius.circular(6),
                           ),
                           child: const Text(
                             "Renew",
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 11,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
@@ -1023,48 +1243,75 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                       ),
                     ],
                   ),
-                ],
+                ),
               ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _buildMenuItem(
+    BuildContext context,
+    String value,
+    IconData icon,
+    String text,
+    Color color, {
+    bool bold = false,
+  }) {
+    return PopupMenuItem<String>(
+      value: value,
+      height: 36,
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 13,
+              color: color,
+              fontWeight: bold ? FontWeight.bold : FontWeight.w500,
             ),
           ),
-
-          // Checkmark at Top Right Edge in Selection Mode
-          if (_isSelectionMode)
-            Positioned(
-              top: 8,
-              right: 8,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isSelected
-                      ? context.color.territoryColor
-                      : context.color.secondaryColor,
-                  border: Border.all(
-                    color: isSelected
-                        ? context.color.territoryColor
-                        : context.color.textLightColor.withValues(alpha: 0.6),
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    if (isSelected)
-                      BoxShadow(
-                        color: context.color.territoryColor.withValues(alpha: 0.3),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                  ],
-                ),
-                child: isSelected
-                    ? const Icon(Icons.check, size: 16, color: Colors.white)
-                    : null,
-              ),
-            ),
         ],
       ),
     );
+  }
+
+  String _extractSpecsSnippet(ItemModel item) {
+    List<String> parts = [];
+    if (item.customFields != null) {
+      for (final cf in item.customFields!) {
+        final name = (cf.name ?? '').toLowerCase();
+        if ((name.contains('year') ||
+                name.contains('kilometer') ||
+                name.contains('specs') ||
+                name.contains('fuel') ||
+                name.contains('brand') ||
+                name.contains('make') ||
+                name.contains('model')) &&
+            cf.value != null &&
+            cf.value!.isNotEmpty) {
+          final val = cf.value!.first.toString().trim();
+          if (val.isNotEmpty && !parts.contains(val)) {
+            parts.add(val);
+          }
+        }
+      }
+    }
+    if (parts.isEmpty) {
+      if (item.category?.name != null && item.category!.name!.isNotEmpty) {
+        parts.add(item.category!.name!);
+      }
+      if (item.area != null && item.area!.isNotEmpty) {
+        parts.add(item.area!);
+      } else if (item.city != null && item.city!.isNotEmpty) {
+        parts.add(item.city!);
+      }
+    }
+    return parts.take(3).join(" • ");
   }
 
   Widget _buildEmptyState() {

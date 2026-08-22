@@ -1,5 +1,3 @@
-import 'dart:developer';
-
 import 'package:Ebozor/app/app_theme.dart';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/system/app_theme_cubit.dart';
@@ -7,8 +5,8 @@ import 'package:Ebozor/ui/screens/home/home_screen.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
-import 'package:Ebozor/utils/responsiveSize.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
+import 'package:Ebozor/ui/screens/widgets/dialogs/save_to_favorite_bottom_sheet.dart';
 import 'package:Ebozor/data/repositories/favourites_repository.dart';
 import 'package:Ebozor/data/cubits/favorite/manage_fav_cubit.dart';
 import 'package:Ebozor/data/model/item/item_model.dart';
@@ -19,8 +17,6 @@ import 'package:Ebozor/utils/app_icon.dart';
 
 import 'package:Ebozor/data/cubits/favorite/favorite_cubit.dart';
 import 'package:Ebozor/data/model/home/home_screen_section.dart';
-
-import 'package:Ebozor/ui/screens/widgets/promoted_widget.dart';
 import 'package:Ebozor/ui/screens/home/widgets/grid_list_adapter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -238,12 +234,19 @@ class _ItemCardState extends State<ItemCard> {
                     UiUtils.checkUser(
                       context: context,
                       onNotGuest: () {
+                        if (isLike) {
+                          context
+                              .read<UpdateFavoriteCubit>()
+                              .setFavoriteItem(
+                            item: widget.item!,
+                            type: 0,
+                          );
+                          return;
+                        }
                         context
                             .read<UpdateFavoriteCubit>()
-                            .setFavoriteItem(
-                          item: widget.item!,
-                          type: isLike ? 0 : 1,
-                        );
+                            .setFavoriteItem(item: widget.item!, type: 1);
+                        SaveToFavoriteBottomSheet.show(context, item: widget.item!);
                       },
                     );
                   },

@@ -48,9 +48,9 @@ class CategoryHomeCard extends StatelessWidget {
                     ? UiUtils.imageType(
                         url,
                         fit: BoxFit.contain,
-                        color: url.endsWith('.svg')
-                            ? context.color.territoryColor
-                            : null,
+                        // color: url.endsWith('.svg')
+                        //     ? context.color.territoryColor
+                        //     : null,
                       )
                     : Icon(
                         Icons.category_outlined,

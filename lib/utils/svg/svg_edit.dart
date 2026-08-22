@@ -4,7 +4,7 @@ import 'package:xml/xml.dart';
 
 class SVGEdit {
   XmlDocument? document;
-  changeWhere(XmlNode node,
+  void changeWhere(XmlNode node,
       {required String id, required String attribute, String? value}) {
     if (node is XmlElement) {
       String? attr = node.getAttribute(attribute);
@@ -18,7 +18,7 @@ class SVGEdit {
     }
   }
 
-  change(
+  void change(
     String id, {
     required String attribute,
     required String value,

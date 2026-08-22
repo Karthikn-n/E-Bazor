@@ -110,7 +110,7 @@ class CustomRadioField extends CustomField {
                     alignment: WrapAlignment.start,
                     runAlignment: WrapAlignment.start,
                     crossAxisAlignment: WrapCrossAlignment.start,
-                    children: List.generate(values!.length ?? 0, (index) {
+                    children: List.generate(values!.length, (index) {
                       var element = values![index];
 
                       return Padding(

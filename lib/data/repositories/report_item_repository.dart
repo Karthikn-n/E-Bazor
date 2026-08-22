@@ -20,8 +20,36 @@ class ReportItemRepository {
     }
   }
 
-  Future<Map> reportItem(
-      {required int reasonId, required int itemId, String? message}) async {
+  Future<Map> reportAd({
+    required int userId,
+    required int itemId,
+    required String reportType,
+    required String reportText,
+    String? spamType,
+  }) async {
+    try {
+      Map response = await Api.post(
+        url: Api.adReportApi,
+        parameter: {
+          "user_id": userId,
+          "item_id": itemId,
+          "report_type": reportType,
+          "report_text": reportText,
+          if (spamType != null && spamType.isNotEmpty) "spam_type": spamType,
+        },
+      );
+
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<Map> reportItem({
+    required int reasonId,
+    required int itemId,
+    String? message,
+  }) async {
     try {
       Map response = await Api.post(
         url: Api.addReportsApi,
@@ -31,7 +59,6 @@ class ReportItemRepository {
           if (message != null) "other_message": message
         },
       );
-
 
       return response;
     } catch (e) {

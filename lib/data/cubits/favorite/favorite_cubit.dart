@@ -53,13 +53,27 @@ class FavoriteFetchFailure extends FavoriteState {
 
 class FavoriteCubit extends Cubit<FavoriteState>{
   final FavoriteRepository favoriteRepository;
+  int? currentListingId;
+  String? currentSearch;
+  int? currentCategoryId;
+  final Map<int, Set<int>> _listingIdsByItem = {};
+  final Set<int> _itemsWithLoadedListings = {};
 
   FavoriteCubit(this.favoriteRepository) : super(FavoriteInitial());
 
-  void getFavorite() async {
+  void getFavorite({int? favouritelistingId, String? search, int? categoryId}) async {
+    currentListingId = favouritelistingId;
+    currentSearch = search;
+    currentCategoryId = categoryId;
+
     try {
       emit(FavoriteFetchInProgress());
-      final result = await favoriteRepository.fetchFavorites(page: 1);
+      final result = await favoriteRepository.fetchFavorites(
+        page: 1,
+        favouritelistingId: currentListingId,
+        search: currentSearch,
+        categoryId: currentCategoryId,
+      );
 
       emit(FavoriteFetchSuccess(
           favorite: result.modelList,
@@ -98,7 +112,11 @@ class FavoriteCubit extends Cubit<FavoriteState>{
         }
         emit((state as FavoriteFetchSuccess).copyWith(isLoadingMore: true));
         final result = await favoriteRepository.fetchFavorites(
-            page: (state as FavoriteFetchSuccess).page + 1);
+          page: (state as FavoriteFetchSuccess).page + 1,
+          favouritelistingId: currentListingId,
+          search: currentSearch,
+          categoryId: currentCategoryId,
+        );
         List<ItemModel> updatedResults =
             (state as FavoriteFetchSuccess).favorite;
         updatedResults.addAll(result.modelList);
@@ -124,6 +142,7 @@ class FavoriteCubit extends Cubit<FavoriteState>{
 
   void addFavoriteitem(ItemModel model) {
     if (state is FavoriteFetchSuccess) {
+      if (isItemFavorite(model.id!)) return;
       List<ItemModel> favoriteList = [];
 
       model.totalLikes = (model.totalLikes ?? 0) + 1;
@@ -143,6 +162,11 @@ class FavoriteCubit extends Cubit<FavoriteState>{
   }
 
   void removeFavoriteItem(ItemModel model) {
+    final itemId = model.id;
+    if (itemId != null) {
+      _listingIdsByItem.remove(itemId);
+      _itemsWithLoadedListings.remove(itemId);
+    }
     if (state is FavoriteFetchSuccess) {
       final favorite = (state as FavoriteFetchSuccess).favorite;
 
@@ -180,7 +204,30 @@ class FavoriteCubit extends Cubit<FavoriteState>{
     return false;
   }
 
+  bool hasLoadedFavoriteListings(int itemId) =>
+      _itemsWithLoadedListings.contains(itemId);
+
+  Set<int> favoriteListingIds(int itemId) =>
+      Set<int>.from(_listingIdsByItem[itemId] ?? const <int>{});
+
+  void setFavoriteListingIds(int itemId, Iterable<int> listingIds) {
+    _listingIdsByItem[itemId] = listingIds.toSet();
+    _itemsWithLoadedListings.add(itemId);
+  }
+
+  void setFavoriteListingMembership(
+    int itemId,
+    int listingId, {
+    required bool isAdded,
+  }) {
+    final listingIds = _listingIdsByItem.putIfAbsent(itemId, () => <int>{});
+    isAdded ? listingIds.add(listingId) : listingIds.remove(listingId);
+    _itemsWithLoadedListings.add(itemId);
+  }
+
   void resetState() {
+    _listingIdsByItem.clear();
+    _itemsWithLoadedListings.clear();
     emit(FavoriteFetchInProgress());
   }
 

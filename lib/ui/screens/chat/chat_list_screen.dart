@@ -2,16 +2,13 @@ import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/chat/blocked_users_list_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/get_buyer_chat_users_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/get_seller_chat_users_cubit.dart';
-import 'package:Ebozor/data/model/chat/chated_user_model.dart';
 import 'package:Ebozor/ui/screens/chat/chatTile.dart' show ChatTile;
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/no_internet.dart';
-import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
 import 'package:Ebozor/ui/screens/widgets/shimmerLoadingContainer.dart' show CustomShimmer;
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
-import 'package:Ebozor/utils/app_icon.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
@@ -187,12 +184,17 @@ class _ChatListScreenState extends State<ChatListScreen>
 
             return ListView.separated(
               controller: _chatBuyerScreenController,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(vertical: 4),
               physics: const AlwaysScrollableScrollPhysics(
                 parent: BouncingScrollPhysics(),
               ),
               itemCount: state.chatedUserList.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 2),
+              separatorBuilder: (_, __) => Divider(
+                height: 1,
+                indent: 82,
+                endIndent: 16,
+                color: context.color.borderColor.withValues(alpha: 0.35),
+              ),
               itemBuilder: (context, index) {
                 final chatedUser = state.chatedUserList[index];
 
@@ -255,12 +257,17 @@ class _ChatListScreenState extends State<ChatListScreen>
 
             return ListView.separated(
               controller: _chatSellerScreenController,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(vertical: 4),
               physics: const AlwaysScrollableScrollPhysics(
                 parent: BouncingScrollPhysics(),
               ),
               itemCount: state.chatedUserList.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 2),
+              separatorBuilder: (_, __) => Divider(
+                height: 1,
+                indent: 82,
+                endIndent: 16,
+                color: context.color.borderColor.withValues(alpha: 0.35),
+              ),
               itemBuilder: (context, index) {
                 final chatedUser = state.chatedUserList[index];
 
@@ -301,15 +308,15 @@ class _ChatListScreenState extends State<ChatListScreen>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 80,
-                height: 80,
+                width: 90,
+                height: 90,
                 decoration: BoxDecoration(
+                  color: context.color.territoryColor.withValues(alpha: 0.08),
                   shape: BoxShape.circle,
-                  color: context.color.territoryColor.withValues(alpha: 0.1),
                 ),
                 child: Icon(
                   Icons.chat_bubble_outline_rounded,
-                  size: 38,
+                  size: 40,
                   color: context.color.territoryColor,
                 ),
               ),
@@ -341,21 +348,20 @@ class _ChatListScreenState extends State<ChatListScreen>
   }
 
   Widget _buildChatListLoadingShimmer() {
-    return ListView.builder(
+    return ListView.separated(
       itemCount: 8,
       physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      separatorBuilder: (_, __) => Divider(
+        height: 1,
+        indent: 82,
+        endIndent: 16,
+        color: context.color.borderColor.withValues(alpha: 0.35),
+      ),
       itemBuilder: (context, index) {
         return Container(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: context.color.secondaryColor,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: context.color.borderColor.withValues(alpha: 0.6),
-            ),
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          color: context.color.secondaryColor,
           child: Row(
             children: [
               Shimmer.fromColors(

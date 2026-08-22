@@ -91,10 +91,7 @@ class BlurredDialogBox extends StatelessWidget implements BlurDialoge {
 
             child: LayoutBuilder(builder: (context, constraints) {
               return AlertDialog(
-                backgroundColor: context.color.secondaryColor ??
-                    makeColorDark(
-                      context.color.primaryColor,
-                    ),
+                backgroundColor: context.color.secondaryColor,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15)),
                 title: Column(

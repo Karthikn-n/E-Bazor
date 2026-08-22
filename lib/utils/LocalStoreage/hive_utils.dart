@@ -90,7 +90,7 @@ class HiveUtils {
         .put(HiveKeys.isProfileCompleted, false);
   }
 
-  static setCurrentTheme(AppTheme theme) {
+  static void setCurrentTheme(AppTheme theme) {
     String newTheme;
     if (theme == AppTheme.light) {
       newTheme = "light";
@@ -327,13 +327,28 @@ class HiveUtils {
     return Hive.box(HiveKeys.authBox).get(HiveKeys.isUserSkip) ?? false;
   }
 
-  static logoutUser(context,
+  static Future<void> logoutUser(context,
       {required VoidCallback onLogout, bool? isRedirect}) async {
-    await Hive.box(HiveKeys.userDetailsBox).clear();
+    try {
+      await Hive.box(HiveKeys.userDetailsBox).clear();
+    } catch (_) {}
+    try {
+      await Hive.box(HiveKeys.historyBox).clear();
+    } catch (_) {}
+    try {
+      await Hive.box(HiveKeys.jwtToken).clear();
+    } catch (_) {}
+
     HiveUtils.setUserIsAuthenticated(false);
     HiveUtils.setEmailVerificationPending(false);
 
-    //GuestChecker.set(isGuest: true);
+    try {
+      await Hive.box(HiveKeys.authBox).delete(HiveKeys.isProfileCompleted);
+      await Hive.box(HiveKeys.authBox).delete(HiveKeys.isUserSkip);
+    } catch (_) {}
+
+    Constant.favoriteItemList.clear();
+
     onLogout.call();
 
     Future.delayed(
@@ -347,10 +362,24 @@ class HiveUtils {
   }
 
   static void clear() async {
-    await Hive.box(HiveKeys.userDetailsBox).clear();
-    await Hive.box(HiveKeys.historyBox).clear();
+    try {
+      await Hive.box(HiveKeys.userDetailsBox).clear();
+    } catch (_) {}
+    try {
+      await Hive.box(HiveKeys.historyBox).clear();
+    } catch (_) {}
+    try {
+      await Hive.box(HiveKeys.jwtToken).clear();
+    } catch (_) {}
+
     HiveUtils.setUserIsAuthenticated(false);
     HiveUtils.setEmailVerificationPending(false);
-    //GuestChecker.set(isGuest: true);
+
+    try {
+      await Hive.box(HiveKeys.authBox).delete(HiveKeys.isProfileCompleted);
+      await Hive.box(HiveKeys.authBox).delete(HiveKeys.isUserSkip);
+    } catch (_) {}
+
+    Constant.favoriteItemList.clear();
   }
 }

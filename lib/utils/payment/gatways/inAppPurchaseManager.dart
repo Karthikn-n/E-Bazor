@@ -182,7 +182,7 @@ class InAppPurchaseManager {
     }
   }
 
-  static getPendings() {
+  static void getPendings() {
     _inAppPurchase.purchaseStream.listen((event) {
       ;
     });

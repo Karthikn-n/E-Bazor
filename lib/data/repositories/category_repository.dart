@@ -106,50 +106,6 @@ class CategoryRepository {
     }
   }
 
-  static List<CategoryModel> _extractFrontCategories(List<CategoryModel> categories) {
-    List<CategoryModel> frontList = [];
-    Set<int> seenIds = {};
-
-    void traverse(CategoryModel cat) {
-      if (cat.frontList == true && cat.id != null && !seenIds.contains(cat.id!)) {
-        seenIds.add(cat.id!);
-        frontList.add(cat);
-      }
-      if (cat.children != null) {
-        for (var child in cat.children!) {
-          traverse(child);
-        }
-      }
-    }
-
-    for (var cat in categories) {
-      traverse(cat);
-    }
-
-    const preferredOrder = [
-      65,  // Property for Rent
-      68,  // Rooms For Rent
-      139, // Property for Sale
-      143, // Off-Plan
-      219, // Furniture Home & Garden
-      220, // Mobile Phones & Tablets
-      1,   // Motors
-      2,   // Classifieds
-      4,   // Jobs
-    ];
-
-    frontList.sort((a, b) {
-      int ia = preferredOrder.indexOf(a.id ?? -1);
-      int ib = preferredOrder.indexOf(b.id ?? -1);
-      if (ia != -1 && ib != -1) return ia.compareTo(ib);
-      if (ia != -1) return -1;
-      if (ib != -1) return 1;
-      return 0;
-    });
-
-    return frontList;
-  }
-
   Future<List<CategoryModel>> fetchCategoryChildrenByParent({
     int? parentId,
     String? slug,

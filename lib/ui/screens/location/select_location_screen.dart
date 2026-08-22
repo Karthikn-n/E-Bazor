@@ -127,8 +127,10 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
       }
 
       Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 8),
+        locationSettings: LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 8),
+        ),
       );
 
       List<Placemark> placemarks = await placemarkFromCoordinates(

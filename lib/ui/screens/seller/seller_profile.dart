@@ -521,16 +521,7 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
       }
       return Container();
     });
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: sidePadding, vertical: 10),
-      child: Column(children: [
-        Container(
-          decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              color: context.color.secondaryColor),
-        )
-      ]),
-    );
+
   }
 
 // Rating summary widget (similar to the top section of your image)

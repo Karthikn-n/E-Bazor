@@ -28,7 +28,7 @@ class FetchHomeScreenCubit extends Cubit<FetchHomeScreenState>
 
   final HomeRepository _homeRepository = HomeRepository();
 
-  fetch({String? country, String? state, String? city, int? areaId, String? slug}) async {
+  Future<void> fetch({String? country, String? state, String? city, int? areaId, String? slug}) async {
     try {
       emit(FetchHomeScreenInProgress());
       List<HomeScreenSection> homeScreenDataList =

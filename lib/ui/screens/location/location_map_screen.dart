@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/confirm_location_screen.dart';
@@ -7,10 +6,7 @@ import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
-import 'package:Ebozor/utils/responsiveSize.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
@@ -170,8 +166,10 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
       if (permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always) {
         Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 8),
+          locationSettings: LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: const Duration(seconds: 8),
+          ),
         );
 
         latitude = position.latitude;
@@ -368,8 +366,6 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: context.color.backgroundColor,

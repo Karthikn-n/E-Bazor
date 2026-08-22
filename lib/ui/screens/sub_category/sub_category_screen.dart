@@ -1,6 +1,7 @@
 import 'package:Ebozor/data/cubits/category/fetch_sub_categories_cubit.dart';
-import 'package:Ebozor/ui/screens/propertyscreen.dart';
-import 'package:Ebozor/ui/screens/widgets/car_finance_calculator.dart';
+import 'package:Ebozor/data/model/motors_service_models.dart';
+import 'package:Ebozor/ui/screens/home/widgets/jobs_bottom_sheet.dart';
+import 'package:Ebozor/ui/screens/sub_category/sub_category_filter_screen.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -11,11 +12,9 @@ import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/model/category_model.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
-import 'package:Ebozor/ui/screens/widgets/errors/no_data_found.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/no_internet.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
-
 
 class SubCategoryScreenOne extends StatefulWidget {
   final List<CategoryModel> categoryList;
@@ -25,10 +24,10 @@ class SubCategoryScreenOne extends StatefulWidget {
 
   const SubCategoryScreenOne(
       {super.key,
-        required this.categoryList,
-        required this.catName,
-        required this.catId,
-        required this.categoryIds});
+      required this.categoryList,
+      required this.catName,
+      required this.catId,
+      required this.categoryIds});
 
   @override
   State<SubCategoryScreenOne> createState() => _SubCategoryScreenOneState();
@@ -36,11 +35,14 @@ class SubCategoryScreenOne extends StatefulWidget {
   static Route route(RouteSettings routeSettings) {
     Map? args = routeSettings.arguments as Map?;
     return BlurredRouter(
-      builder: (_) => SubCategoryScreenOne(
-        categoryList: args?['categoryList'] ?? [],
-        catName: args?['catName'] ?? "",
-        catId: args?['catId'] ?? 0,
-        categoryIds: args?['categoryIds'] ?? [],
+      builder: (_) => BlocProvider(
+        create: (context) => FetchSubCategoriesCubit(),
+        child: SubCategoryScreenOne(
+          categoryList: args?['categoryList'] ?? [],
+          catName: args?['catName'] ?? "",
+          catId: args?['catId'] ?? 0,
+          categoryIds: args?['categoryIds'] ?? [],
+        ),
       ),
     );
   }
@@ -52,19 +54,15 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
 
   @override
   void initState() {
-    getSubCategories();
-    if (widget.categoryList.isEmpty) {
-      controller.addListener(pageScrollListen);
-    }
     super.initState();
+    getSubCategories();
+    controller.addListener(pageScrollListen);
   }
 
   void getSubCategories() {
-    if (widget.categoryList.isEmpty) {
-      context
-          .read<FetchSubCategoriesCubit>()
-          .fetchSubCategories(categoryId: widget.catId);
-    }
+    context
+        .read<FetchSubCategoriesCubit>()
+        .fetchSubCategories(categoryId: widget.catId);
   }
 
   void pageScrollListen() {
@@ -88,54 +86,16 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
 
   @override
   Widget build(BuildContext context) {
+    const filterCategoryIds = [65, 68, 139, 143];
     if (widget.catName.toLowerCase() == "property" ||
-        widget.catName.toLowerCase() == "properties") {
-      if (widget.categoryList.isNotEmpty) {
-        return PropertyFilterScreen(
-          categoryList: widget.categoryList,
-          catName: widget.catName,
-          catId: widget.catId,
-          categoryIds: widget.categoryIds,
-        );
-      }
-
-      return BlocBuilder<FetchSubCategoriesCubit, FetchSubCategoriesState>(
-        builder: (context, state) {
-          if (state is FetchSubCategoriesSuccess) {
-            return PropertyFilterScreen(
-              categoryList: state.categories,
-              catName: widget.catName,
-              catId: widget.catId,
-              categoryIds: widget.categoryIds,
-            );
-          }
-          if (state is FetchSubCategoriesFailure) {
-            if (state.errorMessage is ApiException) {
-              if (state.errorMessage == "no-internet") {
-                return Scaffold(
-                  body: NoInternet(
-                    onRetry: () {
-                      context
-                          .read<FetchSubCategoriesCubit>()
-                          .fetchSubCategories(categoryId: widget.catId);
-                    },
-                  ),
-                );
-              }
-            }
-            return Scaffold(body: const SomethingWentWrong());
-          }
-
-          return Scaffold(
-              appBar: UiUtils.buildAppBar(
-                context,
-                showBackButton: true,
-                title: widget.catName,
-              ),
-              body: Padding(
-                  padding: const EdgeInsets.only(top: 5.0),
-                  child: shimmerEffect()));
-        },
+        widget.catName.toLowerCase() == "properties" ||
+        filterCategoryIds.contains(widget.catId)) {
+      return FiltersPage(
+        category: CategoryModel(
+          id: widget.catId,
+          name: widget.catName,
+          children: widget.categoryList,
+        ),
       );
     }
 
@@ -187,176 +147,7 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
                       thickness: 1.2,
                       height: 10,
                     ),
-                    widget.categoryList.isNotEmpty
-                        ? ListView.separated(
-                      itemCount: widget.categoryList.length,
-                      padding: EdgeInsets.zero,
-                      physics: const NeverScrollableScrollPhysics(),
-                      shrinkWrap: true,
-                      separatorBuilder: (context, index) {
-                        return const Divider(
-                          thickness: 1.2,
-                          height: 10,
-                        );
-                      },
-                      itemBuilder: (context, index) {
-                        CategoryModel category =
-                        widget.categoryList[index];
-                        return ListTile(
-                          onTap: () {
-                            final children = category.children ?? [];
-                            final subCount = category.subcategoriesCount ?? 0;
-
-                            if (children.isEmpty && subCount == 0) {
-                              Navigator.pushNamed(
-                                context,
-                                Routes.itemsList,
-                                arguments: {
-                                  'catID': category.id?.toString() ?? "",
-                                  'catName': category.name ?? "",
-                                  "categoryIds": [
-                                    ...widget.categoryIds,
-                                    category.id?.toString() ?? ""
-                                  ]
-                                },
-                              );
-                            } else {
-                              Navigator.pushNamed(
-                                context,
-                                Routes.subCategoryScreen,
-                                arguments: {
-                                  "categoryList": children,
-                                  "catName": category.name ?? "",
-                                  "catId": category.id ?? 0,
-                                  "categoryIds": [
-                                    ...widget.categoryIds,
-                                    category.id?.toString() ?? ""
-                                  ]
-                                },
-                              );
-                            }
-                          },
-
-                          leading: Container(
-                            width: 48,
-                            height: 48,
-                            padding: const EdgeInsets.all(9),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: context.color.territoryColor.withValues(alpha: 0.1),
-                            ),
-                            child: (category.url != null && category.url!.trim().isNotEmpty)
-                                ? UiUtils.imageType(
-                                    category.url!,
-                                    color: category.url!.endsWith('.svg')
-                                        ? context.color.territoryColor
-                                        : null,
-                                    fit: BoxFit.contain,
-                                  )
-                                : Icon(
-                                    Icons.category_outlined,
-                                    size: 24,
-                                    color: context.color.territoryColor,
-                                  ),
-                          ),
-
-                          title: Text(
-                            category.name ?? "No Name", // ✅ FIX
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          )
-                              .color(context.color.textDefaultColor)
-                              .size(context.font.normal),
-
-                          trailing: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              color: context.color.borderColor.darken(10),
-                            ),
-                            child: Icon(
-                              Icons.chevron_right_outlined,
-                              color: context.color.textDefaultColor,
-                            ),
-                          ),
-                        );
-                        //             0) {
-                        //       Navigator.pushNamed(
-                        //           context, Routes.itemsList,
-                        //           arguments: {
-                        //             'catID': widget.categoryList[index].id
-                        //                 .toString(),
-                        //             'catName':
-                        //             widget.categoryList[index].name,
-                        //             "categoryIds": [
-                        //               ...widget.categoryIds,
-                        //               widget.categoryList[index].id
-                        //                   .toString()
-                        //             ]
-                        //           });
-                        //     } else {
-                        //       Navigator.pushNamed(
-                        //           context, Routes.subCategoryScreen,
-                        //           arguments: {
-                        //             "categoryList": widget
-                        //                 .categoryList[index].children,
-                        //             "catName":
-                        //             widget.categoryList[index].name,
-                        //             "catId":
-                        //             widget.categoryList[index].id,
-                        //             "categoryIds": [
-                        //               ...widget.categoryIds,
-                        //               widget.categoryList[index].id
-                        //                   .toString()
-                        //             ]
-                        //           });
-                        //     }
-                        //   },
-                        //   leading: FittedBox(
-                        //     child: Container(
-                        //         width: 40,
-                        //         height: 40,
-                        //         clipBehavior: Clip.antiAlias,
-                        //         padding: const EdgeInsets.all(0),
-                        //         decoration: BoxDecoration(
-                        //             shape: BoxShape.circle,
-                        //             color: context.color.territoryColor
-                        //                 .withValues(alpha: 0.1)),
-                        //         child: ClipRRect(
-                        //           child: UiUtils.imageType(
-                        //             category.url!,
-                        //             color: context.color.territoryColor,
-                        //             width: double.infinity,
-                        //             height: double.infinity,
-                        //             fit: BoxFit.cover,
-                        //           ),
-                        //         )),
-                        //   ),
-                        //   title: Text(
-                        //     category.name!,
-                        //     textAlign: TextAlign.start,
-                        //     maxLines: 2,
-                        //     overflow: TextOverflow.ellipsis,
-                        //   )
-                        //       .color(context.color.textDefaultColor)
-                        //       .size(context.font.normal),
-                        //   trailing: Container(
-                        //       width: 32,
-                        //       height: 32,
-                        //       decoration: BoxDecoration(
-                        //           borderRadius: BorderRadius.circular(8),
-                        //           color: context.color.borderColor
-                        //               .darken(10)),
-                        //       child: Icon(
-                        //         Icons.chevron_right_outlined,
-                        //         color: context.color.textDefaultColor,
-                        //       )),
-                        // );
-                      },
-                    )
-                        : fetchSubCategoriesData(),
-
+                    fetchSubCategoriesData(),
                     if (_isMotorCategory) ...[
                       const SizedBox(height: 20),
                       Padding(
@@ -410,13 +201,20 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
 
         if (state is FetchSubCategoriesSuccess) {
           if (state.categories.isEmpty) {
-            return NoDataFound(
-              onTap: () {
-                context
-                    .read<FetchSubCategoriesCubit>()
-                    .fetchSubCategories(categoryId: widget.catId);
-              },
-            );
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                Navigator.pushReplacementNamed(
+                  context,
+                  Routes.itemsList,
+                  arguments: {
+                    'catID': widget.catId.toString(),
+                    'catName': widget.catName,
+                    "categoryIds": [...widget.categoryIds],
+                  },
+                );
+              }
+            });
+            return shimmerEffect();
           }
           return Column(
             mainAxisSize: MainAxisSize.min,
@@ -426,7 +224,7 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
                 itemCount: state.categories.length,
                 padding: EdgeInsets.zero,
                 controller: controller,
-                physics: NeverScrollableScrollPhysics(),
+                physics: const NeverScrollableScrollPhysics(),
                 shrinkWrap: true,
                 separatorBuilder: (context, index) {
                   return const Divider(
@@ -439,31 +237,45 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
 
                   return ListTile(
                     onTap: () {
-                      final children = category.children ?? [];
-                      final subCount = category.subcategoriesCount ?? 0;
-
-                      if (children.isEmpty && subCount == 0) {
-                        Navigator.pushNamed(context, Routes.itemsList,
-                            arguments: {
-                              'catID': category.id?.toString() ?? "",
-                              'catName': category.name ?? "",
-                              "categoryIds": [
-                                ...widget.categoryIds,
-                                category.id?.toString() ?? ""
-                              ]
-                            });
-                      } else {
-                        Navigator.pushNamed(context, Routes.subCategoryScreen,
-                            arguments: {
-                              "categoryList": children,
-                              "catName": category.name ?? "",
-                              "catId": category.id ?? 0,
-                              "categoryIds": [
-                                ...widget.categoryIds,
-                                category.id?.toString() ?? ""
-                              ]
-                            });
+                      const filterCategoryIds = [65, 68, 139, 143];
+                      if (filterCategoryIds.contains(category.id) ||
+                          (category.name != null &&
+                              (category.name!
+                                      .toLowerCase()
+                                      .contains("property") ||
+                                  category.name!
+                                      .toLowerCase()
+                                      .contains("properties")))) {
+                        Navigator.pushNamed(
+                          context,
+                          Routes.filterpage,
+                          arguments: category,
+                        );
+                        return;
                       }
+
+                      if (category.id == 4 ||
+                          (category.name != null &&
+                              category.name!.toLowerCase() == 'jobs') ||
+                          (category.slug != null &&
+                              category.slug!.toLowerCase() == 'jobs')) {
+                        JobsBottomSheet.show(context, jobsCategory: category);
+                        return;
+                      }
+
+                      Navigator.pushNamed(
+                        context,
+                        Routes.subCategoryScreen,
+                        arguments: {
+                          "categoryList": category.children ?? [],
+                          "catName": category.name ?? "",
+                          "catId": category.id ?? 0,
+                          "categoryIds": [
+                            ...widget.categoryIds,
+                            category.id?.toString() ?? ""
+                          ]
+                        },
+                      );
                     },
                     leading: Container(
                       width: 48,
@@ -471,9 +283,11 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
                       padding: const EdgeInsets.all(9),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: context.color.territoryColor.withValues(alpha: 0.1),
+                        color:
+                            context.color.territoryColor.withValues(alpha: 0.1),
                       ),
-                      child: (category.url != null && category.url!.trim().isNotEmpty)
+                      child: (category.url != null &&
+                              category.url!.trim().isNotEmpty)
                           ? UiUtils.imageType(
                               category.url!,
                               color: category.url!.endsWith('.svg')
@@ -488,7 +302,7 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
                             ),
                     ),
                     title: Text(
-                      category.name!,
+                      category.name ?? "No Name",
                       textAlign: TextAlign.start,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -654,14 +468,10 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
             size: 32,
             color: Colors.redAccent.shade200,
           ),
-          onTap: () => _showServiceBottomSheet(
-            context: context,
-            title: "Car Inspection",
-            description:
-                "Get a comprehensive 150+ point vehicle inspection conducted by certified automotive technicians before buying or selling.",
-            actionText: "Request Inspection",
-            icon: Icons.car_repair_rounded,
-            accentColor: Colors.redAccent,
+          onTap: () => Navigator.pushNamed(
+            context,
+            Routes.motorsServiceScreen,
+            arguments: MotorsServiceType.inspection,
           ),
         ),
 
@@ -686,7 +496,11 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
               ),
             ),
           ),
-          onTap: () => _openCarFinanceModal(context),
+          onTap: () => Navigator.pushNamed(
+            context,
+            Routes.motorsServiceScreen,
+            arguments: MotorsServiceType.finance,
+          ),
         ),
 
         // 3. Car Evaluation
@@ -700,14 +514,10 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
             size: 30,
             color: Colors.amber.shade700,
           ),
-          onTap: () => _showServiceBottomSheet(
-            context: context,
-            title: "Car Evaluation",
-            description:
-                "Find out the accurate market value of your vehicle based on real-time UAE market trends and valuation insights.",
-            actionText: "Evaluate Now",
-            icon: Icons.assignment_turned_in_rounded,
-            accentColor: Colors.amber.shade800,
+          onTap: () => Navigator.pushNamed(
+            context,
+            Routes.motorsServiceScreen,
+            arguments: MotorsServiceType.evaluation,
           ),
         ),
       ],
@@ -753,140 +563,6 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
           ),
         ),
       ),
-    );
-  }
-
-  void _openCarFinanceModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: context.color.secondaryColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.85,
-          minChildSize: 0.5,
-          maxChildSize: 0.95,
-          expand: false,
-          builder: (_, scrollController) {
-            return SingleChildScrollView(
-              controller: scrollController,
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const CarFinanceCalculator(
-                    initialPrice: 100000,
-                    carName: "Motors Finance Calculator",
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showServiceBottomSheet({
-    required BuildContext context,
-    required String title,
-    required String description,
-    required String actionText,
-    required IconData icon,
-    required Color accentColor,
-  }) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: context.color.secondaryColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: accentColor.withValues(alpha: 0.12),
-                ),
-                child: Icon(icon, color: accentColor, size: 30),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: context.color.textDefaultColor,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                description,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13.5,
-                  color: context.color.textLightColor,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 22),
-              SizedBox(
-                width: double.infinity,
-                height: 46,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: context.color.territoryColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    elevation: 0,
-                  ),
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                  },
-                  child: Text(
-                    actionText,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

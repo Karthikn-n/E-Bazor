@@ -10,7 +10,6 @@ import 'package:Ebozor/ui/screens/widgets/errors/no_internet.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
 import 'package:Ebozor/ui/screens/widgets/shimmerLoadingContainer.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
-import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/cloudState/cloud_state.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';

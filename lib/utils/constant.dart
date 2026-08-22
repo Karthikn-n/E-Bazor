@@ -6,7 +6,6 @@ import 'package:Ebozor/ui/screens/filter_screen.dart';
 
 import 'package:flutter/material.dart';
 
-import 'package:Ebozor/ui/screens/filter_screen.dart';
 import 'package:Ebozor/data/model/item_filter_model.dart';
 
 const String svgPath = 'assets/svg/';

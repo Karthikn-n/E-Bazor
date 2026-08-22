@@ -7,30 +7,22 @@ import 'package:Ebozor/data/cubits/chat/block_user_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/delete_message_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/get_buyer_chat_users_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/load_chat_messages.dart';
-import 'package:Ebozor/data/cubits/chat/send_message.dart';
 import 'package:Ebozor/data/helper/widgets.dart';
 import 'package:Ebozor/data/model/data_output.dart';
 import 'package:Ebozor/data/model/item/item_model.dart';
 import 'package:Ebozor/data/repositories/item/item_repository.dart';
 import 'package:Ebozor/ui/screens/chat/chat_audio/widgets/chat_widget.dart';
 import 'package:Ebozor/ui/screens/chat/chat_audio/widgets/record_button.dart';
-import 'package:Ebozor/ui/screens/widgets/animated_routes/transparant_route.dart';
 import 'package:Ebozor/utils/ApiService/Socketservice.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/constant.dart';
-import 'package:Ebozor/utils/customHeroAnimation.dart';
-import 'package:Ebozor/utils/extensions/lib/color.dart';
 import 'package:Ebozor/utils/notification/chat_message_handler.dart';
 import 'package:Ebozor/utils/notification/notification_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:Ebozor/data/cubits/chat/blocked_users_list_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/unblock_user_cubit.dart';
 import 'package:Ebozor/data/model/chat/chated_user_model.dart';
-import 'package:Ebozor/ui/screens/home/home_screen.dart';
-import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
 import 'package:Ebozor/ui/screens/widgets/blurred_dialoge_box.dart';
-import 'package:Ebozor/ui/screens/widgets/errors/no_data_found.dart';
-import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/app_icon.dart';
 import 'package:Ebozor/utils/extensions/lib/build_context.dart' show CustomContext;
@@ -108,6 +100,14 @@ class _ChatScreenState extends State<ChatScreen>
   bool showRecordButton = true;
   int _rating = 0;
   final TextEditingController _feedbackController = TextEditingController();
+
+  late int _currentItemOfferId = widget.itemOfferId;
+  late double? _currentItemOfferPrice = widget.itemOfferPrice;
+  bool _showMakeOfferInput = false;
+  final TextEditingController _offerPriceController = TextEditingController();
+  final GlobalKey<FormState> _offerInputFormKey = GlobalKey<FormState>();
+  bool _isSubmittingOffer = false;
+
   late final ScrollController _pageScrollController = ScrollController()
     ..addListener(
           () {
@@ -121,7 +121,7 @@ class _ChatScreenState extends State<ChatScreen>
       },
     );
   final ChatSocketService _socketService = ChatSocketService();
-
+  Timer? _typingTimer;
 
   @override
   void initState() {
@@ -129,14 +129,14 @@ class _ChatScreenState extends State<ChatScreen>
 
     ChatMessageHandler.flushMessages();
 
-    // Load messages from API
-    context.read<LoadChatMessagesCubit>().load(itemOfferId: widget.itemOfferId);
+    if (_currentItemOfferId > 0) {
+      // Load messages from API
+      context.read<LoadChatMessagesCubit>().load(itemOfferId: _currentItemOfferId);
 
-
-    final socketService = ChatSocketService();
-
-    if (!socketService.isConnected) socketService.connect();
-    socketService.joinOffer(widget.itemOfferId);
+      final socketService = ChatSocketService();
+      if (!socketService.isConnected) socketService.connect();
+      socketService.joinOffer(_currentItemOfferId);
+    }
 
     // Set current chat info
     currentlyChatItemId = widget.itemId;
@@ -152,10 +152,14 @@ class _ChatScreenState extends State<ChatScreen>
     controller.addListener(() {
       if (controller.text.isNotEmpty) {
         showRecordButton = false;
-        socketService.typingStart(widget.itemOfferId);
+        if (_currentItemOfferId > 0) {
+          _socketService.typingStart(_currentItemOfferId);
+        }
       } else {
         showRecordButton = true;
-        socketService.typingStop(widget.itemOfferId);
+        if (_currentItemOfferId > 0) {
+          _socketService.typingStop(_currentItemOfferId);
+        }
       }
       setState(() {});
     });
@@ -169,10 +173,6 @@ class _ChatScreenState extends State<ChatScreen>
     });
   }
 
-
-
-
-
   Stream<PermissionStatus> notificationPermission() async* {
     while (true) {
       await Future.delayed(const Duration(seconds: 5));
@@ -182,10 +182,469 @@ class _ChatScreenState extends State<ChatScreen>
 
   @override
   void dispose() {
-    _socketService.typingStop(widget.itemOfferId);
-    _socketService.leaveOffer(widget.itemOfferId);
+    if (_currentItemOfferId > 0) {
+      _socketService.typingStop(_currentItemOfferId);
+      _socketService.leaveOffer(_currentItemOfferId);
+    }
+    _typingTimer?.cancel();
     notificationStreamSubsctription.cancel();
+    _offerPriceController.dispose();
     super.dispose();
+  }
+
+  Future<void> _sendMessage(String text, {String? filePath, String? audioPath}) async {
+    if (text.trim().isEmpty && filePath == null && audioPath == null) return;
+
+    if (_currentItemOfferId == 0) {
+      try {
+        final response = await ItemRepository().makeAnOfferItem(int.parse(widget.itemId), null);
+        if (response['data'] != null && response['data']['id'] != null) {
+          final newOfferId = response['data']['id'] is int
+              ? response['data']['id'] as int
+              : int.parse(response['data']['id'].toString());
+          setState(() {
+            _currentItemOfferId = newOfferId;
+            _showMakeOfferInput = false;
+          });
+          final socketService = ChatSocketService();
+          if (!socketService.isConnected) socketService.connect();
+          socketService.joinOffer(_currentItemOfferId);
+
+          try {
+            if (response['data']['buyer'] != null) {
+              context.read<GetBuyerChatListCubit>().addNewChat(ChatedUser.fromJson(response['data']));
+            }
+          } catch (_) {}
+        } else {
+          HelperUtils.showSnackBarMessage(context, "Could not initiate chat. Please try again.");
+          return;
+        }
+      } catch (e) {
+        HelperUtils.showSnackBarMessage(context, "Could not initiate chat: $e");
+        return;
+      }
+    }
+
+    _socketService.typingStop(_currentItemOfferId);
+    _socketService.sendMessage(_currentItemOfferId, text);
+
+    ChatMessageHandler.add(ChatMessage(
+      key: ValueKey(DateTime.now().millisecondsSinceEpoch),
+      message: text,
+      senderId: int.parse(HiveUtils.getUserId()!),
+      createdAt: DateTime.now().toString(),
+      updatedAt: DateTime.now().toString(),
+      isSentNow: true,
+      audio: audioPath ?? "",
+      file: filePath ?? "",
+      itemOfferId: _currentItemOfferId,
+    ));
+
+    totalMessageCount++;
+    controller.clear();
+    messageAttachment = null;
+    setState(() {
+      showRecordButton = true;
+    });
+  }
+
+  Future<void> _submitOffer(double price) async {
+    setState(() {
+      _isSubmittingOffer = true;
+    });
+
+    try {
+      final response = await ItemRepository().makeAnOfferItem(int.parse(widget.itemId), price);
+      if (response['error'] == false || response['data'] != null) {
+        final data = response['data'];
+        final newOfferId = data != null && data['id'] != null
+            ? (data['id'] is int ? data['id'] as int : int.parse(data['id'].toString()))
+            : 0;
+
+        setState(() {
+          if (newOfferId > 0) {
+            _currentItemOfferId = newOfferId;
+          }
+          _currentItemOfferPrice = price;
+          _showMakeOfferInput = false;
+          _isSubmittingOffer = false;
+        });
+
+        // Join socket room
+        final socketService = ChatSocketService();
+        if (!socketService.isConnected) socketService.connect();
+        if (_currentItemOfferId > 0) {
+          socketService.joinOffer(_currentItemOfferId);
+          socketService.sendMessage(_currentItemOfferId, "Offer made: ${Constant.currencySymbol} $price");
+        }
+
+        try {
+          if (data != null && data['buyer'] != null) {
+            context.read<GetBuyerChatListCubit>().addNewChat(ChatedUser.fromJson(data));
+          }
+        } catch (_) {}
+
+        if (_currentItemOfferId > 0) {
+          context.read<LoadChatMessagesCubit>().load(itemOfferId: _currentItemOfferId);
+        }
+
+        HelperUtils.showSnackBarMessage(context, response['message']?.toString() ?? "Offer submitted successfully");
+      } else {
+        setState(() {
+          _isSubmittingOffer = false;
+        });
+        HelperUtils.showSnackBarMessage(context, response['message']?.toString() ?? "Failed to submit offer");
+      }
+    } catch (e) {
+      setState(() {
+        _isSubmittingOffer = false;
+      });
+      HelperUtils.showSnackBarMessage(context, e.toString());
+    }
+  }
+
+  void _showSafetyTipsDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Top close button
+                Align(
+                  alignment: Alignment.topRight,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(dialogContext),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.grey.shade100,
+                      ),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        size: 20,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+
+                // Title
+                RichText(
+                  text: TextSpan(
+                    text: "Safety ",
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.black87,
+                    ),
+                    children: [
+                      TextSpan(
+                        text: "Tips",
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w400,
+                          color: context.color.territoryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Red checkmark circle + text
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: context.color.territoryColor,
+                      ),
+                      child: const Icon(
+                        Icons.check_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Text(
+                        "Welcome To Ebozor! ✨ Buy And Sell Anything You Want—Easily And For Free! ✨ Posting An Ad Is Completely Free, So Start Listing Your Items Today. Happy Buying & Selling! ✨",
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 1.4,
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+
+                // Continue Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: context.color.territoryColor,
+                      side: BorderSide(color: context.color.territoryColor, width: 1.2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(dialogContext);
+                      setState(() {
+                        _showMakeOfferInput = true;
+                      });
+                    },
+                    child: Text(
+                      "Continue".translate(context),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: context.color.territoryColor,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMakeOfferInputCard() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: context.color.secondaryColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: context.color.borderColor.withValues(alpha: 0.5),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              )
+            ],
+          ),
+          child: Form(
+            key: _offerInputFormKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Make an offer".translate(context),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: context.color.textDefaultColor,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _offerPriceController,
+                  keyboardType: TextInputType.number,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
+                    color: context.color.textDefaultColor,
+                  ),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) {
+                      return "Please enter offer price".translate(context);
+                    }
+                    final parsed = double.tryParse(val.trim());
+                    if (parsed == null || parsed <= 0) {
+                      return "valueMustBeGreaterThanZeroLbl".translate(context);
+                    }
+                    if (widget.itemPrice > 0 && parsed > widget.itemPrice) {
+                      return "offerPriceWarning".translate(context);
+                    }
+                    return null;
+                  },
+                  decoration: InputDecoration(
+                    hintText: "Type Offer Price".translate(context),
+                    hintStyle: TextStyle(
+                      fontSize: 14,
+                      color: context.color.textLightColor,
+                      fontWeight: FontWeight.normal,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    filled: true,
+                    fillColor: context.color.backgroundColor,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: context.color.borderColor.withValues(alpha: 0.8)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: context.color.borderColor.withValues(alpha: 0.8)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: context.color.territoryColor),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _showMakeOfferInput = false;
+                        });
+                      },
+                      child: Text(
+                        "Offer later".translate(context),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: context.color.textDefaultColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: context.color.territoryColor,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: _isSubmittingOffer
+                          ? null
+                          : () async {
+                              if (_offerInputFormKey.currentState?.validate() == true) {
+                                final price = double.tryParse(_offerPriceController.text.trim());
+                                if (price != null) {
+                                  await _submitOffer(price);
+                                }
+                              }
+                            },
+                      child: _isSubmittingOffer
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              "Submit".translate(context),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoConversationView() {
+    if (_showMakeOfferInput) {
+      return _buildMakeOfferInputCard();
+    }
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              "No Conversation with Seller Yet!".translate(context),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: context.color.textDefaultColor,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "You haven't initiated any chat with the seller. Feel free to make your offer for this product or start a direct chat with the seller!".translate(context),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.4,
+                color: context.color.textDefaultColor.withValues(alpha: 0.65),
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: context.color.territoryColor,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: () {
+                _showSafetyTipsDialog();
+              },
+              icon: const Icon(
+                Icons.card_giftcard_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+              label: Text(
+                "Make an offer".translate(context),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   List<String> supportedImageTypes = [
@@ -347,9 +806,6 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
 
-  Timer? _typingTimer;
-
-
   @override
   Widget build(BuildContext context) {
     var chatBackground = "assets/chat_background/chat_background.svg";
@@ -397,16 +853,17 @@ class _ChatScreenState extends State<ChatScreen>
                   if (messageAttachment != null) ...[
                     if (supportedImageTypes.contains(attachmentMIME)) ...[
                       Container(
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                             color: context.color.secondaryColor,
                             border: Border.all(color: context.color.borderColor, width: 1.5)),
                         child: Row(
                           children: [
-                            Padding(
-                              padding: const EdgeInsets.all(24.0),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
                               child: SizedBox(
-                                  height: 100,
-                                  width: 100,
+                                  height: 64,
+                                  width: 64,
                                   child: GestureDetector(
                                     onTap: () {
                                       UiUtils.showFullScreenImage(context,
@@ -422,15 +879,43 @@ class _ChatScreenState extends State<ChatScreen>
                                     ),
                                   )),
                             ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(messageAttachment?.name ?? ""),
-                                Text(HelperUtils.getFileSizeString(
-                                  bytes: messageAttachment!.size,
-                                ).toString()),
-                              ],
-                            )
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    messageAttachment?.name ?? "",
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: context.color.textDefaultColor,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    HelperUtils.getFileSizeString(
+                                      bytes: messageAttachment!.size,
+                                    ).toString(),
+                                    style: TextStyle(
+                                      color: context.color.textLightColor,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded, size: 20),
+                              onPressed: () {
+                                setState(() {
+                                  messageAttachment = null;
+                                });
+                              },
+                            ),
                           ],
                         ),
                       )
@@ -625,11 +1110,13 @@ class _ChatScreenState extends State<ChatScreen>
                                           child: TextField(
                                             controller: controller,
                                             onChanged: (value) {
-                                              _socketService.typingStart(widget.itemOfferId);
-                                              _typingTimer?.cancel();
-                                              _typingTimer = Timer(const Duration(seconds: 1), () {
-                                                _socketService.typingStop(widget.itemOfferId);
-                                              });
+                                              if (_currentItemOfferId > 0) {
+                                                _socketService.typingStart(_currentItemOfferId);
+                                                _typingTimer?.cancel();
+                                                _typingTimer = Timer(const Duration(seconds: 1), () {
+                                                  _socketService.typingStop(_currentItemOfferId);
+                                                });
+                                              }
                                               if (value.trim().isNotEmpty && showRecordButton) {
                                                 setState(() => showRecordButton = false);
                                               } else if (value.trim().isEmpty && !showRecordButton && messageAttachment == null) {
@@ -670,53 +1157,18 @@ class _ChatScreenState extends State<ChatScreen>
                                 if (showRecordButton)
                                   RecordButton(
                                     controller: _recordButtonAnimation,
-                                    callback: (path) {
-                                      ChatMessageHandler.add(
-                                        BlocProvider(
-                                          create: (context) => SendMessageCubit(),
-                                          child: ChatMessage(
-                                            key: ValueKey(DateTime.now().toString()),
-                                            message: controller.text,
-                                            senderId: int.parse(HiveUtils.getUserId()!),
-                                            createdAt: DateTime.now().toString(),
-                                            isSentNow: true,
-                                            audio: path,
-                                            itemOfferId: widget.itemOfferId,
-                                            file: "",
-                                            updatedAt: DateTime.now().toString(),
-                                          ),
-                                        ),
-                                      );
-                                      totalMessageCount++;
-                                      setState(() {});
+                                    callback: (path) async {
+                                      await _sendMessage("", audioPath: path);
                                     },
                                     isSending: false,
                                   ),
                                 if (!showRecordButton)
                                   GestureDetector(
-                                    onTap: () {
+                                    onTap: () async {
                                       if (controller.text.trim().isEmpty && messageAttachment == null) return;
-
                                       final text = controller.text.trim();
-                                      _socketService.typingStop(widget.itemOfferId);
-                                      _socketService.sendMessage(widget.itemOfferId, text);
-
-                                      ChatMessageHandler.add(ChatMessage(
-                                        key: ValueKey(DateTime.now().millisecondsSinceEpoch),
-                                        message: text,
-                                        senderId: int.parse(HiveUtils.getUserId()!),
-                                        createdAt: DateTime.now().toString(),
-                                        updatedAt: DateTime.now().toString(),
-                                        isSentNow: true,
-                                        audio: "",
-                                        file: messageAttachment?.path ?? "",
-                                        itemOfferId: widget.itemOfferId,
-                                      ));
-                                      controller.clear();
-                                      messageAttachment = null;
-                                      setState(() {
-                                        showRecordButton = true;
-                                      });
+                                      final filePath = messageAttachment?.path;
+                                      await _sendMessage(text, filePath: filePath);
                                     },
                                     child: Container(
                                       width: 44,
@@ -1148,16 +1600,16 @@ class _ChatScreenState extends State<ChatScreen>
                                 builder: (context,
                                     AsyncSnapshot<List<Widget>> snapshot) {
                                   Widget? loadingMoreWidget;
-                                  if (state is LoadChatMessagesSuccess) {
-                                    if (state.isLoadingMore) {
-                                      loadingMoreWidget = Text("loading".translate(context));
-                                    }
-                                  }
                                   if (state is LoadChatMessagesSuccess && state.isLoadingMore) {
                                     loadingMoreWidget = Text("loading".translate(context));
                                   }
-                                  if (snapshot.connectionState == ConnectionState.active || snapshot.connectionState == ConnectionState.done) {
-                                    if ((snapshot.data as List).isEmpty) {
+
+                                  if (snapshot.connectionState == ConnectionState.active ||
+                                      snapshot.connectionState == ConnectionState.done) {
+                                    if ((snapshot.data as List?)?.isEmpty ?? true) {
+                                      if (_currentItemOfferId == 0 || _showMakeOfferInput) {
+                                        return _buildNoConversationView();
+                                      }
                                       return offerWidget();
                                     }
 
@@ -1179,11 +1631,6 @@ class _ChatScreenState extends State<ChatScreen>
                                               padding: const EdgeInsets.only(
                                                   bottom: 10),
                                               itemBuilder: (context, index) {
-                                                // final adjustedIndex =   index - 1;
-                                                /* dynamic chat =
-                                              (snapshot.data as List)
-                                                  .elementAt(index); */
-
                                                 dynamic chat = snapshot.data![index];
 
                                                 return Column(
@@ -1203,8 +1650,13 @@ class _ChatScreenState extends State<ChatScreen>
                                     }
                                   }
 
+                                  if (_currentItemOfferId == 0 || _showMakeOfferInput) {
+                                    return _buildNoConversationView();
+                                  }
+
                                   return offerWidget();
                                 }),
+                                
                             if (state is LoadChatMessagesInProgress)
                               Positioned.fill(
                                 child: Container(
@@ -1246,33 +1698,32 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   Widget offerWidget() {
-    if (widget.itemOfferPrice != null) {
-      if (int.parse(HiveUtils.getUserId()!) == int.parse(widget.buyerId!)) {
+    if (_currentItemOfferPrice != null) {
+      final currentUserId = HiveUtils.getUserId();
+      final isMyOffer = widget.buyerId == null || currentUserId == widget.buyerId;
+      if (isMyOffer) {
         return Align(
           alignment: AlignmentDirectional.topEnd,
           child: Container(
-              height: 71,
-              margin: EdgeInsetsDirectional.only(top: 15, bottom: 15, end: 15),
-              padding: EdgeInsets.all(12),
+              margin: const EdgeInsetsDirectional.only(top: 15, bottom: 15, end: 15),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                   border: Border.all(
                       color: context.color.territoryColor.withValues(alpha: 0.3)),
                   color: context.color.territoryColor.withValues(alpha: 0.17),
-                  borderRadius: BorderRadius.only(
+                  borderRadius: const BorderRadius.only(
                       topRight: Radius.circular(0),
                       topLeft: Radius.circular(8),
                       bottomRight: Radius.circular(8),
                       bottomLeft: Radius.circular(8))),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text("yourOffer".translate(context))
                       .color(context.color.textDefaultColor.withValues(alpha: 0.5)),
-
-                  /*  Text("yourOffer".translate(context))
-                  .color(context.color.textDefaultColor.withValues(alpha: 0.5)),*/
                   Text(Constant.currencySymbol +
-                      widget.itemOfferPrice.toString())
+                      _currentItemOfferPrice.toString())
                       .bold()
                       .size(context.font.larger)
                       .color(context.color.textDefaultColor)
@@ -1283,26 +1734,26 @@ class _ChatScreenState extends State<ChatScreen>
         return Align(
           alignment: AlignmentDirectional.topStart,
           child: Container(
-              height: 71,
               margin:
-              EdgeInsetsDirectional.only(top: 15, bottom: 15, start: 15),
-              padding: EdgeInsets.all(12),
+              const EdgeInsetsDirectional.only(top: 15, bottom: 15, start: 15),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                   border: Border.all(
                       color: context.color.territoryColor.withValues(alpha: 0.3)),
                   color: context.color.territoryColor.withValues(alpha: 0.17),
-                  borderRadius: BorderRadius.only(
+                  borderRadius: const BorderRadius.only(
                       topRight: Radius.circular(8),
                       topLeft: Radius.circular(0),
                       bottomRight: Radius.circular(8),
                       bottomLeft: Radius.circular(8))),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text("offerLbl".translate(context))
                       .color(context.color.textDefaultColor.withValues(alpha: 0.5)),
                   Text(Constant.currencySymbol +
-                      widget.itemOfferPrice.toString())
+                      _currentItemOfferPrice.toString())
                       .bold()
                       .size(context.font.larger)
                       .color(context.color.textDefaultColor)
@@ -1311,7 +1762,7 @@ class _ChatScreenState extends State<ChatScreen>
         );
       }
     } else {
-      return SizedBox.shrink();
+      return const SizedBox.shrink();
     }
   }
 }
