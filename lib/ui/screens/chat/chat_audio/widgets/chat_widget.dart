@@ -20,6 +20,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
@@ -188,232 +189,223 @@ class ChatMessageState extends State<ChatMessage>
   Widget build(BuildContext context) {
     super.build(context);
 
-    bool isDark = context.watch<AppThemeCubit>().state.appTheme == AppTheme.dark;
+    final bool isMe = widget.senderId.toString() == HiveUtils.getUserId();
+    final bool isDark = context.watch<AppThemeCubit>().state.appTheme == AppTheme.dark;
 
     return GestureDetector(
       onLongPress: () {
-        selectedMessageid.value = (widget.key as ValueKey).value;
-        showDeletebutton.value = true;
-      },
-      onTap: () {
-        selectedMessage = false;
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 7),
-        child: Container(
-          alignment: widget.senderId.toString() == HiveUtils.getUserId()
-              ? AlignmentDirectional.centerEnd
-              : AlignmentDirectional.centerStart,
-          width: MediaQuery.of(context).size.width,
-          margin: EdgeInsetsDirectional.only(
-            // top: MediaQuery.of(context).size.height * 0.007,
-            end: widget.senderId.toString() == HiveUtils.getUserId() ? 20 : 0,
-            start: widget.senderId.toString() == HiveUtils.getUserId() ? 0 : 20,
+        showModalBottomSheet(
+          context: context,
+          backgroundColor: context.color.secondaryColor,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          child: Column(
-            crossAxisAlignment:
-                widget.senderId.toString() == HiveUtils.getUserId()
-                    ? CrossAxisAlignment.end
-                    : CrossAxisAlignment.start,
-            children: [
-              Container(
-                constraints:
-                    BoxConstraints(maxWidth: context.screenWidth * 0.74),
-                decoration: BoxDecoration(
-                    color: selectedMessage == true
-                        ? (widget.senderId.toString() == HiveUtils.getUserId()
-                            ? Colors.redAccent
-                            : Colors.redAccent)
-                        : (widget.senderId.toString() == HiveUtils.getUserId()
-                            ? Color(0xffDCF8C6) // this is self message color
-                            : Colors.grey.shade200), // this is sender message color
-                    borderRadius: BorderRadius.circular(8)),
-                child: Wrap(
-                  runAlignment: WrapAlignment.end,
-                  alignment: WrapAlignment.end,
-                  crossAxisAlignment: WrapCrossAlignment.end,
+          builder: (ctx) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Container(
-                        child: widget.audio != ""
-                            ? RecordMessage(
-                                url: widget.audio ?? "",
-                                isSentByMe: widget.senderId.toString() == HiveUtils.getUserId(),
-                              )
-                            : Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (widget.file != "")
-                                    AttachmentMessage(url: widget.file!),
-                                  //This is preview builder for image
-                                  ValueListenableBuilder(
-                                      valueListenable: _linkAddNotifier,
-                                      builder: (context, dynamic value, c) {
-                                        if (value == null) {
-                                          return const SizedBox.shrink();
-                                        }
-
-                                        return FutureBuilder(
-                                          future: AnyLinkPreview.getMetadata(
-                                              link: value),
-                                          builder: (context,
-                                              AsyncSnapshot snapshot) {
-                                            if (snapshot.connectionState ==
-                                                ConnectionState.done) {
-                                              if (snapshot.data == null) {
-                                                return const SizedBox.shrink();
-                                              }
-                                              return LinkPreviw(
-                                                snapshot: snapshot,
-                                                link: value,
-                                              );
-                                            }
-                                            return const SizedBox.shrink();
-                                          },
-                                        );
-                                      }),
-                                  SelectableText.rich(
-                                    TextSpan(
-                                      style: TextStyle(
-                                          color: (isDark && widget.senderId.toString() != HiveUtils.getUserId())
-                                              ? context.color.buttonColor
-                                              : context.color.textDefaultColor),
-                                      children: _replaceLink().map((data) {
-                                        //This will add link to msg
-                                        if (_isLink(data)) {
-                                          //This will notify priview object that it has link
-                                          _linkAddNotifier.value = data;
-                                          _linkAddNotifier.notifyListeners();
-
-                                          return TextSpan(
-                                              text: data,
-                                              recognizer: TapGestureRecognizer()
-                                                ..onTap = () async {
-                                                  await launchUrl(
-                                                      Uri.parse(data));
-                                                },
-                                              style: TextStyle(
-                                                  decoration: TextDecoration.underline,
-                                                  color: Colors.blue[800]));
-                                        }
-                                        //This will make text bold
-                                        return TextSpan(
-                                          text: "",
-                                          children:
-                                              _matchAstric(data).map((text) {
-                                            if (text.toString().startsWith("*") && text.toString().endsWith("*")) {
-                                              return TextSpan(
-                                                  text:
-                                                      text.replaceAll("*", ""),
-                                                  style: TextStyle(
-                                                      color: (isDark && widget.senderId.toString() != HiveUtils.getUserId())
-                                                          ? context.color.buttonColor
-                                                          : context.color.textDefaultColor,
-                                                      fontWeight: FontWeight.w800));
-                                            }
-
-                                            return TextSpan(
-                                                text: text,
-                                                style: TextStyle(
-                                                    color: (isDark && widget.senderId.toString() != HiveUtils.getUserId())
-                                                        ? context.color.buttonColor
-                                                        : context.color.textDefaultColor)); // this colors it chat text color
-                                          }).toList(),
-                                          style: TextStyle(
-                                              color: widget.senderId.toString() == HiveUtils.getUserId()
-                                                  ? context.color.secondaryColor
-                                                  : context.color.textColorDark),
-                                        );
-                                      }).toList(),
-                                    ),
-                                    style: TextStyle(
-                                        color: (isDark &&
-                                                widget.senderId.toString() !=
-                                                    HiveUtils.getUserId())
-                                            ? context.color.buttonColor
-                                            : context.color.textDefaultColor),
-                                  ),
-                                ],
-                              ),
+                    if (widget.message != null && widget.message!.isNotEmpty)
+                      ListTile(
+                        leading: Icon(
+                          Icons.copy_rounded,
+                          color: context.color.textDefaultColor,
+                        ),
+                        title: Text(
+                          "Copy Message".translate(context),
+                          style: TextStyle(
+                            color: context.color.textDefaultColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        onTap: () {
+                          Clipboard.setData(ClipboardData(text: widget.message!));
+                          Navigator.pop(ctx);
+                          HelperUtils.showSnackBarMessage(
+                            context,
+                            "Message copied".translate(context),
+                          );
+                        },
                       ),
-                    ),
-                    if (widget.senderId.toString() != HiveUtils.getUserId() &&
-                        (widget.isSentNow != null
-                            ? widget.isSentNow!
-                            : widget.createdAt ==
-                                DateTime.now().toString())) ...[
-                      BlocConsumer<SendMessageCubit, SendMessageState>(
-                        listener: (context, state) {
-                          if (state is SendMessageSuccess) {
-                            isChatSent = true;
-
-                            ///Value which we added locally
-                            ValueKey? uniqueIdentifier = widget.key as ValueKey;
-                            ////We were added local id so whenit completed we will replace it with server message id
-
-                            /*ChatMessageHandler.updateMessageId(
-                                uniqueIdentifier.value, state.messageId);*/
-
-                            WidgetsBinding.instance
-                                .addPostFrameCallback((timeStamp) {
-                              if (mounted) setState(() {});
-                            });
-                          }
-                          if (state is SendMessageFailed) {
-                            HelperUtils.showSnackBarMessage(
-                                context, state.error.toString());
-                          }
+                    if (isMe)
+                      ListTile(
+                        leading: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: Colors.red,
+                        ),
+                        title: Text(
+                          "Delete Message".translate(context),
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          selectedMessageid.value = (widget.key as ValueKey).value;
+                          showDeletebutton.value = true;
                         },
-                        builder: (context, state) {
-                          if (state is SendMessageInProgress) {
-                            return Padding(
-                              padding: EdgeInsetsDirectional.only(
-                                  end: 5.0, bottom: 2),
-                              child: Icon(
-                                Icons.watch_later_outlined,
-                                size: context.font.smaller,
-                                color: context.color.textLightColor,
-                              ),
-                            );
-                          }
-
-                          if (state is SendMessageFailed) {
-                            return Padding(
-                              padding: EdgeInsetsDirectional.only(
-                                  end: 5.0, bottom: 2),
-                              child: Icon(
-                                Icons.error,
-                                size: context.font.smaller,
-                                color: context.color.primaryColor,
-                              ),
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        },
-                      )
-                    ]
+                      ),
                   ],
                 ),
               ),
-              const SizedBox(
-                height: 5,
+            );
+          },
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Container(
+          alignment: isMe ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
+          width: MediaQuery.of(context).size.width,
+          margin: EdgeInsetsDirectional.only(
+            end: isMe ? 14 : 0,
+            start: isMe ? 0 : 14,
+          ),
+          child: Column(
+            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            children: [
+              Container(
+                constraints: BoxConstraints(maxWidth: context.screenWidth * 0.76),
+                decoration: BoxDecoration(
+                  color: isMe
+                      ? context.color.territoryColor
+                      : context.color.secondaryColor,
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(16),
+                    topRight: const Radius.circular(16),
+                    bottomLeft: Radius.circular(isMe ? 16 : 4),
+                    bottomRight: Radius.circular(isMe ? 4 : 16),
+                  ),
+                  border: isMe
+                      ? null
+                      : Border.all(
+                          color: context.color.borderColor.withValues(alpha: 0.6),
+                          width: 1,
+                        ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    )
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                    children: [
+                      if (widget.audio != "")
+                        RecordMessage(
+                          url: widget.audio ?? "",
+                          isSentByMe: isMe,
+                        )
+                      else
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (widget.file != "")
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: AttachmentMessage(url: widget.file!),
+                              ),
+                            ValueListenableBuilder(
+                              valueListenable: _linkAddNotifier,
+                              builder: (context, dynamic value, c) {
+                                if (value == null || value.toString().isEmpty) {
+                                  return const SizedBox.shrink();
+                                }
+                                return FutureBuilder(
+                                  future: AnyLinkPreview.getMetadata(link: value),
+                                  builder: (context, AsyncSnapshot snapshot) {
+                                    if (snapshot.connectionState == ConnectionState.done &&
+                                        snapshot.data != null) {
+                                      return LinkPreviw(
+                                        snapshot: snapshot,
+                                        link: value,
+                                      );
+                                    }
+                                    return const SizedBox.shrink();
+                                  },
+                                );
+                              },
+                            ),
+                            if (_emptyTextIfAttachmentHasNoText().isNotEmpty)
+                              Text.rich(
+                                TextSpan(
+                                  style: TextStyle(
+                                    fontSize: 14.5,
+                                    color: isMe ? Colors.white : context.color.textDefaultColor,
+                                    height: 1.35,
+                                  ),
+                                  children: _replaceLink().map((data) {
+                                    if (_isLink(data)) {
+                                      _linkAddNotifier.value = data;
+                                      _linkAddNotifier.notifyListeners();
+
+                                      return TextSpan(
+                                        text: data,
+                                        recognizer: TapGestureRecognizer()
+                                          ..onTap = () async {
+                                            await launchUrl(Uri.parse(data));
+                                          },
+                                        style: TextStyle(
+                                          decoration: TextDecoration.underline,
+                                          color: isMe ? Colors.white : Colors.blue.shade700,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      );
+                                    }
+                                    return TextSpan(
+                                      text: "",
+                                      children: _matchAstric(data).map((text) {
+                                        if (text.toString().startsWith("*") &&
+                                            text.toString().endsWith("*")) {
+                                          return TextSpan(
+                                            text: text.replaceAll("*", ""),
+                                            style: TextStyle(
+                                              color: isMe
+                                                  ? Colors.white
+                                                  : context.color.textDefaultColor,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          );
+                                        }
+                                        return TextSpan(
+                                          text: text,
+                                          style: TextStyle(
+                                            color: isMe
+                                                ? Colors.white
+                                                : context.color.textDefaultColor,
+                                          ),
+                                        );
+                                      }).toList(),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
               ),
-              Padding(
-                padding: EdgeInsetsDirectional.only(end: 3.0),
-                child: Text(
-                  (DateTime.parse(widget.createdAt))
-                      .toLocal()
-                      .toIso8601String()
-                      .toString()
-                      .formatDate(format: "hh:mm aa"), //
-                  style: TextStyle(
-                      color: widget.senderId.toString() != HiveUtils.getUserId()
-                          ? context.color.textLightColor
-                          : context.color
-                              .textLightColor), // this is time showing colors
-                ).size(context.font.smaller),
+              const SizedBox(height: 3),
+              Text(
+                (DateTime.tryParse(widget.createdAt) ?? DateTime.now())
+                    .toLocal()
+                    .toIso8601String()
+                    .formatDate(format: "hh:mm aa"),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                  color: context.color.textLightColor,
+                ),
               ),
             ],
           ),

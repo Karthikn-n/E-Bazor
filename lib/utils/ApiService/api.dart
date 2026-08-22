@@ -97,13 +97,26 @@ class Api {
 
   static String stripeIntentAPI = "https://api.stripe.com/v1/payment_intents";
   static String getCategoryFiltersApi = "get-category-filters";
+  static String getCategoryChildrenByParentApi = "get-category-children-by-parent";
+  static String getParentCategoryListApi = "get-parent-category-list";
+  static String getParentCategoriesApi = "get-parent-categories";
+  static String getCategoryTreeBySlugApi = "get-category-tree-by-slug";
+
+  // Cars module endpoints
+  static String getCarMakesApi = "car_makes";
+  static String getCarModelsApi = "car_models";
+  static String getCarModelTrimsApi = "car_model_trims";
+  static String getCarMakeModelsMergedApi = "car_make_models_merged";
+  static String searchCarMakeModelApi = "search-car-make-model";
+  static String getCarModelsSearchApi = "get-car-models";
 //api fun
   static String loginApi = "user-signup";
   static String updateProfileApi = "update-profile";
   static String getSliderApi = "get-slider";
-  static String getCategoriesApi = "front_categories";
+  static String getFrontCategoriesApi = "front_categories";
   static String getItemApi = "get-item";
   static String getMyItemApi = "my-items";
+  static String getMyItemsCountApi = "my-items-count";
   static String getNotificationListApi = "get-notification-list";
   static String deleteUserApi = "delete-user";
   static String manageFavouriteApi = "manage-favourite";
@@ -116,6 +129,7 @@ class Api {
   static String getReportReasonsApi = "get-report-reasons";
   static String addReportsApi = "add-reports";
   static String getCustomFieldsApi = "get-customfields";
+  static String getCustomFieldsByCategoryIdApi = "get-customfields-by-category-id";
   static String getFeaturedSectionApi = "get-featured-section";
   static String updateItemApi = "update-item";
   static String addItemApi = "add-item";
@@ -143,6 +157,14 @@ class Api {
   static String getMyReviewApi = "my-review";
   static String addReviewReportApi = "add-review-report";
   static String renewItemApi = "renew-item";
+  static String postContactUsApi = "contact-us";
+  static String getUserAddressApi = "get-user-address";
+  static String userAddressChangesApi = "user-address-changes";
+  static String sendOtpApi = "send-otp";
+  static String verifyOtpApi = "verify-otp";
+  static String getCategoriesApi = "get-categories";
+  static String getHomeCategoriesApi = "get-home-categories";
+  static String carFinanceApi = "car-finance";
 
 //Chat module apis
   static String sendMessageApi = "send-message";
@@ -153,6 +175,13 @@ class Api {
   static String unBlockUserApi = "unblock-user";
   static String blockedUsersListApi = "blocked-users";
   static String getPaymentDetailsApi = "payment-transactions";
+
+//WebSocket helper apis
+  static String wsAuthApi = "ws/auth";
+  static String wsMessageApi = "ws/message";
+  static String wsCanJoinApi = "ws/can-join";
+  static String wsPingApi = "ws/ping";
+  static String wsPresenceApi = "ws/presence";
 
 //not used API List
 
@@ -226,6 +255,8 @@ class Api {
 
   static String bathroom = "bathroom";
   static String aboutUs = "about_us";
+  static String contactUs = "contact_us";
+  static String faq = "faqs";
   static String termsAndConditions = "terms_conditions";
   static String privacyPolicy = "privacy_policy";
   static String currencySymbol = "currency_symbol";
@@ -338,7 +369,9 @@ class Api {
       var resp = response.data;
 
       if (resp['error'] ?? false) {
-        throw ApiException(resp['message'].toString());
+        final details = resp['details']?.toString() ?? '';
+        final msg = resp['message']?.toString() ?? 'Error occurred';
+        throw ApiException(details.isNotEmpty ? "$msg ($details)" : msg);
       }
 
       return Map.from(resp);
@@ -351,16 +384,37 @@ class Api {
         throw "server-not-available";
       }
 
-      throw ApiException(
-        e.error is SocketException
-            ? "no-internet"
-            : "Something went wrong with error ${e.response?.statusCode}",
-      );
+      throw ApiException(_extractDioErrorMessage(e));
     } on ApiException catch (e) {
       throw ApiException(e.errorMessage);
     } catch (e) {
       throw ApiException(e.toString());
     }
+  }
+
+  static String _extractDioErrorMessage(DioException e) {
+    if (e.response?.data is Map) {
+      final data = e.response!.data as Map;
+      String? serverMsg = data['message']?.toString() ??
+          data['error_message']?.toString() ??
+          data['details']?.toString();
+      if (data['errors'] is Map) {
+        final errs = (data['errors'] as Map).values.map((v) {
+          if (v is List) return v.join(", ");
+          return v.toString();
+        }).where((v) => v.isNotEmpty).join("; ");
+        if (errs.isNotEmpty) {
+          serverMsg = serverMsg != null ? "$serverMsg ($errs)" : errs;
+        }
+      }
+      if (serverMsg != null && serverMsg.isNotEmpty) {
+        return serverMsg;
+      }
+    }
+    if (e.error is SocketException) {
+      return "no-internet";
+    }
+    return "Something went wrong with error ${e.response?.statusCode ?? e.message}";
   }
 
   static void userExpired() {
@@ -393,15 +447,13 @@ class Api {
       Map<String, dynamic>? queryParameters,
       bool? useBaseUrl}) async {
     try {
-//
       final Dio dio = _dio();
       dio.interceptors.add(NetworkRequestInterseptor());
 
       final response =
           await dio.delete(((useBaseUrl ?? true) ? Constant.baseUrl : "") + url,
               queryParameters: queryParameters,
-              options: /*(useAuthToken ?? true) ?*/
-                  Options(headers: headers()) /* : null*/);
+              options: Options(headers: headers()));
 
       if (response.data['error'] == true) {
         throw ApiException(response.data['message'].toString());
@@ -410,15 +462,12 @@ class Api {
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
         userExpired();
-// throw "auth-expired";
       }
       if (e.response?.statusCode == 503) {
         throw "server-not-available";
       }
 
-      throw ApiException(e.error is SocketException
-          ? "no-internet"
-          : "Something went wrong with error ${e.response?.statusCode}");
+      throw ApiException(_extractDioErrorMessage(e));
     } on ApiException catch (e) {
       throw ApiException(e.errorMessage);
     } catch (e, st) {
@@ -428,11 +477,9 @@ class Api {
 
   static Future<Map<String, dynamic>> get(
       {required String url,
-/* bool? useAuthToken,*/
       Map<String, dynamic>? queryParameters,
       bool? useBaseUrl}) async {
     try {
-//
       final Dio dio = _dio();
       dio.interceptors.add(NetworkRequestInterseptor());
 
@@ -442,27 +489,18 @@ class Api {
           options: Options(headers: headers()));
 
       if (response.data['error'] == true) {
-/* if(kDebugMode&&response.data?['details']!=null){
-
-
-          throw ApiException(response.data['details'].toString());
-        }*/
-
         throw ApiException(response.data['message'].toString());
       }
       return Map.from(response.data);
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
         userExpired();
-// throw "auth-expired";
       }
       if (e.response?.statusCode == 503) {
         throw "server-not-available";
       }
 
-      throw ApiException(e.error is SocketException
-          ? "no-internet"
-          : "Something went wrong with error ${e.response?.statusCode}");
+      throw ApiException(_extractDioErrorMessage(e));
     } on ApiException catch (e) {
       throw ApiException(e.errorMessage);
     } catch (e, st) {
@@ -470,3 +508,4 @@ class Api {
     }
   }
 }
+

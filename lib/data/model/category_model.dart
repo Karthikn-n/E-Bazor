@@ -21,62 +21,105 @@ class CategoryModel {
   final String? slug;
   final List<CategoryModel>? children;
   final String? description;
-
-  //final String translatedName;
   final int? subcategoriesCount;
+  final bool? frontList;
+  final int? parentCategoryId;
 
   CategoryModel({
-     this.id,
-     this.name,
-     this.url,
-     this.description,
-     this.children,
-    this.subcategoriesCount, this.slug,
-    //required this.translatedName,
+    this.id,
+    this.name,
+    this.url,
+    this.description,
+    this.children,
+    this.subcategoriesCount,
+    this.slug,
+    this.frontList,
+    this.parentCategoryId,
   });
 
   factory CategoryModel.fromJson(Map<String, dynamic> json) {
     try {
-      List<dynamic> childData = json['subcategories'] ?? [];
+      List<dynamic> childData =
+          json['subcategories'] ?? json['children'] ?? [];
       List<CategoryModel> children =
-          childData.map((child) => CategoryModel.fromJson(child)).toList();
+          childData.map((child) => CategoryModel.fromJson(Map<String, dynamic>.from(child))).toList();
+
+      int? catId = json['id'] != null
+          ? int.tryParse(json['id'].toString())
+          : (json['category_id'] != null
+              ? int.tryParse(json['category_id'].toString())
+              : null);
+
+      bool? isFront = json['front_list'] == true ||
+          json['front_list'] == 1 ||
+          json['front_list'] == '1' ||
+          json['front_list'] == 'true';
+
+      int? parentCatId = json['parent_category_id'] != null
+          ? int.tryParse(json['parent_category_id'].toString())
+          : null;
 
       return CategoryModel(
-          id: json['id'],
-          //name: json['name'],
-        //  name: json['translated_name'],
-          name: (json['translated_name'] != null && json['translated_name'] != "")
-              ? json['translated_name']
-              : json['name'],
-          url: (json['image'] != null && json['image'] != "")
-              ? json['image']
-              : null,
-          slug: json['slug'],
-         // url: json['image'],
-          subcategoriesCount: json['subcategories_count']??0,
-          children: children,
-          description: json['description'] ?? "");
+        id: catId,
+        name: (json['translated_name'] != null &&
+                json['translated_name'].toString().isNotEmpty)
+            ? json['translated_name']
+            : json['name'],
+        url: (json['image'] != null && json['image'].toString().isNotEmpty)
+            ? json['image']
+            : null,
+        slug: json['slug'],
+        subcategoriesCount: json['subcategories_count'] ?? children.length,
+        children: children,
+        description: json['description'] ?? "",
+        frontList: isFront,
+        parentCategoryId: parentCatId,
+      );
     } catch (e) {
       rethrow;
     }
   }
 
+  CategoryModel copyWith({
+    int? id,
+    String? name,
+    String? url,
+    String? slug,
+    List<CategoryModel>? children,
+    String? description,
+    int? subcategoriesCount,
+    bool? frontList,
+    int? parentCategoryId,
+  }) {
+    return CategoryModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      url: url ?? this.url,
+      slug: slug ?? this.slug,
+      children: children ?? this.children,
+      description: description ?? this.description,
+      subcategoriesCount: subcategoriesCount ?? this.subcategoriesCount,
+      frontList: frontList ?? this.frontList,
+      parentCategoryId: parentCategoryId ?? this.parentCategoryId,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
       'id': id,
-      //'name': name,
       'translated_name': name,
       'image': url,
+      'slug': slug,
       'subcategories_count': subcategoriesCount,
       "description": description,
-      'subcategories': children!.map((child) => child.toJson()).toList(),
+      'subcategories': children?.map((child) => child.toJson()).toList() ?? [],
     };
     return data;
   }
 
   @override
   String toString() {
-    return 'CategoryModel( id: $id, translated_name:$name, url: $url, descrtiption:$description, children: $children,subcategories_count:$subcategoriesCount)';
+    return 'CategoryModel( id: $id, translated_name:$name, url: $url, slug: $slug, descrtiption:$description, children: $children, subcategories_count:$subcategoriesCount)';
   }
 }
 // class FilterCategory {

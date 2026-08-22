@@ -104,21 +104,17 @@ class ProfileSettingCubit extends Cubit<ProfileSettingState>
           Map data = (response['data']);
 
           if (title == Api.termsAndConditions) {
-            profileSettingData = data['terms_conditions'];
-            // .where((element) => element['type'] == "terms_conditions")
-            // .first['data'];
-          }
-
-          if (title == Api.privacyPolicy) {
+            profileSettingData = data['terms_conditions'] ?? data['terms_and_conditions'];
+          } else if (title == Api.privacyPolicy) {
             profileSettingData = data['privacy_policy'];
-            // .where((element) => element['type'] == "privacy_policy")
-            // .first['data'];
-          }
-
-          if (title == Api.aboutUs) {
+          } else if (title == Api.aboutUs) {
             profileSettingData = data['about_us'];
-            // .where((element) => element['type'] == "about_us")
-            // .first['data'];
+          } else if (title == Api.contactUs) {
+            profileSettingData = data['contact_us'];
+          } else if (title == Api.faq) {
+            profileSettingData = data['faq'] ?? data['faqs'];
+          } else {
+            profileSettingData = data[title] ?? data[title.replaceAll('-', '_')];
           }
         }
       } else {

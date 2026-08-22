@@ -164,7 +164,22 @@ it will call API in background without showing the process and when data availab
   static String phonePeCurrency = "";
 
   static List<PaymentGateway> getEnabledPaymentGateways() {
-    return paymentGateways.where((gateway) => gateway.status == 1).toList();
+    if (paymentGateways.isEmpty) {
+      updatePaymentGateways();
+    }
+    final enabled = paymentGateways.where((gateway) => gateway.status == 1).toList();
+    if (enabled.isEmpty && stripePublishableKey.isNotEmpty) {
+      return [
+        PaymentGateway(
+          name: "Stripe",
+          key: stripePublishableKey,
+          currency: stripeCurrency.isNotEmpty ? stripeCurrency : "AED",
+          status: 1,
+          type: "stripe",
+        ),
+      ];
+    }
+    return enabled;
   }
 }
 

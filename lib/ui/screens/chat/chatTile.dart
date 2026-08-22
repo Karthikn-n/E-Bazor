@@ -4,14 +4,15 @@ import 'package:Ebozor/ui/screens/chat/chat_screen.dart';
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/app_icon.dart';
-import 'package:Ebozor/utils/extensions/lib/build_context.dart';
-import 'package:Ebozor/utils/extensions/lib/textWidgetExtention.dart';
+import 'package:Ebozor/utils/constant.dart';
+import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/notification/notification_service.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/svg.dart';
+
 class ChatTile extends StatelessWidget {
   final String profilePicture;
   final String userName;
@@ -48,154 +49,248 @@ class ChatTile extends StatelessWidget {
     required this.alreadyReview,
   });
 
+  String _formatChatDate(String rawDate) {
+    try {
+      final parsed = DateTime.parse(rawDate).toLocal();
+      final now = DateTime.now();
+      final difference = now.difference(parsed);
+
+      if (difference.inDays == 0 && parsed.day == now.day) {
+        return parsed.toIso8601String().formatDate(format: "hh:mm aa");
+      } else if (difference.inDays <= 1 || (difference.inDays == 0 && parsed.day != now.day)) {
+        return "Yesterday";
+      } else if (difference.inDays < 7) {
+        return parsed.toIso8601String().formatDate(format: "EEE");
+      } else {
+        return parsed.toIso8601String().formatDate(format: "dd MMM");
+      }
+    } catch (_) {
+      return date;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(context, BlurredRouter(
-          builder: (context) {
+    final effectivePrice = itemAmount ?? itemPrice;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: context.color.secondaryColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.color.borderColor.withValues(alpha: 0.6),
+          width: 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () {
             currentlyChatingWith = id;
             currentlyChatItemId = itemId;
-            return MultiBlocProvider(
-              providers: [
-                BlocProvider(
-                  create: (context) => LoadChatMessagesCubit(),
-                ),
-                BlocProvider(
-                  create: (context) => DeleteMessageCubit(),
-                ),
-              ],
-              child: Builder(builder: (context) {
-                return ChatScreen(
-                  profilePicture: profilePicture,
-                  itemTitle: itemName,
-                  userId: id,
-                  itemImage: itemPicture,
-                  userName: userName,
-                  itemId: itemId,
-                  date: date,
-                  itemOfferId: itemOfferId,
-                  itemPrice: itemPrice,
-                  itemOfferPrice: itemAmount??null,
-                  status: status,
-                  buyerId: buyerId,
-                  alreadyReview: alreadyReview,
-                  isPurchased: isPurchased,
-                );
-              }),
+            Navigator.push(
+              context,
+              BlurredRouter(
+                builder: (context) {
+                  return MultiBlocProvider(
+                    providers: [
+                      BlocProvider(
+                        create: (context) => LoadChatMessagesCubit(),
+                      ),
+                      BlocProvider(
+                        create: (context) => DeleteMessageCubit(),
+                      ),
+                    ],
+                    child: Builder(builder: (context) {
+                      return ChatScreen(
+                        profilePicture: profilePicture,
+                        itemTitle: itemName,
+                        userId: id,
+                        itemImage: itemPicture,
+                        userName: userName,
+                        itemId: itemId,
+                        date: date,
+                        itemOfferId: itemOfferId,
+                        itemPrice: itemPrice,
+                        itemOfferPrice: itemAmount,
+                        status: status,
+                        buyerId: buyerId,
+                        alreadyReview: alreadyReview,
+                        isPurchased: isPurchased,
+                      );
+                    }),
+                  );
+                },
+              ),
             );
           },
-        ));
-      },
-      child: AbsorbPointer(
-        absorbing: true,
-        child: Container(
-          height: 74,
-          decoration: BoxDecoration(
-            color: context.color.secondaryColor,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: context.color.borderColor,
-              width: 1.5,
-            ),
-          ),
-          width: MediaQuery.of(context).size.width,
           child: Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                Stack(
-                  children: [
-                    const SizedBox(
-                      width: 58,
-                      height: 58,
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        UiUtils.showFullScreenImage(context,
-                            provider: CachedNetworkImageProvider(itemPicture));
-                      },
-                      child: Container(
-                        width: 47,
-                        height: 47,
-                        clipBehavior: Clip.antiAlias,
+                // Avatar with overlapping item thumbnail
+                SizedBox(
+                  width: 52,
+                  height: 52,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      // User profile avatar
+                      Container(
+                        width: 46,
+                        height: 46,
                         decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                                color: context.color.textDefaultColor
-                                    .withValues(alpha: 0.05))),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(24),
-                          child: UiUtils.getImage(
-                            itemPicture,
-                            fit: BoxFit.cover,
+                          shape: BoxShape.circle,
+                          color: context.color.territoryColor.withValues(alpha: 0.1),
+                          border: Border.all(
+                            color: context.color.borderColor.withValues(alpha: 0.5),
+                            width: 1,
                           ),
                         ),
-                      ),
-                    ),
-                    PositionedDirectional(
-                      end: 8,
-                      bottom: 0,
-                      child: GestureDetector(
-                        onTap: () {
-                          UiUtils.showFullScreenImage(context,
-                              provider:
-                                  CachedNetworkImageProvider(profilePicture));
-                        },
-                        child: Container(
-                          height: 24,
-                          width: 24,
-                          decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(18),
-                              border:
-                                  Border.all(color: Colors.white, width: 1)),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(18),
-                            child: profilePicture == ""
-                                ? CircleAvatar(
-                                    radius: 18,
-                                    backgroundColor:
-                                        context.color.territoryColor,
-                                    child: SvgPicture.asset(AppIcons.profile,
-                                        height: 15,
-                                        width: 15,
-                                        colorFilter: ColorFilter.mode(
-                                            context.color.buttonColor,
-                                            BlendMode.srcIn)),
-                                  )
-                                : CircleAvatar(
-                                    radius: 15,
-                                    backgroundColor:
-                                        context.color.territoryColor,
-                                    backgroundImage:
-                                        NetworkImage(profilePicture),
+                        child: ClipOval(
+                          child: profilePicture.isNotEmpty
+                              ? CachedNetworkImage(
+                                  imageUrl: profilePicture,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, __) => Container(
+                                    color: context.color.borderColor.withValues(alpha: 0.2),
                                   ),
-                          ),
+                                  errorWidget: (_, __, ___) => Icon(
+                                    Icons.person_rounded,
+                                    color: context.color.territoryColor,
+                                    size: 24,
+                                  ),
+                                )
+                              : SvgPicture.asset(
+                                  AppIcons.profile,
+                                  fit: BoxFit.scaleDown,
+                                  colorFilter: ColorFilter.mode(
+                                    context.color.territoryColor,
+                                    BlendMode.srcIn,
+                                  ),
+                                ),
                         ),
                       ),
-                    )
-                  ],
+                      // Overlapping Item Image badge
+                      if (itemPicture.isNotEmpty)
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: context.color.secondaryColor,
+                              border: Border.all(
+                                color: context.color.secondaryColor,
+                                width: 1.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.1),
+                                  blurRadius: 3,
+                                  offset: const Offset(0, 1),
+                                )
+                              ],
+                            ),
+                            child: ClipOval(
+                              child: CachedNetworkImage(
+                                imageUrl: itemPicture,
+                                fit: BoxFit.cover,
+                                errorWidget: (_, __, ___) => Icon(
+                                  Icons.shopping_bag_outlined,
+                                  size: 12,
+                                  color: context.color.territoryColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-                const SizedBox(
-                  width: 10,
-                ),
+                const SizedBox(width: 14),
+
+                // Middle Content
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        userName,
-                        softWrap: true,
-                        overflow: TextOverflow.ellipsis,
-                      ).bold().color(context.color.textColorDark),
-                      Text(
-                        itemName,
-                        softWrap: true,
-                        overflow: TextOverflow.ellipsis,
-                      ).color(context.color.textColorDark),
+                      // User Name & Date Row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              userName.isNotEmpty ? userName : "User",
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: context.color.textDefaultColor,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _formatChatDate(date),
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: context.color.textLightColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+
+                      // Item Title & Price / Status Row
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              itemName.isNotEmpty ? itemName : "Item Offer",
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: context.color.textLightColor,
+                              ),
+                            ),
+                          ),
+                          if (effectivePrice > 0) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: context.color.territoryColor.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                "${Constant.currencySymbol} ${effectivePrice.toStringAsFixed(0)}",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.color.territoryColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
-                )
+                ),
               ],
             ),
           ),

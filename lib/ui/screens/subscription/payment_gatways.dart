@@ -34,16 +34,47 @@ class PaymentGateways {
       {required double price,
       required int packageId,
       required dynamic paymentIntent}) async {
+    if (paymentIntent == null) {
+      HelperUtils.showSnackBarMessage(
+        context,
+        "Failed to obtain Stripe payment intent from server",
+        type: MessageType.error,
+      );
+      return;
+    }
 
-    String paymentIntentId = paymentIntent["id"].toString();
-    String clientSecret =
-        paymentIntent['payment_gateway_response']["client_secret"].toString();
+    String paymentIntentId = paymentIntent["id"]?.toString() ??
+        paymentIntent["payment_intent_id"]?.toString() ??
+        "";
+
+    String clientSecret = "";
+    if (paymentIntent is Map) {
+      if (paymentIntent['payment_gateway_response'] is Map) {
+        clientSecret = paymentIntent['payment_gateway_response']['client_secret']
+                ?.toString() ??
+            "";
+      }
+      if (clientSecret.isEmpty) {
+        clientSecret = paymentIntent['client_secret']?.toString() ?? "";
+      }
+    }
+
+    if (clientSecret.isEmpty) {
+      HelperUtils.showSnackBarMessage(
+        context,
+        "Missing Stripe client secret in response",
+        type: MessageType.error,
+      );
+      return;
+    }
 
     await StripeService.payWithPaymentSheet(
       context: context,
       merchantDisplayName: Constant.appName,
-      amount: paymentIntent["amount"].toString(),
-      currency: AppSettings.stripeCurrency,
+      amount: (paymentIntent['amount'] ?? price).toString(),
+      currency: AppSettings.stripeCurrency.isNotEmpty
+          ? AppSettings.stripeCurrency
+          : "AED",
       clientSecret: clientSecret,
       paymentIntentId: paymentIntentId,
     );

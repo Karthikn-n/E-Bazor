@@ -44,7 +44,11 @@ class HomeSearchField extends StatelessWidget {
                     height: 56,
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
-                      border: Border.all(width: 2,color: Colors.grey),
+                      color: context.color.secondaryColor,
+                      border: Border.all(
+                        width: 1.5,
+                        color: context.color.borderColor.withValues(alpha: 0.8),
+                      ),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -78,7 +82,7 @@ class HomeSearchField extends StatelessWidget {
           },
           child: UiUtils.getSvg(
             AppIcons.location,
-            color: Colors.grey,
+            color: context.color.textColorDark.withValues(alpha: 0.7),
             width: 28, // 👈 reduce size slightly
             height: 28,
           ),
@@ -98,7 +102,7 @@ class HomeSearchField extends StatelessWidget {
           },
           child: UiUtils.getSvg(
             AppIcons.notification,
-            color: Colors.grey,
+            color: context.color.textColorDark.withValues(alpha: 0.7),
             width: 28,
             height: 28,
           ),
@@ -189,7 +193,14 @@ class _DynamicSearchTextState extends State<_DynamicSearchText>
     /// SVG
 
     if (widget.categories.isEmpty) {
-      return Text("Search");
+      return Text(
+        "search".translate(context),
+        style: TextStyle(
+          color: context.color.textDefaultColor,
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+        ),
+      );
     }
 
     final category = widget.categories[index];
@@ -205,7 +216,9 @@ class _DynamicSearchTextState extends State<_DynamicSearchText>
         Text(
           "${"search".translate(context)} ",
           style: TextStyle(
-            color: Colors.black
+            color: context.color.textDefaultColor,
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
           ),
         ),
         const SizedBox(width: 4),

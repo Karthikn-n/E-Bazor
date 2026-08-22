@@ -32,7 +32,7 @@ class FetchCustomFieldsCubit extends Cubit<FetchCustomFieldState> {
       print("///////////////////");
       emit(FetchCustomFieldInProgress());
       List<CustomFieldModel> result =
-          await _customFieldRepository.getCustomFields(categoryIds);
+          await _customFieldRepository.getCustomFieldsByCategoryId(categoryIds);
 
 
       emit(FetchCustomFieldSuccess(result));

@@ -14,26 +14,35 @@ class StripeService {
   // static BuildContext? currContext;
   static String paymentIntentSuccessResponse = "succeeded";
 
-  static initStripe(String? stripeId, String? stripeMode) async {
-    if (AppSettings.stripeStatus == 1) {
-      Stripe.publishableKey = stripeId ?? '';
+  static Future<void> initStripe(String? stripeId, String? stripeMode) async {
+    final key = (stripeId != null && stripeId.isNotEmpty)
+        ? stripeId
+        : AppSettings.stripePublishableKey;
+    if (key.isNotEmpty) {
+      Stripe.publishableKey = key;
       Stripe.merchantIdentifier = 'merchant.flutter.stripe.test';
       Stripe.urlScheme = 'flutterstripe';
       await Stripe.instance.applySettings();
     }
   }
 
-  static payWithPaymentSheet({
+  static Future<bool> payWithPaymentSheet({
     required BuildContext context,
     String amount = "0",
-    String currency = 'INR',
+    String currency = 'AED',
     String clientSecret = '',
     String paymentIntentId = '',
     String merchantDisplayName = "",
   }) async {
     try {
-      // currContext = bcontext;
-      //setting up Payment Sheet
+      final key = AppSettings.stripePublishableKey;
+      if (key.isNotEmpty && Stripe.publishableKey.isEmpty) {
+        Stripe.publishableKey = key;
+        Stripe.merchantIdentifier = 'merchant.flutter.stripe.test';
+        Stripe.urlScheme = 'flutterstripe';
+        await Stripe.instance.applySettings();
+      }
+
       await Stripe.instance.initPaymentSheet(
         paymentSheetParameters: SetupPaymentSheetParameters(
           paymentIntentClientSecret: clientSecret,
@@ -46,36 +55,43 @@ class StripeService {
                   email: CollectionMode.always,
                   name: CollectionMode.always,
                   phone: CollectionMode.always),
-          merchantDisplayName: merchantDisplayName,
+          merchantDisplayName: merchantDisplayName.isNotEmpty
+              ? merchantDisplayName
+              : Constant.appName,
         ),
       );
 
-      //open payment sheet
-      displayPaymentSheet(context);
-    } catch (e) {
-      throw Exception(e.toString());
-    }
-  }
-
-  static void displayPaymentSheet(BuildContext context) async {
-    try {
+      // Present payment sheet and await user completion
       await Stripe.instance.presentPaymentSheet();
 
       HelperUtils.showSnackBarMessage(
-          Constant.navigatorKey.currentContext!,
-          "paymentSuccessfullyCompleted"
-              .translate(Constant.navigatorKey.currentContext!));
-      Future.delayed(Duration.zero, () {
-        Navigator.pop(Constant.navigatorKey.currentContext!);
-      });
-    } on Exception catch (e) {
-      if (e is StripeException) {
-        HelperUtils.showSnackBarMessage(Constant.navigatorKey.currentContext!,
-            'Error from Stripe: ${e.error.localizedMessage}');
+        context,
+        "paymentSuccessfullyCompleted".translate(context),
+        type: MessageType.success,
+      );
+      return true;
+    } on StripeException catch (e) {
+      if (e.error.code == FailureCode.Canceled) {
+        HelperUtils.showSnackBarMessage(
+          context,
+          "Payment was cancelled",
+          type: MessageType.warning,
+        );
       } else {
         HelperUtils.showSnackBarMessage(
-            Constant.navigatorKey.currentContext!, 'Unforeseen error: ${e}');
+          context,
+          'Stripe: ${e.error.localizedMessage ?? e.error.message}',
+          type: MessageType.error,
+        );
       }
+      return false;
+    } catch (e) {
+      HelperUtils.showSnackBarMessage(
+        context,
+        'Payment error: $e',
+        type: MessageType.error,
+      );
+      return false;
     }
   }
 

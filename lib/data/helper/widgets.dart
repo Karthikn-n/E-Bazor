@@ -49,6 +49,10 @@ class Widgets {
     }
   }
 
+  static void hideLoader(BuildContext context) {
+    hideLoder(context);
+  }
+
   static Center noDataFound(String errorMsg) {
     return Center(child: Text(errorMsg));
   }

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:dio/dio.dart';
 import 'package:Ebozor/data/model/item_filter_model.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
@@ -47,7 +48,22 @@ class ItemRepository {
         parameter: parameters, /* useAuthToken: true*/
       );
 
-      return ItemModel.fromJson(response['data'][0]);
+      if (response['error'] == true) {
+        final errDetails = response['details']?.toString() ?? '';
+        final errMsg = response['message']?.toString() ?? 'Error Occurred';
+        throw ApiException(errDetails.isNotEmpty ? "$errMsg: $errDetails" : errMsg);
+      }
+
+      dynamic resData = response['data'];
+      if (resData is List && resData.isNotEmpty) {
+        return ItemModel.fromJson(resData[0]);
+      } else if (resData is Map<String, dynamic>) {
+        if (resData['data'] is List && (resData['data'] as List).isNotEmpty) {
+          return ItemModel.fromJson(resData['data'][0]);
+        }
+        return ItemModel.fromJson(resData);
+      }
+      return ItemModel.fromJson(response);
     } catch (e) {
       rethrow;
     }
@@ -93,6 +109,40 @@ class ItemRepository {
           total: response['data']['total'] ?? 0, modelList: itemList);
     } catch (e) {
       rethrow;
+    }
+  }
+
+  Future<Map<String, int>> fetchMyItemsCount({String? categorySlug}) async {
+    try {
+      Map<String, dynamic> parameters = {
+        if (categorySlug != null && categorySlug.isNotEmpty)
+          "category_slug": categorySlug,
+      };
+
+      Map<String, dynamic> response = await Api.get(
+        url: Api.getMyItemsCountApi,
+        queryParameters: parameters,
+      );
+
+      var data = response['data'];
+      if (data is Map) {
+        return {
+          "all_ads": int.tryParse(data['all_ads']?.toString() ?? '0') ?? 0,
+          "live": int.tryParse(data['live']?.toString() ?? '0') ?? 0,
+          "drafts": int.tryParse(data['drafts']?.toString() ?? '0') ?? 0,
+          "payment_pending":
+              int.tryParse(data['payment_pending']?.toString() ?? '0') ?? 0,
+          "under_review":
+              int.tryParse(data['under_review']?.toString() ?? '0') ?? 0,
+          "rejected":
+              int.tryParse(data['rejected']?.toString() ?? '0') ?? 0,
+          "expired":
+              int.tryParse(data['expired']?.toString() ?? '0') ?? 0,
+        };
+      }
+      return {};
+    } catch (e) {
+      return {};
     }
   }
 
@@ -173,21 +223,19 @@ class ItemRepository {
           parameters['longitude'] = filter.longitude;
         }
 
-        // Remove location-related fields when radius is provided
         parameters.remove('city');
         parameters.remove('area');
         parameters.remove('area_id');
         parameters.remove('country');
         parameters.remove('state');
       } else {
-        // If radius is not present, include other location-related parameters
         if (city != null && city != "") parameters['city'] = city;
         if (areaId != null) parameters['area_id'] = areaId;
         if (country != null && country != "") parameters['country'] = country;
         if (state != null && state != "") parameters['state'] = state;
       }
 
-      if (filter.areaId == null) {
+      if (filter.areaId == null && areaId == null) {
         parameters.remove('area_id');
       }
 
@@ -203,6 +251,11 @@ class ItemRepository {
           }
         });
       }
+    } else {
+      if (city != null && city != "") parameters['city'] = city;
+      if (areaId != null) parameters['area_id'] = areaId;
+      if (country != null && country != "") parameters['country'] = country;
+      if (state != null && state != "") parameters['state'] = state;
     }
 
     if (search != null) {
@@ -356,26 +409,59 @@ class ItemRepository {
       {required int page})
   async {
     Map<String, dynamic> parameters = {
-    ///api.search rathu just String tha
-
       Api.search: query,
       Api.page: page,
-      if (filter != null) ...filter.toMap(),
     };
 
+    String? effCountry = (filter?.country != null && filter!.country!.isNotEmpty)
+        ? filter.country
+        : HiveUtils.getCountryName();
+    String? effState = (filter?.state != null && filter!.state!.isNotEmpty)
+        ? filter.state
+        : HiveUtils.getStateName();
+    String? effCity = (filter?.city != null && filter!.city!.isNotEmpty)
+        ? filter.city
+        : HiveUtils.getCityName();
+    int? effAreaId = filter?.areaId ?? HiveUtils.getAreaId();
+    int? effRadius = filter?.radius ?? HiveUtils.getNearbyRadius();
+    double? effLat = filter?.latitude ?? HiveUtils.getLatitude();
+    double? effLng = filter?.longitude ?? HiveUtils.getLongitude();
+
+    if (effRadius != null && effLat != null && effLng != null) {
+      parameters['latitude'] = effLat;
+      parameters['longitude'] = effLng;
+      parameters['radius'] = effRadius;
+    } else {
+      if (effCity != null && effCity.isNotEmpty) parameters['city'] = effCity;
+      if (effState != null && effState.isNotEmpty) parameters['state'] = effState;
+      if (effCountry != null && effCountry.isNotEmpty) parameters['country'] = effCountry;
+      if (effAreaId != null) parameters['area_id'] = effAreaId;
+    }
+
     if (filter != null) {
-      if (filter.areaId == null) {
-        parameters.remove('area_id');
+      if (filter.minPrice != null && filter.minPrice!.isNotEmpty && filter.minPrice != '0') {
+        parameters['min_price'] = filter.minPrice;
       }
-      parameters.remove('area');
-      if (filter.customFields != null) {
-        parameters.addAll(filter.customFields!);
+      if (filter.maxPrice != null && filter.maxPrice!.isNotEmpty) {
+        parameters['max_price'] = filter.maxPrice;
+      }
+      if (filter.categoryId != null && filter.categoryId!.isNotEmpty) {
+        parameters['category_id'] = filter.categoryId;
+      }
+      if (filter.postedSince != null && filter.postedSince!.isNotEmpty) {
+        parameters['posted_since'] = filter.postedSince;
+      }
+      if (filter.customFields != null && filter.customFields!.isNotEmpty) {
+        filter.customFields!.forEach((key, value) {
+          if (value is List) {
+            parameters[key] = value.map((v) => v.toString()).join(',');
+          } else {
+            parameters[key] = value.toString();
+          }
+        });
       }
     }
 
-    print("/////////////seach param below///////////");
-    print(parameters);
-//get api egga call aguthu
     Map<String, dynamic> response =
         await Api.get(url: Api.getItemApi, queryParameters: parameters);
 

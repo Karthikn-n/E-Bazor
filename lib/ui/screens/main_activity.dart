@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:app_links/app_links.dart';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/item/search_item_cubit.dart';
@@ -34,10 +35,9 @@ import 'package:Ebozor/utils/errorFilter.dart';
 
 import 'package:Ebozor/utils/helper_utils.dart';
 
-import 'package:Ebozor/utils/responsiveSize.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/ui/screens/home/search_screen.dart';
-import 'package:Ebozor/ui/screens/item/my_items_screen.dart';
+import 'package:Ebozor/ui/screens/advertisement/my_advertisment_screen.dart';
 import 'package:Ebozor/ui/screens/user_profile/profile_screen.dart';
 import 'package:Ebozor/ui/screens/chat/chat_list_screen.dart';
 import 'package:Ebozor/ui/screens/home/home_screen.dart';
@@ -68,18 +68,19 @@ List<ScrollController> controllerList = [
 //
 class MainActivity extends StatefulWidget {
   final String from;
-   static final GlobalKey<MainActivityState> globalKey =
-       GlobalKey<MainActivityState>();
+  static GlobalKey<MainActivityState> globalKey =
+      GlobalKey<MainActivityState>();
 
-  MainActivity({Key? key, required this.from}) : super(key: globalKey);
+  MainActivity({Key? key, required this.from}) : super(key: key ?? globalKey);
 
   @override
   State<MainActivity> createState() => MainActivityState();
 
   static Route route(RouteSettings routeSettings) {
     Map arguments = routeSettings.arguments as Map;
+    globalKey = GlobalKey<MainActivityState>();
     return BlurredRouter(
-        builder: (_) => MainActivity(from: arguments['from'] as String));
+        builder: (_) => MainActivity(key: globalKey, from: arguments['from'] as String));
   }
 }
 
@@ -324,7 +325,7 @@ class MainActivityState extends State<MainActivity>
   late List<Widget> pages = [
     HomeScreen(from: widget.from),
     ChatListScreen(),
-    const ItemsScreen(),
+    const MyAdvertisementScreen(),
     const ProfileScreen(),
   ];
 
@@ -332,7 +333,7 @@ class MainActivityState extends State<MainActivity>
   Widget build(BuildContext context) {
     return AnnotatedRegion(
       value: UiUtils.getSystemUiOverlayStyle(
-          context: context, statusBarColor: context.color.primaryColor),
+          context: context, statusBarColor: context.color.secondaryColor),
       child: PopScope(
         canPop: isBack,
         onPopInvokedWithResult: (didPop, result) {
@@ -397,7 +398,7 @@ class MainActivityState extends State<MainActivity>
       } else if (xIndex == 4) {
         xIndex = 3;
       }*/
-      if (controllerList[index].hasClients) {
+      if (index < controllerList.length && controllerList[index].hasClients) {
         controllerList[index].animateTo(0,
             duration: const Duration(milliseconds: 200),
             curve: Curves.bounceOut);
@@ -418,6 +419,9 @@ class MainActivityState extends State<MainActivity>
           onNotGuest: () {
             currtab = index;
             pageCntrlr.jumpToPage(currtab);
+            if (index == 2) {
+              MyAdvertisementScreen.refreshCallback?.call();
+            }
             setState(
               () {},
             );
@@ -476,29 +480,41 @@ class MainActivityState extends State<MainActivity>
   }*/
 
 
-  /////// here your bottom navigation handled
   BottomAppBar bottomBar() {
     return BottomAppBar(
       color: context.color.secondaryColor,
-      shape: const CircularNotchedRectangle(),
+      elevation: 0,
+      padding: EdgeInsets.zero,
       child: Container(
-        height: 64, // 🔥 proper height
-        color: context.color.secondaryColor,
+        height: 58,
+        decoration: BoxDecoration(
+          color: context.color.secondaryColor,
+          border: Border(
+            top: BorderSide(
+              color: context.color.borderColor.withValues(alpha: 0.5),
+              width: 0.8,
+            ),
+          ),
+        ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: <Widget>[
             buildBottomNavigationbarItem(
-              0,
-              AppIcons.homeNav,
-              AppIcons.homeNavActive,
-        //      "homeTab".translate(context),
+              index: 0,
+              title: "homeTab".translate(context).isNotEmpty
+                  ? "homeTab".translate(context)
+                  : "Home",
+              outlineAsset: AppIcons.homeNavPng,
+              filledAsset: AppIcons.homeNavFilledPng,
             ),
 
             buildBottomNavigationbarItem(
-              1,
-              AppIcons.chatNav,
-              AppIcons.chatNavActive,
-         //     "chat".translate(context),
+              index: 1,
+              title: "message".translate(context).isNotEmpty
+                  ? "message".translate(context)
+                  : "Chats",
+              outlineAsset: AppIcons.chatNavPng,
+              filledAsset: AppIcons.chatNavFilledPng,
             ),
 
             /// CENTER BUTTON
@@ -533,39 +549,51 @@ class MainActivityState extends State<MainActivity>
                         },
                       );
                     },
-                    child:SizedBox(
-                      width: 72.rw(context),   // ⬅️ WIDTH INCREASED
-                      height: 72,              // ⬅️ HEIGHT INCREASED
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: context.color.territoryColor,
+                      ),
                       child: Center(
                         child: state is FetchUserPackageLimitInProgress
-                            ? const CircularProgressIndicator(strokeWidth: 2)
-                            : !svgLoaded
-                            ? const SizedBox.shrink()
-                            : SizedBox(               // ⬅️ ICON SIZE CONTROL
-                          width: 60,
-                          height: 60,
-                          child:Image.asset("assets/plusimage.png")
-                        ),
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.add_rounded,
+                                color: Colors.white,
+                                size: 24,
+                              ),
                       ),
                     ),
-
                   );
                 },
               ),
             ),
 
             buildBottomNavigationbarItem(
-              2,
-              AppIcons.myAdsNav,
-              AppIcons.myAdsNavActive,
-          //    "myAdsTab".translate(context),
+              index: 2,
+              title: "myAdsTab".translate(context).isNotEmpty
+                  ? "myAdsTab".translate(context)
+                  : "My Ads",
+              outlineAsset: AppIcons.adsNavPng,
+              filledAsset: AppIcons.adsNavFilledPng,
             ),
 
             buildBottomNavigationbarItem(
-              3,
-              AppIcons.profileNav,
-              AppIcons.profileNavActive,
-           //   "profileTab".translate(context),
+              index: 3,
+              title: "profileTab".translate(context).isNotEmpty
+                  ? "profileTab".translate(context)
+                  : "Profile",
+              outlineAsset: AppIcons.profileNavPng,
+              filledAsset: AppIcons.profileNavFilledPng,
             ),
           ],
         ),
@@ -573,13 +601,14 @@ class MainActivityState extends State<MainActivity>
     );
   }
 
+  Widget buildBottomNavigationbarItem({
+    required int index,
+    required String title,
+    required String outlineAsset,
+    required String filledAsset,
+  }) {
+    final isSelected = currtab == index;
 
-  Widget buildBottomNavigationbarItem(
-    int index,
-    String svgImage,
-    String activeSvg,
-  //  String title,
-  ) {
     return Expanded(
       child: Material(
         type: MaterialType.transparency,
@@ -587,24 +616,41 @@ class MainActivityState extends State<MainActivity>
           highlightColor: Colors.transparent,
           splashColor: Colors.transparent,
           onTap: () => onItemTapped(index),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              if (currtab == index) ...{
-                UiUtils.getSvg(activeSvg,color: context.color.territoryColor),
-              } else ...{
-                UiUtils.getSvg(svgImage,
-                    color: context.color.textLightColor.darken(30)),
-              },
-              /*
-              Text(
-                title,
-                textAlign: TextAlign.center,
-              ).color(currtab == index
-                  ? context.color.textDefaultColor
-                  : context.color.textLightColor.darken(30)),*/
-            ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Center(
+                    child: Image.asset(
+                      isSelected ? filledAsset : outlineAsset,
+                      color: isSelected
+                          ? context.color.territoryColor
+                          : context.color.textColorDark.withValues(alpha: 0.55),
+                      width: 22,
+                      height: 22,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  title,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected
+                        ? context.color.territoryColor
+                        : context.color.textColorDark.withValues(alpha: 0.55),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

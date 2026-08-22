@@ -139,11 +139,19 @@ class _CategoryFilterScreenState extends State<CategoryFilterScreen>
                                         borderRadius: BorderRadius.circular(20),
                                         color: context.color.territoryColor
                                             .withValues(alpha: 0.1)),
-                                    child: UiUtils.imageType(
-                                      category.url!,
-                                      color: context.color.territoryColor,
-                                      fit: BoxFit.cover,
-                                    )
+                                    child: (category.url != null && category.url!.trim().isNotEmpty)
+                                        ? UiUtils.imageType(
+                                            category.url!,
+                                            color: category.url!.endsWith('.svg')
+                                                ? context.color.territoryColor
+                                                : null,
+                                            fit: BoxFit.contain,
+                                          )
+                                        : Icon(
+                                            Icons.category_outlined,
+                                            color: context.color.territoryColor,
+                                            size: 20,
+                                          ),
                                 ),
                                 title: Text(
                                   category.name!,
@@ -153,17 +161,11 @@ class _CategoryFilterScreenState extends State<CategoryFilterScreen>
                                 )
                                     .color(context.color.textDefaultColor)
                                     .size(context.font.normal),
-                                trailing: Container(
-                                    width: 32,
-                                    height: 32,
-                                    decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(8),
-                                        color: context.color.borderColor
-                                            .darken(10)),
-                                    child: Icon(
-                                      Icons.chevron_right_outlined,
-                                      color: context.color.textDefaultColor,
-                                    )),
+                                trailing: Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: context.color.textLightColor,
+                                  size: 22,
+                                ),
                               );
                             },
                           ),

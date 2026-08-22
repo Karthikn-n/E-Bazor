@@ -262,84 +262,125 @@ class FilterScreenState extends State<FilterScreen> {
         return;
       },
       child: Scaffold(
-        backgroundColor: isProperty ? Color(0xFFF9F9F9) : Theme.of(context).colorScheme.primaryColor,
+        backgroundColor: context.color.backgroundColor,
         appBar: UiUtils.buildAppBar(
           context,
           onBackPress: () {
-            print("Clicked");
             checkFilterValSet();
             Navigator.pop(context);
           },
           showBackButton: true,
           title: "filterTitle".translate(context),
           actions: [
-            FittedBox(
-              fit: BoxFit.none,
-              child: UiUtils.buildButton(
-                context,
-                onPressed: () {
-                  setDefaultVal(isRefresh: true);
-                  setState(() {});
-                },
-                width: 100,
-                height: 50,
-                fontSize: context.font.normal,
-                buttonColor: context.color.secondaryColor,
-                showElevation: false,
-                textColor: context.color.textColorDark,
-                buttonTitle: "reset".translate(context),
+            TextButton(
+              onPressed: () {
+                setDefaultVal(isRefresh: true);
+                setState(() {});
+              },
+              child: Text(
+                "reset".translate(context),
+                style: TextStyle(
+                  color: context.color.territoryColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
               ),
-            )
+            ),
+            const SizedBox(width: 8),
           ],
         ),
-        bottomNavigationBar: BottomAppBar(
-          color: isProperty ? Color(0xFFF9F9F9) : context.color.secondaryColor,
-          elevation: isProperty ? 0 : 3,
-          child: UiUtils.buildButton(context,
-              outerPadding: const EdgeInsets.all(12),
-              height: 50.rh(context), onPressed: () {
-            Map<String, dynamic> customFields =
-                convertToCustomFields(AbstractField.fieldsData);
-            Constant.itemFilter = ItemFilterModel(
-                maxPrice: maxController.text,
-                minPrice: minController.text,
-                categoryId: selectedCategories.isNotEmpty
-                    ? selectedCategories.last
-                    : "",
-                postedSince: postedOn,
-                city: city,
-                areaId: areaId,
-                radius: radius,
-                state: _state,
-                country: country,
-                latitude: latitude,
-                longitude: longitude,
-                customFields: customFields);
-
-            widget.update(ItemFilterModel(
-                maxPrice: maxController.text,
-                minPrice: minController.text,
-                categoryId: widget.from == "search"
-                    ? selectedCategories.isNotEmpty
-                        ? selectedCategories.last
-                        : ""
-                    : '',
-                postedSince: postedOn,
-                city: city,
-                areaId: areaId,
-                radius: radius,
-                state: _state,
-                country: country,
-                longitude: longitude,
-                latitude: latitude,
-                customFields: customFields));
-
-            Navigator.pop(context, true);
-          }, 
-          buttonTitle: "applyFilter".translate(context), 
-          radius: 8,
-          buttonColor: isProperty ? Color(0xFFE52D2D) : context.color.territoryColor,
-          textColor: Colors.white
+        bottomNavigationBar: Container(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 12,
+            bottom: MediaQuery.of(context).padding.bottom + 12,
+          ),
+          decoration: BoxDecoration(
+            color: context.color.secondaryColor,
+            border: Border(
+              top: BorderSide(
+                color: context.color.borderColor.withValues(alpha: 0.5),
+                width: 1,
+              ),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 1,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    side: BorderSide(
+                      color: context.color.borderColor.withValues(alpha: 0.8),
+                      width: 1,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () {
+                    setDefaultVal(isRefresh: true);
+                    setState(() {});
+                  },
+                  child: Text(
+                    "reset".translate(context),
+                    style: TextStyle(
+                      color: context.color.textDefaultColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: context.color.territoryColor,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () {
+                    Map<String, dynamic> customFields =
+                        convertToCustomFields(AbstractField.fieldsData);
+                    final appliedFilter = ItemFilterModel(
+                      maxPrice: maxController.text,
+                      minPrice: minController.text,
+                      categoryId: selectedCategories.isNotEmpty
+                          ? selectedCategories.last
+                          : "",
+                      postedSince: postedOn,
+                      city: city,
+                      areaId: areaId,
+                      radius: radius,
+                      state: _state,
+                      country: country,
+                      latitude: latitude,
+                      longitude: longitude,
+                      customFields: customFields,
+                    );
+                    Constant.itemFilter = appliedFilter;
+                    widget.update(appliedFilter);
+                    Navigator.pop(context, true);
+                  },
+                  child: Text(
+                    "applyFilter".translate(context),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         body: isProperty ? propertyFilterBody() : SingleChildScrollView(
@@ -626,54 +667,67 @@ class FilterScreenState extends State<FilterScreen> {
   }
 
   Widget locationWidget(BuildContext context) {
-    return InkWell(
-      onTap: () {
-        _onTapChooseLocation();
-      },
-      child: Padding(
-        padding: const EdgeInsets.only(top: 10.0),
-        child: Container(
-          height: 55,
-          decoration: BoxDecoration(
-              color: context.color.secondaryColor,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: context.color.borderColor.darken(30),
-                width: 1,
-              )),
+    final locationText = [area, city, _state, country]
+        .where((element) => element != null && element.isNotEmpty)
+        .join(", ");
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(
+        color: context.color.secondaryColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.color.borderColor.withValues(alpha: 0.6),
+          width: 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: _onTapChooseLocation,
           child: Padding(
-            padding: const EdgeInsetsDirectional.only(start: 14.0),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                UiUtils.getSvg(AppIcons.locationIcon,
-                    color: context.color.textDefaultColor),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsetsDirectional.only(start: 10.0),
-                    child: /*(city != "" && city != null)
-                        ? Text(
-                            "${area != null && area != "" ? '$area,' : ''}$city, $_state, $country",
-                            overflow: TextOverflow.ellipsis,
-                            softWrap: true,
-                          )*/
-                        [area, city, _state, country]
-                                .where((element) =>
-                                    element != null && element.isNotEmpty)
-                                .join(", ")
-                                .isNotEmpty
-                            ? Text(
-                                [area, city, _state, country]
-                                    .where((element) =>
-                                        element != null && element.isNotEmpty)
-                                    .join(", "),
-                                overflow: TextOverflow.ellipsis,
-                                softWrap: true,
-                              )
-                            : Text("allCities".translate(context)).color(context
-                                .color.textDefaultColor
-                                .withValues(alpha: 0.5)),
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: context.color.territoryColor.withValues(alpha: 0.1),
                   ),
+                  child: Center(
+                    child: Icon(
+                      Icons.location_on_outlined,
+                      size: 20,
+                      color: context.color.territoryColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    locationText.isNotEmpty
+                        ? locationText
+                        : "allCities".translate(context),
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: locationText.isNotEmpty
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                      color: locationText.isNotEmpty
+                          ? context.color.textDefaultColor
+                          : context.color.textLightColor,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: context.color.textLightColor,
                 ),
               ],
             ),
@@ -684,55 +738,91 @@ class FilterScreenState extends State<FilterScreen> {
   }
 
   Widget categoryWidget(BuildContext context) {
-    return InkWell(
-      onTap: () {
-        categoryList.clear();
-        Navigator.pushNamed(context, Routes.categoryFilterScreen,
-            arguments: {"categoryList": categoryList}).then((value) {
-          if (categoryList.isNotEmpty) {
-            setState(() {});
-            selectedCategories.clear();
-            selectedCategories.addAll(
-                categoryList.map<String>((e) => e.id.toString()).toList());
-            getCustomFieldsData();
-          }
-        });
-      },
-      child: Padding(
-        padding: const EdgeInsets.only(top: 10.0),
-        child: Container(
-          height: 55,
-          width: double.infinity,
-          decoration: BoxDecoration(
-              color: context.color.secondaryColor,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: context.color.borderColor.darken(30),
-                width: 1,
-              )),
+    final hasCategory = categoryList.isNotEmpty;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(
+        color: context.color.secondaryColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.color.borderColor.withValues(alpha: 0.6),
+          width: 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () {
+            categoryList.clear();
+            Navigator.pushNamed(context, Routes.categoryFilterScreen,
+                arguments: {"categoryList": categoryList}).then((value) {
+              if (categoryList.isNotEmpty) {
+                setState(() {});
+                selectedCategories.clear();
+                selectedCategories.addAll(
+                    categoryList.map<String>((e) => e.id.toString()).toList());
+                getCustomFieldsData();
+              }
+            });
+          },
           child: Padding(
-            padding: const EdgeInsetsDirectional.only(start: 14.0),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                categoryList.isNotEmpty
-                    ? UiUtils.getImage(categoryList[0].url!,
-                        height: 20, width: 20, fit: BoxFit.contain)
-                    : UiUtils.getSvg(AppIcons.categoryIcon,
-                        color: context.color.textDefaultColor),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsetsDirectional.only(start: 15.0),
-                    child: categoryList.isNotEmpty
-                        ? Text("${categoryList.map((e) => e.name).join(' - ')}",
-                            maxLines: 1, overflow: TextOverflow.ellipsis)
-                        : Text("allInClassified".translate(context)).color(
-                            context.color.textDefaultColor.withValues(alpha: 0.5)),
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: context.color.territoryColor.withValues(alpha: 0.1),
+                  ),
+                  child: ClipOval(
+                    child: (hasCategory &&
+                            categoryList[0].url != null &&
+                            categoryList[0].url!.trim().isNotEmpty)
+                        ? Padding(
+                            padding: const EdgeInsets.all(7.0),
+                            child: UiUtils.imageType(
+                              categoryList[0].url!,
+                              fit: BoxFit.contain,
+                              color: categoryList[0].url!.endsWith('.svg')
+                                  ? context.color.territoryColor
+                                  : null,
+                            ),
+                          )
+                        : Icon(
+                            Icons.grid_view_rounded,
+                            size: 18,
+                            color: context.color.territoryColor,
+                          ),
                   ),
                 ),
-                Padding(
-                  padding: EdgeInsetsDirectional.only(end: 14.0),
-                  child: UiUtils.getSvg(AppIcons.downArrow,
-                      color: context.color.textDefaultColor),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    hasCategory
+                        ? categoryList.map((e) => e.name).join(' - ')
+                        : "allInClassified".translate(context),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: hasCategory
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                      color: hasCategory
+                          ? context.color.textDefaultColor
+                          : context.color.textLightColor,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: context.color.textLightColor,
                 ),
               ],
             ),
@@ -743,112 +833,128 @@ class FilterScreenState extends State<FilterScreen> {
   }
 
   Widget saveFilter() {
-    //save prefs & validate fields & call API
     return IconButton(
-        onPressed: () {
-          Constant.itemFilter = ItemFilterModel(
-            maxPrice: maxController.text,
-            city: city,
-            areaId: areaId,
-            radius: radius,
-            state: _state,
-            country: country,
-            longitude: longitude,
-            latitude: latitude,
-            minPrice: minController.text,
-            categoryId: selectedCategory?.id ?? "",
-            postedSince: postedOn,
-          );
+      onPressed: () {
+        Constant.itemFilter = ItemFilterModel(
+          maxPrice: maxController.text,
+          city: city,
+          areaId: areaId,
+          radius: radius,
+          state: _state,
+          country: country,
+          longitude: longitude,
+          latitude: latitude,
+          minPrice: minController.text,
+          categoryId: selectedCategory?.id ?? "",
+          postedSince: postedOn,
+        );
 
-          Navigator.pop(context, true);
-        },
-        icon: const Icon(Icons.check));
+        Navigator.pop(context, true);
+      },
+      icon: const Icon(Icons.check),
+    );
   }
 
   Widget budgetOption() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: <Widget>[
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              minMaxTFF(
-                "minLbl".translate(context),
-              )
-            ],
-          ),
+    double min = double.tryParse(minController.text.replaceAll(',', '')) ?? 0;
+    double max = double.tryParse(maxController.text.replaceAll(',', '')) ?? 1000000;
+    if (min < 0) min = 0;
+    if (max > 1000000) max = 1000000;
+    if (max < min) max = min;
+
+    return Column(
+      children: [
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: minMaxTFF("minLbl".translate(context)),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10),
+              child: Text(
+                "-",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            Expanded(
+              child: minMaxTFF("maxLbl".translate(context)),
+            ),
+          ],
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              minMaxTFF("maxLbl".translate(context)),
-            ],
-          ),
+        const SizedBox(height: 8),
+        RangeSlider(
+          values: RangeValues(min, max),
+          min: 0,
+          max: 1000000,
+          activeColor: context.color.territoryColor,
+          inactiveColor: context.color.territoryColor.withValues(alpha: 0.2),
+          onChanged: (RangeValues values) {
+            setState(() {
+              _priceRangeValues = values;
+              minController.text = values.start.round().toString();
+              maxController.text = values.end.round().toString();
+            });
+          },
         ),
       ],
     );
   }
 
-  //// min and max input boc for flutter
   Widget minMaxTFF(String minMax) {
-    return Container(
-        /*  padding: EdgeInsetsDirectional.only(
-            end: minMax == "minLbl".translate(context) ? 5 :),*/
-        alignment: AlignmentDirectional.center,
-        decoration: BoxDecoration(
-            borderRadius: const BorderRadius.all(Radius.circular(10)),
-            color: Theme.of(context).colorScheme.secondaryColor),
-        child: TextFormField(
-            controller: (minMax == "minLbl".translate(context))
-                ? minController
-                : maxController,
-            onChanged: ((value) {
-              bool isEmpty = value.trim().isEmpty;
-              if (minMax == "minLbl".translate(context)) {
-                if (isEmpty && searchbody.containsKey(Api.minPrice)) {
-                  searchbody.remove(Api.minPrice);
-                } else {
-                  searchbody[Api.minPrice] = value;
-                }
-              } else {
-                if (isEmpty && searchbody.containsKey(Api.maxPrice)) {
-                  searchbody.remove(Api.maxPrice);
-                } else {
-                  searchbody[Api.maxPrice] = value;
-                }
-              }
-            }),
-            textInputAction: TextInputAction.done,
-            decoration: InputDecoration(
-                isDense: true,
-                focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        BorderSide(color: context.color.territoryColor)),
-                enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(
-                        color: context.color.borderColor.darken(30))),
-                labelStyle: TextStyle(
-                    color: context.color.textDefaultColor.withValues(alpha: 0.5)),
-                hintText: "00",
-                label: Text(
-                  minMax,
-                ),
-                prefixText: '${Constant.currencySymbol} ',
-                prefixStyle: TextStyle(
-                    color: Theme.of(context).colorScheme.territoryColor),
-                fillColor: Theme.of(context).colorScheme.secondaryColor,
-                border: const OutlineInputBorder()),
-            keyboardType: TextInputType.number,
-            style:
-                TextStyle(color: Theme.of(context).colorScheme.territoryColor),
+    final isMin = minMax == "minLbl".translate(context);
+    final controller = isMin ? minController : maxController;
 
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly]));
+    return Container(
+      decoration: BoxDecoration(
+        color: context.color.secondaryColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: context.color.borderColor.withValues(alpha: 0.6),
+          width: 1,
+        ),
+      ),
+      child: TextFormField(
+        controller: controller,
+        onChanged: (value) {
+          bool isEmpty = value.trim().isEmpty;
+          if (isMin) {
+            if (isEmpty && searchbody.containsKey(Api.minPrice)) {
+              searchbody.remove(Api.minPrice);
+            } else {
+              searchbody[Api.minPrice] = value;
+            }
+          } else {
+            if (isEmpty && searchbody.containsKey(Api.maxPrice)) {
+              searchbody.remove(Api.maxPrice);
+            } else {
+              searchbody[Api.maxPrice] = value;
+            }
+          }
+        },
+        keyboardType: TextInputType.number,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: context.color.textDefaultColor,
+        ),
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        decoration: InputDecoration(
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          border: InputBorder.none,
+          labelText: minMax,
+          labelStyle: TextStyle(
+            color: context.color.textLightColor,
+            fontSize: 13,
+          ),
+          prefixText: '${Constant.currencySymbol} ',
+          prefixStyle: TextStyle(
+            color: context.color.territoryColor,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
   }
 
   postedSinceUpdate(String value) {
@@ -858,47 +964,66 @@ class FilterScreenState extends State<FilterScreen> {
   }
 
   Widget postedSinceOption(BuildContext context) {
-    int index =
-        Constant.postedSince.indexWhere((item) => item.value == postedOn);
+    int index = Constant.postedSince.indexWhere((item) => item.value == postedOn);
+    if (index == -1) index = 0;
 
-
-    return InkWell(
-      onTap: () {
-        Navigator.pushNamed(context, Routes.postedSinceFilterScreen,
-            arguments: {
-              "list": Constant.postedSince,
-              "postedSince": postedOn,
-              "update": postedSinceUpdate
-            }).then((value) {});
-      },
-      child: Padding(
-        padding: const EdgeInsets.only(top: 10.0),
-        child: Container(
-          height: 55,
-          width: double.infinity,
-          decoration: BoxDecoration(
-              color: context.color.secondaryColor,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: context.color.borderColor.darken(30),
-                width: 1,
-              )),
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(
+        color: context.color.secondaryColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.color.borderColor.withValues(alpha: 0.6),
+          width: 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () {
+            Navigator.pushNamed(context, Routes.postedSinceFilterScreen,
+                arguments: {
+                  "list": Constant.postedSince,
+                  "postedSince": postedOn,
+                  "update": postedSinceUpdate
+                });
+          },
           child: Padding(
-            padding: const EdgeInsetsDirectional.only(start: 14.0),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                UiUtils.getSvg(AppIcons.sinceIcon,
-                    color: context.color.textDefaultColor),
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(start: 15.0),
-                  child: Text(Constant.postedSince[index].status)
-                      .color(context.color.textDefaultColor.withValues(alpha: 0.5)),
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: context.color.territoryColor.withValues(alpha: 0.1),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      Icons.calendar_today_outlined,
+                      size: 18,
+                      color: context.color.territoryColor,
+                    ),
+                  ),
                 ),
-                Spacer(),
-                Padding(
-                  padding: EdgeInsetsDirectional.only(end: 14.0),
-                  child: UiUtils.getSvg(AppIcons.downArrow,
-                      color: context.color.textDefaultColor),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    Constant.postedSince[index].status,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: context.color.textDefaultColor,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: context.color.textLightColor,
                 ),
               ],
             ),

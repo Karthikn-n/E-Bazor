@@ -55,13 +55,49 @@ class NearbyLocationScreenState extends State<NearbyLocationScreen>
   String currentLocation = '';
   double? latitude, longitude;
   AddressComponent? formatedAddress;
+  bool isMapLoading = true;
 
   @override
   void initState() {
     super.initState();
+    // 1. Load persistent radius if set previously
+    final savedRadius = HiveUtils.getNearbyRadius();
+    if (savedRadius != null) {
+      if (savedRadius is int) {
+        radius = savedRadius.toDouble();
+      } else if (savedRadius is double) {
+        radius = savedRadius;
+      }
+    }
+
+    // 2. Set fast initial coordinates immediately so map loads instantly
+    latitude = HiveUtils.getLatitude() ?? HiveUtils.getCurrentLatitude();
+    longitude = HiveUtils.getLongitude() ?? HiveUtils.getCurrentLongitude();
+    if (latitude == null || longitude == null || latitude == 0 || longitude == 0) {
+      latitude = double.tryParse(Constant.defaultLatitude) ?? 25.2048;
+      longitude = double.tryParse(Constant.defaultLongitude) ?? 55.2708;
+    }
+
+    _cameraPosition = CameraPosition(
+      target: LatLng(latitude!, longitude!),
+      zoom: 14.4746,
+      bearing: 0,
+    );
+
     _getCurrentLocation();
 
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  bool _initialCircleSet = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialCircleSet && latitude != null && longitude != null) {
+      _addCircle(LatLng(latitude!, longitude!), radius);
+      _initialCircleSet = true;
+    }
   }
 
   Future<void> _getCurrentLocation() async {
@@ -92,8 +128,8 @@ class NearbyLocationScreenState extends State<NearbyLocationScreen>
   }
 
   void setDefaultLocation() {
-    latitude = double.parse(Constant.defaultLatitude);
-    longitude = double.parse(Constant.defaultLongitude);
+    latitude = double.tryParse(Constant.defaultLatitude) ?? 25.2048;
+    longitude = double.tryParse(Constant.defaultLongitude) ?? 55.2708;
     getLocationFromLatitudeLongitude(latLng: LatLng(latitude!, longitude!));
     _cameraPosition = CameraPosition(
       target: LatLng(latitude!, longitude!),
@@ -101,7 +137,9 @@ class NearbyLocationScreenState extends State<NearbyLocationScreen>
       bearing: 0,
     );
     _addCircle(LatLng(latitude!, longitude!), radius);
-    setState(() {});
+    if (mounted) setState(() {
+      isMapLoading = false;
+    });
   }
 
   Future<void> preFillLocationWhileEdit() async {
@@ -208,21 +246,22 @@ class NearbyLocationScreenState extends State<NearbyLocationScreen>
 
   void _addCircle(LatLng position, double radiusInKm) {
     final double radiusInMeters = radiusInKm * 1000; // Convert km to meters
+    final color = context.color.territoryColor;
 
-    setState(() {
-      circles.clear(); // Clear any existing circles
-      circles.add(
-        Circle(
-          circleId: CircleId("radius_circle"),
-          center: position,
-          radius: radiusInMeters,
-          // Set radius in meters
-          fillColor: context.color.territoryColor.withValues(alpha: 0.15),
-          strokeColor: context.color.territoryColor,
-          strokeWidth: 2,
-        ),
-      );
-    });
+    circles = {
+      Circle(
+        circleId: const CircleId("radius_circle"),
+        center: position,
+        radius: radiusInMeters,
+        fillColor: color.withValues(alpha: 0.15),
+        strokeColor: color,
+        strokeWidth: 2,
+      ),
+    };
+
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Widget bottomBar() {
@@ -245,6 +284,7 @@ class NearbyLocationScreenState extends State<NearbyLocationScreen>
                   radius = 1;
                   _addCircle(LatLng(latitude!, longitude!), radius);
                 });
+                HiveUtils.clearNearbyRadius();
               },
                       buttonTitle: "reset".translate(context),
                       height: 43,

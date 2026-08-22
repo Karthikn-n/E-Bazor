@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:Ebozor/data/model/item_filter_model.dart';
+import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
+import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -46,7 +48,7 @@ class _FiltersPageState extends State<FiltersPage> {
   // Property Type index
   int _selectedPropertyType = 0;
 
-  // Sub-category (e.g., All, Apartment, Villa) index
+  // Sub-category index
   int _selectedCategory = 0;
 
   // Price Range
@@ -55,43 +57,54 @@ class _FiltersPageState extends State<FiltersPage> {
   final TextEditingController _priceMaxController =
       TextEditingController(text: '');
 
-  // Area/Size Range
-  final TextEditingController _areaMinController =
-      TextEditingController(text: '');
-  final TextEditingController _areaMaxController =
-      TextEditingController(text: '');
-
   // Dynamic filter state stored per filter name:
   // Multi-select stores Set<String>
   // Single-select stores String?
   final Map<String, dynamic> _selectedFilters = {};
 
-  // Text / numeric input dynamic filters stored per filter name
+  // Text / single numeric input dynamic filters stored per filter name
   final Map<String, TextEditingController> _filterTextControllers = {};
 
-  // Location & keywords
-  final TextEditingController _locationController = TextEditingController();
-  final TextEditingController _excludeLocationController =
-      TextEditingController();
-  final TextEditingController _keywordController = TextEditingController();
-  final TextEditingController _agencyController = TextEditingController();
+  // Range Min / Max controllers for numeric range filters (e.g. Size, Km, etc.)
+  final Map<String, TextEditingController> _rangeMinControllers = {};
+  final Map<String, TextEditingController> _rangeMaxControllers = {};
+  final Map<String, RangeValues> _rangeSliderValues = {};
 
-  // More Filters static toggles
-  final Set<String> _selectedMoreFilters = {};
+  // Location controller
+  final TextEditingController _locationController = TextEditingController();
 
   // Live count state
   int _resultCount = 0;
   bool _isLoadingCount = false;
   Timer? _countDebounceTimer;
 
-  static const Color _redColor = Color(0xFFE02020);
-  static const Color _borderColor = Color(0xFFDDDDDD);
-  static const Color _greyText = Color(0xFF888888);
-
   @override
   void initState() {
     super.initState();
     cubit = context.read<FilterCubit>();
+
+    // Determine default tab based on category id, name, or slug:
+    final catId = widget.category.id;
+    final slugLower = (widget.category.slug ?? "").toLowerCase();
+    final nameLower = (widget.category.name ?? "").toLowerCase();
+
+    if (catId == 143 ||
+        slugLower.contains("off-plan") ||
+        nameLower.contains("off-plan")) {
+      _selectedTab = 2; // Off-Plan
+    } else if (catId == 139 ||
+        slugLower.contains("sale") ||
+        nameLower.contains("sale") ||
+        nameLower.contains("buy")) {
+      _selectedTab = 1; // Buy
+    } else if (catId == 65 ||
+        catId == 68 ||
+        slugLower.contains("rent") ||
+        nameLower.contains("rent")) {
+      _selectedTab = 0; // Rent
+    } else {
+      _selectedTab = 0; // Default Rent
+    }
 
     final initialSlug = (widget.category.children != null &&
             widget.category.children!.isNotEmpty)
@@ -101,13 +114,11 @@ class _FiltersPageState extends State<FiltersPage> {
     selectedSlug = initialSlug;
     cubit.fetchFilters(initialSlug);
 
+    _locationController.text = HiveUtils.getCityName() ?? "";
+
     _priceMinController.addListener(_onFilterChanged);
     _priceMaxController.addListener(_onFilterChanged);
-    _areaMinController.addListener(_onFilterChanged);
-    _areaMaxController.addListener(_onFilterChanged);
     _locationController.addListener(_onFilterChanged);
-    _keywordController.addListener(_onFilterChanged);
-    _agencyController.addListener(_onFilterChanged);
 
     _updateItemCount();
   }
@@ -117,13 +128,14 @@ class _FiltersPageState extends State<FiltersPage> {
     _countDebounceTimer?.cancel();
     _priceMinController.dispose();
     _priceMaxController.dispose();
-    _areaMinController.dispose();
-    _areaMaxController.dispose();
     _locationController.dispose();
-    _excludeLocationController.dispose();
-    _keywordController.dispose();
-    _agencyController.dispose();
     for (var controller in _filterTextControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _rangeMinControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _rangeMaxControllers.values) {
       controller.dispose();
     }
     super.dispose();
@@ -133,9 +145,32 @@ class _FiltersPageState extends State<FiltersPage> {
     _updateItemCount();
   }
 
+  int get _appliedFiltersCount {
+    int count = 0;
+    if (_priceMinController.text.isNotEmpty ||
+        _priceMaxController.text.isNotEmpty) count++;
+    if (_locationController.text.isNotEmpty &&
+        _locationController.text != (HiveUtils.getCityName() ?? "")) count++;
+    _selectedFilters.forEach((_, val) {
+      if (val is Set && val.isNotEmpty) count++;
+      if (val is List && val.isNotEmpty) count++;
+      if (val is String && val.isNotEmpty) count++;
+    });
+    _filterTextControllers.forEach((_, c) {
+      if (c.text.isNotEmpty) count++;
+    });
+    _rangeMinControllers.forEach((k, minC) {
+      final maxC = _rangeMaxControllers[k];
+      if (minC.text.isNotEmpty || (maxC != null && maxC.text.isNotEmpty)) {
+        count++;
+      }
+    });
+    return count;
+  }
+
   void _updateItemCount() {
     _countDebounceTimer?.cancel();
-    _countDebounceTimer = Timer(const Duration(milliseconds: 400), () async {
+    _countDebounceTimer = Timer(const Duration(milliseconds: 350), () async {
       if (!mounted) return;
       setState(() {
         _isLoadingCount = true;
@@ -165,11 +200,20 @@ class _FiltersPageState extends State<FiltersPage> {
           if (_priceMaxController.text.trim().isNotEmpty)
             "max_price": _priceMaxController.text.trim(),
           if (_locationController.text.trim().isNotEmpty)
-            "city": _locationController.text.trim(),
+            "city": _locationController.text.trim()
+          else if (HiveUtils.getCityName() != null &&
+              HiveUtils.getCityName()!.isNotEmpty)
+            "city": HiveUtils.getCityName(),
+          if (HiveUtils.getStateName() != null &&
+              HiveUtils.getStateName()!.isNotEmpty)
+            "state": HiveUtils.getStateName(),
+          if (HiveUtils.getCountryName() != null &&
+              HiveUtils.getCountryName()!.isNotEmpty)
+            "country": HiveUtils.getCountryName(),
           "category_slug": activeCategorySlug,
         };
 
-        // Add dynamic filters: filters[Key]=Value or filters[Key]=["Val1", "Val2"]
+        // Add dynamic filters
         _selectedFilters.forEach((key, val) {
           if (val is Set<String> && val.isNotEmpty) {
             queryParams["filters[$key]"] = jsonEncode(val.toList());
@@ -184,6 +228,20 @@ class _FiltersPageState extends State<FiltersPage> {
         _filterTextControllers.forEach((key, controller) {
           if (controller.text.trim().isNotEmpty) {
             queryParams["filters[$key]"] = controller.text.trim();
+          }
+        });
+
+        // Add range dynamic filters
+        _rangeMinControllers.forEach((key, minController) {
+          final maxController = _rangeMaxControllers[key];
+          final minVal = minController.text.trim();
+          final maxVal = maxController?.text.trim() ?? "";
+          if (minVal.isNotEmpty && maxVal.isNotEmpty) {
+            queryParams["filters[$key]"] = jsonEncode([minVal, maxVal]);
+          } else if (minVal.isNotEmpty) {
+            queryParams["filters[$key]"] = minVal;
+          } else if (maxVal.isNotEmpty) {
+            queryParams["filters[$key]"] = maxVal;
           }
         });
 
@@ -281,15 +339,16 @@ class _FiltersPageState extends State<FiltersPage> {
       _selectedCategory = 0;
       _priceMinController.clear();
       _priceMaxController.clear();
-      _areaMinController.clear();
-      _areaMaxController.clear();
-      _locationController.clear();
-      _excludeLocationController.clear();
-      _keywordController.clear();
-      _agencyController.clear();
+      _locationController.text = HiveUtils.getCityName() ?? "";
       _selectedFilters.clear();
-      _selectedMoreFilters.clear();
+      _rangeSliderValues.clear();
       for (var controller in _filterTextControllers.values) {
+        controller.clear();
+      }
+      for (var controller in _rangeMinControllers.values) {
+        controller.clear();
+      }
+      for (var controller in _rangeMaxControllers.values) {
         controller.clear();
       }
     });
@@ -333,6 +392,18 @@ class _FiltersPageState extends State<FiltersPage> {
     _filterTextControllers.forEach((key, controller) {
       if (controller.text.trim().isNotEmpty) {
         customFieldFilterMap[key] = [controller.text.trim()];
+      }
+    });
+
+    _rangeMinControllers.forEach((key, minController) {
+      final maxController = _rangeMaxControllers[key];
+      final minVal = minController.text.trim();
+      final maxVal = maxController?.text.trim() ?? "";
+      if (minVal.isNotEmpty || maxVal.isNotEmpty) {
+        customFieldFilterMap[key] = [
+          if (minVal.isNotEmpty) minVal else "0",
+          if (maxVal.isNotEmpty) maxVal else "999999999"
+        ];
       }
     });
 
@@ -382,154 +453,82 @@ class _FiltersPageState extends State<FiltersPage> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final propertyTypes = (widget.category.children != null &&
-            widget.category.children!.isNotEmpty)
-        ? widget.category.children!
-        : [widget.category];
+  PreferredSizeWidget _buildAppBar() {
+    final activeCount = _appliedFiltersCount;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
+    return AppBar(
+      backgroundColor: context.color.secondaryColor,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0.5,
+      leading: IconButton(
+        icon: Icon(
+          Icons.arrow_back_ios_new_rounded,
+          color: context.color.textDefaultColor,
+          size: 20,
+        ),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _buildAppBar(),
-          _buildTabBar(),
-          Expanded(
-            child: BlocConsumer<FilterCubit, FilterState>(
-              listener: (context, state) {
-                if (state is FilterLoaded) {
-                  _onFilterChanged();
-                }
-              },
-              builder: (context, state) {
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  physics: const BouncingScrollPhysics(),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 20),
-
-                      // Location Section
-                      _buildLocationSection(),
-                      const SizedBox(height: 24),
-
-                      // Property Type Section
-                      _buildPropertyTypeSection(propertyTypes),
-                      const SizedBox(height: 24),
-
-                      if (state is FilterLoading)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 30),
-                          child: Center(
-                            child: CircularProgressIndicator(color: _redColor),
-                          ),
-                        )
-                      else if (state is FilterError)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 20),
-                          child: Center(
-                            child: Text(
-                              state.message,
-                              style: const TextStyle(color: Colors.red),
-                            ),
-                          ),
-                        )
-                      else if (state is FilterLoaded) ...[
-                        // Sub-categories Chips (e.g. All, Apartment, Villa, etc.)
-                        if (state.data.children.isNotEmpty) ...[
-                          _buildResidentialCategoriesSection(
-                            state.data.children,
-                            state.data.name ?? 'Categories',
-                          ),
-                          const SizedBox(height: 24),
-                        ],
-
-                        // Price Range Section
-                        _buildPriceRangeSection(),
-                        const SizedBox(height: 24),
-
-                        // Dynamic API Filters (Bedrooms, Bathrooms, Furnishing, Amenities, etc.)
-                        ...state.data.filters
-                            .map((filter) => _buildDynamicFilterSection(filter))
-                            .where((w) => w is! SizedBox)
-                            .expand((w) => [w, const SizedBox(height: 24)]),
-
-                        // Static filters commented out - Filter screen now only contains API-driven filters
-                        // // Static Exclude Locations
-                        // _buildExcludeLocationsSection(),
-                        // const SizedBox(height: 24),
-
-                        // // Static Keyword Section
-                        // _buildKeywordSection(),
-                        // const SizedBox(height: 24),
-
-                        // // Static Real Estate Agencies Section
-                        // _buildRealEstateAgenciesSection(),
-                        // const SizedBox(height: 24),
-
-                        // // Static More Filters
-                        // _buildMoreFiltersSection(),
-                        // const SizedBox(height: 24),
-                      ],
-                    ],
-                  ),
-                );
-              },
+          Text(
+            "Filters".translate(context),
+            style: TextStyle(
+              color: context.color.textDefaultColor,
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
             ),
           ),
-          _buildShowResultsButton(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAppBar() {
-    return SafeArea(
-      bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: const Icon(Icons.close, color: _redColor, size: 24),
-            ),
-            const Expanded(
-              child: Center(
-                child: Text(
-                  'Filters',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black,
-                  ),
-                ),
+          if (activeCount > 0) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: context.color.territoryColor,
+                borderRadius: BorderRadius.circular(10),
               ),
-            ),
-            GestureDetector(
-              onTap: _resetAllFilters,
-              child: const Text(
-                'Reset',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: _greyText,
-                  fontWeight: FontWeight.w500,
+              child: Text(
+                "$activeCount",
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
           ],
-        ),
+        ],
       ),
+      centerTitle: true,
+      actions: [
+        TextButton(
+          onPressed: _resetAllFilters,
+          child: Text(
+            "Reset".translate(context),
+            style: TextStyle(
+              color: context.color.territoryColor,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+      ],
     );
   }
 
   Widget _buildTabBar() {
     final tabs = ['Rent', 'Buy', 'Off-Plan'];
+
     return Container(
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: _borderColor, width: 1)),
+      decoration: BoxDecoration(
+        color: context.color.secondaryColor,
+        border: Border(
+          bottom: BorderSide(
+            color: context.color.borderColor.withValues(alpha: 0.5),
+            width: 1,
+          ),
+        ),
       ),
       child: Row(
         children: List.generate(tabs.length, (i) {
@@ -538,31 +537,52 @@ class _FiltersPageState extends State<FiltersPage> {
             child: GestureDetector(
               onTap: () {
                 if (_selectedTab != i) {
-                  setState(() => _selectedTab = i);
+                  setState(() {
+                    _selectedTab = i;
+                    _selectedCategory = 0;
+                    _selectedPropertyType = 0;
+                    _selectedFilters.clear();
+                    _filterTextControllers.clear();
+                    _rangeMinControllers.clear();
+                    _rangeMaxControllers.clear();
+                  });
+
+                  String tabSlug = "property-for-rent";
+                  if (i == 1) tabSlug = "property-for-sale";
+                  if (i == 2) tabSlug = "property-for-sale-off-plan";
+
+                  selectedSlug = tabSlug;
+                  cubit.fetchFilters(tabSlug);
                   _onFilterChanged();
                 }
               },
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: isSelected ? Colors.white : const Color(0xFFEEEEEE),
-                  border: isSelected
-                      ? const Border(
-                          bottom: BorderSide(color: _redColor, width: 2.5),
-                        )
-                      : null,
-                ),
-                child: Center(
-                  child: Text(
-                    tabs[i],
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight:
-                          isSelected ? FontWeight.w700 : FontWeight.w400,
-                      color: isSelected ? Colors.black : _greyText,
+              behavior: HitTestBehavior.opaque,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: Text(
+                      tabs[i],
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected
+                            ? context.color.territoryColor
+                            : context.color.textLightColor,
+                      ),
                     ),
                   ),
-                ),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    height: 2.5,
+                    width: double.infinity,
+                    color: isSelected
+                        ? context.color.territoryColor
+                        : Colors.transparent,
+                  ),
+                ],
               ),
             ),
           );
@@ -573,13 +593,13 @@ class _FiltersPageState extends State<FiltersPage> {
 
   Widget _buildSectionTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Text(
         title,
-        style: const TextStyle(
-          fontSize: 17,
+        style: TextStyle(
+          fontSize: 15,
           fontWeight: FontWeight.w700,
-          color: Colors.black,
+          color: context.color.textDefaultColor,
         ),
       ),
     );
@@ -589,34 +609,49 @@ class _FiltersPageState extends State<FiltersPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('Location'),
+        _buildSectionTitle('Location'.translate(context)),
         Container(
           decoration: BoxDecoration(
-            border: Border.all(color: _borderColor),
-            borderRadius: BorderRadius.circular(8),
+            color: context.color.secondaryColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: context.color.borderColor.withValues(alpha: 0.6),
+            ),
           ),
           child: TextField(
             controller: _locationController,
+            style: TextStyle(
+              color: context.color.textDefaultColor,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
             decoration: InputDecoration(
-              hintText: 'e.g. Dubai Marina',
-              hintStyle: const TextStyle(color: _greyText, fontSize: 15),
-              prefixIcon: const Icon(Icons.location_on_outlined,
-                  color: _greyText, size: 22),
+              hintText: 'e.g. Dubai Marina, Deira...'.translate(context),
+              hintStyle: TextStyle(
+                color: context.color.textLightColor,
+                fontSize: 13,
+              ),
+              prefixIcon: Icon(
+                Icons.location_on_rounded,
+                color: context.color.territoryColor,
+                size: 20,
+              ),
               suffixIcon: IconButton(
-                icon: const Icon(Icons.my_location,
-                    color: _redColor, size: 20),
-                tooltip: 'Use current location',
+                icon: Icon(
+                  Icons.my_location_rounded,
+                  color: context.color.territoryColor,
+                  size: 20,
+                ),
+                tooltip: 'Use current location'.translate(context),
                 onPressed: _fetchCurrentLocation,
               ),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Select the cities, neighborhoods or buildings that you want to search properties in.',
-          style: TextStyle(fontSize: 13, color: _greyText, height: 1.4),
         ),
       ],
     );
@@ -626,9 +661,9 @@ class _FiltersPageState extends State<FiltersPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('Property Type'),
+        _buildSectionTitle('Property Type'.translate(context)),
         SizedBox(
-          height: 90,
+          height: 86,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: propertyTypes.length,
@@ -642,44 +677,47 @@ class _FiltersPageState extends State<FiltersPage> {
                   if (_selectedPropertyType != i) {
                     setState(() {
                       _selectedPropertyType = i;
-                      _selectedCategory = 0; // reset subcategory
+                      _selectedCategory = 0;
                     });
                     final slug = item.slug ?? "residential";
                     selectedSlug = slug;
                     cubit.fetchFilters(slug);
                   }
                 },
-                child: Container(
-                  width: 100,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 96,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                   decoration: BoxDecoration(
+                    color: isSelected
+                        ? context.color.territoryColor.withValues(alpha: 0.12)
+                        : context.color.secondaryColor,
                     border: Border.all(
-                      color: isSelected ? Colors.black : _borderColor,
+                      color: isSelected
+                          ? context.color.territoryColor
+                          : context.color.borderColor.withValues(alpha: 0.6),
                       width: isSelected ? 1.5 : 1,
                     ),
-                    borderRadius: BorderRadius.circular(8),
-                    color: isSelected
-                        ? Colors.black.withValues(alpha: 0.04)
-                        : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       _buildCategoryImage(item.url, item.name, isSelected),
-                      const SizedBox(height: 6),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          item.name ?? '',
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: isSelected
-                                ? FontWeight.w700
-                                : FontWeight.w400,
-                            color: isSelected ? Colors.black : _greyText,
-                          ),
+                      const SizedBox(height: 5),
+                      Text(
+                        item.name ?? '',
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight:
+                              isSelected ? FontWeight.w700 : FontWeight.w500,
+                          color: isSelected
+                              ? context.color.territoryColor
+                              : context.color.textDefaultColor,
                         ),
                       ),
                     ],
@@ -696,54 +734,50 @@ class _FiltersPageState extends State<FiltersPage> {
   IconData _getIcon(String? name) {
     switch (name?.toLowerCase()) {
       case 'residential':
-        return Icons.home_outlined;
+        return Icons.home_rounded;
       case 'commercial':
-        return Icons.business_outlined;
+        return Icons.business_rounded;
       case 'rooms for rent':
-        return Icons.meeting_room_outlined;
+        return Icons.meeting_room_rounded;
       case 'monthly short term':
-        return Icons.calendar_month;
+        return Icons.calendar_month_rounded;
       case 'daily short term':
-        return Icons.today;
+        return Icons.today_rounded;
       default:
-        return Icons.category_outlined;
+        return Icons.category_rounded;
     }
   }
 
   Widget _buildCategoryImage(String? image, String? name, bool isSelected) {
+    final activeColor = isSelected
+        ? context.color.territoryColor
+        : context.color.textLightColor;
+
     if (image != null && image.isNotEmpty) {
       return Image.network(
         image,
-        height: 30,
-        width: 30,
+        height: 26,
+        width: 26,
         fit: BoxFit.contain,
         errorBuilder: (context, error, stackTrace) {
-          return Icon(
-            _getIcon(name),
-            size: 26,
-            color: isSelected ? Colors.black : _greyText,
-          );
+          return Icon(_getIcon(name), size: 24, color: activeColor);
         },
       );
     } else {
-      return Icon(
-        _getIcon(name),
-        size: 26,
-        color: isSelected ? Colors.black : _greyText,
-      );
+      return Icon(_getIcon(name), size: 24, color: activeColor);
     }
   }
 
-  Widget _buildResidentialCategoriesSection(
+  Widget _buildSubCategoriesSection(
       List<FilterSubCategory> categories, String title) {
     if (categories.isEmpty) return const SizedBox();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle("${title} Categories"),
+        _buildSectionTitle("${title} Categories".translate(context)),
         SizedBox(
-          height: 44,
+          height: 40,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: categories.length,
@@ -759,24 +793,32 @@ class _FiltersPageState extends State<FiltersPage> {
                   });
                   _onFilterChanged();
                 },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: isSelected ? Colors.black : Colors.white,
+                    color: isSelected
+                        ? context.color.territoryColor
+                        : context.color.secondaryColor,
                     border: Border.all(
-                      color: isSelected ? Colors.black : _borderColor,
+                      color: isSelected
+                          ? context.color.territoryColor
+                          : context.color.borderColor.withValues(alpha: 0.6),
                       width: 1,
                     ),
-                    borderRadius: BorderRadius.circular(22),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     item.name ?? '',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight:
-                          isSelected ? FontWeight.w700 : FontWeight.w400,
-                      color: isSelected ? Colors.white : Colors.black87,
+                          isSelected ? FontWeight.w700 : FontWeight.w500,
+                      color: isSelected
+                          ? Colors.white
+                          : context.color.textDefaultColor,
                     ),
                   ),
                 ),
@@ -789,37 +831,124 @@ class _FiltersPageState extends State<FiltersPage> {
   }
 
   Widget _buildPriceRangeSection() {
+    return _buildRangeInputs(
+      fieldKey: "price",
+      title: "Price Range".translate(context),
+      minController: _priceMinController,
+      maxController: _priceMaxController,
+      unit: "AED",
+      maxLimit: 1000000,
+    );
+  }
+
+  Widget _buildRangeInputs({
+    required String fieldKey,
+    required String title,
+    required TextEditingController minController,
+    required TextEditingController maxController,
+    required String unit,
+    double maxLimit = 100000,
+  }) {
+    double currentMin = double.tryParse(minController.text.trim()) ?? 0;
+    double currentMax =
+        double.tryParse(maxController.text.trim()) ?? maxLimit;
+    if (currentMin < 0) currentMin = 0;
+    if (currentMax > maxLimit) currentMax = maxLimit;
+    if (currentMax < currentMin) currentMax = currentMin;
+
+    final sliderRange = _rangeSliderValues[fieldKey] ??
+        RangeValues(currentMin, currentMax);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('Price Range'),
+        _buildSectionTitle(title),
         Row(
           children: [
             Expanded(
               child: _buildEditableRangeField(
-                  _priceMinController, '0', 'AED'),
+                minController,
+                'Min'.translate(context),
+                unit,
+                onChanged: (val) {
+                  final v = double.tryParse(val) ?? 0;
+                  setState(() {
+                    _rangeSliderValues[fieldKey] = RangeValues(
+                      v.clamp(0, sliderRange.end),
+                      sliderRange.end,
+                    );
+                  });
+                  _onFilterChanged();
+                },
+              ),
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Text('to',
-                  style: TextStyle(fontSize: 15, color: Colors.black)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Text(
+                'to'.translate(context),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: context.color.textLightColor,
+                ),
+              ),
             ),
             Expanded(
               child: _buildEditableRangeField(
-                  _priceMaxController, 'Any', 'AED'),
+                maxController,
+                'Max'.translate(context),
+                unit,
+                onChanged: (val) {
+                  final v = double.tryParse(val) ?? maxLimit;
+                  setState(() {
+                    _rangeSliderValues[fieldKey] = RangeValues(
+                      sliderRange.start,
+                      v.clamp(sliderRange.start, maxLimit),
+                    );
+                  });
+                  _onFilterChanged();
+                },
+              ),
             ),
           ],
+        ),
+        const SizedBox(height: 6),
+        // Range Slider
+        RangeSlider(
+          values: RangeValues(
+            sliderRange.start.clamp(0, maxLimit),
+            sliderRange.end.clamp(0, maxLimit),
+          ),
+          min: 0,
+          max: maxLimit,
+          activeColor: context.color.territoryColor,
+          inactiveColor: context.color.territoryColor.withValues(alpha: 0.2),
+          onChanged: (values) {
+            setState(() {
+              _rangeSliderValues[fieldKey] = values;
+              minController.text = values.start.round().toString();
+              maxController.text = values.end.round().toString();
+            });
+            _onFilterChanged();
+          },
         ),
       ],
     );
   }
 
   Widget _buildEditableRangeField(
-      TextEditingController controller, String hint, String suffix) {
+    TextEditingController controller,
+    String hint,
+    String suffix, {
+    Function(String)? onChanged,
+  }) {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: _borderColor),
-        borderRadius: BorderRadius.circular(8),
+        color: context.color.secondaryColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: context.color.borderColor.withValues(alpha: 0.6),
+        ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
@@ -829,33 +958,94 @@ class _FiltersPageState extends State<FiltersPage> {
               controller: controller,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              onChanged: onChanged,
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: const TextStyle(color: _greyText, fontSize: 15),
+                hintStyle: TextStyle(
+                  color: context.color.textLightColor,
+                  fontSize: 13,
+                ),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
-              style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: context.color.textDefaultColor,
+              ),
             ),
           ),
-          Text(suffix,
-              style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: _greyText)),
+          Text(
+            suffix,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: context.color.textLightColor,
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  bool _isRangeField(String name) {
+    final lower = name.toLowerCase();
+    return lower.contains('size') ||
+        lower.contains('area') ||
+        lower.contains('sqft') ||
+        lower.contains('kilometer') ||
+        lower.contains('km') ||
+        lower.contains('year') ||
+        lower.contains('capacity') ||
+        lower.contains('horsepower') ||
+        lower.contains('price');
+  }
+
+  String _getFieldUnit(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains('sqft') || lower.contains('size')) return 'Sqft';
+    if (lower.contains('km') || lower.contains('kilometer')) return 'Km';
+    if (lower.contains('year')) return 'Yr';
+    if (lower.contains('cc')) return 'cc';
+    if (lower.contains('hp') || lower.contains('horsepower')) return 'HP';
+    return '';
+  }
+
+  double _getFieldMaxLimit(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains('sqft') || lower.contains('size')) return 20000;
+    if (lower.contains('km') || lower.contains('kilometer')) return 300000;
+    if (lower.contains('price')) return 1000000;
+    if (lower.contains('cc')) return 6000;
+    if (lower.contains('hp') || lower.contains('horsepower')) return 1000;
+    return 10000;
   }
 
   Widget _buildDynamicFilterSection(FilterItem filter) {
     final filterName = filter.name ?? '';
     if (filterName.isEmpty) return const SizedBox();
 
-    // Text or Number input filter
+    // Check if numeric field qualifies for Range Picker Slider
+    if (filter.type == 'number' && _isRangeField(filterName)) {
+      _rangeMinControllers.putIfAbsent(
+          filterName, () => TextEditingController());
+      _rangeMaxControllers.putIfAbsent(
+          filterName, () => TextEditingController());
+
+      final minC = _rangeMinControllers[filterName]!;
+      final maxC = _rangeMaxControllers[filterName]!;
+
+      return _buildRangeInputs(
+        fieldKey: filterName,
+        title: filterName,
+        minController: minC,
+        maxController: maxC,
+        unit: _getFieldUnit(filterName),
+        maxLimit: _getFieldMaxLimit(filterName),
+      );
+    }
+
+    // Text or generic Number input filter
     if (filter.type == 'text' || filter.type == 'number') {
       _filterTextControllers.putIfAbsent(
           filterName, () => TextEditingController());
@@ -867,8 +1057,11 @@ class _FiltersPageState extends State<FiltersPage> {
           _buildSectionTitle(filterName),
           Container(
             decoration: BoxDecoration(
-              border: Border.all(color: _borderColor),
-              borderRadius: BorderRadius.circular(8),
+              color: context.color.secondaryColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: context.color.borderColor.withValues(alpha: 0.6),
+              ),
             ),
             child: TextField(
               controller: controller,
@@ -879,12 +1072,22 @@ class _FiltersPageState extends State<FiltersPage> {
                   ? [FilteringTextInputFormatter.digitsOnly]
                   : null,
               onChanged: (_) => _onFilterChanged(),
+              style: TextStyle(
+                color: context.color.textDefaultColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
               decoration: InputDecoration(
                 hintText: filter.placeholder ?? 'Enter $filterName',
-                hintStyle: const TextStyle(color: _greyText, fontSize: 15),
+                hintStyle: TextStyle(
+                  color: context.color.textLightColor,
+                  fontSize: 13,
+                ),
                 border: InputBorder.none,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
               ),
             ),
           ),
@@ -894,7 +1097,7 @@ class _FiltersPageState extends State<FiltersPage> {
 
     if (filter.values.isEmpty) return const SizedBox();
 
-    // Multi-select filter (e.g. Amenities, Listed By)
+    // Multi-select filter (e.g. Amenities, Listed By, Regional Specs, etc.)
     if (filter.multiSelect) {
       if (!_selectedFilters.containsKey(filterName) ||
           _selectedFilters[filterName] is! Set<String>) {
@@ -911,10 +1114,11 @@ class _FiltersPageState extends State<FiltersPage> {
             runSpacing: 8,
             children: filter.values.map((val) {
               final isSelected = selectedSet.contains(val);
-              return _buildToggleChip(
-                val,
-                isSelected,
-                () {
+              return _buildFilterPill(
+                label: val,
+                isSelected: isSelected,
+                isMulti: true,
+                onTap: () {
                   setState(() {
                     if (isSelected) {
                       selectedSet.remove(val);
@@ -943,7 +1147,10 @@ class _FiltersPageState extends State<FiltersPage> {
           runSpacing: 8,
           children: filter.values.map((val) {
             final isSelected = selectedVal == val;
-            return GestureDetector(
+            return _buildFilterPill(
+              label: val,
+              isSelected: isSelected,
+              isMulti: false,
               onTap: () {
                 setState(() {
                   if (isSelected) {
@@ -954,27 +1161,6 @@ class _FiltersPageState extends State<FiltersPage> {
                 });
                 _onFilterChanged();
               },
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isSelected ? Colors.black : Colors.white,
-                  border: Border.all(
-                    color: isSelected ? Colors.black : _borderColor,
-                    width: 1.5,
-                  ),
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: Text(
-                  val,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight:
-                        isSelected ? FontWeight.w700 : FontWeight.w400,
-                    color: isSelected ? Colors.white : Colors.black87,
-                  ),
-                ),
-              ),
             );
           }).toList(),
         ),
@@ -982,174 +1168,54 @@ class _FiltersPageState extends State<FiltersPage> {
     );
   }
 
-  Widget _buildToggleChip(String label, bool isSelected, VoidCallback onTap) {
-    return GestureDetector(
+  Widget _buildFilterPill({
+    required String label,
+    required bool isSelected,
+    required bool isMulti,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.black : Colors.white,
+          color: isSelected
+              ? context.color.territoryColor.withValues(alpha: 0.12)
+              : context.color.secondaryColor,
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? Colors.black : _borderColor,
-            width: 1.5,
+            color: isSelected
+                ? context.color.territoryColor
+                : context.color.borderColor.withValues(alpha: 0.6),
+            width: isSelected ? 1.5 : 1,
           ),
-          borderRadius: BorderRadius.circular(8),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-            color: isSelected ? Colors.white : Colors.black87,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected
+                    ? context.color.territoryColor
+                    : context.color.textDefaultColor,
+              ),
+            ),
+            if (isSelected) ...[
+              const SizedBox(width: 5),
+              Icon(
+                Icons.check_circle_rounded,
+                size: 15,
+                color: context.color.territoryColor,
+              ),
+            ],
+          ],
         ),
       ),
-    );
-  }
-
-  Widget _buildExcludeLocationsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('Exclude locations'),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: _borderColor),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: TextField(
-            controller: _excludeLocationController,
-            decoration: const InputDecoration(
-              hintText: 'e.g. Dubai Marina',
-              hintStyle: TextStyle(color: _greyText, fontSize: 15),
-              prefixIcon: Icon(Icons.location_off_outlined,
-                  color: _greyText, size: 20),
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(vertical: 14),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildKeywordSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('Keyword'),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: _borderColor),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: TextField(
-            controller: _keywordController,
-            decoration: const InputDecoration(
-              hintText: 'e.g. Pool, Security, Ref ID',
-              hintStyle: TextStyle(color: _greyText, fontSize: 15),
-              border: InputBorder.none,
-              contentPadding:
-                  EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRealEstateAgenciesSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('Real Estate Agencies'),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: _borderColor),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: TextField(
-            controller: _agencyController,
-            decoration: const InputDecoration(
-              hintText: 'e.g. Agency name',
-              hintStyle: TextStyle(color: _greyText, fontSize: 15),
-              border: InputBorder.none,
-              contentPadding:
-                  EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMoreFiltersSection() {
-    final filters = [
-      {'icon': Icons.abc, 'label': 'Ads in\nEnglish'},
-      {'icon': Icons.play_circle_outline, 'label': 'Ads with\nVideo'},
-      {'icon': Icons.rotate_left, 'label': 'Ads with\n360 View'},
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('More Filters'),
-        Row(
-          children: filters.map((f) {
-            final label = f['label'] as String;
-            final isSelected = _selectedMoreFilters.contains(label);
-            return Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    if (isSelected) {
-                      _selectedMoreFilters.remove(label);
-                    } else {
-                      _selectedMoreFilters.add(label);
-                    }
-                  });
-                  _onFilterChanged();
-                },
-                child: Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? Colors.black.withValues(alpha: 0.05)
-                        : Colors.white,
-                    border: Border.all(
-                      color: isSelected ? Colors.black : _borderColor,
-                      width: 1.5,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        f['icon'] as IconData,
-                        size: 28,
-                        color: isSelected ? Colors.black : _greyText,
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        label,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isSelected ? Colors.black : _greyText,
-                          fontWeight: isSelected
-                              ? FontWeight.w600
-                              : FontWeight.w400,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
     );
   }
 
@@ -1161,37 +1227,142 @@ class _FiltersPageState extends State<FiltersPage> {
 
     return Container(
       width: double.infinity,
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      child: SizedBox(
-        width: double.infinity,
-        height: 52,
-        child: ElevatedButton(
-          onPressed: _applyFiltersAndNavigate,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: _redColor,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            elevation: 0,
+      decoration: BoxDecoration(
+        color: context.color.secondaryColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
+          )
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton(
+            onPressed: _applyFiltersAndNavigate,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: context.color.territoryColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
+            ),
+            child: _isLoadingCount
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text(
+                    'Show $countFormatted Results'.translate(context),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
           ),
-          child: _isLoadingCount
-              ? const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: Colors.white,
-                  ),
-                )
-              : Text(
-                  'Show $countFormatted Results',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
         ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final propertyTypes = (widget.category.children != null &&
+            widget.category.children!.isNotEmpty)
+        ? widget.category.children!
+        : [widget.category];
+
+    return Scaffold(
+      backgroundColor: context.color.backgroundColor,
+      appBar: _buildAppBar(),
+      body: Column(
+        children: [
+          _buildTabBar(),
+          Expanded(
+            child: BlocConsumer<FilterCubit, FilterState>(
+              listener: (context, state) {
+                if (state is FilterLoaded) {
+                  _onFilterChanged();
+                }
+              },
+              builder: (context, state) {
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 12),
+
+                      // Location Section
+                      _buildLocationSection(),
+                      const SizedBox(height: 20),
+
+                      // Property Type Section
+                      _buildPropertyTypeSection(propertyTypes),
+                      const SizedBox(height: 20),
+
+                      if (state is FilterLoading)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 30),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              color: context.color.territoryColor,
+                            ),
+                          ),
+                        )
+                      else if (state is FilterError)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          child: Center(
+                            child: Text(
+                              state.message,
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        )
+                      else if (state is FilterLoaded) ...[
+                        // Sub-categories Chips
+                        if (state.data.children.isNotEmpty) ...[
+                          _buildSubCategoriesSection(
+                            state.data.children,
+                            state.data.name ?? 'Categories',
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+
+                        // Price Range Section with RangeSlider
+                        _buildPriceRangeSection(),
+                        const SizedBox(height: 20),
+
+                        // API-driven Dynamic Filters with RangeSliders
+                        ...state.data.filters.map((filter) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 20),
+                            child: _buildDynamicFilterSection(filter),
+                          );
+                        }),
+                      ],
+
+                      const SizedBox(height: 30),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          _buildShowResultsButton(),
+        ],
       ),
     );
   }

@@ -64,7 +64,7 @@ extension ColorPrefs on ColorScheme {
       lightColor: territoryColor_, darkColor: territoryColorDark);
 
   Color get deactivateColor => _getColor(brightness,
-      lightColor: deactivateColorLight, darkColor: backgroundColorDark);
+      lightColor: deactivateColorLight, darkColor: const Color(0xffA5A5A5));
 
   Color get forthColor =>
       _getColor(brightness, lightColor: forthColor_, darkColor: forthColorDark);

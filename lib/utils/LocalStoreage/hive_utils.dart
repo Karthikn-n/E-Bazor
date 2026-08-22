@@ -112,6 +112,10 @@ class HiveUtils {
     return Hive.box(HiveKeys.userDetailsBox).get(HiveKeys.nearbyRadius);
   }
 
+  static void clearNearbyRadius() async {
+    await Hive.box(HiveKeys.userDetailsBox).delete(HiveKeys.nearbyRadius);
+  }
+
   static dynamic getCityName() {
     return Hive.box(HiveKeys.userDetailsBox).get(HiveKeys.city);
   }

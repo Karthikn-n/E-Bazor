@@ -33,12 +33,13 @@ class GetPaymentIntentCubit extends Cubit<GetPaymentIntentState> {
     repository
         .getPaymentIntent(packageId: packageId, paymentMethod: paymentMethod)
         .then((value) {
-
-      emit(GetPaymentIntentInSuccess(
-
-          value['data']['payment_intent']));
+      final data = value['data'];
+      dynamic intent = data;
+      if (data is Map && data.containsKey('payment_intent')) {
+        intent = data['payment_intent'];
+      }
+      emit(GetPaymentIntentInSuccess(intent));
     }).catchError((e) {
-
       emit(GetPaymentIntentFailure(e.toString()));
     });
   }

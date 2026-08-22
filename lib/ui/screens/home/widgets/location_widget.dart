@@ -127,6 +127,8 @@ class LocationWidget extends StatelessWidget {
 */
 
 import 'package:Ebozor/app/routes.dart';
+import 'package:Ebozor/data/cubits/home/fetch_home_all_items_cubit.dart';
+import 'package:Ebozor/data/cubits/home/fetch_home_screen_cubit.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_keys.dart';
@@ -134,6 +136,7 @@ import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/responsiveSize.dart';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:Ebozor/utils/app_icon.dart';
 
@@ -147,15 +150,35 @@ class LocationWidget extends StatelessWidget {
     return FittedBox(
       fit: BoxFit.none,
       alignment: AlignmentDirectional.centerStart,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          GestureDetector(
-            onTap: () async {
-              Navigator.pushNamed(context, Routes.countriesScreen,
-                  arguments: {"from": "home"});
-            },
-            child: Container(
+      child: GestureDetector(
+        onTap: () async {
+          await Navigator.pushNamed(
+            context,
+            Routes.selectLocationScreen,
+            arguments: {"from": "home"},
+          );
+          if (context.mounted) {
+            context.read<FetchHomeScreenCubit>().fetch(
+                  city: HiveUtils.getCityName(),
+                  areaId: HiveUtils.getAreaId(),
+                  country: HiveUtils.getCountryName(),
+                  state: HiveUtils.getStateName(),
+                );
+            context.read<FetchHomeAllItemsCubit>().fetch(
+                  city: HiveUtils.getCityName(),
+                  areaId: HiveUtils.getAreaId(),
+                  radius: HiveUtils.getNearbyRadius(),
+                  longitude: HiveUtils.getLongitude(),
+                  latitude: HiveUtils.getLatitude(),
+                  country: HiveUtils.getCountryName(),
+                  state: HiveUtils.getStateName(),
+                );
+          }
+        },
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
               width: 40.rw(context),
               height: 40.rh(context),
               child: UiUtils.getSvg(
@@ -164,10 +187,9 @@ class LocationWidget extends StatelessWidget {
                 color: context.color.textLightColor,
               ),
             ),
-          ),
-          SizedBox(
-            width: 10.rw(context),
-          ),
+            SizedBox(
+              width: 10.rw(context),
+            ),
           ValueListenableBuilder(
               valueListenable: Hive.box(HiveKeys.userDetailsBox).listenable(),
               builder: (context, value, child) {
@@ -233,6 +255,7 @@ class LocationWidget extends StatelessWidget {
               }),
         ],
       ),
+      )
     );
   }
 }

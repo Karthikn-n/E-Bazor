@@ -7,6 +7,8 @@ import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:Ebozor/ui/screens/widgets/phone_verification_dialog.dart';
+
 class VerificationBanner extends StatefulWidget {
   const VerificationBanner({super.key});
 
@@ -32,38 +34,24 @@ class _VerificationBannerState extends State<VerificationBanner> {
       return;
     }
 
-    final state = context.read<FetchVerificationRequestsCubit>().state;
-    if (state is FetchVerificationRequestSuccess) {
-      final status = state.data.status?.toLowerCase();
-      if (status == "pending" || status == "under review" || status == "review") {
-        HelperUtils.showSnackBarMessage(
-          context,
-          "Your verification request is currently under review.",
-        );
-        return;
-      } else if (status == "rejected") {
-        Navigator.pushNamed(context, Routes.sellerIntroVerificationScreen,
-            arguments: {"isResubmitted": true}).then((value) {
-          if (value == 'refresh') {
-            context
-                .read<FetchVerificationRequestsCubit>()
-                .fetchVerificationRequests();
-          }
-        });
-        return;
-      } else if (status == "approved") {
-        return;
-      }
+    if (HiveUtils.getUserDetails().isVerified == 1) {
+      HelperUtils.showSnackBarMessage(
+        context,
+        "Your account is already verified!",
+        type: MessageType.success,
+      );
+      return;
     }
 
-    Navigator.pushNamed(context, Routes.sellerIntroVerificationScreen,
-        arguments: {"isResubmitted": false}).then((value) {
-      if (value == 'refresh') {
+    PhoneVerificationDialog.show(
+      context,
+      onVerified: () {
+        setState(() {});
         context
             .read<FetchVerificationRequestsCubit>()
             .fetchVerificationRequests();
-      }
-    });
+      },
+    );
   }
 
   @override

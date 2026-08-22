@@ -1,40 +1,24 @@
 import 'dart:async';
 
-import 'package:Ebozor/app/app_theme.dart';
 import 'package:Ebozor/app/routes.dart';
-import 'package:Ebozor/data/cubits/system/app_theme_cubit.dart';
-import 'package:Ebozor/ui/screens/home/home_screen.dart';
 import 'package:Ebozor/data/cubits/location/fetch_countries_cubit.dart';
 import 'package:Ebozor/data/model/location/countriesModel.dart';
-import 'package:Ebozor/ui/screens/widgets/errors/no_data_found.dart';
+import 'package:Ebozor/ui/screens/location/location_map_screen.dart';
+import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
+import 'package:Ebozor/ui/screens/widgets/errors/no_internet.dart';
+import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
+import 'package:Ebozor/ui/screens/widgets/shimmerLoadingContainer.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
-import 'package:Ebozor/utils/constant.dart';
-import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
+import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_keys.dart';
-
-import 'package:flutter/services.dart';
+import 'package:Ebozor/utils/extensions/extensions.dart';
+import 'package:Ebozor/utils/helper_utils.dart';
+import 'package:Ebozor/utils/ui_utils.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:hive/hive.dart';
-import 'package:shimmer/shimmer.dart';
-
-import 'package:Ebozor/utils/ApiService/api.dart';
-
-import 'package:Ebozor/utils/helper_utils.dart';
-import 'package:Ebozor/data/cubits/home/fetch_home_all_items_cubit.dart';
-import 'package:Ebozor/data/cubits/home/fetch_home_screen_cubit.dart';
-
-import 'package:Ebozor/ui/screens/widgets/errors/no_internet.dart';
-import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
-import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
-import 'package:Ebozor/utils/app_icon.dart';
-import 'package:Ebozor/utils/extensions/extensions.dart';
-import 'package:Ebozor/utils/responsiveSize.dart';
-import 'package:flutter/material.dart';
-
-import 'package:Ebozor/utils/ui_utils.dart';
-import 'package:Ebozor/ui/screens/location/location_map_screen.dart';
 
 class CountriesScreen extends StatefulWidget {
   final String from;
@@ -49,10 +33,11 @@ class CountriesScreen extends StatefulWidget {
 
     return BlurredRouter(
       builder: (context) => BlocProvider(
-          create: (context) => FetchCountriesCubit(),
-          child: CountriesScreen(
-            from: arguments!['from'] ?? "",
-          )),
+        create: (context) => FetchCountriesCubit(),
+        child: CountriesScreen(
+          from: arguments?['from'] ?? "",
+        ),
+      ),
     );
   }
 
@@ -61,11 +46,11 @@ class CountriesScreen extends StatefulWidget {
 }
 
 class CountriesScreenState extends State<CountriesScreen> {
-  bool isFocused = false;
-  String previousSearchQuery = "";
-  TextEditingController searchController = TextEditingController(text: null);
+  final TextEditingController searchController = TextEditingController();
+  final FocusNode searchFocusNode = FocusNode();
   final ScrollController controller = ScrollController();
   Timer? _searchDelay;
+  String previousSearchQuery = "";
   CountriesModel? selectedCountry;
   List<String> recentSearches = [];
   bool isLocationLoading = false;
@@ -73,39 +58,41 @@ class CountriesScreenState extends State<CountriesScreen> {
   @override
   void initState() {
     super.initState();
-    context
-        .read<FetchCountriesCubit>()
-        .fetchCountries(search: searchController.text);
-
-    searchController = TextEditingController();
-
-    searchController.addListener(searchItemListener);
-    controller.addListener(pageScrollListen);
-    getRecentSearches();
+    context.read<FetchCountriesCubit>().fetchCountries(search: "");
+    controller.addListener(_pageScrollListen);
+    _getRecentSearches();
   }
 
-  void getRecentSearches() {
+  @override
+  void dispose() {
+    _searchDelay?.cancel();
+    searchController.dispose();
+    searchFocusNode.dispose();
+    controller.dispose();
+    super.dispose();
+  }
+
+  void _getRecentSearches() {
     try {
       if (Hive.isBoxOpen(HiveKeys.historyBox)) {
         recentSearches = List<String>.from(
-            Hive.box(HiveKeys.historyBox).get("country_history") ?? []);
+          Hive.box(HiveKeys.historyBox).get("country_history") ?? [],
+        );
       }
-    } catch (e) {
-      print("Error fetching history: $e");
-    }
+    } catch (_) {}
   }
 
-  void addToRecentSearches(String name) {
+  void _addToRecentSearches(String name) {
     if (!recentSearches.contains(name)) {
       recentSearches.insert(0, name);
-      if (recentSearches.length > 5) recentSearches.removeLast();
+      if (recentSearches.length > 8) recentSearches.removeLast();
       if (Hive.isBoxOpen(HiveKeys.historyBox)) {
         Hive.box(HiveKeys.historyBox).put("country_history", recentSearches);
       }
     }
   }
 
-  void clearRecentSearches() {
+  void _clearRecentSearches() {
     setState(() {
       recentSearches.clear();
       if (Hive.isBoxOpen(HiveKeys.historyBox)) {
@@ -114,44 +101,31 @@ class CountriesScreenState extends State<CountriesScreen> {
     });
   }
 
-  void pageScrollListen() {
+  void _pageScrollListen() {
     if (controller.isEndReached()) {
       if (context.read<FetchCountriesCubit>().hasMoreData()) {
-        context
-            .read<FetchCountriesCubit>()
-            .fetchCountriesMore(search: searchController.text);
+        context.read<FetchCountriesCubit>().fetchCountriesMore(
+              search: searchController.text,
+            );
       }
     }
   }
 
-//this will listen and manage search
-  void searchItemListener() {
+  void _onSearchChanged(String query) {
     _searchDelay?.cancel();
-    searchCallAfterDelay();
+    _searchDelay = Timer(const Duration(milliseconds: 350), () {
+      final trimmed = query.trim();
+      if (previousSearchQuery != trimmed) {
+        context.read<FetchCountriesCubit>().fetchCountries(search: trimmed);
+        previousSearchQuery = trimmed;
+        setState(() {});
+      }
+    });
     setState(() {});
   }
 
-//This will create delay so we don't face rapid api call
-  void searchCallAfterDelay() {
-    _searchDelay = Timer(const Duration(milliseconds: 500), itemSearch);
-  }
-
-  ///This will call api after some delay
-  void itemSearch() {
-    // if (searchController.text.isNotEmpty) {
-    if (previousSearchQuery != searchController.text) {
-      context.read<FetchCountriesCubit>().fetchCountries(
-            search: searchController.text,
-          );
-      previousSearchQuery = searchController.text;
-      setState(() {});
-    }
-    // } else {
-    // context.read<SearchItemCubit>().clearSearch();
-    // }
-  }
-
   Future<void> _getCurrentLocation() async {
+    if (isLocationLoading) return;
     setState(() {
       isLocationLoading = true;
     });
@@ -164,40 +138,45 @@ class CountriesScreenState extends State<CountriesScreen> {
 
       if (permission == LocationPermission.deniedForever) {
         if (mounted) {
-           HelperUtils.showSnackBarMessage(
-            context, "pleaseEnableLocationServicesManually".translate(context));
-            // You can add logic to open app settings here
+          HelperUtils.showSnackBarMessage(
+            context,
+            "pleaseEnableLocationServicesManually".translate(context),
+          );
         }
       } else if (permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always) {
         Position position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.high);
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 8),
+        );
 
         List<Placemark> placemarks = await placemarkFromCoordinates(
-            position.latitude, position.longitude);
+          position.latitude,
+          position.longitude,
+        );
 
-        if (placemarks.isNotEmpty) {
-          Placemark place = placemarks[0];
-          if (mounted) {
-            Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const LocationMapScreen(),
-                    settings: RouteSettings(arguments: {
-                      'latitude': position.latitude,
-                      'longitude': position.longitude,
-                      'city': place.locality,
-                      'state': place.administrativeArea,
-                      'country': place.country,
-                      'area': place.subLocality,
-                      'area_id': null,
-                      'from': widget.from // Passing 'from' parameter
-                    }))).then((value) {
-                      if (value != null && widget.from == "addItem") {
-                        Navigator.pop(context, value);
-                      }
-                    });
-          }
+        if (placemarks.isNotEmpty && mounted) {
+          Placemark place = placemarks.first;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const LocationMapScreen(),
+              settings: RouteSettings(arguments: {
+                'latitude': position.latitude,
+                'longitude': position.longitude,
+                'city': place.locality,
+                'state': place.administrativeArea,
+                'country': place.country,
+                'area': place.subLocality,
+                'area_id': null,
+                'from': widget.from,
+              }),
+            ),
+          ).then((value) {
+            if (value != null && widget.from == "addItem") {
+              Navigator.pop(context, value);
+            }
+          });
         }
       }
     } catch (e) {
@@ -213,224 +192,490 @@ class CountriesScreenState extends State<CountriesScreen> {
     }
   }
 
-  PreferredSizeWidget appBarWidget(List<CountriesModel> countriesModel) {
+  PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      systemOverlayStyle:
-          SystemUiOverlayStyle(statusBarColor: context.color.backgroundColor),
+      backgroundColor: context.color.secondaryColor,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0.5,
+      leading: IconButton(
+        icon: Icon(
+          Icons.arrow_back_ios_new_rounded,
+          color: context.color.textDefaultColor,
+          size: 20,
+        ),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: Text(
+        "Select Country".translate(context),
+        style: TextStyle(
+          color: context.color.textDefaultColor,
+          fontWeight: FontWeight.w700,
+          fontSize: 18,
+        ),
+      ),
+      centerTitle: true,
+      actions: [
+        if (recentSearches.isNotEmpty)
+          TextButton(
+            onPressed: _clearRecentSearches,
+            child: Text(
+              "Clear".translate(context),
+              style: TextStyle(
+                color: context.color.territoryColor,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        const SizedBox(width: 4),
+      ],
       bottom: PreferredSize(
-          preferredSize: Size.fromHeight(58.rh(context)),
+        preferredSize: const Size.fromHeight(60),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
               Expanded(
                 child: Container(
-                    width: double.maxFinite,
-                    height: 48.rh(context),
-                    margin: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    alignment: AlignmentDirectional.center,
-                    decoration: BoxDecoration(
-                        border: Border.all(
-                            width:
-                                context.watch<AppThemeCubit>().state.appTheme ==
-                                        AppTheme.dark
-                                    ? 0
-                                    : 1,
-                            color: context.color.borderColor.darken(30)),
-                        borderRadius:
-                            const BorderRadius.all(Radius.circular(10)),
-                        color: context.color.secondaryColor),
-                    child: TextFormField(
-                        controller: searchController,
-                        decoration: InputDecoration(
-                          border: InputBorder.none,
-                          //OutlineInputBorder()
-                          fillColor:
-                              Theme.of(context).colorScheme.secondaryColor,
-                          hintText:
-                              "${"search".translate(context)}\t${"country".translate(context)}..",
-                          prefixIcon: setSearchIcon(),
-                          prefixIconConstraints:
-                              const BoxConstraints(minHeight: 5, minWidth: 5),
-                        ),
-                        enableSuggestions: true,
-                        onEditingComplete: () {
-                          setState(
-                            () {
-                              isFocused = false;
-                            },
-                          );
-                          FocusScope.of(context).unfocus();
-                        },
-                        onTap: () {
-                          //change prefix icon color to primary
-                          setState(() {
-                            isFocused = true;
-                          });
-                        })),
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: context.color.backgroundColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: context.color.borderColor.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  child: TextField(
+                    controller: searchController,
+                    focusNode: searchFocusNode,
+                    onChanged: _onSearchChanged,
+                    style: TextStyle(
+                      color: context.color.textDefaultColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: "Search country...".translate(context),
+                      hintStyle: TextStyle(
+                        color: context.color.textLightColor,
+                        fontSize: 13,
+                      ),
+                      border: InputBorder.none,
+                      prefixIcon: Icon(
+                        Icons.search_rounded,
+                        color: context.color.territoryColor,
+                        size: 20,
+                      ),
+                      suffixIcon: searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(
+                                Icons.close_rounded,
+                                color: context.color.textLightColor,
+                                size: 18,
+                              ),
+                              onPressed: () {
+                                searchController.clear();
+                                _onSearchChanged("");
+                              },
+                            )
+                          : null,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 11,
+                      ),
+                    ),
+                  ),
+                ),
               ),
+              const SizedBox(width: 8),
               InkWell(
+                borderRadius: BorderRadius.circular(12),
                 onTap: () {
-                  Navigator.pushNamed(context, Routes.nearbyLocationScreen,
-                      arguments: {"from": widget.from});
+                  Navigator.pushNamed(
+                    context,
+                    Routes.nearbyLocationScreen,
+                    arguments: {"from": widget.from},
+                  );
                 },
                 child: Container(
-                  width: 50.rw(context),
-                  height: 50.rh(context),
-                  margin: EdgeInsetsDirectional.only(end: sidePadding),
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
+                    color: context.color.backgroundColor,
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                        width: 1, color: context.color.borderColor.darken(30)),
-                    color: context.color.secondaryColor,
-                    borderRadius: BorderRadius.circular(10),
+                      color: context.color.borderColor.withValues(alpha: 0.6),
+                    ),
                   ),
                   child: Center(
-                    child: Image.asset("assets/seachfiltericon.png")
+                    child: Icon(
+                      Icons.radar_rounded,
+                      color: context.color.territoryColor,
+                      size: 22,
+                    ),
                   ),
                 ),
               ),
             ],
-          )),
-      automaticallyImplyLeading: false,
-      title: Text(
-        "locationLbl".translate(context),
-      )
-          .color(context.color.textDefaultColor)
-          .bold(weight: FontWeight.w600)
-          .size(18),
-      leading: Material(
-        clipBehavior: Clip.antiAlias,
-        color: Colors.transparent,
-        type: MaterialType.circle,
-        child: InkWell(
-            onTap: () {
-              Navigator.pop(context);
-            },
-            child: Padding(
-                padding: EdgeInsetsDirectional.only(
-                  start: 18.0,
-                ),
-                child: Directionality(
-                  textDirection: Directionality.of(context),
-                  child: RotatedBox(
-                    quarterTurns:
-                        Directionality.of(context) == TextDirection.rtl
-                            ? 2
-                            : -4,
-                    child: UiUtils.getSvg(AppIcons.arrowLeft,
-                        fit: BoxFit.none,
-                        color: context.color.textDefaultColor),
-                  ),
-                ))),
+          ),
+        ),
       ),
-      actions: [
-        Center(
-          child: Padding(
-            padding: const EdgeInsetsDirectional.only(end: 18.0),
-            child: InkWell(
-              onTap: clearRecentSearches,
-              child: Text("clearAll".translate(context))
-                  .color(context.color.textLightColor)
-                  .size(context.font.large),
+    );
+  }
+
+  Widget _buildShimmer() {
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: 10,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (_, __) => Container(
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: context.color.secondaryColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: context.color.borderColor.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          children: const [
+            CustomShimmer(height: 20, width: 20, borderRadius: 10),
+            SizedBox(width: 12),
+            CustomShimmer(height: 14, width: 140),
+            Spacer(),
+            CustomShimmer(height: 14, width: 14),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentSearchesSection() {
+    if (recentSearches.isEmpty || searchController.text.isNotEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Row(
+            children: [
+              Icon(
+                Icons.history_rounded,
+                size: 16,
+                color: context.color.textLightColor,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                "Recent Searches".translate(context),
+                style: TextStyle(
+                  color: context.color.textLightColor,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 38,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            itemCount: recentSearches.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final countryName = recentSearches[index];
+              return InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  searchController.text = countryName;
+                  _onSearchChanged(countryName);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: context.color.secondaryColor,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: context.color.borderColor.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        countryName,
+                        style: TextStyle(
+                          color: context.color.textDefaultColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  Widget _buildBody() {
+    return BlocBuilder<FetchCountriesCubit, FetchCountriesState>(
+      builder: (context, state) {
+        if (state is FetchCountriesInProgress) {
+          return _buildShimmer();
+        }
+
+        if (state is FetchCountriesFailure) {
+          if (state.errorMessage.contains("no-internet")) {
+            return NoInternet(
+              onRetry: () {
+                context.read<FetchCountriesCubit>().fetchCountries(
+                      search: searchController.text,
+                    );
+              },
+            );
+          }
+          return const Center(child: SomethingWentWrong());
+        }
+
+        if (state is FetchCountriesSuccess) {
+          if (state.countriesModel.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.public_off_rounded,
+                      size: 54,
+                      color: context.color.textLightColor.withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      "No countries found".translate(context),
+                      style: TextStyle(
+                        color: context.color.textDefaultColor,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          return NotificationListener<ScrollNotification>(
+            onNotification: (ScrollNotification scrollInfo) {
+              if (scrollInfo.metrics.pixels >=
+                  scrollInfo.metrics.maxScrollExtent - 50) {
+                if (context.read<FetchCountriesCubit>().hasMoreData()) {
+                  context.read<FetchCountriesCubit>().fetchCountriesMore(
+                        search: searchController.text.trim(),
+                      );
+                }
+              }
+              return false;
+            },
+            child: SingleChildScrollView(
+              controller: controller,
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildRecentSearchesSection(),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.public_rounded,
+                        size: 16,
+                        color: context.color.territoryColor,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        "All Countries".translate(context),
+                        style: TextStyle(
+                          color: context.color.textDefaultColor,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        "(${state.countriesModel.length})",
+                        style: TextStyle(
+                          color: context.color.textLightColor,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: state.countriesModel.map((country) {
+                      final isSelected = selectedCountry?.id == country.id;
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () {
+                          setState(() {
+                            selectedCountry = country;
+                          });
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? context.color.territoryColor.withValues(alpha: 0.12)
+                                : context.color.secondaryColor,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected
+                                  ? context.color.territoryColor
+                                  : context.color.borderColor.withValues(alpha: 0.6),
+                              width: isSelected ? 1.5 : 1.0,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                country.name ?? "",
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? context.color.territoryColor
+                                      : context.color.textDefaultColor,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              if (isSelected) ...[
+                                const SizedBox(width: 6),
+                                Icon(
+                                  Icons.check_circle_rounded,
+                                  size: 16,
+                                  color: context.color.territoryColor,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                if (state.isLoadingMore)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Center(
+                      child: UiUtils.progress(
+                        normalProgressColor: context.color.territoryColor,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 24),
+              ],
             ),
           ),
-        )
-      ],
-      elevation: context.watch<AppThemeCubit>().state.appTheme == AppTheme.dark
-          ? 0
-          : 6,
-      shadowColor:
-          context.watch<AppThemeCubit>().state.appTheme == AppTheme.dark
-              ? null
-              : context.color.textDefaultColor.withValues(alpha: 0.2),
-      backgroundColor: context.color.backgroundColor,
-    );
-  }
-
-  Widget shimmerEffect() {
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: 15,
-      separatorBuilder: (context, index) {
-        return Container();
-      },
-      itemBuilder: (context, index) {
-        return Shimmer.fromColors(
-          baseColor: Theme.of(context).colorScheme.shimmerBaseColor,
-          highlightColor: Theme.of(context).colorScheme.shimmerHighlightColor,
-          child: Container(
-            padding: EdgeInsets.all(5),
-            width: double.maxFinite,
-            height: 56,
-            decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(5),
-                border:
-                    Border.all(color: context.color.borderColor.darken(30))),
-          ),
         );
+      }
+
+        return const SizedBox.shrink();
       },
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<FetchCountriesCubit, FetchCountriesState>(
-        builder: (context, state) {
-      List<CountriesModel> countriesModel = [];
-      if (state is FetchCountriesSuccess) {
-        countriesModel = state.countriesModel;
-      }
-      return Scaffold(
-        appBar: appBarWidget(countriesModel),
-        body: bodyData(),
-        bottomNavigationBar: bottomBar(),
-        backgroundColor: context.color.backgroundColor,
-      );
-    });
-  }
-
-  Widget bodyData() {
-    return searchItemsWidget();
-  }
-
-  Widget bottomBar() {
+  Widget _buildBottomBar() {
     return Container(
-      color: context.color.backgroundColor,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      decoration: BoxDecoration(
+        color: context.color.secondaryColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
+          )
+        ],
+      ),
       child: SafeArea(
+        top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            isLocationLoading
-                ? Center(
-                    child: UiUtils.progress(
-                        normalProgressColor: context.color.territoryColor))
-                : UiUtils.buildButton(
-                    context,
-                    onPressed: () {
-                      _getCurrentLocation();
-                    },
-                    buttonTitle: "useCurrentLocation".translate(context),
-                    buttonColor: context.color.backgroundColor,
-                    textColor: context.color.territoryColor,
-                    border: BorderSide(color: context.color.territoryColor),
-                    showElevation: false,
-                    radius: 8,
-                    height: 48,
+            // Use Current Location Button
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: OutlinedButton.icon(
+                onPressed: _getCurrentLocation,
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: context.color.territoryColor),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
                   ),
-            const SizedBox(height: 12),
+                ),
+                icon: isLocationLoading
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: context.color.territoryColor,
+                        ),
+                      )
+                    : Icon(
+                        Icons.my_location_rounded,
+                        color: context.color.territoryColor,
+                        size: 18,
+                      ),
+                label: Text(
+                  "Use Current Location".translate(context),
+                  style: TextStyle(
+                    color: context.color.territoryColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Continue Button
             UiUtils.buildButton(
               context,
               onPressed: () {
                 if (selectedCountry != null) {
-                  addToRecentSearches(selectedCountry!.name!);
+                  _addToRecentSearches(selectedCountry!.name!);
                   Navigator.pushNamed(
                     context,
                     Routes.statesScreen,
                     arguments: {
                       "countryId": selectedCountry!.id!,
                       "countryName": selectedCountry!.name!,
-                      "from": widget.from
+                      "from": widget.from,
                     },
                   ).then((value) {
                     if (value != null && widget.from == "addItem") {
@@ -439,13 +684,14 @@ class CountriesScreenState extends State<CountriesScreen> {
                   });
                 }
               },
-              buttonTitle: "continue".translate(context),
-              radius: 8,
+              buttonTitle: "Continue".translate(context),
+              textColor: Colors.white,
+              buttonColor: selectedCountry != null
+                  ? context.color.territoryColor
+                  : context.color.territoryColor.withValues(alpha: 0.4),
+              radius: 10,
               height: 48,
               disabled: selectedCountry == null,
-              disabledColor:
-                  context.color.territoryColor.withValues(alpha: 0.5), // Lighter red
-              buttonColor: context.color.territoryColor, // Red background
             ),
           ],
         ),
@@ -453,236 +699,13 @@ class CountriesScreenState extends State<CountriesScreen> {
     );
   }
 
-  Widget searchItemsWidget() {
-    return Column(
-      children: [
-        Expanded(
-          child: BlocBuilder<FetchCountriesCubit, FetchCountriesState>(
-            builder: (context, state) {
-              if (state is FetchCountriesInProgress) {
-                return shimmerEffect();
-              }
-
-              if (state is FetchCountriesFailure) {
-                if (state.errorMessage is ApiException) {
-                  if (state.errorMessage == "no-internet") {
-                    return SingleChildScrollView(
-                      child: NoInternet(
-                        onRetry: () {
-                          context
-                              .read<FetchCountriesCubit>()
-                              .fetchCountries(search: searchController.text);
-                        },
-                      ),
-                    );
-                  }
-                }
-                return const Center(child: SomethingWentWrong());
-              }
-
-              if (state is FetchCountriesSuccess) {
-                if (state.countriesModel.isEmpty) {
-                  return Center(
-                      child: SingleChildScrollView(child: NoDataFound()));
-                }
-
-                return Container(
-                  width: double.infinity,
-                  color: context.color.secondaryColor,
-                  child: NotificationListener<ScrollNotification>(
-                    onNotification: (ScrollNotification scrollInfo) {
-                      if (scrollInfo.metrics.pixels >=
-                          scrollInfo.metrics.maxScrollExtent - 50) {
-                        if (context.read<FetchCountriesCubit>().hasMoreData()) {
-                          context
-                              .read<FetchCountriesCubit>()
-                              .fetchCountriesMore(search: searchController.text);
-                        }
-                      }
-                      return false;
-                    },
-                    child: SingleChildScrollView(
-                      controller: controller,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          /// -------- RECENT SEARCHES ----------
-                          if (recentSearches.isNotEmpty) ...[
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 12),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.history,
-                                      size: 18,
-                                      color: context.color.textDefaultColor),
-                                  const SizedBox(width: 6),
-                                  Text("Your Last Searches".translate(context))
-                                      .color(context.color.textDefaultColor)
-                                      .size(context.font.normal)
-                                      .bold(weight: FontWeight.bold),
-                                  const Spacer(),
-                                  InkWell(
-                                    onTap: () {
-                                      // See All Logic
-                                    },
-                                    child: Text("seeAll".translate(context))
-                                        .size(context.font.small)
-                                        .color(context.color.textLightColor),
-                                  )
-                                ],
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
-                                  children: recentSearches.map((search) {
-                                    return Padding(
-                                      padding: const EdgeInsetsDirectional.only(
-                                          end: 10),
-                                      child: Chip(
-                                        label: Text(search),
-                                        backgroundColor:
-                                            context.color.secondaryColor,
-                                        side: BorderSide(
-                                            color: context.color.borderColor),
-                                        labelStyle: TextStyle(
-                                            color: context.color.textDefaultColor,
-                                            fontSize: 12),
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                              ),
-                            ),
-                          ],
-
-                          /// -------- POPULAR SEARCHES ----------
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                            child: Row(
-                              children: [
-                                Icon(Icons.trending_up,
-                                    size: 18,
-                                    color: context.color.textDefaultColor),
-                                const SizedBox(width: 6),
-                                Text(
-                                  "All Countries".translate(context),
-                                )
-                                    .color(context.color.textDefaultColor)
-                                    .size(context.font.normal)
-                                    .bold(weight: FontWeight.bold),
-                              ],
-                            ),
-                          ),
-
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              children: state.countriesModel.map((country) {
-                                bool isSelected =
-                                    selectedCountry?.id == country.id;
-                                return InkWell(
-                                  borderRadius: BorderRadius.circular(20),
-                                  onTap: () {
-                                    setState(() {
-                                      selectedCountry = country;
-                                    });
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 14, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: isSelected
-                                            ? context.color.territoryColor
-                                            : context.color.borderColor,
-                                      ),
-                                      color: isSelected
-                                          ? context.color.territoryColor
-                                          .withValues(alpha: 0.1)
-                                          : context.color.secondaryColor,
-                                    ),
-                                    child: Text(
-                                      country.name!,
-                                    )
-                                        .color(isSelected
-                                        ? context.color.territoryColor
-                                        : context.color.textDefaultColor)
-                                        .size(context.font.small),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-
-                          if (state.isLoadingMore)
-                            Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Center(
-                                child: UiUtils.progress(
-                                  normalProgressColor:
-                                  context.color.territoryColor,
-                                ),
-                              ),
-                            ),
-
-                          SizedBox(height: 20), // Bottom padding
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }
-
-              return const SizedBox.shrink();
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget setSearchIcon() {
-    return Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: UiUtils.getSvg(AppIcons.search,
-            color: context.color.territoryColor));
-  }
-
-  Widget setSuffixIcon() {
-    return GestureDetector(
-      onTap: () {
-        searchController.clear();
-        isFocused = false; //set icon color to black back
-        FocusScope.of(context).unfocus(); //dismiss keyboard
-        setState(() {});
-      },
-      child: Icon(
-        Icons.close_rounded,
-        color: Theme.of(context).colorScheme.blackColor,
-        size: 30,
-      ),
-    );
-  }
-
   @override
-  @override
-  void dispose() {
-    _searchDelay?.cancel(); // cancel timer
-    searchController.removeListener(searchItemListener);
-    controller.removeListener(pageScrollListen);
-
-    searchController.dispose();
-    controller.dispose();
-
-    super.dispose();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: context.color.backgroundColor,
+      appBar: _buildAppBar(),
+      body: _buildBody(),
+      bottomNavigationBar: _buildBottomBar(),
+    );
   }
 }

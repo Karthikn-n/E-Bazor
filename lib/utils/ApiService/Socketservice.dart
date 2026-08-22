@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:Ebozor/ui/screens/chat/chat_audio/widgets/chat_widget.dart';
+import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/notification/chat_message_handler.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
@@ -145,6 +146,85 @@ class ChatSocketService {
 
   void _stopPresencePing() {
     _presenceTimer?.cancel();
+  }
+
+  /// Leave a specific offer room
+  void leaveOffer(int offerId) {
+    if (_socket != null && _socket!.connected) {
+      print("🔥 Emitting leave: {offerId: $offerId}");
+      _socket?.emit("leave", {"offerId": offerId});
+    }
+  }
+
+  /// REST WebSocket Helpers (from API_DOCUMENTATION 1.md section 3.9)
+
+  /// GET /api/ws/auth
+  static Future<Map<String, dynamic>> wsAuth() async {
+    try {
+      return await Api.get(url: Api.wsAuthApi);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// GET /api/ws/can-join?item_offer_id={id}
+  static Future<Map<String, dynamic>> wsCanJoin({required int itemOfferId}) async {
+    try {
+      return await Api.get(
+        url: Api.wsCanJoinApi,
+        queryParameters: {"item_offer_id": itemOfferId},
+      );
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// GET /api/ws/ping
+  static Future<Map<String, dynamic>> wsPing() async {
+    try {
+      return await Api.get(url: Api.wsPingApi);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// GET /api/ws/presence?item_offer_id={id}&details=1
+  static Future<Map<String, dynamic>> wsPresence({
+    int? itemOfferId,
+    int? details = 1,
+  }) async {
+    try {
+      return await Api.get(
+        url: Api.wsPresenceApi,
+        queryParameters: {
+          if (itemOfferId != null) "item_offer_id": itemOfferId,
+          if (details != null) "details": details,
+        },
+      );
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// POST /api/ws/message (Proxy endpoint for Socket.IO server)
+  static Future<Map<String, dynamic>> wsSendMessageProxy({
+    required int itemOfferId,
+    String? message,
+    dynamic file,
+    dynamic audio,
+  }) async {
+    try {
+      Map<String, dynamic> parameters = {
+        "item_offer_id": itemOfferId,
+      };
+      if (message != null && message.isNotEmpty) parameters["message"] = message;
+      if (file != null) parameters["file"] = file;
+      if (audio != null) parameters["audio"] = audio;
+
+      return await Api.post(url: Api.wsMessageApi, parameter: parameters);
+    } catch (e) {
+      rethrow;
+    }
   }
 
   /// Disconnect socket safely

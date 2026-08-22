@@ -25,6 +25,7 @@ import 'package:in_app_review/in_app_review.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
 
 import 'package:Ebozor/data/cubits/report/update_report_items_list_cubit.dart';
 import 'package:Ebozor/data/cubits/auth/authentication_cubit.dart';
@@ -36,10 +37,10 @@ import 'package:Ebozor/utils/app_icon.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/network/apiCallTrigger.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
+import 'package:Ebozor/ui/screens/widgets/phone_verification_dialog.dart';
 
 import 'package:Ebozor/utils/helper_utils.dart';
 
-import 'package:Ebozor/utils/responsiveSize.dart';
 import 'package:Ebozor/ui/screens/widgets/blurred_dialoge_box.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -191,42 +192,74 @@ class _ProfileScreenState extends State<ProfileScreen>
       return ValueListenableBuilder(
           valueListenable: Hive.box(HiveKeys.userDetailsBox).listenable(),
           builder: (context, Box box, _) {
-            return Padding(
-              padding: const EdgeInsets.all(10.0),
+            final user = HiveUtils.getUserDetails();
+            final isAuthenticated = HiveUtils.isUserAuthenticated();
+            final isVerified = user.isVerified == 1 ||
+                (state is FetchVerificationRequestSuccess &&
+                    state.data.status == "approved");
+
+            String joinedDate = "";
+            if (isAuthenticated && user.createdAt != null && user.createdAt!.isNotEmpty) {
+              final parsed = DateTime.tryParse(user.createdAt!);
+              if (parsed != null) {
+                joinedDate = "Joined on ${DateFormat('MMMM yyyy').format(parsed)}";
+              }
+            }
+
+            return Container(
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: context.color.secondaryColor,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: context.color.borderColor.withValues(alpha: 0.5),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   Stack(
                     children: [
                       Container(
-                          clipBehavior: Clip.antiAlias,
-                          decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                  color: context.color.territoryColor)),
-                          child: CircleAvatar(
-                              backgroundColor: context.color.backgroundColor,
-                              radius: 30,
-                              child: HiveUtils.isUserAuthenticated()
-                                  ? (HiveUtils.getUserDetails().profile ?? "")
-                                          .isEmpty
-                                      ? UiUtils.getSvg(
-                                          AppIcons.defaultPersonLogo,
-                                          color: context.color.territoryColor,
-                                          fit: BoxFit.none,
-                                        )
-                                      : UiUtils.getImage(
-                                          height: 100,
-                                          width: 100,
-                                          HiveUtils.getUserDetails().profile!,
-                                          fit: BoxFit.cover,
-                                        )
-                                  : UiUtils.getSvg(
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: context.color.territoryColor.withValues(alpha: 0.4),
+                            width: 2,
+                          ),
+                        ),
+                        child: CircleAvatar(
+                          backgroundColor: context.color.territoryColor.withValues(alpha: 0.08),
+                          radius: 32,
+                          child: isAuthenticated
+                              ? ((user.profile ?? "").isEmpty
+                                  ? UiUtils.getSvg(
                                       AppIcons.defaultPersonLogo,
                                       color: context.color.territoryColor,
                                       fit: BoxFit.none,
-                                    ))),
-                      if (HiveUtils.isUserAuthenticated())
+                                    )
+                                  : UiUtils.getImage(
+                                      height: 64,
+                                      width: 64,
+                                      user.profile!,
+                                      fit: BoxFit.cover,
+                                    ))
+                              : UiUtils.getSvg(
+                                  AppIcons.defaultPersonLogo,
+                                  color: context.color.territoryColor,
+                                  fit: BoxFit.none,
+                                ),
+                        ),
+                      ),
+                      if (isAuthenticated)
                         Positioned(
                           right: 0,
                           bottom: 0,
@@ -237,420 +270,152 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   args: {"from": "profile"});
                             },
                             child: Container(
-                              padding: EdgeInsets.all(4),
+                              padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(
-                                  color: context.color.territoryColor,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                      color: context.color.secondaryColor)),
-                              //alignment: Alignment.center,
-                              child: UiUtils.getSvg(AppIcons.editProfileIcon,
-                                  width: 18, height: 18, fit: BoxFit.fill),
+                                color: context.color.territoryColor,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: context.color.secondaryColor,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.edit,
+                                color: Colors.white,
+                                size: 12,
+                              ),
                             ),
                           ),
                         ),
                     ],
                   ),
-                  SizedBox(
-                    width: context.screenWidth * 0.04,
-                  ),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        (state is FetchVerificationRequestInProgress ||
-                                state is FetchVerificationRequestInitial ||
-                                state is FetchVerificationRequestFail)
-                            ? SizedBox()
-                            : (HiveUtils.isUserAuthenticated() &&
-                                    ((HiveUtils.getUserDetails().isVerified ==
-                                            1) ||
-                                        (state as FetchVerificationRequestSuccess)
-                                                .data
-                                                .status ==
-                                            "approved"))
-                                ? Container(
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(5),
+                      children: [
+                        Text(
+                          isAuthenticated
+                              ? (user.name ?? 'User')
+                              : "anonymous".translate(context),
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: context.color.textColorDark,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 5),
+                        if (isAuthenticated) ...[
+                          if (isVerified)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: context.color.forthColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.verified_rounded,
+                                    size: 14,
+                                    color: context.color.forthColor,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    "verifiedLbl".translate(context),
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
                                       color: context.color.forthColor,
                                     ),
-                                    padding: EdgeInsets.symmetric(
-                                        horizontal: 5, vertical: 1),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        UiUtils.getSvg(AppIcons.verifiedIcon,
-                                            width: 14, height: 14),
-                                        SizedBox(width: 4),
-                                        Text("verifiedLbl".translate(context))
-                                            .color(context.color.secondaryColor)
-                                            .bold(weight: FontWeight.w500)
-                                      ],
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            InkWell(
+                              onTap: () {
+                                PhoneVerificationDialog.show(
+                                  context,
+                                  onVerified: () {
+                                    setState(() {});
+                                    context
+                                        .read<FetchVerificationRequestsCubit>()
+                                        .fetchVerificationRequests();
+                                  },
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: context.color.borderColor.withValues(alpha: 0.8),
+                                  ),
+                                  color: context.color.backgroundColor,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      "Get Verified",
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: context.color.textColorDark,
+                                      ),
                                     ),
-                                  )
-                                : SizedBox(),
-                        // If none of the conditions are met, return an empty widget
-
-                        SizedBox(
-                          height: 5,
-                        ),
-                        if (HiveUtils.isUserAuthenticated()) ...[
-                          SizedBox(
-                            width: context.screenWidth * 0.63,
-                            child: Text(
-                              HiveUtils.getUserDetails().name ?? '',
-                              softWrap: true,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 2,
-                            )
-                                .color(context.color.textColorDark)
-                                .size(context.font.large)
-                                .bold(weight: FontWeight.w700),
-                          ),
-                          SizedBox(
-                            height: 3,
-                          ),
-                          SizedBox(
-                            width: context.screenWidth * 0.63,
-                            child: Text(
-                              HiveUtils.getUserDetails().email ?? '',
-                              softWrap: true,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 2,
-                            )
-                                .color(context.color.textColorDark)
-                                .size(context.font.small),
-                          ),
-                        ],
-
-                        if (!HiveUtils.isUserAuthenticated()) ...[
-                          SizedBox(
-                            width: context.screenWidth * 0.4,
-                            child: Text(
-                              "anonymous".translate(context),
-                              softWrap: true,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 2,
-                            )
-                                .color(context.color.textColorDark)
-                                .size(context.font.large)
-                                .bold(weight: FontWeight.w700),
-                          ),
-                          SizedBox(
-                            height: 3,
-                          ),
-                          SizedBox(
-                            width: context.screenWidth * 0.4,
-                            child: Text(
-                              "loginFirst".translate(context),
-                              softWrap: true,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 2,
-                            )
-                                .color(context.color.textColorDark)
-                                .size(context.font.small),
-                          ),
-                        ],
-
-                        if (_appVersion.isNotEmpty) ...[
-                          const SizedBox(height: 5),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: context.color.territoryColor
-                                  .withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              "App $_appVersion",
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: context.color.territoryColor,
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      Icons.check_circle_outline_rounded,
+                                      size: 14,
+                                      color: context.color.textLightColor,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
+                        ],
+                        if (joinedDate.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            joinedDate,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.color.textLightColor,
+                            ),
                           ),
                         ],
-
-                        (state is FetchVerificationRequestInProgress ||
-                                state is FetchVerificationRequestInitial ||
-                                state is FetchVerificationRequestFail)
-                            ? SizedBox()
-                            : (HiveUtils.isUserAuthenticated() &&
-                                    (((state as FetchVerificationRequestSuccess)
-                                            .data
-                                            .status) ==
-                                        "rejected"))
-                                ? Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                        SizedBox(
-                                          height: 7,
-                                        ),
-                                        SizedBox(
-                                          width: context.screenWidth *
-                                              0.63.rw(context),
-                                          child: LayoutBuilder(
-                                            builder: (context, constraints) {
-                                              // Measure the rendered text
-                                              final span = TextSpan(
-                                                text:
-                                                    "${state.data.rejectionReason!}\t",
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w400,
-                                                  fontSize: context.font.small,
-                                                  color: Colors.red,
-                                                ),
-                                              );
-                                              final tp = TextPainter(
-                                                text: span,
-                                                maxLines: 2,
-                                                // Maximum number of lines before overflow
-                                                textDirection:
-                                                    TextDirection.ltr,
-                                              );
-                                              tp.layout(
-                                                  maxWidth:
-                                                      constraints.maxWidth);
-
-                                              final isOverflowing =
-                                                  tp.didExceedMaxLines;
-
-                                              return Row(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.end,
-                                                children: [
-                                                  Expanded(
-                                                    child: Text(
-                                                      "${state.data.rejectionReason!}\t",
-                                                      maxLines:
-                                                          isExpanded ? null : 2,
-                                                      softWrap: true,
-                                                      overflow: isExpanded
-                                                          ? TextOverflow.visible
-                                                          : TextOverflow
-                                                              .ellipsis,
-                                                    )
-                                                        .color(Colors.red)
-                                                        .bold(
-                                                            weight:
-                                                                FontWeight.w400)
-                                                        .size(
-                                                            context.font.small),
-                                                  ),
-                                                  if (isOverflowing) // Conditionally show the button
-                                                    Padding(
-                                                      padding:
-                                                          EdgeInsetsDirectional
-                                                              .only(start: 3),
-                                                      child: GestureDetector(
-                                                        onTap: () {
-                                                          setState(() {
-                                                            isExpanded =
-                                                                !isExpanded; // Toggle the expanded state
-                                                          });
-                                                        },
-                                                        child: Text(
-                                                          isExpanded
-                                                              ? "readLessLbl"
-                                                                  .translate(
-                                                                      context)
-                                                              : "readMoreLbl"
-                                                                  .translate(
-                                                                      context),
-                                                        )
-                                                            .color(context.color
-                                                                .textDefaultColor)
-                                                            .bold(
-                                                                weight:
-                                                                    FontWeight
-                                                                        .w400)
-                                                            .size(context
-                                                                .font.small),
-                                                      ),
-                                                    ),
-                                                ],
-                                              );
-                                            },
-                                          ),
-                                        )
-                                      ])
-                                : SizedBox.shrink(),
-
-                        (state is FetchVerificationRequestInProgress ||
-                                state is FetchVerificationRequestInitial ||
-                                state is FetchVerificationRequestFail)
-                            ? SizedBox()
-                            : (HiveUtils.isUserAuthenticated() &&
-                                    (((state as FetchVerificationRequestSuccess)
-                                            .data
-                                            .status) !=
-                                        "approved"))
-                                ? Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      SizedBox(
-                                        height: 12,
-                                      ),
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceEvenly,
-                                        children: [
-                                          SizedBox(
-                                              child: Container(
-                                            padding: EdgeInsets.symmetric(
-                                                horizontal: 12, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              borderRadius:
-                                                  BorderRadius.circular(5),
-                                              color: ((state).data.status ==
-                                                      'rejected')
-                                                  ? Colors.red
-                                                  : context
-                                                      .color.territoryColor,
-                                            ),
-                                            child: Text(sellerStatus(
-                                                    (state).data.status!))
-                                                .color(context
-                                                    .color.secondaryColor)
-                                                .size(context.font.small)
-                                                .bold(weight: FontWeight.w500),
-                                          )),
-                                          if ((state).data.status ==
-                                              'rejected') ...[
-                                            SizedBox(
-                                              width: 12,
-                                            ),
-                                            InkWell(
-                                              child: SizedBox(
-                                                  child: Container(
-                                                padding: EdgeInsets.symmetric(
-                                                    horizontal: 12,
-                                                    vertical: 4),
-                                                decoration: BoxDecoration(
-                                                  borderRadius:
-                                                      BorderRadius.circular(5),
-                                                  color: context
-                                                      .color.territoryColor,
-                                                ),
-                                                child: Text("resubmit"
-                                                        .translate(context))
-                                                    .color(context
-                                                        .color.secondaryColor)
-                                                    .size(context.font.small)
-                                                    .bold(
-                                                        weight:
-                                                            FontWeight.w500),
-                                              )),
-                                              onTap: () {
-                                                Navigator.pushNamed(
-                                                    context,
-                                                    Routes
-                                                        .sellerIntroVerificationScreen,
-                                                    arguments: {
-                                                      "isResubmitted": true
-                                                    }).then((value) {
-                                                  if (value == 'refresh') {
-                                                    context
-                                                        .read<
-                                                            FetchVerificationRequestsCubit>()
-                                                        .fetchVerificationRequests();
-                                                  }
-                                                });
-                                              },
-                                            )
-                                          ],
-                                        ],
-                                      ),
-                                    ],
-                                  )
-                                : SizedBox.shrink(),
-
-                        (state is FetchVerificationRequestInProgress ||
-                                state is FetchVerificationRequestInitial ||
-                                state is FetchVerificationRequestSuccess)
-                            ? SizedBox()
-                            : (HiveUtils.isUserAuthenticated() &&
-                                    ((HiveUtils.getUserDetails().isVerified ==
-                                            0) ||
-                                        (state is FetchVerificationRequestFail))
-                                ? Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      SizedBox(
-                                        height: 7,
-                                      ),
-                                      InkWell(
-                                        child: SizedBox(
-                                            child: Container(
-                                          padding: EdgeInsets.symmetric(
-                                              horizontal: 12, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            borderRadius:
-                                                BorderRadius.circular(5),
-                                            color: context.color.territoryColor,
-                                          ),
-                                          child: Text("getVerificationBadge"
-                                                  .translate(context))
-                                              .color(
-                                                  context.color.secondaryColor)
-                                              .size(context.font.small)
-                                              .bold(weight: FontWeight.w500),
-                                        )),
-                                        onTap: () {
-                                          Navigator.pushNamed(
-                                              context,
-                                              Routes
-                                                  .sellerIntroVerificationScreen,
-                                              arguments: {
-                                                "isResubmitted": false
-                                              }).then((value) {
-                                            if (value == 'refresh') {
-                                              context
-                                                  .read<
-                                                      FetchVerificationRequestsCubit>()
-                                                  .fetchVerificationRequests();
-                                            }
-                                          });
-                                        },
-                                      ),
-                                    ],
-                                  )
-                                : SizedBox.shrink()),
                       ],
                     ),
                   ),
-                  //const Spacer(),
-                  if (!HiveUtils.isUserAuthenticated())
-                    Align(
-                      alignment: AlignmentDirectional.centerEnd,
-                      child: MaterialButton(
+                  if (!isAuthenticated)
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: context.color.territoryColor,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         shape: RoundedRectangleBorder(
-                          side: BorderSide(
-                            color: context.color.textDefaultColor
-                                .withValues(alpha: 0.3),
-                            width: 1.5,
-                          ),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        onPressed: () {
-                          /* Navigator.pushNamed(
-                            context,
-                            Routes.login,
-                            arguments: {"popToCurrent": true},
-                          );*/
-
-                          Navigator.of(context).pushNamedAndRemoveUntil(
-                              Routes.login, (route) => false);
-                        },
-                        child: Text("loginLbl".translate(context)),
                       ),
-                    )
+                      onPressed: () {
+                        Navigator.of(context).pushNamedAndRemoveUntil(
+                          Routes.login,
+                          (route) => false,
+                        );
+                      },
+                      child: Text(
+                        "loginLbl".translate(context),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             );
@@ -658,138 +423,621 @@ class _ProfileScreenState extends State<ProfileScreen>
     });
   }
 
+  Widget _buildCardBox({required List<Widget> children}) {
+    final validChildren = children
+        .where((w) => w is! SizedBox || (w.height != 0 && w.width != 0))
+        .toList();
+    if (validChildren.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: context.color.secondaryColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: context.color.borderColor.withValues(alpha: 0.5),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: List.generate(validChildren.length, (index) {
+          return Column(
+            children: [
+              validChildren[index],
+              if (index < validChildren.length - 1)
+                Divider(
+                  height: 1,
+                  thickness: 0.7,
+                  indent: 60,
+                  endIndent: 14,
+                  color: context.color.borderColor.withValues(alpha: 0.35),
+                ),
+            ],
+          );
+        }),
+      ),
+    );
+  }
+
+  void _handleJobProfileTap() {
+    final user = HiveUtils.getUserDetails();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: context.color.secondaryColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (bottomSheetCtx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: context.color.borderColor,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: context.color.territoryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.work_outline_rounded,
+                        color: context.color.territoryColor,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "My Job Profile",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: context.color.textDefaultColor,
+                            ),
+                          ),
+                          Text(
+                            user.name ?? "Job Seeker",
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: context.color.textLightColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: context.color.backgroundColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: context.color.borderColor.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Email",
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: context.color.textLightColor,
+                            ),
+                          ),
+                          Text(
+                            user.email ?? "Not added",
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: context.color.textDefaultColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Mobile",
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: context.color.textLightColor,
+                            ),
+                          ),
+                          Text(
+                            user.mobile ?? "Not added",
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: context.color.textDefaultColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Verified Candidate",
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: context.color.textLightColor,
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              Icon(
+                                user.isVerified == 1
+                                    ? Icons.check_circle_rounded
+                                    : Icons.cancel_outlined,
+                                size: 16,
+                                color: user.isVerified == 1
+                                    ? Colors.green
+                                    : Colors.orange,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                user.isVerified == 1 ? "Verified" : "Unverified",
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: user.isVerified == 1
+                                      ? Colors.green
+                                      : Colors.orange,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(bottomSheetCtx);
+                      HelperUtils.goToNextPage(
+                        Routes.completeProfile,
+                        context,
+                        false,
+                        args: {"from": "profile"},
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: context.color.territoryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text(
+                      "Edit Profile & Resume Info",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _testCategoriesApi() async {
+    HelperUtils.showSnackBarMessage(
+      context,
+      "Calling GET /api/get-categories...",
+    );
+
+    try {
+      final response = await Api.get(
+        url: Api.getCategoriesApi,
+        queryParameters: {},
+      );
+
+      final total = response['data']?['total'] ??
+          (response['data'] is List ? (response['data'] as List).length : 0);
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (dialogCtx) => AlertDialog(
+            backgroundColor: context.color.secondaryColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.teal),
+                const SizedBox(width: 8),
+                Text(
+                  "getCategories API Success",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: context.color.textDefaultColor,
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      "Endpoint: GET /api/get-categories\nTotal Categories Returned: $total\nResponse status: ${response['error'] == false ? '200 OK' : 'Error'}",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: context.color.textDefaultColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: context.color.backgroundColor,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        response.toString().length > 600
+                            ? "${response.toString().substring(0, 600)}...\n[truncated]"
+                            : response.toString(),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontFamily: 'monospace',
+                          color: context.color.textLightColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: Text(
+                  "Close",
+                  style: TextStyle(color: context.color.territoryColor),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        HelperUtils.showSnackBarMessage(
+          context,
+          "GET /api/get-categories failed: $e",
+          type: MessageType.error,
+        );
+      }
+    }
+  }
+
+  Future<void> _testHomeCategoriesApi() async {
+    HelperUtils.showSnackBarMessage(
+      context,
+      "Calling GET /api/get-home-categories...",
+    );
+
+    try {
+      final response = await Api.get(
+        url: Api.getHomeCategoriesApi,
+        queryParameters: {},
+      );
+
+      final total = response['data']?['total'] ??
+          (response['data'] is List
+              ? (response['data'] as List).length
+              : (response['data'] is Map ? (response['data'] as Map).length : 0));
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (dialogCtx) => AlertDialog(
+            backgroundColor: context.color.secondaryColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.teal),
+                const SizedBox(width: 8),
+                Text(
+                  "getHomeCategories Response",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: context.color.textDefaultColor,
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      "Endpoint: GET /api/get-home-categories\nTotal Elements: $total\nResponse error: ${response['error']}",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: context.color.textDefaultColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: context.color.backgroundColor,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        response.toString().length > 800
+                            ? "${response.toString().substring(0, 800)}...\n[truncated]"
+                            : response.toString(),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontFamily: 'monospace',
+                          color: context.color.textLightColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: Text(
+                  "Close",
+                  style: TextStyle(color: context.color.territoryColor),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        HelperUtils.showSnackBarMessage(
+          context,
+          "GET /api/get-home-categories failed: $e",
+          type: MessageType.error,
+        );
+      }
+    }
+  }
+
+  customTile(
+    BuildContext context, {
+    required String title,
+    required VoidCallback onTap,
+    String? svgImage,
+    IconData? iconData,
+    bool? isSwitchBox,
+    Function(dynamic value)? onTapSwitch,
+    dynamic switchValue,
+    Color? color,
+    BorderRadius? borderRadius,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: borderRadius,
+      clipBehavior: borderRadius != null ? Clip.antiAlias : Clip.none,
+      child: InkWell(
+        borderRadius: borderRadius,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: (color ?? context.color.territoryColor).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Center(
+                  child: iconData != null
+                      ? Icon(
+                          iconData,
+                          size: 19,
+                          color: color ?? context.color.textColorDark,
+                        )
+                      : UiUtils.getSvg(
+                          svgImage!,
+                          color: color ?? context.color.textColorDark,
+                          width: 17,
+                          height: 17,
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: color ?? context.color.textDefaultColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              if (isSwitchBox == true)
+                Switch(
+                  value: switchValue ?? false,
+                  onChanged: onTapSwitch,
+                  activeColor: Colors.white,
+                  activeTrackColor: context.color.territoryColor,
+                  inactiveThumbColor: Colors.white,
+                  inactiveTrackColor: Colors.grey.shade400,
+                  trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+                )
+              else
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 13,
+                  color: context.color.textLightColor.withValues(alpha: 0.8),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
-
     return AnnotatedRegion(
       value: UiUtils.getSystemUiOverlayStyle(
-          context: context, statusBarColor: context.color.secondaryColor),
+        context: context,
+        statusBarColor: context.color.secondaryColor,
+      ),
       child: Scaffold(
-        backgroundColor: context.color.primaryColor,
-        appBar: UiUtils.buildAppBar(context,
-            showBackButton: false,
-            bottomHeight: 10,
-            title: "myProfile".translate(context),
-            actions: [
-              if (HiveUtils.isUserAuthenticated())
-                setIconButtons(
-                  assetName: AppIcons.logout,
-                  onTap: () {
-                    logOutConfirmWidget();
-                  },
-                  color: context.color.textDefaultColor,
-                ),
-            ]),
+        backgroundColor: context.color.backgroundColor,
+        appBar: UiUtils.buildAppBar(
+          context,
+          title: "profileTab".translate(context).isNotEmpty &&
+                  "profileTab".translate(context) != "profileTab"
+              ? "profileTab".translate(context)
+              : "Profile",
+          showBackButton: false,
+        ),
         body: SingleChildScrollView(
           controller: profileScreenController,
           physics: const BouncingScrollPhysics(),
           child: Padding(
-            padding: const EdgeInsets.all(18.0),
-            child: Column(children: <Widget>[
-              profileHeader(),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  const SizedBox(
-                    height: 20,
-                  ),
-                  customTile(
-                    context,
-                    title: "myFeaturedAds".translate(context),
-                    svgImagePath: AppIcons.promoted,
-                    onTap: () async {
-                      APICallTrigger.trigger();
-                      UiUtils.checkUser(
-                          onNotGuest: () {
-                            Navigator.pushNamed(context, Routes.myAdvertisment,
-                                arguments: {});
-                          },
-                          context: context);
-                    },
-                  ),
-                  customTile(
-                    context,
-                    title: "subscription".translate(context),
-                    svgImagePath: AppIcons.subscription,
-                    onTap: () async {
-                      //TODO: change it once @End
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            child: Column(
+              children: <Widget>[
+                profileHeader(),
+                const SizedBox(height: 14),
 
-                      UiUtils.checkUser(
-                          onNotGuest: () {
-                            Navigator.pushNamed(
-                                context, Routes.subscriptionPackageListRoute);
-                          },
-                          context: context);
-                    },
-                  ),
-                  customTile(
-                    context,
-                    title: "transactionHistory".translate(context),
-                    svgImagePath: AppIcons.transaction,
-                    onTap: () {
-                      UiUtils.checkUser(
-                          onNotGuest: () {
-                            Navigator.pushNamed(
-                                context, Routes.transactionHistory);
-                          },
-                          context: context);
-                    },
-                  ),
-                  customTile(
-                    context,
-                    title: "myReview".translate(context),
-                    svgImagePath: AppIcons.myReviewIcon,
-                    onTap: () {
-                      UiUtils.checkUser(
-                          onNotGuest: () {
-                            Navigator.pushNamed(
-                                context, Routes.myReviewsScreen);
-                          },
-                          context: context);
-                    },
+                // BOX 1: Profile & Personal Details
+                if (HiveUtils.isUserAuthenticated())
+                  _buildCardBox(
+                    children: [
+                      customTile(
+                        context,
+                        title: "editprofile".translate(context),
+                        iconData: Icons.person_outline_rounded,
+                        onTap: () {
+                          HelperUtils.goToNextPage(
+                              Routes.completeProfile, context, false,
+                              args: {"from": "profile"});
+                        },
+                      ),
+                      customTile(
+                        context,
+                        title: "Addresses",
+                        iconData: Icons.location_on_outlined,
+                        onTap: () {
+                          Navigator.pushNamed(
+                              context, Routes.userAddressListScreen);
+                        },
+                      ),
+                      customTile(
+                        context,
+                        title: "My Job Profile",
+                        iconData: Icons.work_outline_rounded,
+                        onTap: () {
+                          _handleJobProfileTap();
+                        },
+                      ),
+                      customTile(
+                        context,
+                        title: "blockedUsers".translate(context),
+                        iconData: Icons.person_off_outlined,
+                        onTap: () {
+                          Navigator.pushNamed(
+                              context, Routes.blockedUserListScreen);
+                        },
+                      ),
+                    ],
                   ),
 
-                  /*   customTile(
-                    context,
-                    title: "personalized".translate(context),
-                    svgImagePath: AppIcons.magic,
-                    onTap: () {
-                      GuestChecker.check(onNotGuest: () {
+                // BOX 2: Settings (App Related)
+                _buildCardBox(
+                  children: [
+                    customTile(
+                      context,
+                      title: "notifications".translate(context),
+                      iconData: Icons.notifications_none_rounded,
+                      onTap: () {
+                        UiUtils.checkUser(
+                          onNotGuest: () {
+                            Navigator.pushNamed(context, Routes.notificationPage);
+                          },
+                          context: context,
+                        );
+                      },
+                    ),
+                    customTile(
+                      context,
+                      title: "language".translate(context),
+                      iconData: Icons.translate_rounded,
+                      onTap: () {
                         Navigator.pushNamed(
-                            context, Routes.personalizedItemScreen,
-                            arguments: {
-                              "type": PersonalizedVisitType.Normal
-                            });
-                      });
-                    },
-                  ),*/
-
-                  customTile(
-                    context,
-                    title: "language".translate(context),
-                    svgImagePath: AppIcons.language,
-                    onTap: () {
-                      Navigator.pushNamed(
-                          context, Routes.languageListScreenRoute);
-                    },
-                  ),
-                  /*  customTile(
-                    context,
-                    title: "Testing",
-                    svgImagePath: AppIcons.language,
-                    onTap: () {
-                      Navigator.pushNamed(context, Routes.soldOutBoughtScreen);
-                    },
-                  ),*/
-                  ValueListenableBuilder(
+                            context, Routes.languageListScreenRoute);
+                      },
+                    ),
+                    ValueListenableBuilder(
                       valueListenable: isDarkTheme,
                       builder: (context, v, c) {
+                        final bool isDark = v == true;
                         return customTile(
                           context,
                           title: "darkTheme".translate(context),
-                          svgImagePath: AppIcons.darkTheme,
+                          iconData: isDark
+                              ? Icons.dark_mode_outlined
+                              : Icons.light_mode_outlined,
                           isSwitchBox: true,
                           onTapSwitch: (value) {
                             context.read<AppThemeCubit>().changeTheme(
@@ -799,204 +1047,258 @@ class _ProfileScreenState extends State<ProfileScreen>
                             });
                           },
                           switchValue: v,
-                          onTap: () {},
+                          onTap: () {
+                            final newVal = !isDark;
+                            context.read<AppThemeCubit>().changeTheme(
+                                newVal ? AppTheme.dark : AppTheme.light);
+                            setState(() {
+                              isDarkTheme.value = newVal;
+                            });
+                          },
                         );
-                      }),
-                  customTile(
-                    context,
-                    title: "notifications".translate(context),
-                    svgImagePath: AppIcons.notification,
-                    onTap: () {
-                      UiUtils.checkUser(
-                          onNotGuest: () {
-                            Navigator.pushNamed(
-                                context, Routes.notificationPage);
-                          },
-                          context: context);
-                    },
-                  ),
-                  customTile(
-                    context,
-                    title: "blogs".translate(context),
-                    svgImagePath: AppIcons.articles,
-                    onTap: () {
-                      UiUtils.checkUser(
-                          onNotGuest: () {
-                            Navigator.pushNamed(
-                              context,
-                              Routes.blogsScreenRoute,
-                            );
-                          },
-                          context: context);
-                    },
-                  ),
-                  customTile(
-                    context,
-                    title: "favorites".translate(context),
-                    svgImagePath: AppIcons.favorites,
-                    onTap: () {
-                      UiUtils.checkUser(
-                          onNotGuest: () {
-                            Navigator.pushNamed(
-                                context, Routes.favoritesScreen);
-                          },
-                          context: context);
-                    },
-                  ),
-                  customTile(
-                    context,
-                    title: "faqsLbl".translate(context),
-                    svgImagePath: AppIcons.faqsIcon,
-                    onTap: () {
-                      UiUtils.checkUser(
-                          onNotGuest: () {
-                            Navigator.pushNamed(
-                              context,
-                              Routes.faqsScreen,
-                            );
-                          },
-                          context: context);
-                    },
-                  ),
-                  customTile(
-                    context,
-                    title: "shareApp".translate(context),
-                    svgImagePath: AppIcons.shareApp,
-                    onTap: shareApp,
-                  ),
-                  customTile(
-                    context,
-                    title: "rateUs".translate(context),
-                    svgImagePath: AppIcons.rateUs,
-                    onTap: rateUs,
-                  ),
-                  customTile(
-                    context,
-                    title: "contactUs".translate(context),
-                    svgImagePath: AppIcons.contactUs,
-                    onTap: () {
-                      Navigator.pushNamed(
-                        context,
-                        Routes.contactUs,
-                      );
-                      // Navigator.pushNamed(context, Routes.ab);
-                    },
-                  ),
-                  customTile(
-                    context,
-                    title: "aboutUs".translate(context),
-                    svgImagePath: AppIcons.aboutUs,
-                    onTap: () {
-                      Navigator.pushNamed(context, Routes.profileSettings,
-                          arguments: {
-                            'title': "aboutUs".translate(context),
-                            'param': Api.aboutUs
-                          });
-                      // Navigator.pushNamed(context, Routes.ab);
-                    },
-                  ),
-                  customTile(
-                    context,
-                    title: "termsConditions".translate(context),
-                    svgImagePath: AppIcons.terms,
-                    onTap: () {
-                      Navigator.pushNamed(context, Routes.profileSettings,
-                          arguments: {
-                            'title': "termsConditions".translate(context),
-                            'param': Api.termsAndConditions
-                          });
-                    },
-                  ),
-                  customTile(
-                    context,
-                    title: "privacyPolicy".translate(context),
-                    svgImagePath: AppIcons.privacy,
-                    onTap: () {
-                      Navigator.pushNamed(
-                        context,
-                        Routes.profileSettings,
-                        arguments: {
-                          'title': "privacyPolicy".translate(context),
-                          'param': Api.privacyPolicy
-                        },
-                      );
-                    },
-                  ),
-                  if (Constant.isUpdateAvailable == true) ...[
-                    updateTile(
-                      context,
-                      isUpdateAvailable: Constant.isUpdateAvailable,
-                      title: "update".translate(context),
-                      newVersion: Constant.newVersionNumber,
-                      svgImagePath: AppIcons.update,
-                      onTap: () async {
-                        if (Platform.isIOS) {
-                          await launchUrl(Uri.parse(Constant.appstoreURLios));
-                        } else if (Platform.isAndroid) {
-                          await launchUrl(
-                              Uri.parse(Constant.playstoreURLAndroid));
-                        }
                       },
                     ),
                   ],
-                  if (HiveUtils.isUserAuthenticated()) ...[
+                ),
+
+                // BOX 3: Activity & Commercials
+                _buildCardBox(
+                  children: [
                     customTile(
                       context,
-                      title: "deleteAccount".translate(context),
-                      svgImagePath: AppIcons.delete,
+                      title: "myAds".translate(context).isNotEmpty
+                          ? "myAds".translate(context)
+                          : "My Ads",
+                      iconData: Icons.view_list_rounded,
                       onTap: () {
-                        if (Constant.isDemoModeOn) {
-                          if (HiveUtils.getUserDetails().mobile !=
-                              null) if (Constant
-                                  .demoMobileNumber ==
-                              (HiveUtils.getUserDetails().mobile!.replaceFirst(
-                                  "+${HiveUtils.getCountryCode()}", ""))) {
-                            HelperUtils.showSnackBarMessage(context,
-                                "thisActionNotValidDemo".translate(context));
-                            return;
-                          }
-                        }
-                        deleteConfirmWidget();
+                        APICallTrigger.trigger();
+                        UiUtils.checkUser(
+                          onNotGuest: () {
+                            Navigator.pushNamed(
+                                context, Routes.myAdvertisment,
+                                arguments: {"fromProfile": true});
+                          },
+                          context: context,
+                        );
+                      },
+                    ),
+                    customTile(
+                      context,
+                      title: "favorites".translate(context),
+                      iconData: Icons.favorite_border_rounded,
+                      onTap: () {
+                        UiUtils.checkUser(
+                          onNotGuest: () {
+                            Navigator.pushNamed(context, Routes.favoritesScreen);
+                          },
+                          context: context,
+                        );
+                      },
+                    ),
+                    customTile(
+                      context,
+                      title: "myReview".translate(context).isNotEmpty
+                          ? "myReview".translate(context)
+                          : "My Reviews",
+                      iconData: Icons.rate_review_outlined,
+                      onTap: () {
+                        UiUtils.checkUser(
+                          onNotGuest: () {
+                            Navigator.pushNamed(context, Routes.myReviewsScreen);
+                          },
+                          context: context,
+                        );
+                      },
+                    ),
+                    customTile(
+                      context,
+                      title: "transactionHistory".translate(context).isNotEmpty
+                          ? "transactionHistory".translate(context)
+                          : "Transaction History",
+                      iconData: Icons.receipt_long_outlined,
+                      onTap: () {
+                        UiUtils.checkUser(
+                          onNotGuest: () {
+                            Navigator.pushNamed(
+                                context, Routes.transactionHistory);
+                          },
+                          context: context,
+                        );
                       },
                     ),
                   ],
-                  if (_appVersion.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Center(
-                      child: Text(
-                        "${Constant.appName} $_appVersion",
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: context.color.textDefaultColor
-                              .withValues(alpha: 0.45),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                ),
+
+                // BOX 4: Support & Test Tools
+                _buildCardBox(
+                  children: [
+                    customTile(
+                      context,
+                      title: "blogs".translate(context),
+                      iconData: Icons.article_outlined,
+                      onTap: () {
+                        UiUtils.checkUser(
+                          onNotGuest: () {
+                            Navigator.pushNamed(context, Routes.blogsScreenRoute);
+                          },
+                          context: context,
+                        );
+                      },
+                    ),
+                    customTile(
+                      context,
+                      title: "faqsLbl".translate(context),
+                      iconData: Icons.help_outline_rounded,
+                      onTap: () {
+                        UiUtils.checkUser(
+                          onNotGuest: () {
+                            Navigator.pushNamed(context, Routes.faqsScreen);
+                          },
+                          context: context,
+                        );
+                      },
+                    ),
+                    customTile(
+                      context,
+                      title: "contactUs".translate(context),
+                      iconData: Icons.headset_mic_outlined,
+                      onTap: () {
+                        Navigator.pushNamed(context, Routes.contactUs);
+                      },
+                    ),
+                    customTile(
+                      context,
+                      title: "Test get-home-categories API",
+                      iconData: Icons.category_rounded,
+                      color: Colors.indigo.shade700,
+                      onTap: () {
+                        _testHomeCategoriesApi();
+                      },
                     ),
                   ],
-                  const SizedBox(
-                    height: 20,
-                  )
-                ],
-              ),
+                ),
 
-              // profileInfo(),
-              // Expanded(
-              //   child: profileMenus(),
-              // )
-            ]),
+                // BOX 5: Legal & About
+                _buildCardBox(
+                  children: [
+                    customTile(
+                      context,
+                      title: "aboutUs".translate(context),
+                      iconData: Icons.info_outline_rounded,
+                      onTap: () {
+                        Navigator.pushNamed(context, Routes.profileSettings, arguments: {
+                          'title': "aboutUs".translate(context),
+                          'param': Api.aboutUs,
+                        });
+                      },
+                    ),
+                    customTile(
+                      context,
+                      title: "termsConditions".translate(context),
+                      iconData: Icons.description_outlined,
+                      onTap: () {
+                        Navigator.pushNamed(context, Routes.profileSettings, arguments: {
+                          'title': "termsConditions".translate(context),
+                          'param': Api.termsAndConditions,
+                        });
+                      },
+                    ),
+                    customTile(
+                      context,
+                      title: "privacyPolicy".translate(context),
+                      iconData: Icons.privacy_tip_outlined,
+                      onTap: () {
+                        Navigator.pushNamed(context, Routes.profileSettings, arguments: {
+                          'title': "privacyPolicy".translate(context),
+                          'param': Api.privacyPolicy,
+                        });
+                      },
+                    ),
+                    customTile(
+                      context,
+                      title: "shareApp".translate(context),
+                      iconData: Icons.share_outlined,
+                      onTap: shareApp,
+                    ),
+                    customTile(
+                      context,
+                      title: "rateUs".translate(context),
+                      iconData: Icons.star_outline_rounded,
+                      onTap: rateUs,
+                    ),
+                    if (Constant.isUpdateAvailable == true)
+                      updateTile(
+                        context,
+                        isUpdateAvailable: Constant.isUpdateAvailable,
+                        title: "update".translate(context),
+                        newVersion: Constant.newVersionNumber,
+                        svgImagePath: AppIcons.update,
+                        onTap: () async {
+                          if (Platform.isIOS) {
+                            await launchUrl(Uri.parse(Constant.appstoreURLios));
+                          } else if (Platform.isAndroid) {
+                            await launchUrl(Uri.parse(Constant.playstoreURLAndroid));
+                          }
+                        },
+                      ),
+                  ],
+                ),
+
+                // BOX 6: Account Actions (Logout / Delete)
+                if (HiveUtils.isUserAuthenticated())
+                  _buildCardBox(
+                    children: [
+                      customTile(
+                        context,
+                        title: "deleteAccount".translate(context),
+                        iconData: Icons.delete_outline_rounded,
+                        color: Colors.red,
+                        onTap: () {
+                          if (Constant.isDemoModeOn) {
+                            if (HiveUtils.getUserDetails().mobile != null &&
+                                Constant.demoMobileNumber ==
+                                    (HiveUtils.getUserDetails().mobile!.replaceFirst(
+                                        "+${HiveUtils.getCountryCode()}", ""))) {
+                              HelperUtils.showSnackBarMessage(context,
+                                  "thisActionNotValidDemo".translate(context));
+                              return;
+                            }
+                          }
+                          deleteConfirmWidget();
+                        },
+                      ),
+                      customTile(
+                        context,
+                        title: "logout".translate(context),
+                        iconData: Icons.logout_rounded,
+                        color: Colors.red,
+                        onTap: () {
+                          logOutConfirmWidget();
+                        },
+                      ),
+                    ],
+                  ),
+                if (_appVersion.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Text(
+                      "Build Version - $_appVersion",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.color.textLightColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
-
-/*  Padding dividerWithSpacing() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10.0),
-      child: UiUtils.getDivider(),
-    );
-  }*/
 
   Widget updateTile(BuildContext context,
       {required String title,
@@ -1006,249 +1308,161 @@ class _ProfileScreenState extends State<ProfileScreen>
       Function(dynamic value)? onTapSwitch,
       dynamic switchValue,
       required VoidCallback onTap}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 25.0),
-      child: GestureDetector(
-        onTap: () {
-          if (isUpdateAvailable) {
-            onTap.call();
-          }
-        },
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: context.color.territoryColor
-                    .withValues(alpha: 0.10000000149011612),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: FittedBox(
-                  fit: BoxFit.none,
-                  child: isUpdateAvailable == false
-                      ? const Icon(Icons.done)
-                      : UiUtils.getSvg(svgImagePath,
-                          color: context.color.territoryColor)),
-            ),
-            SizedBox(
-              width: 25.rw(context),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      children: [
+        InkWell(
+          onTap: () {
+            if (isUpdateAvailable) {
+              onTap.call();
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 13.0),
+            child: Row(
               children: [
-                Text(isUpdateAvailable == false
-                        ? "uptoDate".translate(context)
-                        : title)
-                    .bold(weight: FontWeight.w700)
-                    .color(context.color.textColorDark),
-                if (isUpdateAvailable)
-                  Text("v$newVersion")
-                      .bold(weight: FontWeight.w300)
-                      .color(context.color.textColorDark)
-                      .size(context.font.small)
-                      .italic()
-              ],
-            ),
-            if (isUpdateAvailable) ...[
-              const Spacer(),
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  border:
-                      Border.all(color: context.color.borderColor, width: 1.5),
-                  color: context.color.secondaryColor
-                      .withValues(alpha: 0.10000000149011612),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: FittedBox(
-                  fit: BoxFit.none,
-                  child: SizedBox(
-                    width: 8,
-                    height: 15,
-                    child: UiUtils.getSvg(
-                      AppIcons.arrowRight,
+                UiUtils.getSvg(svgImagePath,
+                    height: 20,
+                    width: 20,
+                    color: context.color.territoryColor),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    isUpdateAvailable == false ? "uptoDate".translate(context) : title,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w500,
                       color: context.color.textColorDark,
                     ),
                   ),
                 ),
-              ),
-            ]
-          ],
-        ),
-      ),
-    );
-  }
-
-//eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL3Rlc3Ricm9rZXJodWIud3J0ZWFtLmluL2FwaS91c2VyX3NpZ251cCIsImlhdCI6MTY5Njg1MDQyNCwibmJmIjoxNjk2ODUwNDI0LCJqdGkiOiJxVTNpY1FsRFN3MVJ1T3M5Iiwic3ViIjoiMzg4IiwicHJ2IjoiMWQwYTAyMGFjZjVjNGI2YzQ5Nzk4OWRmMWFiZjBmYmQ0ZThjOGQ2MyIsImN1c3RvbWVyX2lkIjozODh9.Y8sQhZtz6xGROEMvrTwA6gSSfPK-YwuhwDDc7Yahfg4
-  Widget customTile(BuildContext context,
-      {required String title,
-      required String svgImagePath,
-      bool? isSwitchBox,
-      Function(dynamic value)? onTapSwitch,
-      dynamic switchValue,
-      required VoidCallback onTap}) {
-    return Container(
-      height: 60,
-      margin: const EdgeInsets.only(top: 0.5, bottom: 3),
-      decoration: BoxDecoration(
-        /*border: Border.all(
-          width: 1.5,
-          color: context.color.borderColor,
-        ),*/
-        color: context.color.secondaryColor,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 25.0),
-        child: GestureDetector(
-          onTap: onTap,
-          child: AbsorbPointer(
-            absorbing: !(isSwitchBox ?? false),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: context.color.territoryColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: FittedBox(
-                      fit: BoxFit.none,
-                      child: UiUtils.getSvg(svgImagePath,
-                          height: 24,
-                          width: 24,
-                          color: context.color.territoryColor
-                          )),
+                if (isUpdateAvailable)
+                  Text("v$newVersion", style: TextStyle(color: context.color.textLightColor, fontSize: 13)),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 13,
+                  color: context.color.textLightColor,
                 ),
-                SizedBox(
-                  width: 25.rw(context),
-                ),
-                Expanded(
-                  flex: 3,
-                  child: Text(title)
-                      .bold(weight: FontWeight.w700)
-                      .color(context.color.textColorDark),
-                ),
-                const Spacer(),
-                if (isSwitchBox != true)
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: context.color.backgroundColor,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: FittedBox(
-                      fit: BoxFit.none,
-                      child: SizedBox(
-                        width: 8,
-                        height: 15,
-                        child: Directionality(
-                          textDirection: Directionality.of(context),
-                          child: RotatedBox(
-                            quarterTurns: Directionality.of(context) ==
-                                    ui.TextDirection.rtl
-                                ? 2
-                                : -4,
-                            child: UiUtils.getSvg(
-                              AppIcons.arrowRight,
-                              color: context.color.textColorDark,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                if (isSwitchBox ?? false)
-                  // CupertinoSwitch(value: value, onChanged: onChanged)
-                  SizedBox(
-                    height: 40,
-                    width: 30,
-                    child: CupertinoSwitch(
-                      activeColor: context.color.territoryColor,
-                      value: switchValue ?? false,
-                      onChanged: (value) {
-                        onTapSwitch?.call(value);
-                      },
-                    ),
-                  )
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget bulletPoint(String text) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("• "),
-        SizedBox(width: 3),
-        Expanded(
-          child: Text(
-            text,
-            textAlign: TextAlign.left,
-          ),
+        Divider(
+          height: 1,
+          thickness: 0.8,
+          color: context.color.borderColor.withValues(alpha: 0.35),
         ),
       ],
     );
   }
 
   deleteConfirmWidget() {
-    UiUtils.showBlurredDialoge(
-      context,
-      dialoge: BlurredDialogBox(
-        title: (_auth.currentUser != null)
-            ? "deleteProfileMessageTitle".translate(context)
-            : "deleteAlertTitle".translate(context),
-        content: _auth.currentUser != null
-            ? Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  bulletPoint("yourAdsAndTransactionDelete".translate(context)),
-                  bulletPoint("accDetailsCanNotRecovered".translate(context)),
-                  bulletPoint("subscriptionsCancelled".translate(context)),
-                  bulletPoint(
-                      "savedPreferencesAndMessagesLost".translate(context)),
-                ],
-              )
-            : Text("deleteRelogin".translate(context),
-                textAlign: TextAlign.center),
-        cancelButtonName: (_auth.currentUser != null)
-            ? 'no'.translate(context)
-            : 'cancelLbl'.translate(context),
-        acceptButtonName: (_auth.currentUser != null)
-            ? "deleteBtnLbl".translate(context)
-            : 'logout'.translate(context),
-        cancelTextColor: context.color.textColorDark,
-        svgImagePath: AppIcons.deleteIcon,
-        isAcceptContainesPush: true,
-        onAccept: () async {
-          (_auth.currentUser != null)
-              ? proceedToDeleteProfile()
-              : askToLoginAgain();
-          /*Navigator.of(context).pop();
-          if (callDel) {
-            Future.delayed(
-              const Duration(microseconds: 100),
-                  () {
-                Navigator.pushNamed(context, Routes.login,
-                    arguments: {"isDeleteAccount": true});
-              },
-            );
-          } else {
-            HiveUtils.logoutUser(
-              context,
-              onLogout: () {},
-            );
-          }*/
-        },
-      ),
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          backgroundColor: context.color.secondaryColor,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: Padding(
+            padding: const EdgeInsets.all(22.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.delete_forever_rounded,
+                      color: Colors.red,
+                      size: 30,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "deleteProfileMessageTitle".translate(context),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: context.color.textDefaultColor,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  "This action is permanent and cannot be undone. All your ads, messages, saved preferences, and account history will be permanently deleted.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: context.color.textLightColor,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: BorderSide(
+                            color: context.color.borderColor.withValues(alpha: 0.8),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        onPressed: () => Navigator.pop(dialogContext),
+                        child: Text(
+                          "cancelLbl".translate(context),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: context.color.textDefaultColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        onPressed: () async {
+                          Navigator.pop(dialogContext);
+                          (_auth.currentUser != null)
+                              ? proceedToDeleteProfile()
+                              : askToLoginAgain();
+                        },
+                        child: Text(
+                          "deleteBtnLbl".translate(context),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

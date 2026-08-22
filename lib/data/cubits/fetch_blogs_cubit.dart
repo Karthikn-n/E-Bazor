@@ -2,6 +2,7 @@ import 'package:Ebozor/data/model/blog_model.dart';
 import 'package:Ebozor/data/model/data_output.dart';
 import 'package:Ebozor/data/repositories/blogs_repository.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+
 abstract class FetchBlogsState {}
 
 class FetchBlogsInitial extends FetchBlogsState {}
@@ -14,6 +15,7 @@ class FetchBlogsSuccess extends FetchBlogsState {
   final List<BlogModel> blogModel;
   final int page;
   final int total;
+  final String? activeTag;
 
   FetchBlogsSuccess({
     required this.isLoadingMore,
@@ -21,6 +23,7 @@ class FetchBlogsSuccess extends FetchBlogsState {
     required this.blogModel,
     required this.page,
     required this.total,
+    this.activeTag,
   });
 
   FetchBlogsSuccess copyWith({
@@ -29,6 +32,7 @@ class FetchBlogsSuccess extends FetchBlogsState {
     List<BlogModel>? blogModel,
     int? page,
     int? total,
+    String? activeTag,
   }) {
     return FetchBlogsSuccess(
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
@@ -36,6 +40,7 @@ class FetchBlogsSuccess extends FetchBlogsState {
       blogModel: blogModel ?? this.blogModel,
       page: page ?? this.page,
       total: total ?? this.total,
+      activeTag: activeTag ?? this.activeTag,
     );
   }
 }
@@ -50,27 +55,35 @@ class FetchBlogsCubit extends Cubit<FetchBlogsState> {
   FetchBlogsCubit() : super(FetchBlogsInitial());
 
   final BlogsRepository _blogRepository = BlogsRepository();
+  String? _currentTag;
 
-  Future<void> fetchBlogs() async {
+  Future<void> fetchBlogs({String? tag, String? categoryId}) async {
     try {
+      _currentTag = tag;
       emit(FetchBlogsInProgress());
 
-      DataOutput<BlogModel> result = await _blogRepository.fetchBlogs(page: 1);
+      DataOutput<BlogModel> result = await _blogRepository.fetchBlogs(
+        page: 1,
+        tag: tag,
+        categoryId: categoryId,
+      );
 
       emit(
         FetchBlogsSuccess(
-            isLoadingMore: false,
-            loadingMoreError: false,
-            blogModel: result.modelList,
-            page: 1,
-            total: result.total),
+          isLoadingMore: false,
+          loadingMoreError: false,
+          blogModel: result.modelList,
+          page: 1,
+          total: result.total,
+          activeTag: tag,
+        ),
       );
     } catch (e) {
       emit(FetchBlogsFailure(e));
     }
   }
 
-  Future<void> fetchBlogsMore() async {
+  Future<void> fetchBlogsMore({String? categoryId}) async {
     try {
       if (state is FetchBlogsSuccess) {
         if ((state as FetchBlogsSuccess).isLoadingMore) {
@@ -81,16 +94,20 @@ class FetchBlogsCubit extends Cubit<FetchBlogsState> {
 
         DataOutput<BlogModel> result = await _blogRepository.fetchBlogs(
           page: (state as FetchBlogsSuccess).page + 1,
+          tag: _currentTag,
+          categoryId: categoryId,
         );
 
         FetchBlogsSuccess blogModelState = (state as FetchBlogsSuccess);
         blogModelState.blogModel.addAll(result.modelList);
         emit(FetchBlogsSuccess(
-            isLoadingMore: false,
-            loadingMoreError: false,
-            blogModel: blogModelState.blogModel,
-            page: (state as FetchBlogsSuccess).page + 1,
-            total: result.total));
+          isLoadingMore: false,
+          loadingMoreError: false,
+          blogModel: blogModelState.blogModel,
+          page: (state as FetchBlogsSuccess).page + 1,
+          total: result.total,
+          activeTag: _currentTag,
+        ));
       }
     } catch (e) {
       emit((state as FetchBlogsSuccess)

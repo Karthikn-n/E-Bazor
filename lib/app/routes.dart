@@ -14,6 +14,15 @@ import 'package:Ebozor/ui/screens/chat/blocked_user_list_screen.dart';
 import 'package:Ebozor/ui/screens/favorite_screen.dart';
 
 import 'package:Ebozor/ui/screens/item/add_item_screen/add_item_details.dart';
+import 'package:Ebozor/ui/screens/item/add_item_screen/cars/car_specs_form_screen.dart';
+import 'package:Ebozor/ui/screens/item/add_item_screen/cars/car_posting_details_screen.dart';
+import 'package:Ebozor/ui/screens/item/add_item_screen/cars/car_package_payment_screen.dart';
+import 'package:Ebozor/ui/screens/item/add_item_screen/motors/motor_posting_form_screen.dart';
+import 'package:Ebozor/ui/screens/item/add_item_screen/common_title_input_screen.dart';
+import 'package:Ebozor/ui/screens/item/add_item_screen/property/property_posting_form_screen.dart';
+import 'package:Ebozor/ui/screens/item/add_item_screen/classifieds/classifieds_posting_form_screen.dart';
+import 'package:Ebozor/ui/screens/location/user_address_list_screen.dart';
+import 'package:Ebozor/ui/screens/location/location_details_form_screen.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/confirm_location_screen.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/more_details.dart';
 import 'package:Ebozor/ui/screens/item/items_list.dart';
@@ -44,7 +53,9 @@ import 'package:Ebozor/ui/screens/item/add_item_screen/select_category.dart';
 import 'package:Ebozor/ui/screens/item/my_items_screen.dart';
 
 import 'package:Ebozor/ui/screens/location/areas_screen.dart';
+import 'package:Ebozor/ui/screens/location/location_map_screen.dart';
 import 'package:Ebozor/ui/screens/location/nearby_location.dart';
+import 'package:Ebozor/ui/screens/location/select_location_screen.dart';
 import 'package:Ebozor/ui/screens/onboarding/onboarding_screen.dart';
 
 import 'package:Ebozor/ui/screens/seller/seller_intro_verification.dart';
@@ -115,6 +126,8 @@ class Routes {
   static const locationPermissionScreen = '/locationPermissionScreen';
   static const sellerProfileScreen = '/sellerProfileScreen';
   static const nearbyLocationScreen = '/nearbyLocationScreen';
+  static const selectLocationScreen = '/selectLocationScreen';
+  static const locationMapScreen = '/locationMapScreen';
 
   static const myAdvertisment = '/myAdvertisment';
   static const transactionHistory = '/transactionHistory';
@@ -146,6 +159,15 @@ class Routes {
   static const addItemDetails = '/addItemDetails';
   static const addMoreDetailsScreen = '/addMoreDetailsScreen';
   static const confirmLocationScreen = '/confirmLocationScreen';
+  static const carSpecsFormScreen = '/carSpecsFormScreen';
+  static const carPostingDetailsScreen = '/carPostingDetailsScreen';
+  static const carPackagePaymentScreen = '/carPackagePaymentScreen';
+  static const motorPostingFormScreen = '/motorPostingFormScreen';
+  static const commonTitleInputScreen = '/commonTitleInputScreen';
+  static const propertyPostingFormScreen = '/propertyPostingFormScreen';
+  static const classifiedsPostingFormScreen = '/classifiedsPostingFormScreen';
+  static const userAddressListScreen = '/userAddressListScreen';
+  static const locationDetailsFormScreen = '/locationDetailsFormScreen';
   static const sectionWiseItemsScreen = '/sectionWiseItemsScreen';
   static const blockedUserListScreen = '/blockedUserListScreen';
   static const payStackWebViewScreen = '/payStackWebViewScreen';
@@ -309,10 +331,33 @@ class Routes {
         return SellerVerificationCompleteScreen.route(routeSettings);
       case nearbyLocationScreen:
         return NearbyLocationScreen.route(routeSettings);
+      case selectLocationScreen:
+        return SelectLocationScreen.route(routeSettings);
+      case locationMapScreen:
+        return LocationMapScreen.route(routeSettings);
       case myReviewsScreen:
         return MyReviewScreen.route(routeSettings);
       case filterpage:
         return FiltersPage.route(routeSettings);
+      case carSpecsFormScreen:
+        return CarSpecsFormScreen.route(routeSettings);
+      case carPostingDetailsScreen:
+        return CarPostingDetailsScreen.route(routeSettings);
+      case carPackagePaymentScreen:
+        return CarPackagePaymentScreen.route(routeSettings);
+      case motorPostingFormScreen:
+        return MotorPostingFormScreen.route(routeSettings);
+      case commonTitleInputScreen:
+        return CommonTitleInputScreen.route(routeSettings);
+      case propertyPostingFormScreen:
+        return PropertyPostingFormScreen.route(routeSettings);
+      case classifiedsPostingFormScreen:
+        return ClassifiedsPostingFormScreen.route(routeSettings);
+      case userAddressListScreen:
+      case addresses:
+        return UserAddressListScreen.route(routeSettings);
+      case locationDetailsFormScreen:
+        return LocationDetailsFormScreen.route(routeSettings);
 
       /*case payStackWebViewScreen:
         return PaystackWebView.route(routeSettings);*/

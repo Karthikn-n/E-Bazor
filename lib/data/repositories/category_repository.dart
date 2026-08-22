@@ -56,31 +56,45 @@ class CategoryRepository {
   Future<DataOutput<CategoryModel>> fetchCategories({
     required int page,
     int? categoryId,
-  }) async
-  {
+  }) async {
     try {
-      Map<String, dynamic> parameters = {
-        Api.page: page,
-      };
+      String apiUrl;
+      Map<String, dynamic> parameters = {};
 
       if (categoryId != null) {
-        parameters[Api.categoryId] = categoryId;
+        apiUrl = Api.getCategoryChildrenByParentApi;
+        parameters['parent_category_id'] = categoryId;
+      } else {
+        apiUrl = Api.getFrontCategoriesApi;
+        parameters[Api.page] = page;
       }
 
       Map<String, dynamic> response = await Api.get(
-        url: Api.getCategoriesApi,
+        url: apiUrl,
         queryParameters: parameters,
       );
 
-      print("FULL API RESPONSE 👉 $response");
+      print("FULL API RESPONSE ($apiUrl) 👉 $response");
 
-      /// ✅ FIX: data is List
-      List list = response['data'];
+      List rawList = [];
+      if (response['data'] is List) {
+        rawList = response['data'];
+      } else if (response['data'] is Map) {
+        final dataMap = response['data'] as Map;
+        if (dataMap['data'] is List) {
+          rawList = dataMap['data'];
+        } else if (dataMap['subcategories'] is List) {
+          rawList = dataMap['subcategories'];
+        } else {
+          rawList = [dataMap];
+        }
+      }
 
-      print("📦 LIST LENGTH 👉 ${list.length}");
+      List<CategoryModel> modelList = rawList
+          .map((e) => CategoryModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
 
-      List<CategoryModel> modelList =
-      list.map((e) => CategoryModel.fromJson(e)).toList();
+      print("📦 CATEGORIES COUNT FOR $apiUrl (parent_category_id: $categoryId) 👉 ${modelList.length}");
 
       return DataOutput(
         total: modelList.length,
@@ -92,10 +106,99 @@ class CategoryRepository {
     }
   }
 
+  static List<CategoryModel> _extractFrontCategories(List<CategoryModel> categories) {
+    List<CategoryModel> frontList = [];
+    Set<int> seenIds = {};
 
+    void traverse(CategoryModel cat) {
+      if (cat.frontList == true && cat.id != null && !seenIds.contains(cat.id!)) {
+        seenIds.add(cat.id!);
+        frontList.add(cat);
+      }
+      if (cat.children != null) {
+        for (var child in cat.children!) {
+          traverse(child);
+        }
+      }
+    }
 
+    for (var cat in categories) {
+      traverse(cat);
+    }
 
+    const preferredOrder = [
+      65,  // Property for Rent
+      68,  // Rooms For Rent
+      139, // Property for Sale
+      143, // Off-Plan
+      219, // Furniture Home & Garden
+      220, // Mobile Phones & Tablets
+      1,   // Motors
+      2,   // Classifieds
+      4,   // Jobs
+    ];
 
+    frontList.sort((a, b) {
+      int ia = preferredOrder.indexOf(a.id ?? -1);
+      int ib = preferredOrder.indexOf(b.id ?? -1);
+      if (ia != -1 && ib != -1) return ia.compareTo(ib);
+      if (ia != -1) return -1;
+      if (ib != -1) return 1;
+      return 0;
+    });
+
+    return frontList;
+  }
+
+  Future<List<CategoryModel>> fetchCategoryChildrenByParent({
+    int? parentId,
+    String? slug,
+    String? title,
+  }) async {
+    try {
+      Map<String, dynamic> parameters = {};
+      if (parentId != null) {
+        parameters['parent_category_id'] = parentId;
+      }
+      if (slug != null && slug.isNotEmpty) {
+        parameters['category_slug'] = slug;
+      }
+      if (title != null && title.isNotEmpty) {
+        parameters['title'] = title;
+      }
+      Map<String, dynamic> response = await Api.get(
+        url: Api.getCategoryChildrenByParentApi,
+        queryParameters: parameters,
+      );
+
+      if (response['data'] is List) {
+        List list = response['data'];
+        return list.map((e) => CategoryModel.fromJson(e)).toList();
+      }
+      return [];
+    } catch (e) {
+      print("❌ ERROR IN fetchCategoryChildrenByParent 👉 $e");
+      return [];
+    }
+  }
+   /// GET /api/get-category-tree-by-slug
+  Future<dynamic> fetchCategoryTreeBySlug({required String categorySlug}) async {
+    try {
+      Map<String, dynamic> parameters = {
+        'category_slug': categorySlug,
+      };
+      log("🌐 [REQ] → GET ${Api.getCategoryTreeBySlugApi} | params: $parameters");
+      Map<String, dynamic> response = await Api.get(
+        url: Api.getCategoryTreeBySlugApi,
+        queryParameters: parameters,
+      );
+      log("📦 [CATEGORY TREE BY SLUG RES] 👉 $response");
+      return response['data'];
+    } catch (e) {
+      log("❌ [CATEGORY TREE BY SLUG ERR] 👉 $e");
+      rethrow;
+    }
+  }
 }
 
 class FilterRepository {

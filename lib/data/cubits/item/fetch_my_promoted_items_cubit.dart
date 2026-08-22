@@ -48,16 +48,24 @@ class FetchMyPromotedItemsFailure extends FetchMyPromotedItemsState {
 }
 
 class FetchMyPromotedItemsCubit extends Cubit<FetchMyPromotedItemsState> {
-  FetchMyPromotedItemsCubit() : super(FetchMyPromotedItemsInitial());
+  static FetchMyPromotedItemsCubit? globalInstance;
+
+  FetchMyPromotedItemsCubit() : super(FetchMyPromotedItemsInitial()) {
+    globalInstance = this;
+  }
 
   final ItemRepository _itemRepository = ItemRepository();
+  String? _currentStatus;
 
-  Future<void> fetchMyPromotedItems() async {
+  Future<void> fetchMyPromotedItems({String? status}) async {
     try {
+      _currentStatus = status;
       emit(FetchMyPromotedItemsInProgress());
 
-      DataOutput<ItemModel> result =
-          await _itemRepository.fetchMyFeaturedItems(page: 1);
+      DataOutput<ItemModel> result = await _itemRepository.fetchMyItems(
+        getItemsWithStatus: (status != null && status.isNotEmpty) ? status : null,
+        page: 1,
+      );
 
       emit(
         FetchMyPromotedItemsSuccess(
@@ -73,10 +81,23 @@ class FetchMyPromotedItemsCubit extends Cubit<FetchMyPromotedItemsState> {
     }
   }
 
+  void addItem(ItemModel item) {
+    if (state is FetchMyPromotedItemsSuccess) {
+      List<ItemModel> itemModel =
+          List<ItemModel>.from((state as FetchMyPromotedItemsSuccess).itemModel);
+      itemModel.insert(0, item);
+
+      emit((state as FetchMyPromotedItemsSuccess).copyWith(
+        itemModel: itemModel,
+        total: (state as FetchMyPromotedItemsSuccess).total + 1,
+      ));
+    }
+  }
+
   void delete(dynamic id) {
     if (state is FetchMyPromotedItemsSuccess) {
       List<ItemModel> itemModel =
-          (state as FetchMyPromotedItemsSuccess).itemModel;
+          List<ItemModel>.from((state as FetchMyPromotedItemsSuccess).itemModel);
       itemModel.removeWhere((element) => element.id == id);
 
       emit((state as FetchMyPromotedItemsSuccess)
@@ -84,7 +105,7 @@ class FetchMyPromotedItemsCubit extends Cubit<FetchMyPromotedItemsState> {
     }
   }
 
-  Future<void> fetchMyPromotedItemsMore() async {
+  Future<void> fetchMyPromotedItemsMore({String? status}) async {
     try {
       if (state is FetchMyPromotedItemsSuccess) {
         if ((state as FetchMyPromotedItemsSuccess).isLoadingMore) {
@@ -92,18 +113,21 @@ class FetchMyPromotedItemsCubit extends Cubit<FetchMyPromotedItemsState> {
         }
         emit((state as FetchMyPromotedItemsSuccess)
             .copyWith(isLoadingMore: true));
-        DataOutput<ItemModel> result =
-            await _itemRepository.fetchMyFeaturedItems(
+        DataOutput<ItemModel> result = await _itemRepository.fetchMyItems(
+          getItemsWithStatus: (status != null && status.isNotEmpty)
+              ? status
+              : _currentStatus,
           page: (state as FetchMyPromotedItemsSuccess).page + 1,
         );
 
         FetchMyPromotedItemsSuccess itemModelState =
             (state as FetchMyPromotedItemsSuccess);
-        itemModelState.itemModel.addAll(result.modelList);
+        List<ItemModel> updatedList = List<ItemModel>.from(itemModelState.itemModel)
+          ..addAll(result.modelList);
         emit(FetchMyPromotedItemsSuccess(
             isLoadingMore: false,
             loadingMoreError: false,
-            itemModel: itemModelState.itemModel,
+            itemModel: updatedList,
             page: (state as FetchMyPromotedItemsSuccess).page + 1,
             total: result.total));
       }
@@ -123,7 +147,8 @@ class FetchMyPromotedItemsCubit extends Cubit<FetchMyPromotedItemsState> {
 
   void update(ItemModel model) {
     if (state is FetchMyPromotedItemsSuccess) {
-      List<ItemModel> items = (state as FetchMyPromotedItemsSuccess).itemModel;
+      List<ItemModel> items =
+          List<ItemModel>.from((state as FetchMyPromotedItemsSuccess).itemModel);
 
       var index = items.indexWhere((element) => element.id == model.id);
       if (index != -1) {

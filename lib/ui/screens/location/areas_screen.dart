@@ -1,30 +1,18 @@
 import 'dart:async';
-import 'package:Ebozor/app/app_theme.dart';
-import 'package:Ebozor/app/routes.dart';
-import 'package:Ebozor/data/cubits/location/fetch_areas_cubit.dart';
-import 'package:Ebozor/data/cubits/system/app_theme_cubit.dart';
-import 'package:Ebozor/data/model/location/areaModel.dart';
-import 'package:Ebozor/ui/theme/theme.dart';
-import 'package:Ebozor/utils/constant.dart';
-import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shimmer/shimmer.dart';
-import 'package:Ebozor/utils/ApiService/api.dart';
-import 'package:Ebozor/utils/helper_utils.dart';
-import 'package:Ebozor/data/cubits/home/fetch_home_all_items_cubit.dart';
-import 'package:Ebozor/data/cubits/home/fetch_home_screen_cubit.dart';
 
-import 'package:Ebozor/ui/screens/widgets/errors/no_data_found.dart';
-import 'package:Ebozor/ui/screens/widgets/errors/no_internet.dart';
-import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
-import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
-import 'package:Ebozor/utils/app_icon.dart';
-import 'package:Ebozor/utils/extensions/extensions.dart';
-import 'package:Ebozor/utils/responsiveSize.dart';
-import 'package:flutter/material.dart';
-import 'package:Ebozor/utils/ui_utils.dart';
+import 'package:Ebozor/data/cubits/location/fetch_areas_cubit.dart';
+import 'package:Ebozor/data/model/location/areaModel.dart';
 import 'package:Ebozor/ui/screens/location/location_map_screen.dart';
+import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
+import 'package:Ebozor/ui/screens/widgets/errors/no_internet.dart';
+import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
+import 'package:Ebozor/ui/screens/widgets/shimmerLoadingContainer.dart';
+import 'package:Ebozor/ui/theme/theme.dart';
+import 'package:Ebozor/utils/ApiService/api.dart';
+import 'package:Ebozor/utils/extensions/extensions.dart';
+import 'package:Ebozor/utils/ui_utils.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class AreasScreen extends StatefulWidget {
   final int cityId;
@@ -51,16 +39,21 @@ class AreasScreen extends StatefulWidget {
 
     return BlurredRouter(
       builder: (context) => BlocProvider(
-          create: (context) => FetchAreasCubit(),
-          child: AreasScreen(
-            cityId: arguments?['cityId'],
-            cityName: arguments?['cityName'],
-            countryName: arguments?['countryName'],
-            stateName: arguments?['stateName'],
-            from: arguments?['from'],
-            latitude: arguments?['latitude'],
-            longitude: arguments?['longitude'],
-          )),
+        create: (context) => FetchAreasCubit(),
+        child: AreasScreen(
+          cityId: arguments?['cityId'] ?? 0,
+          cityName: arguments?['cityName'] ?? "",
+          countryName: arguments?['countryName'] ?? "",
+          stateName: arguments?['stateName'] ?? "",
+          from: arguments?['from'] ?? "",
+          latitude: (arguments?['latitude'] is num)
+              ? (arguments?['latitude'] as num).toDouble()
+              : 0.0,
+          longitude: (arguments?['longitude'] is num)
+              ? (arguments?['longitude'] as num).toDouble()
+              : 0.0,
+        ),
+      ),
     );
   }
 
@@ -69,398 +62,408 @@ class AreasScreen extends StatefulWidget {
 }
 
 class AreasScreenState extends State<AreasScreen> {
-  bool isFocused = false;
-  String previousSearchQuery = "";
-  TextEditingController searchController = TextEditingController(text: null);
+  final TextEditingController searchController = TextEditingController();
+  final FocusNode searchFocusNode = FocusNode();
   final ScrollController controller = ScrollController();
   Timer? _searchDelay;
+  String previousSearchQuery = "";
   AreaModel? selectedArea;
 
   @override
   void initState() {
     super.initState();
-    context
-        .read<FetchAreasCubit>()
-        .fetchAreas(search: searchController.text, cityId: widget.cityId);
-    searchController = TextEditingController();
-
-    searchController.addListener(searchItemListener);
-    controller.addListener(pageScrollListen);
+    context.read<FetchAreasCubit>().fetchAreas(
+          search: "",
+          cityId: widget.cityId,
+        );
+    controller.addListener(_pageScrollListen);
   }
 
-  void pageScrollListen() {
+  @override
+  void dispose() {
+    _searchDelay?.cancel();
+    searchController.dispose();
+    searchFocusNode.dispose();
+    controller.dispose();
+    super.dispose();
+  }
+
+  void _pageScrollListen() {
     if (controller.isEndReached()) {
       if (context.read<FetchAreasCubit>().hasMoreData()) {
-        context.read<FetchAreasCubit>().fetchAreasMore(cityId: widget.cityId);
+        context.read<FetchAreasCubit>().fetchAreasMore(
+              cityId: widget.cityId,
+            );
       }
     }
   }
 
-//this will listen and manage search
-  void searchItemListener() {
+  void _onSearchChanged(String query) {
     _searchDelay?.cancel();
-    searchCallAfterDelay();
+    _searchDelay = Timer(const Duration(milliseconds: 350), () {
+      final trimmed = query.trim();
+      if (previousSearchQuery != trimmed) {
+        context.read<FetchAreasCubit>().fetchAreas(
+              search: trimmed,
+              cityId: widget.cityId,
+            );
+        previousSearchQuery = trimmed;
+        setState(() {});
+      }
+    });
     setState(() {});
   }
 
-//This will create delay so we don't face rapid api call
-  void searchCallAfterDelay() {
-    _searchDelay = Timer(const Duration(milliseconds: 500), itemSearch);
-  }
-
-  ///This will call api after some delay
-  void itemSearch() {
-    // if (searchController.text.isNotEmpty) {
-    if (previousSearchQuery != searchController.text) {
-      context
-          .read<FetchAreasCubit>()
-          .fetchAreas(search: searchController.text, cityId: widget.cityId);
-      previousSearchQuery = searchController.text;
-      setState(() {});
-    }
-    // } else {
-    // context.read<SearchItemCubit>().clearSearch();
-    // }
-  }
-
-  PreferredSizeWidget appBarWidget() {
+  PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      systemOverlayStyle:
-          SystemUiOverlayStyle(statusBarColor: context.color.backgroundColor),
-      bottom: PreferredSize(
-          preferredSize: Size.fromHeight(58.rh(context)),
-          child: Container(
-              width: double.maxFinite,
-              height: 48.rh(context),
-              margin: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              alignment: AlignmentDirectional.center,
-              decoration: BoxDecoration(
-                  border: Border.all(
-                      width: context.watch<AppThemeCubit>().state.appTheme ==
-                              AppTheme.dark
-                          ? 0
-                          : 1,
-                      color: context.color.borderColor.darken(30)),
-                  borderRadius: const BorderRadius.all(Radius.circular(10)),
-                  color: context.color.secondaryColor),
-              child: TextFormField(
-                  controller: searchController,
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                    //OutlineInputBorder()
-                    fillColor: Theme.of(context).colorScheme.secondaryColor,
-                    hintText:
-                        "${"search".translate(context)}\t${"area".translate(context)}",
-                    prefixIcon: setSearchIcon(),
-                    prefixIconConstraints:
-                        const BoxConstraints(minHeight: 5, minWidth: 5),
-                  ),
-                  enableSuggestions: true,
-                  onEditingComplete: () {
-                    setState(
-                      () {
-                        isFocused = false;
-                      },
-                    );
-                    FocusScope.of(context).unfocus();
-                  },
-                  onTap: () {
-                    //change prefix icon color to primary
-                    setState(() {
-                      isFocused = true;
-                    });
-                  }))),
-      automaticallyImplyLeading: false,
-      title: Text(
-        widget.cityName,
-      )
-          .color(context.color.textDefaultColor)
-          .bold(weight: FontWeight.w600)
-          .size(18),
-      leading: Material(
-        clipBehavior: Clip.antiAlias,
-        color: Colors.transparent,
-        type: MaterialType.circle,
-        child: InkWell(
-            onTap: () {
-              Navigator.pop(context);
-            },
-            child: Padding(
-                padding: EdgeInsetsDirectional.only(
-                  start: 18.0,
-                ),
-                child: Directionality(
-                  textDirection: Directionality.of(context),
-                  child: RotatedBox(
-                    quarterTurns:
-                        Directionality.of(context) == TextDirection.rtl
-                            ? 2
-                            : -4,
-                    child: UiUtils.getSvg(AppIcons.arrowLeft,
-                        fit: BoxFit.none,
-                        color: context.color.textDefaultColor),
-                  ),
-                ))),
+      backgroundColor: context.color.secondaryColor,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0.5,
+      leading: IconButton(
+        icon: Icon(
+          Icons.arrow_back_ios_new_rounded,
+          color: context.color.textDefaultColor,
+          size: 20,
+        ),
+        onPressed: () => Navigator.pop(context),
       ),
-      /*BackButton(
-        color: context.color.textDefaultColor,
-        ),*/
-      elevation: context.watch<AppThemeCubit>().state.appTheme == AppTheme.dark
-          ? 0
-          : 6,
-      shadowColor:
-          context.watch<AppThemeCubit>().state.appTheme == AppTheme.dark
-              ? null
-              : context.color.textDefaultColor.withValues(alpha: 0.2),
-      backgroundColor: context.color.backgroundColor,
+      title: Text(
+        widget.cityName.isNotEmpty ? widget.cityName : "Select Area".translate(context),
+        style: TextStyle(
+          color: context.color.textDefaultColor,
+          fontWeight: FontWeight.w700,
+          fontSize: 18,
+        ),
+      ),
+      centerTitle: true,
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(56),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Container(
+            height: 44,
+            decoration: BoxDecoration(
+              color: context.color.backgroundColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: context.color.borderColor.withValues(alpha: 0.6),
+              ),
+            ),
+            child: TextField(
+              controller: searchController,
+              focusNode: searchFocusNode,
+              onChanged: _onSearchChanged,
+              style: TextStyle(
+                color: context.color.textDefaultColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              decoration: InputDecoration(
+                hintText: "Search area...".translate(context),
+                hintStyle: TextStyle(
+                  color: context.color.textLightColor,
+                  fontSize: 13,
+                ),
+                border: InputBorder.none,
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: context.color.territoryColor,
+                  size: 20,
+                ),
+                suffixIcon: searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(
+                          Icons.close_rounded,
+                          color: context.color.textLightColor,
+                          size: 18,
+                        ),
+                        onPressed: () {
+                          searchController.clear();
+                          _onSearchChanged("");
+                        },
+                      )
+                    : null,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 11,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
-  Widget shimmerEffect() {
+  Widget _buildShimmer() {
     return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      /*   padding: const EdgeInsets.symmetric(
-        vertical: 10 + defaultPadding,
-        //horizontal: defaultPadding,
-      ),*/
-      itemCount: 15,
-      separatorBuilder: (context, index) {
-        return Container();
-      },
-      itemBuilder: (context, index) {
-        return Shimmer.fromColors(
-          baseColor: Theme.of(context).colorScheme.shimmerBaseColor,
-          highlightColor: Theme.of(context).colorScheme.shimmerHighlightColor,
-          child: Container(
-            padding: EdgeInsets.all(5),
-            width: double.maxFinite,
-            height: 56,
-            decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(5),
-                border:
-                    Border.all(color: context.color.borderColor.darken(30))),
+      padding: const EdgeInsets.all(16),
+      itemCount: 10,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (_, __) => Container(
+        height: 50,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: context.color.secondaryColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: context.color.borderColor.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          children: const [
+            CustomShimmer(height: 14, width: 130),
+            Spacer(),
+            CustomShimmer(height: 14, width: 14),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    return BlocBuilder<FetchAreasCubit, FetchAreasState>(
+      builder: (context, state) {
+        if (state is FetchAreasInProgress) {
+          return _buildShimmer();
+        }
+
+        if (state is FetchAreasFailure) {
+          if (state.errorMessage.contains("no-internet")) {
+            return NoInternet(
+              onRetry: () {
+                context.read<FetchAreasCubit>().fetchAreas(
+                      search: searchController.text,
+                      cityId: widget.cityId,
+                    );
+              },
+            );
+          }
+          return const Center(child: SomethingWentWrong());
+        }
+
+        if (state is FetchAreasSuccess) {
+          if (state.areasModel.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.near_me_disabled_rounded,
+                      size: 54,
+                      color: context.color.textLightColor.withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      "No areas found".translate(context),
+                      style: TextStyle(
+                        color: context.color.textDefaultColor,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          return NotificationListener<ScrollNotification>(
+            onNotification: (ScrollNotification scrollInfo) {
+              if (scrollInfo.metrics.pixels >=
+                  scrollInfo.metrics.maxScrollExtent - 50) {
+                if (context.read<FetchAreasCubit>().hasMoreData()) {
+                  context.read<FetchAreasCubit>().fetchAreasMore(
+                        cityId: widget.cityId,
+                      );
+                }
+              }
+              return false;
+            },
+            child: SingleChildScrollView(
+              controller: controller,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.pin_drop_rounded,
+                        size: 16,
+                        color: context.color.territoryColor,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        "All Areas".translate(context),
+                        style: TextStyle(
+                          color: context.color.textDefaultColor,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        "(${state.areasModel.length})",
+                        style: TextStyle(
+                          color: context.color.textLightColor,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: state.areasModel.map((area) {
+                      final isSelected = selectedArea?.id == area.id;
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () {
+                          setState(() {
+                            selectedArea = area;
+                          });
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? context.color.territoryColor.withValues(alpha: 0.12)
+                                : context.color.secondaryColor,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected
+                                  ? context.color.territoryColor
+                                  : context.color.borderColor.withValues(alpha: 0.6),
+                              width: isSelected ? 1.5 : 1.0,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                area.name ?? "",
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? context.color.territoryColor
+                                      : context.color.textDefaultColor,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              if (isSelected) ...[
+                                const SizedBox(width: 6),
+                                Icon(
+                                  Icons.check_circle_rounded,
+                                  size: 16,
+                                  color: context.color.territoryColor,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                if (state.isLoadingMore)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Center(
+                      child: UiUtils.progress(
+                        normalProgressColor: context.color.territoryColor,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         );
+      }
+
+        return const SizedBox.shrink();
       },
+    );
+  }
+
+  Widget _buildBottomBar() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      decoration: BoxDecoration(
+        color: context.color.secondaryColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
+          )
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: UiUtils.buildButton(
+          context,
+          onPressed: () {
+            if (selectedArea != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LocationMapScreen(),
+                  settings: RouteSettings(
+                    arguments: {
+                      'area_id': selectedArea!.id,
+                      'area': selectedArea!.name,
+                      'city': widget.cityName,
+                      'state': widget.stateName,
+                      'country': widget.countryName,
+                      'latitude': widget.latitude,
+                      'longitude': widget.longitude,
+                      'from': widget.from,
+                    },
+                  ),
+                ),
+              ).then((value) {
+                if (value != null && widget.from == "addItem") {
+                  Navigator.pop(context, value);
+                }
+              });
+            }
+          },
+          buttonTitle: "Continue".translate(context),
+          textColor: Colors.white,
+          buttonColor: selectedArea != null
+              ? context.color.territoryColor
+              : context.color.territoryColor.withValues(alpha: 0.4),
+          radius: 10,
+          height: 48,
+          disabled: selectedArea == null,
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: appBarWidget(),
-      body: bodyData(),
-      bottomNavigationBar: getBottomButtons(),
       backgroundColor: context.color.backgroundColor,
+      appBar: _buildAppBar(),
+      body: _buildBody(),
+      bottomNavigationBar: _buildBottomBar(),
     );
-  }
-
-  Widget bodyData() {
-    return searchItemsWidget();
-  }
-
-  Widget searchItemsWidget() {
-    return BlocBuilder<FetchAreasCubit, FetchAreasState>(
-      builder: (context, state) {
-        if (state is FetchAreasInProgress) {
-          return shimmerEffect();
-        }
-
-        if (state is FetchAreasFailure) {
-          if (state.errorMessage is ApiException) {
-            if (state.errorMessage == "no-internet") {
-              return SingleChildScrollView(
-                child: NoInternet(
-                  onRetry: () {
-                    context.read<FetchAreasCubit>().fetchAreas(
-                        search: searchController.text, cityId: widget.cityId);
-                  },
-                ),
-              );
-            }
-          }
-
-          return Center(child: const SomethingWentWrong());
-        }
-
-        if (state is FetchAreasSuccess) {
-          if (state.areasModel.isEmpty) {
-            return SingleChildScrollView(
-              child: NoDataFound(
-                onTap: () {
-                  context.read<FetchAreasCubit>().fetchAreas(
-                      search: searchController.text, cityId: widget.cityId);
-                },
-              ),
-            );
-          }
-
-          return Padding(
-            padding: const EdgeInsets.only(top: 17),
-            child: Container(
-              color: context.color.secondaryColor,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  widget.from == "addItem"
-                      ? Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 18, vertical: 18),
-                          child: Text(
-                            "${"lblall".translate(context)}\t${"area".translate(context)}",
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          )
-                              .color(context.color.textDefaultColor)
-                              .size(context.font.normal)
-                              .bold(weight: FontWeight.w600),
-                        )
-                      : SizedBox.shrink(),
-                  const Divider(
-                    thickness: 1.2,
-                    height: 10,
-                  ),
-                  Expanded(
-                    child: ListView.separated(
-                      itemCount: state.areasModel.length,
-                      padding: EdgeInsets.zero,
-                      controller: controller,
-                      physics: AlwaysScrollableScrollPhysics(),
-                      shrinkWrap: true,
-                      separatorBuilder: (context, index) {
-                        return const Divider(
-                          thickness: 1.2,
-                          height: 10,
-                        );
-                      },
-                      itemBuilder: (context, index) {
-                        AreaModel area = state.areasModel[index];
-                        bool isSelected = selectedArea?.id == area.id;
-
-                        return ListTile(
-                          tileColor: isSelected ? context.color.territoryColor.withValues(alpha: 0.1) : null,
-                          onTap: () {
-                            setState(() {
-                              selectedArea = area;
-                            });
-                          },
-                          title: Text(
-                            area.name!,
-                            textAlign: TextAlign.start,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          )
-                              .color(isSelected ? context.color.territoryColor : context.color.textDefaultColor)
-                              .size(context.font.normal),
-                          trailing: isSelected
-                              ? Icon(Icons.check,
-                                color: context.color.territoryColor,
-                                size: 20)
-                              : null,
-                        );
-                      },
-                    ),
-                  ),
-                  if (state.isLoadingMore)
-                    Center(
-                      child: UiUtils.progress(
-                        normalProgressColor: context.color.territoryColor,
-                      ),
-                    )
-                ],
-              ),
-            ),
-          );
-        }
-        return Container();
-      },
-    );
-  }
-
-  Widget getBottomButtons() {
-    return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: context.color.secondaryColor,
-          boxShadow: [
-            BoxShadow(
-              color: context.color.borderColor.withValues(alpha: 0.5),
-              blurRadius: 10,
-              offset: const Offset(0, -5),
-            )
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            UiUtils.buildButton(
-              context,
-              onPressed: () {
-                if (selectedArea != null) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LocationMapScreen(),
-                      settings: RouteSettings(
-                        arguments: {
-                          'area_id': selectedArea!.id,
-                          'area': selectedArea!.name,
-                          'city': widget.cityName,
-                          'state': widget.stateName,
-                          'country': widget.countryName,
-                          'latitude': widget.latitude,
-                          'longitude': widget.longitude,
-                          'from': widget.from,
-                        }
-                      )
-                    ),
-                  ).then((value) {
-                    if (value != null && widget.from == "addItem") {
-                      Navigator.pop(context, value);
-                    }
-                  });
-                }
-              },
-              buttonTitle: "continue".translate(context),
-              textColor: Colors.white,
-              buttonColor: selectedArea != null
-                  ? context.color.territoryColor
-                  : context.color.textLightColor,
-              radius: 8,
-              disabled: selectedArea == null,
-            ),
-          ],
-        ));
-  }
-  Widget setSearchIcon() {
-    return Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: UiUtils.getSvg(AppIcons.search,
-            color: context.color.territoryColor));
-  }
-
-  Widget setSuffixIcon() {
-    return GestureDetector(
-      onTap: () {
-        searchController.clear();
-        isFocused = false; //set icon color to black back
-        FocusScope.of(context).unfocus(); //dismiss keyboard
-        setState(() {});
-      },
-      child: Icon(
-        Icons.close_rounded,
-        color: Theme.of(context).colorScheme.blackColor,
-        size: 30,
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    searchController.dispose();
-    searchController.clear();
-    super.dispose();
   }
 }

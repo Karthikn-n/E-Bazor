@@ -321,6 +321,7 @@ class TitleHeader extends StatelessWidget {
             child: Text(title)
                 .size(context.font.large)
                 .bold(weight: FontWeight.bold)
+                .color(context.color.textColorDark)
                 .setMaxLines(lines: 1),
           ),
 
@@ -333,7 +334,7 @@ class TitleHeader extends StatelessWidget {
                 const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                 child: Text("seeAll".translate(context))
                     .size(context.font.smaller + 3)
-                    .color(context.color.deactivateColor),
+                    .color(context.color.territoryColor),
               ),
             ),
         ],

@@ -130,6 +130,16 @@ class AppIcons {
   static String profileNav = _svgPath("bottomnav/profile");
   static String profileNavActive = _svgPath("bottomnav/profile_active");
 
+  /// Custom PNG bottom nav icons
+  static const String homeNavPng = "assets/icons/home.png";
+  static const String homeNavFilledPng = "assets/icons/home_filled.png";
+  static const String chatNavPng = "assets/icons/chat.png";
+  static const String chatNavFilledPng = "assets/icons/chat_filled.png";
+  static const String adsNavPng = "assets/icons/ads.png";
+  static const String adsNavFilledPng = "assets/icons/ads_filed.png";
+  static const String profileNavPng = "assets/icons/profile.png";
+  static const String profileNavFilledPng = "assets/icons/profile_filled.png";
+
   ///
 
 }

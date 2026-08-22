@@ -47,13 +47,11 @@ class _ItemListingSubscriptionPlansItemState
   @override
   void initState() {
     super.initState();
-    if (Platform.isAndroid) {
-      if (AppSettings.stripeStatus == 1) {
-        StripeService.initStripe(
-          AppSettings.stripePublishableKey,
-          "test",
-        );
-      }
+    if (AppSettings.stripePublishableKey.isNotEmpty) {
+      StripeService.initStripe(
+        AppSettings.stripePublishableKey,
+        "test",
+      );
     }
   }
 
@@ -77,7 +75,7 @@ class _ItemListingSubscriptionPlansItemState
               if (state is GetPaymentIntentInSuccess) {
                 Widgets.hideLoder(context);
 
-                if (_selectedGateway == "stripe") {
+                if (_selectedGateway == "stripe" || _selectedGateway == null) {
                   PaymentGateways.stripe(context,
                       price: widget.model.finalPrice!.toDouble(),
                       packageId: widget.model.id!,
@@ -515,6 +513,7 @@ class _ItemListingSubscriptionPlansItemState
         AppSettings.getEnabledPaymentGateways();
 
     if (enabledGateways.isEmpty) {
+      _selectedGateway = "stripe";
       return;
     }
 

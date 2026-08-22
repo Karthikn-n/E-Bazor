@@ -257,24 +257,20 @@ class UiUtils {
   ///Divider / Container
 
   static SystemUiOverlayStyle getSystemUiOverlayStyle(
-      {required BuildContext context, required Color statusBarColor}) {
+      {required BuildContext context, Color? statusBarColor}) {
+    final bool isDark =
+        context.read<AppThemeCubit>().state.appTheme == AppTheme.dark;
+    final Color effectiveStatusBarColor =
+        statusBarColor ?? context.color.secondaryColor;
+
     return SystemUiOverlayStyle(
         systemNavigationBarDividerColor: Colors.transparent,
-        // systemNavigationBarColor: Theme.of(context).colorScheme.secondaryColor,
+        systemNavigationBarColor: context.color.secondaryColor,
         systemNavigationBarIconBrightness:
-            context.watch<AppThemeCubit>().state.appTheme == AppTheme.dark
-                ? Brightness.light
-                : Brightness.dark,
-        //
-        statusBarColor: statusBarColor,
-        statusBarBrightness:
-            context.watch<AppThemeCubit>().state.appTheme == AppTheme.dark
-                ? Brightness.dark
-                : Brightness.light,
-        statusBarIconBrightness:
-            context.watch<AppThemeCubit>().state.appTheme == AppTheme.dark
-                ? Brightness.light
-                : Brightness.dark);
+            isDark ? Brightness.light : Brightness.dark,
+        statusBarColor: effectiveStatusBarColor,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark);
   }
 
   static setDefaultLocationValue(
@@ -323,84 +319,89 @@ class UiUtils {
       bool? hideTopBorder,
       VoidCallback? onBackPress,
       Color? backgroundColor}) {
+    final Color barColor = backgroundColor ?? context.color.secondaryColor;
     return PreferredSize(
       preferredSize: Size.fromHeight(55 + (bottomHeight ?? 0)),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Expanded(
-            child: RoundedBorderOnSomeSidesWidget(
-              borderColor: context.color.borderColor,
-              borderRadius: 0,
-              borderWidth: 1.5,
-              contentBackgroundColor:
-                  backgroundColor ?? context.color.secondaryColor,
-              bottomLeft: true,
-              bottomRight: true,
-              topLeft: false,
-              topRight: false,
-              child: Container(
-                alignment: AlignmentDirectional.bottomStart,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: (showBackButton ?? false) ? 0 : 20,
-                      vertical: (showBackButton ?? false) ? 0 : 18),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    //crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      if (showBackButton ?? false) ...[
-                        Material(
-                          clipBehavior: Clip.antiAlias,
-                          color: Colors.transparent,
-                          type: MaterialType.circle,
-                          child: InkWell(
-                            onTap: () {
-                              if (onBackPress != null) {
-                                onBackPress.call();
-                              } else {
-                                Navigator.pop(context);
-                              }
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.all(18.0),
-                              child: Directionality(
-                                textDirection: Directionality.of(context),
-                                child: RotatedBox(
-                                  quarterTurns: Directionality.of(context) ==
-                                          ui.TextDirection.rtl
-                                      ? 2
-                                      : -4,
-                                  child: UiUtils.getSvg(AppIcons.arrowLeft,
-                                      fit: BoxFit.none,
-                                      color: context.color.textDefaultColor),
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: getSystemUiOverlayStyle(
+          context: context,
+          statusBarColor: barColor,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Expanded(
+              child: RoundedBorderOnSomeSidesWidget(
+                borderColor: context.color.borderColor,
+                borderRadius: 0,
+                borderWidth: 1.5,
+                contentBackgroundColor: barColor,
+                bottomLeft: true,
+                bottomRight: true,
+                topLeft: false,
+                topRight: false,
+                child: Container(
+                  alignment: AlignmentDirectional.bottomStart,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                        horizontal: (showBackButton ?? false) ? 0 : 20,
+                        vertical: (showBackButton ?? false) ? 0 : 18),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      //crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (showBackButton ?? false) ...[
+                          Material(
+                            clipBehavior: Clip.antiAlias,
+                            color: Colors.transparent,
+                            type: MaterialType.circle,
+                            child: InkWell(
+                              onTap: () {
+                                if (onBackPress != null) {
+                                  onBackPress.call();
+                                } else {
+                                  Navigator.pop(context);
+                                }
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(18.0),
+                                child: Directionality(
+                                  textDirection: Directionality.of(context),
+                                  child: RotatedBox(
+                                    quarterTurns: Directionality.of(context) ==
+                                            ui.TextDirection.rtl
+                                        ? 2
+                                        : -4,
+                                    child: UiUtils.getSvg(AppIcons.arrowLeft,
+                                        fit: BoxFit.none,
+                                        color: context.color.textDefaultColor),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
+                        ],
+                        Expanded(
+                          child: Text(
+                            title ?? "",
+                            overflow: TextOverflow.ellipsis,
+                            softWrap: true,
+                            //textAlign: TextAlign.center,
+                          )
+                              .color(context.color.textDefaultColor)
+                              .bold(weight: FontWeight.w600)
+                              .size(18),
                         ),
+                        if (actions != null) ...[const Spacer(), ...actions],
                       ],
-                      Expanded(
-                        child: Text(
-                          title ?? "",
-                          overflow: TextOverflow.ellipsis,
-                          softWrap: true,
-                          //textAlign: TextAlign.center,
-                        
-                        )
-                            .color(context.color.textDefaultColor)
-                            .bold(weight: FontWeight.w600)
-                            .size(18),
-                      ),
-                      if (actions != null) ...[const Spacer(), ...actions],
-                    ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          ...bottom ?? [const SizedBox.shrink()]
-        ],
+            ...bottom ?? [const SizedBox.shrink()]
+          ],
+        ),
       ),
     );
   }

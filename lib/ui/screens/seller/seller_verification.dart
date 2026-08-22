@@ -155,15 +155,17 @@ class _SellerVerificationScreenState
         children: [
           UiUtils.buildButton(context, height: 46, radius: 8, onPressed: () {
             if (page == 1) {
-              setState(() {
-                page = 2;
-                fillValue = 1.0;
-                Future.delayed(Duration.zero, () {
-                  context
-                      .read<FetchSellerVerificationFieldsCubit>()
-                      .fetchSellerVerificationFields();
+              if (_formKey.currentState?.validate() ?? false) {
+                setState(() {
+                  page = 2;
+                  fillValue = 1.0;
+                  Future.delayed(Duration.zero, () {
+                    context
+                        .read<FetchSellerVerificationFieldsCubit>()
+                        .fetchSellerVerificationFields();
+                  });
                 });
-              });
+              }
             } else {
               if (_formKey.currentState?.validate() ?? false) {
                 Map<String, dynamic> data =
@@ -334,32 +336,32 @@ class _SellerVerificationScreenState
           title: "fullName",
           hintText: "provideFullNameHere".translate(context),
           controller: nameController,
-          //validator: CustomTextFieldValidator.nullCheck,
-          readOnly: true,
+          validator: CustomTextFieldValidator.nullCheck,
+          readOnly: false,
         ),
         buildTextField(
           context,
           title: "addressLbl",
           hintText: "homeAddressHere".translate(context),
           controller: addressController,
-          //validator: CustomTextFieldValidator.nullCheck,
-          readOnly: true,
+          validator: CustomTextFieldValidator.nullCheck,
+          readOnly: false,
         ),
         buildTextField(
           context,
           title: "phoneNumber",
           hintText: "phoneNumberHere".translate(context),
           controller: phoneController,
-          readOnly: true,
-          //validator: CustomTextFieldValidator.phoneNumber,
+          validator: CustomTextFieldValidator.phoneNumber,
+          readOnly: false,
         ),
         buildTextField(
           context,
           title: "emailAddress",
           hintText: "emailAddressHere".translate(context),
           controller: emailController,
-          readOnly: true,
-          //validator: CustomTextFieldValidator.email,
+          validator: CustomTextFieldValidator.email,
+          readOnly: false,
         ),
       ],
     );
@@ -368,7 +370,7 @@ class _SellerVerificationScreenState
   Widget buildTextField(BuildContext context,
       {required String title,
       required TextEditingController controller,
-      //CustomTextFieldValidator? validator,
+      CustomTextFieldValidator? validator,
       bool? readOnly,
       required String hintText}) {
     return Column(
@@ -383,8 +385,8 @@ class _SellerVerificationScreenState
         ),
         CustomTextFormField(
           controller: controller,
-          isReadOnly: readOnly,
-          //validator: validator,
+          isReadOnly: readOnly ?? false,
+          validator: validator,
           hintText: hintText,
           fillColor: context.color.secondaryColor,
         ),

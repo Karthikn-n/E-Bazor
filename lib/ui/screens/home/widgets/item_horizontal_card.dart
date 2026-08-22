@@ -26,17 +26,20 @@ class ItemHorizontalCard extends StatelessWidget {
   final VoidCallback? onDeleteTap;
   final double? additionalImageWidth;
   final bool? showLikeButton;
+  final VoidCallback? onTap;
 
-  const ItemHorizontalCard(
-      {super.key,
-      required this.item,
-      this.useRow,
-      this.addBottom,
-      this.additionalHeight,
-      this.statusButton,
-      this.onDeleteTap,
-      this.showLikeButton,
-      this.additionalImageWidth});
+  const ItemHorizontalCard({
+    super.key,
+    required this.item,
+    this.useRow,
+    this.addBottom,
+    this.additionalHeight,
+    this.statusButton,
+    this.onDeleteTap,
+    this.showLikeButton,
+    this.additionalImageWidth,
+    this.onTap,
+  });
 
   Widget favButton(BuildContext context) {
     bool isLike = context.read<FavoriteCubit>().isItemFavorite(item.id!);
@@ -118,15 +121,38 @@ class ItemHorizontalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = context.watch<AppThemeCubit>().state.appTheme == AppTheme.dark;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.5),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Container(
         decoration: BoxDecoration(
-          border: Border.all(color: context.color.borderColor.darken(50)),
-          color: context.color.secondaryColor,
-          borderRadius: BorderRadius.circular(15),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.07),
+              blurRadius: 10,
+              spreadRadius: 0,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        child: Column(
+        child: Material(
+          color: context.color.secondaryColor,
+          borderRadius: BorderRadius.circular(16),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: onTap,
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: context.color.borderColor.withValues(alpha: 0.6),
+                  width: 1,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // IMAGE SECTION
@@ -240,9 +266,11 @@ class ItemHorizontalCard extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ),
+  ),
+),
+);
   }
-
 }
 
 class StatusButton {

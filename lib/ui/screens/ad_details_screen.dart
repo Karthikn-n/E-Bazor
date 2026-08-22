@@ -62,6 +62,7 @@ import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
 import 'package:Ebozor/ui/screens/widgets/shimmerLoadingContainer.dart';
 import 'package:Ebozor/ui/screens/widgets/video_view_screen.dart';
 import 'package:Ebozor/ui/screens/google_map_screen.dart';
+import 'package:Ebozor/ui/screens/widgets/car_finance_calculator.dart';
 
 class AdDetailsScreen extends StatefulWidget {
   final ItemModel model;
@@ -350,6 +351,13 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                     // Make an offer button (if buyer)
                     makeOfferButtonWidget(),
 
+                    // Car Finance Calculator (shown for Cars / Motors listings with price > 0)
+                    if (_isCarListing() && (model.price != null && model.price! > 0))
+                      CarFinanceCalculator(
+                        initialPrice: model.price ?? 0.0,
+                        carName: model.name,
+                      ),
+
                     // Location section with map preview
                     _buildLocationSection(),
 
@@ -380,6 +388,36 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
       ),
       )
     );
+  }
+
+  bool _isCarListing() {
+    final catName = (model.category?.name ?? "").toLowerCase();
+    final catSlug = (model.category?.slug ?? "").toLowerCase();
+    if (catName.contains("car") ||
+        catName.contains("motor") ||
+        catName.contains("vehicle") ||
+        catName.contains("auto") ||
+        catSlug.contains("car") ||
+        catSlug.contains("motor") ||
+        catSlug.contains("vehicle") ||
+        catSlug.contains("auto")) {
+      return true;
+    }
+    // Check custom fields for vehicle specific attributes (e.g. kilometers, transmission, trim, year)
+    if (model.customFields != null) {
+      for (var cf in model.customFields!) {
+        final n = (cf.name ?? "").toLowerCase();
+        if (n.contains("kilometer") ||
+            n.contains("mileage") ||
+            n.contains("trim") ||
+            n.contains("car_make") ||
+            n.contains("transmission") ||
+            n.contains("specs")) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   Widget _buildKeyHighlights() {

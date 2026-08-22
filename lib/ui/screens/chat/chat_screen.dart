@@ -152,12 +152,10 @@ class _ChatScreenState extends State<ChatScreen>
     controller.addListener(() {
       if (controller.text.isNotEmpty) {
         showRecordButton = false;
-        // Optional: Emit typing start
-        // socketService.typingStart(widget.itemOfferId);
+        socketService.typingStart(widget.itemOfferId);
       } else {
         showRecordButton = true;
-        // Optional: Emit typing stop
-        // socketService.typingStop(widget.itemOfferId);
+        socketService.typingStop(widget.itemOfferId);
       }
       setState(() {});
     });
@@ -184,6 +182,8 @@ class _ChatScreenState extends State<ChatScreen>
 
   @override
   void dispose() {
+    _socketService.typingStop(widget.itemOfferId);
+    _socketService.leaveOffer(widget.itemOfferId);
     notificationStreamSubsctription.cancel();
     super.dispose();
   }
@@ -584,121 +584,118 @@ class _ChatScreenState extends State<ChatScreen>
                             child: Row(
                               children: [
                                 Expanded(
-                                  child: TextField(
-                                    controller: controller,
-                                    onChanged: (value){
-                                      _socketService.typingStart(widget.itemOfferId);
-
-                                      _typingTimer?.cancel();
-                                      _typingTimer = Timer(const Duration(seconds: 1), () {
-                                        _socketService.typingStop(widget.itemOfferId);
-                                      });
-
-                                    },
-                                    cursorColor:
-                                    context.color.territoryColor,
-                                    onTap: () {
-                                      showDeletebutton.value = false;
-                                    },
-                                    textInputAction:
-                                    TextInputAction.newline,
-                                    minLines: 1,
-                                    maxLines: null,
-                                    decoration: InputDecoration(
-                                      suffixIconColor:
-                                      context.color.textLightColor,
-                                      suffixIcon: IconButton(
-                                        onPressed: () async {
-                                          if (messageAttachment == null) {
-                                            FilePickerResult?
-                                            pickedAttachment =
-                                            await FilePicker.platform
-                                                .pickFiles(
-                                              allowMultiple: false,
-                                              type: FileType.custom,
-                                              allowedExtensions: [
-                                                'jpg',
-                                                'jpeg',
-                                                'png'
-                                              ],
-                                            );
-                                            messageAttachment =
-                                                pickedAttachment
-                                                    ?.files.first;
-                                            showRecordButton = false;
-                                            setState(() {});
-                                          } else {
-                                            messageAttachment = null;
-                                            showRecordButton = true;
-                                            setState(() {});
-                                          }
-                                        },
-                                        icon: messageAttachment != null
-                                            ? const Icon(Icons.close)
-                                            : Transform.rotate(
-                                          angle: -3.14 / 5.0,
-                                          child: const Icon(
-                                            Icons.attachment,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: context.color.secondaryColor,
+                                      borderRadius: BorderRadius.circular(24),
+                                      border: Border.all(
+                                        color: context.color.borderColor.withValues(alpha: 0.6),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        IconButton(
+                                          onPressed: () async {
+                                            if (messageAttachment == null) {
+                                              FilePickerResult? pickedAttachment =
+                                                  await FilePicker.platform.pickFiles(
+                                                allowMultiple: false,
+                                                type: FileType.custom,
+                                                allowedExtensions: ['jpg', 'jpeg', 'png'],
+                                              );
+                                              messageAttachment = pickedAttachment?.files.first;
+                                              showRecordButton = false;
+                                              setState(() {});
+                                            } else {
+                                              messageAttachment = null;
+                                              showRecordButton = true;
+                                              setState(() {});
+                                            }
+                                          },
+                                          icon: messageAttachment != null
+                                              ? const Icon(Icons.close_rounded, size: 20)
+                                              : Icon(
+                                                  Icons.attach_file_rounded,
+                                                  size: 20,
+                                                  color: context.color.textLightColor,
+                                                ),
+                                        ),
+                                        Expanded(
+                                          child: TextField(
+                                            controller: controller,
+                                            onChanged: (value) {
+                                              _socketService.typingStart(widget.itemOfferId);
+                                              _typingTimer?.cancel();
+                                              _typingTimer = Timer(const Duration(seconds: 1), () {
+                                                _socketService.typingStop(widget.itemOfferId);
+                                              });
+                                              if (value.trim().isNotEmpty && showRecordButton) {
+                                                setState(() => showRecordButton = false);
+                                              } else if (value.trim().isEmpty && !showRecordButton && messageAttachment == null) {
+                                                setState(() => showRecordButton = true);
+                                              }
+                                            },
+                                            cursorColor: context.color.territoryColor,
+                                            onTap: () {
+                                              showDeletebutton.value = false;
+                                            },
+                                            textInputAction: TextInputAction.newline,
+                                            minLines: 1,
+                                            maxLines: 4,
+                                            style: TextStyle(
+                                              fontSize: 14.5,
+                                              color: context.color.textDefaultColor,
+                                            ),
+                                            decoration: InputDecoration(
+                                              contentPadding: const EdgeInsets.symmetric(
+                                                vertical: 10,
+                                                horizontal: 4,
+                                              ),
+                                              border: InputBorder.none,
+                                              hintText: "Type a message...".translate(context),
+                                              hintStyle: TextStyle(
+                                                color: context.color.textLightColor,
+                                                fontSize: 14,
+                                              ),
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                      contentPadding:
-                                      const EdgeInsets.symmetric(
-                                          vertical: 6, horizontal: 8),
-                                      border: OutlineInputBorder(
-                                          borderRadius:
-                                          BorderRadius.circular(20),
-                                          borderSide: BorderSide(
-                                              color: context
-                                                  .color.territoryColor)),
-                                      focusedBorder: OutlineInputBorder(
-                                          borderRadius:
-                                          BorderRadius.circular(20),
-                                          borderSide: BorderSide(
-                                              color: context
-                                                  .color.territoryColor)),
-                                      hintText:
-                                      "writeHere".translate(context),
+                                        const SizedBox(width: 8),
+                                      ],
                                     ),
                                   ),
                                 ),
-                                const SizedBox(
-                                  width: 9.5,
-                                ),
+                                const SizedBox(width: 8),
                                 if (showRecordButton)
                                   RecordButton(
                                     controller: _recordButtonAnimation,
                                     callback: (path) {
-                                      //This is adding Chat widget in stream with BlocProvider , because we will need to do api process to store chat message to server, when it will be added to list it's initState method will be called
                                       ChatMessageHandler.add(
                                         BlocProvider(
-                                          create: (context) =>
-                                              SendMessageCubit(),
+                                          create: (context) => SendMessageCubit(),
                                           child: ChatMessage(
-                                              key: ValueKey(DateTime.now().toString().toString()),
-                                              message: controller.text,
-                                              senderId: int.parse(HiveUtils.getUserId()!),
-                                              createdAt: DateTime.now().toString(),
-                                              isSentNow: true,
-                                              audio: path,
-                                              itemOfferId: widget.itemOfferId,
-                                              file: "",
-                                              updatedAt: DateTime.now().toString()),
+                                            key: ValueKey(DateTime.now().toString()),
+                                            message: controller.text,
+                                            senderId: int.parse(HiveUtils.getUserId()!),
+                                            createdAt: DateTime.now().toString(),
+                                            isSentNow: true,
+                                            audio: path,
+                                            itemOfferId: widget.itemOfferId,
+                                            file: "",
+                                            updatedAt: DateTime.now().toString(),
+                                          ),
                                         ),
                                       );
                                       totalMessageCount++;
-
                                       setState(() {});
                                     },
                                     isSending: false,
                                   ),
                                 if (!showRecordButton)
                                   GestureDetector(
-
-
                                     onTap: () {
                                       if (controller.text.trim().isEmpty && messageAttachment == null) return;
-
 
                                       final text = controller.text.trim();
                                       _socketService.typingStop(widget.itemOfferId);
@@ -717,19 +714,31 @@ class _ChatScreenState extends State<ChatScreen>
                                       ));
                                       controller.clear();
                                       messageAttachment = null;
-                                      FocusScope.of(context).unfocus();
-                                      setState(() {});
+                                      setState(() {
+                                        showRecordButton = true;
+                                      });
                                     },
-                                    child: CircleAvatar(
-                                      radius: 20,
-                                      backgroundColor:
-                                      context.color.territoryColor,
-                                      child: Icon(
-                                        Icons.send,
-                                        color: context.color.buttonColor,
+                                    child: Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: context.color.territoryColor,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: context.color.territoryColor.withValues(alpha: 0.3),
+                                            blurRadius: 6,
+                                            offset: const Offset(0, 2),
+                                          )
+                                        ],
+                                      ),
+                                      child: const Icon(
+                                        Icons.send_rounded,
+                                        color: Colors.white,
+                                        size: 20,
                                       ),
                                     ),
-                                  )
+                                  ),
                               ],
                             ),
                           ),
@@ -744,140 +753,128 @@ class _ChatScreenState extends State<ChatScreen>
           appBar: AppBar(
             centerTitle: false,
             automaticallyImplyLeading: false,
-            leading: Material(
-              clipBehavior: Clip.antiAlias,
-              color: Colors.transparent,
-              type: MaterialType.circle,
-              child: InkWell(
-                  onTap: () {
-                    Navigator.pop(context);
-                  },
-                  child: Padding(
-                      padding: EdgeInsetsDirectional.only(start: 15),
-                      child: Directionality(
-                        textDirection: Directionality.of(context),
-                        child: RotatedBox(
-                          quarterTurns:
-                          Directionality.of(context) == TextDirection.rtl
-                              ? 2
-                              : -4,
-                          child: UiUtils.getSvg(AppIcons.arrowLeft,
-                              fit: BoxFit.none,
-                              color: context.color.textDefaultColor),
-                        ),
-                      ))),
+            leading: IconButton(
+              icon: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: context.color.textDefaultColor,
+                size: 20,
+              ),
+              onPressed: () => Navigator.pop(context),
             ),
             backgroundColor: context.color.secondaryColor,
-            elevation: 0,
-            iconTheme: IconThemeData(color: context.color.territoryColor),
+            surfaceTintColor: Colors.transparent,
+            elevation: 0.5,
             bottom: PreferredSize(
-              preferredSize: Size.fromHeight(70),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  Divider(
-                    color: context.color.borderColor.darken(40),
-                    thickness: 1,
+              preferredSize: const Size.fromHeight(64),
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: context.color.backgroundColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: context.color.borderColor.withValues(alpha: 0.5),
                   ),
-                  Container(
-                    margin: EdgeInsets.symmetric(horizontal: 25, vertical: 0),
-                    color: context.color.secondaryColor,
-                    height: 63,
-                    child: Row(
-                      children: [
-                        FittedBox(
-                          fit: BoxFit.none,
-                          child: GestureDetector(
-                            onTap: () async {
-                              try {
-                                Widgets.showLoader(context);
-
-                                DataOutput<ItemModel> dataOutput =
+                ),
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () async {
+                        try {
+                          Widgets.showLoader(context);
+                          DataOutput<ItemModel> dataOutput =
+                              await ItemRepository().fetchItemFromItemId(
+                            int.parse(widget.itemId),
+                          );
+                          if (context.mounted) {
+                            Widgets.hideLoder(context);
+                            Navigator.pushNamed(
+                              context,
+                              Routes.adDetailsScreen,
+                              arguments: {
+                                "model": dataOutput.modelList[0],
+                              },
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) Widgets.hideLoder(context);
+                        }
+                      },
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: SizedBox(
+                          width: 44,
+                          height: 44,
+                          child: CachedNetworkImage(
+                            imageUrl: widget.itemImage,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => Icon(
+                              Icons.shopping_bag_outlined,
+                              color: context.color.territoryColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          try {
+                            Widgets.showLoader(context);
+                            DataOutput<ItemModel> dataOutput =
                                 await ItemRepository().fetchItemFromItemId(
-                                    int.parse(widget.itemId));
-
-                                Future.delayed(
-                                  Duration.zero,
-                                      () {
-                                    Widgets.hideLoder(context);
-                                    Navigator.pushNamed(
-                                        context, Routes.adDetailsScreen,
-                                        arguments: {
-                                          "model": dataOutput.modelList[0],
-                                        });
-                                  },
-                                );
-                              } catch (e) {
-                                Widgets.hideLoder(context);
-                              }
-                            },
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(24),
-                              child: SizedBox(
-                                width: 47,
-                                height: 47,
-                                child: UiUtils.getImage(
-                                  widget.itemImage,
-                                  fit: BoxFit.cover,
-                                ),
+                              int.parse(widget.itemId),
+                            );
+                            if (context.mounted) {
+                              Widgets.hideLoder(context);
+                              Navigator.pushNamed(
+                                context,
+                                Routes.adDetailsScreen,
+                                arguments: {
+                                  "model": dataOutput.modelList[0],
+                                },
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) Widgets.hideLoder(context);
+                          }
+                        },
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              widget.itemTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: context.color.textDefaultColor,
                               ),
                             ),
-                          ),
-                        ),
-
-                        SizedBox(width: 10),
-                        // Adding horizontal space between items
-                        Expanded(
-                          child: Container(
-                            color: context.color.secondaryColor,
-                            padding: EdgeInsets.symmetric(horizontal: 10),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    widget.itemTitle,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    softWrap: true,
-                                  )
-                                      .color(context.color.textDefaultColor)
-                                      .size(context.font.large),
-                                ),
-                                Padding(
-                                  padding:
-                                  EdgeInsetsDirectional.only(start: 15.0),
-                                  child: Text(
-                                    Constant.currencySymbol.toString() +
-                                        widget.itemPrice
-                                            .toString(), // Replace with your item price
-                                  )
-                                      .color(context.color.textDefaultColor)
-                                      .size(context.font.large)
-                                      .bold(),
-                                ),
-                              ],
+                            const SizedBox(height: 2),
+                            Text(
+                              "${Constant.currencySymbol} ${widget.itemPrice.toStringAsFixed(0)}",
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: context.color.territoryColor,
+                              ),
                             ),
-                          ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                  /*  isNotificationPermissionGranted
-                      ? SizedBox.shrink()
-                      : FittedBox(
-                          fit: BoxFit.cover,
-                          child: Container(
-                            width: context.screenWidth,
-                            color: const Color.fromARGB(255, 151, 151, 151),
-                            child: Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child:
-                                  Text("turnOnNotification".translate(context)),
-                            ),
-                          ),
-                        ),*/
-                ],
+                    const SizedBox(width: 6),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 14,
+                      color: context.color.textLightColor,
+                    ),
+                  ],
+                ),
               ),
             ),
             actions: [
@@ -1034,70 +1031,93 @@ class _ChatScreenState extends State<ChatScreen>
                 }),
               )
             ],
-            title: FittedBox(
-              fit: BoxFit.none,
-              child: Row(
-                children: [
-                  widget.profilePicture == ""
-                      ? CircleAvatar(
-                    backgroundColor: context.color.territoryColor,
-                    child: SvgPicture.asset(
-                      AppIcons.profile,
-                      colorFilter: ColorFilter.mode(
-                          context.color.buttonColor, BlendMode.srcIn),
-                    ),
-                  )
-                      : GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        TransparantRoute(
-                          barrierDismiss: true,
-                          builder: (context) {
-                            return GestureDetector(
-                              onTap: () {
-                                Navigator.pop(context);
-                              },
-                              child: Container(
-                                color: const Color.fromARGB(69, 0, 0, 0),
-                              ),
-                            );
-                          },
-                        ),
-                      );
-                    },
-                    child: CustomImageHeroAnimation(
-                      type: CImageType.Network,
-                      image: widget.profilePicture,
-                      child: CircleAvatar(
-                        backgroundImage: CachedNetworkImageProvider(
-                          widget.profilePicture,
+            title: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: context.color.territoryColor.withValues(alpha: 0.1),
+                  ),
+                  child: ClipOval(
+                    child: widget.profilePicture.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: widget.profilePicture,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => Icon(
+                              Icons.person_rounded,
+                              color: context.color.territoryColor,
+                              size: 20,
+                            ),
+                          )
+                        : SvgPicture.asset(
+                            AppIcons.profile,
+                            fit: BoxFit.scaleDown,
+                            colorFilter: ColorFilter.mode(
+                              context.color.territoryColor,
+                              BlendMode.srcIn,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        widget.userName.isNotEmpty ? widget.userName : "User",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: context.color.textDefaultColor,
                         ),
                       ),
-                    ),
+                      ValueListenableBuilder<bool>(
+                        valueListenable: _socketService.isOtherUserTyping,
+                        builder: (context, isTyping, _) {
+                          return Text(
+                            isTyping
+                                ? "typing...".translate(context)
+                                : "Online".translate(context),
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: isTyping
+                                  ? context.color.territoryColor
+                                  : Colors.green.shade600,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
-                  const SizedBox(
-                    width: 10,
-                  ),
-                  SizedBox(
-                    width: context.screenWidth * 0.35,
-                    child: Text(widget.userName)
-                        .color(context.color.textColorDark)
-                        .size(context.font.normal),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           body: BlocProvider(
             create: (context) => AddItemReviewCubit(),
             child: Stack(
               children: [
+                Container(
+                  color: context.color.backgroundColor,
+                  width: MediaQuery.of(context).size.width,
+                  height: MediaQuery.of(context).size.height,
+                ),
                 SvgPicture.asset(
                   chatBackground,
                   height: MediaQuery.of(context).size.height,
                   fit: BoxFit.cover,
                   width: MediaQuery.of(context).size.width,
+                  colorFilter: ColorFilter.mode(
+                    context.color.backgroundColor.withValues(alpha: 0.9),
+                    BlendMode.srcOver,
+                  ),
                 ),
                 BlocListener<DeleteMessageCubit, DeleteMessageState>(
                   listener: (context, state) {
@@ -1185,10 +1205,32 @@ class _ChatScreenState extends State<ChatScreen>
 
                                   return offerWidget();
                                 }),
-                            if ((state is LoadChatMessagesInProgress))
-                              Center(
-                                child: UiUtils.progress(),
-                              )
+                            if (state is LoadChatMessagesInProgress)
+                              Positioned.fill(
+                                child: Container(
+                                  color: context.color.backgroundColor,
+                                  child: ListView.builder(
+                                    itemCount: 6,
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                    itemBuilder: (context, index) {
+                                      final isMe = index % 2 == 1;
+                                      return Align(
+                                        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                                        child: Container(
+                                          margin: const EdgeInsets.symmetric(vertical: 6),
+                                          width: context.screenWidth * 0.55,
+                                          height: 48,
+                                          decoration: BoxDecoration(
+                                            color: context.color.borderColor.withValues(alpha: 0.2),
+                                            borderRadius: BorderRadius.circular(14),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
                           ],
                         );
                       },

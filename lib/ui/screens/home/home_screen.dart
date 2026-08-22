@@ -16,12 +16,14 @@ import 'package:Ebozor/data/cubits/favorite/favorite_cubit.dart';
 
 import 'package:Ebozor/data/model/home/home_screen_section.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
+import 'package:Ebozor/utils/LocalStoreage/hive_keys.dart';
 import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/notification/awsomeNotification.dart';
 import 'package:Ebozor/utils/notification/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hive/hive.dart';
 import 'package:permission_handler/permission_handler.dart';
 //import 'package:uni_links/uni_links.dart';
 
@@ -45,7 +47,6 @@ import 'package:Ebozor/ui/screens/home/widgets/category_widget_home.dart';
 import 'package:Ebozor/ui/screens/home/widgets/home_search.dart';
 import 'package:Ebozor/ui/screens/home/widgets/home_sections_adapter.dart';
 import 'package:Ebozor/ui/screens/home/widgets/home_shimmers.dart';
-import 'package:Ebozor/ui/screens/home/widgets/location_widget.dart';
 import 'package:Ebozor/ui/screens/home/slider_widget.dart';
 import 'package:Ebozor/ui/screens/home/widgets/verification_banner.dart';
 
@@ -133,11 +134,28 @@ class HomeScreenState extends State<HomeScreen>
         }
       }
     });
+
+    _userBoxSubscription = Hive.box(HiveKeys.userDetailsBox).watch().listen((event) {
+      if (event.key == HiveKeys.city ||
+          event.key == HiveKeys.stateKey ||
+          event.key == HiveKeys.countryKey ||
+          event.key == HiveKeys.areaId ||
+          event.key == HiveKeys.nearbyRadius ||
+          event.key == HiveKeys.latitudeKey ||
+          event.key == HiveKeys.longitudeKey) {
+        _refreshData();
+      }
+    });
+
     super.initState();
   }
 
+  StreamSubscription? _userBoxSubscription;
+
   @override
   void dispose() {
+    _userBoxSubscription?.cancel();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -190,7 +208,7 @@ class HomeScreenState extends State<HomeScreen>
                     : const SizedBox.shrink()),*/
           backgroundColor: const Color.fromARGB(0, 0, 0, 0),
         ),*/
-        backgroundColor: Colors.white,
+        backgroundColor: context.color.primaryColor,
         body: RefreshIndicator(
           key: _refreshIndicatorKey,
 
@@ -492,8 +510,20 @@ class AllItemsWidget extends StatelessWidget {
         if (state is FetchHomeAllItemsSuccess) {
           if (state.items.isNotEmpty) {
             return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Recent Ads"),
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(
+                    top: 18,
+                    bottom: 12,
+                    start: sidePadding,
+                    end: sidePadding,
+                  ),
+                  child: Text("recentAds".translate(context).isNotEmpty ? "recentAds".translate(context) : "Recent Ads")
+                      .size(context.font.large)
+                      .bold(weight: FontWeight.bold)
+                      .color(context.color.textColorDark),
+                ),
                 GridListAdapter(
                   type: ListUiType.Mixed,
                   mixMode: true,

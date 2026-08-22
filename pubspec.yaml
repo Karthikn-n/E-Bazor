@@ -115,6 +115,7 @@ flutter:
   assets:
     - assets/svg/
     - assets/svg/bottomnav/
+    - assets/icons/
     - assets/languages/
     - assets/lottie/
     - assets/chat_background/

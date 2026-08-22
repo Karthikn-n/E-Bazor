@@ -100,17 +100,19 @@ class _AddItemDetailsState extends CloudState<AddItemDetails> {
     AbstractField.fieldsData.clear();
     AbstractField.files.clear();
     if (widget.isEdit == true) {
-      item = getCloudData('edit_request') as ItemModel;
+      item = getCloudData('edit_request') as ItemModel?;
 
       clearCloudData("item_details");
       clearCloudData("with_more_details");
-      context.read<FetchCustomFieldsCubit>().fetchCustomFields(
-            categoryIds: item!.allCategoryIds!,
-          );
+      if (item?.allCategoryIds != null && item!.allCategoryIds!.isNotEmpty) {
+        context.read<FetchCustomFieldsCubit>().fetchCustomFields(
+              categoryIds: item!.allCategoryIds!,
+            );
+      }
       adTitleController.text = item?.name ?? "";
       adSlugController.text = item?.slug ?? "";
       adDescriptionController.text = item?.description ?? "";
-      adPriceController.text = item?.price.toString() ?? "";
+      adPriceController.text = item?.price?.toString() ?? "";
       adPhoneNumberController.text = item?.contact ?? "";
       adAdditionalDetailsController.text = item?.videoLink ?? "";
       titleImageURL = item?.image ?? "";
@@ -119,12 +121,25 @@ class _AddItemDetailsState extends CloudState<AddItemDetails> {
       mixedItemImageList.addAll([...list ?? []]);
 
       setState(() {});
-    } else {
-      List<int> ids = widget.breadCrumbItems!.map((item) => item.id!).toList();
+      List<CategoryModel> breadCrumbs = [];
+      if (widget.breadCrumbItems != null && widget.breadCrumbItems!.isNotEmpty) {
+        breadCrumbs = List<CategoryModel>.from(widget.breadCrumbItems!);
+      } else {
+        final dynamic rawBreadcrumb = getCloudData("breadCrumb");
+        if (rawBreadcrumb is List) {
+          breadCrumbs = rawBreadcrumb.whereType<CategoryModel>().toList();
+        }
+      }
+      List<int> ids = breadCrumbs
+          .where((item) => item.id != null)
+          .map((item) => item.id!)
+          .toList();
 
-      context
-          .read<FetchCustomFieldsCubit>()
-          .fetchCustomFields(categoryIds: ids.join(','));
+      if (ids.isNotEmpty) {
+        context
+            .read<FetchCustomFieldsCubit>()
+            .fetchCustomFields(categoryIds: ids.join(','));
+      }
       print("///////////////////");
       print("categoryIDs in filte screen:$ids");
       print("///////////////////");
@@ -326,7 +341,7 @@ class _AddItemDetailsState extends CloudState<AddItemDetails> {
                                           _onBreadCrumbItemTap(index);
                                         },
                                         child: Text(widget
-                                                .breadCrumbItems![index].name!)
+                                                .breadCrumbItems![index].name ?? "")
                                             .firstUpperCaseWidget()
                                             .color(
                                               isNotLast

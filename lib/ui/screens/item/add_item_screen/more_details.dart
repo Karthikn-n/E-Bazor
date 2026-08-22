@@ -67,19 +67,16 @@ class _AddMoreDetailsScreenState extends CloudState<AddMoreDetailsScreen> {
 
               // Check if 'item' and 'item.customFields' are not null before accessing them
               if (widget.isEdit == true) {
-                ItemModel item = getCloudData('edit_request') as ItemModel;
-
-                /*CustomFieldModel matchingField =
-                item.customFields!.firstWhere((e) => e.id == field.id);*/
+                ItemModel? item = getCloudData('edit_request') as ItemModel?;
 
                 CustomFieldModel? matchingField =
-                item.customFields!.any((e) => e.id == field.id)
-                    ? item.customFields?.firstWhere((e) => e.id == field.id)
-                    : null;
+                    (item != null && item.customFields != null && item.customFields!.any((e) => e.id == field.id))
+                        ? item.customFields?.firstWhere((e) => e.id == field.id)
+                        : null;
                 if (matchingField != null) {
                   // Set 'value' in 'fieldData' based on the matching field's value
                   fieldData['value'] = matchingField.value;
-                } // Use null-aware operator '?.' for safety
+                }
               }
 
               fieldData['isEdit'] = widget.isEdit == true;
@@ -127,7 +124,11 @@ class _AddMoreDetailsScreenState extends CloudState<AddMoreDetailsScreen> {
               context,
               onPressed: () {
                 if (_formKey.currentState?.validate() ?? false) {
-                  Map itemDetailsScreenData = getCloudData("item_details");
+                  final dynamic rawItemDetails = getCloudData("item_details");
+                  Map itemDetailsScreenData = rawItemDetails is Map
+                      ? Map.from(rawItemDetails)
+                      : <String, dynamic>{};
+
                   itemDetailsScreenData['custom_fields'] =
                       json.encode(AbstractField.fieldsData);
 
