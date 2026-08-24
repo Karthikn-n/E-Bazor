@@ -43,11 +43,11 @@ extension ListExt<T> on List<T> {
   }
 
   List<int> forceInt() {
-    return map((e) => Adapter.forceInt(e)!).toList() ?? <int>[];
+    return map((e) => Adapter.forceInt(e)!).toList();
   }
 
   List<double> forceDouble() {
-    return map((e) => Adapter().forceDouble(e)!).toList() ?? <double>[];
+    return map((e) => Adapter().forceDouble(e)!).toList();
   }
 
   dynamic sum(num Function(T e) fn) {

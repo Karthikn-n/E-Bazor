@@ -293,4 +293,30 @@ class JobRepository {
       rethrow;
     }
   }
+
+  Future<Map<String, dynamic>?> fetchJobDashboardProfile({
+    String type = "personal",
+  }) async {
+    try {
+      final user = HiveUtils.getUserDetails();
+      final userId = user.id ?? HiveUtils.getUserId();
+
+      final response = await Api.get(
+        url: Api.getJobDashboardProfileApi,
+        queryParameters: {
+          if (userId != null) 'user_id': userId,
+          'type': type,
+        },
+      );
+
+      final data = response['data'];
+      if (data is Map<String, dynamic>) {
+        return data;
+      }
+      return null;
+    } catch (e) {
+      log("⚠️ [JOB REPO] fetchJobDashboardProfile error: $e");
+      return null;
+    }
+  }
 }

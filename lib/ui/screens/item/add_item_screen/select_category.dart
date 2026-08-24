@@ -642,16 +642,19 @@ class _SelectNestedCategoryState extends CloudState<SelectNestedCategory> {
     } else {
       // 3. If no children returned from the API -> this is a leaf node!
       // Call get-customfields-by-category-id and navigate based on the category and custom fields
+      final isCar = _isCarCategory(category, breadCrumbData);
       List<CustomFieldModel> customFields = [];
-      try {
-        Widgets.showLoader(context);
-        customFields = await _customFieldsRepository
-            .getCustomFieldsByCategoryId(category.id);
-      } catch (e) {
-        log("❌ [CUSTOM FIELDS BY CATEGORY FETCH ERROR] $e");
-      } finally {
-        if (mounted) {
-          Widgets.hideLoader(context);
+      if (!isCar) {
+        try {
+          Widgets.showLoader(context);
+          customFields = await _customFieldsRepository
+              .getCustomFieldsByCategoryId(category.id);
+        } catch (e) {
+          log("❌ [CUSTOM FIELDS BY CATEGORY FETCH ERROR] $e");
+        } finally {
+          if (mounted) {
+            Widgets.hideLoader(context);
+          }
         }
       }
 

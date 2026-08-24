@@ -42,6 +42,7 @@ import 'package:Ebozor/data/cubits/chat/delete_message_cubit.dart';
 
 class ItemsList extends StatefulWidget {
   final String categoryId, categoryName;
+  final String? categorySlug;
   final String? initialSearch;
   final List<String>? categoryIds;
   final List<CategoryModel>? selectedCategoryChain;
@@ -52,6 +53,7 @@ class ItemsList extends StatefulWidget {
       {super.key,
       required this.categoryId,
       required this.categoryName,
+      this.categorySlug,
       this.initialSearch,
       this.categoryIds,
       this.selectedCategoryChain,
@@ -67,6 +69,8 @@ class ItemsList extends StatefulWidget {
       builder: (_) => ItemsList(
         categoryId: (arguments?['catID'] ?? "").toString(),
         categoryName: (arguments?['catName'] ?? "").toString(),
+        categorySlug: arguments?['categorySlug']?.toString() ??
+            arguments?['catSlug']?.toString(),
         initialSearch: arguments?['search']?.toString(),
         categoryIds: arguments?['categoryIds'] != null
             ? List<String>.from(arguments!['categoryIds'])
@@ -196,6 +200,20 @@ class ItemsListState extends State<ItemsList> {
     return int.tryParse(widget.categoryId) ?? 0;
   }
 
+  String get _activeCategorySlug {
+    final candidates = <String?>[
+      filter?.categorySlug,
+      _propertyFilterConfiguration?.slug,
+      if (_currentChain.isNotEmpty) _currentChain.last.slug,
+      widget.categorySlug,
+    ];
+    for (final candidate in candidates) {
+      final slug = candidate?.trim() ?? '';
+      if (slug.isNotEmpty) return slug;
+    }
+    return '';
+  }
+
   String _normalizeFilterName(String name) {
     var normalized = name.trim();
     if (normalized.startsWith('filters[') && normalized.endsWith(']')) {
@@ -272,13 +290,22 @@ class ItemsListState extends State<ItemsList> {
     Constant.itemFilter = filter;
   }
 
-  List<FilterItem> get _jobQuickFilters =>
-      (_propertyFilterConfiguration?.filters ?? const <FilterItem>[])
-          .where((item) =>
-              (item.name?.trim().isNotEmpty ?? false) && item.values.isNotEmpty)
-          .toList();
+  List<FilterItem> get _apiQuickFilters {
+    final items =
+        (_propertyFilterConfiguration?.filters ?? const <FilterItem>[])
+            .where((item) {
+      final type = item.type?.toLowerCase() ?? 'button';
+      return item.isActive &&
+          (item.name?.trim().isNotEmpty ?? false) &&
+          type != 'text' &&
+          type != 'number' &&
+          item.values.isNotEmpty;
+    }).toList();
+    items.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    return items.take(4).toList();
+  }
 
-  String _jobFilterLabel(FilterItem item) {
+  String _apiFilterLabel(FilterItem item) {
     final name = item.name?.trim() ?? 'Filter';
     final value = _customFilterValue(name);
     if (value is Iterable && value is! String) {
@@ -287,18 +314,25 @@ class ItemsListState extends State<ItemsList> {
           .where((entry) => entry.isNotEmpty)
           .toList();
       if (selected.isEmpty) return name;
-      if (selected.length == 1) return selected.first;
+      if (selected.length == 1) return '$name: ${selected.first}';
       return '$name (${selected.length})';
     }
     final selected = value?.toString().trim() ?? '';
-    return selected.isEmpty ? name : selected;
+    return selected.isEmpty ? name : '$name: $selected';
   }
 
-  Future<void> _showJobApiQuickFilter(FilterItem item) async {
+  Future<void> _showApiQuickFilter(FilterItem item) async {
     final fieldName = item.name?.trim();
-    if (fieldName == null || fieldName.isEmpty || item.values.isEmpty) return;
+    if (fieldName == null || fieldName.isEmpty) return;
 
     final existing = _customFilterValue(fieldName);
+    final type = item.type?.toLowerCase() ?? 'button';
+    final isInput = type == 'text' || type == 'number' || item.values.isEmpty;
+    final inputController = TextEditingController(
+      text: existing is Iterable && existing is! String
+          ? (existing.isEmpty ? '' : existing.first.toString())
+          : existing?.toString() ?? '',
+    );
     final selected = <String>{};
     if (existing is Iterable && existing is! String) {
       selected.addAll(existing.map((entry) => entry.toString()));
@@ -306,118 +340,200 @@ class ItemsListState extends State<ItemsList> {
       selected.add(existing.toString());
     }
 
+    final optionCount = item.values.length;
+    final initialSize =
+        (0.38 + (optionCount.clamp(0, 12) * 0.032)).clamp(0.46, 0.82);
     final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
-            return Material(
-              color: sheetContext.color.secondaryColor,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(18)),
-              clipBehavior: Clip.antiAlias,
-              child: SafeArea(
-                top: false,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.72,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Center(
-                          child: Container(
-                            width: 40,
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: sheetContext.color.borderColor,
-                              borderRadius: BorderRadius.circular(2),
+            return DraggableScrollableSheet(
+              initialChildSize: initialSize.toDouble(),
+              minChildSize: 0.36,
+              maxChildSize: 0.92,
+              expand: false,
+              builder: (sheetContext, scrollController) => Material(
+                color: sheetContext.color.secondaryColor,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(24)),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 4,
+                      margin: const EdgeInsets.only(top: 10, bottom: 8),
+                      decoration: BoxDecoration(
+                        color: sheetContext.color.borderColor,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 12, 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  fieldName,
+                                  style: TextStyle(
+                                    color: sheetContext.color.textDefaultColor,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  item.multiSelect
+                                      ? 'Choose one or more options'
+                                      : 'Choose an option',
+                                  style: TextStyle(
+                                    color: sheetContext.color.textLightColor,
+                                    fontSize: 12.5,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(sheetContext),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 1, color: sheetContext.color.borderColor),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        controller: scrollController,
+                        physics: const BouncingScrollPhysics(),
+                        padding: EdgeInsets.fromLTRB(
+                          20,
+                          20,
+                          20,
+                          MediaQuery.viewInsetsOf(sheetContext).bottom + 20,
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          fieldName,
-                          style: TextStyle(
-                            color: sheetContext.color.textDefaultColor,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
+                        child: isInput
+                            ? TextField(
+                                controller: inputController,
+                                autofocus: true,
+                                keyboardType: type == 'number'
+                                    ? const TextInputType.numberWithOptions(
+                                        decimal: true)
+                                    : TextInputType.text,
+                                decoration: InputDecoration(
+                                  hintText:
+                                      item.placeholder ?? 'Enter $fieldName',
+                                  prefixIcon: Icon(
+                                    type == 'number'
+                                        ? Icons.numbers_rounded
+                                        : Icons.edit_outlined,
+                                  ),
+                                  filled: true,
+                                  fillColor: sheetContext.color.backgroundColor,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    borderSide: BorderSide(
+                                      color: sheetContext.color.borderColor,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Wrap(
+                                spacing: 10,
+                                runSpacing: 10,
+                                children: item.values.map((option) {
+                                  final isSelected = selected.contains(option);
+                                  return FilterChip(
+                                    label: Text(option),
+                                    selected: isSelected,
+                                    showCheckmark: true,
+                                    selectedColor: sheetContext
+                                        .color.territoryColor
+                                        .withValues(alpha: 0.12),
+                                    side: BorderSide(
+                                      color: isSelected
+                                          ? sheetContext.color.territoryColor
+                                          : sheetContext.color.borderColor,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    onSelected: (_) {
+                                      setSheetState(() {
+                                        if (item.multiSelect) {
+                                          isSelected
+                                              ? selected.remove(option)
+                                              : selected.add(option);
+                                        } else {
+                                          selected
+                                            ..clear()
+                                            ..add(option);
+                                        }
+                                      });
+                                    },
+                                  );
+                                }).toList(),
+                              ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          top: BorderSide(
+                            color: sheetContext.color.borderColor,
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        Flexible(
-                          child: SingleChildScrollView(
-                            child: Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: item.values.map((option) {
-                                final isSelected = selected.contains(option);
-                                return ChoiceChip(
-                                  label: Text(option),
-                                  selected: isSelected,
-                                  onSelected: (_) {
-                                    setSheetState(() {
-                                      if (item.multiSelect) {
-                                        isSelected
-                                            ? selected.remove(option)
-                                            : selected.add(option);
-                                      } else {
-                                        selected
-                                          ..clear()
-                                          ..add(option);
-                                      }
-                                    });
-                                  },
-                                );
-                              }).toList(),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(
+                                sheetContext,
+                                <String, dynamic>{
+                                  'apply': true,
+                                  'value': null,
+                                },
+                              ),
+                              child: const Text('Clear'),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () => Navigator.pop(
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                final dynamic value = isInput
+                                    ? (inputController.text.trim().isEmpty
+                                        ? null
+                                        : inputController.text.trim())
+                                    : item.multiSelect
+                                        ? selected.toList()
+                                        : (selected.isEmpty
+                                            ? null
+                                            : selected.first);
+                                Navigator.pop(
                                   sheetContext,
                                   <String, dynamic>{
                                     'apply': true,
-                                    'value': null,
+                                    'value': value,
                                   },
-                                ),
-                                child: const Text('Clear'),
-                              ),
+                                );
+                              },
+                              child: const Text('Apply'),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  final value = item.multiSelect
-                                      ? selected.toList()
-                                      : (selected.isEmpty
-                                          ? null
-                                          : selected.first);
-                                  Navigator.pop(
-                                    sheetContext,
-                                    <String, dynamic>{
-                                      'apply': true,
-                                      'value': value,
-                                    },
-                                  );
-                                },
-                                child: const Text('Apply'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             );
@@ -426,6 +542,7 @@ class ItemsListState extends State<ItemsList> {
       },
     );
 
+    inputController.dispose();
     if (!mounted || result?['apply'] != true) return;
     setState(() {
       _setDynamicCustomFilterValue(fieldName, result?['value']);
@@ -445,12 +562,17 @@ class ItemsListState extends State<ItemsList> {
   }
 
   Future<void> _loadPropertyFilterConfiguration(String slug) async {
-    if (slug.isEmpty) return;
+    final requestedSlug = slug.trim();
+    if (requestedSlug.isEmpty) return;
     try {
-      final configuration = await FilterRepository().getFilters(slug);
+      final configuration = await FilterRepository().getFilters(requestedSlug);
       if (!mounted) return;
       setState(() {
         _propertyFilterConfiguration = configuration;
+        filter = (filter ??
+                ItemFilterModel(categoryId: _activeCategoryId.toString()))
+            .copyWith(categorySlug: configuration.slug ?? requestedSlug);
+        Constant.itemFilter = filter;
         _syncQuickFilterLabelsFromFilter();
       });
     } catch (_) {
@@ -647,6 +769,7 @@ class ItemsListState extends State<ItemsList> {
       _currentChain.add(CategoryModel(
           id: int.tryParse(widget.categoryId) ?? 0,
           name: widget.categoryName,
+          slug: widget.categorySlug,
           children: [],
           subcategoriesCount: 0));
     }
@@ -655,7 +778,7 @@ class ItemsListState extends State<ItemsList> {
         widget.categoryIds != null ? List.from(widget.categoryIds!) : [];
     _propertyFilterConfiguration = widget.filterConfiguration;
     searchbody = {};
-    filter = widget.appliedFilter ?? Constant.itemFilter;
+    filter = widget.appliedFilter;
     searchController = TextEditingController(text: widget.initialSearch ?? '');
     previousSearchQuery = widget.initialSearch?.trim() ?? '';
     searchController.addListener(searchItemListener);
@@ -674,6 +797,10 @@ class ItemsListState extends State<ItemsList> {
             latitude: HiveUtils.getLatitude() ?? null,
             longitude: HiveUtils.getLongitude() ?? null);
 
+    if ((initialFilter.categorySlug?.trim().isEmpty ?? true) &&
+        (widget.categorySlug?.trim().isNotEmpty ?? false)) {
+      initialFilter = initialFilter.copyWith(categorySlug: widget.categorySlug);
+    }
     filter = initialFilter;
     Constant.itemFilter = initialFilter;
 
@@ -702,11 +829,8 @@ class ItemsListState extends State<ItemsList> {
     }
 
     _syncQuickFilterLabelsFromFilter();
-    if ((_isPropertyVertical() || _isJobsVertical()) &&
-        _propertyFilterConfiguration == null) {
-      final configurationSlug = filter?.categorySlug ??
-          (_currentChain.isNotEmpty ? _currentChain.last.slug : null) ??
-          '';
+    if (_propertyFilterConfiguration == null) {
+      final configurationSlug = _activeCategorySlug;
       if (configurationSlug.isNotEmpty) {
         _loadPropertyFilterConfiguration(configurationSlug);
       }
@@ -1123,11 +1247,9 @@ class ItemsListState extends State<ItemsList> {
 
   void _openFullFilterScreen() {
     final catIdInt = _activeCategoryId;
-    const filterCategoryIds = [65, 68, 139, 143];
-
     CategoryModel? activeCategory;
     if (_currentChain.isNotEmpty) {
-      activeCategory = _currentChain.first;
+      activeCategory = _currentChain.last;
     } else if (widget.selectedCategoryChain != null &&
         widget.selectedCategoryChain!.isNotEmpty) {
       activeCategory = widget.selectedCategoryChain!.first;
@@ -1135,17 +1257,20 @@ class ItemsListState extends State<ItemsList> {
       activeCategory = CategoryModel(
         id: catIdInt,
         name: widget.categoryName,
+        slug: _activeCategorySlug,
         children: [],
         subcategoriesCount: 0,
       );
     }
 
-    if (filterCategoryIds.contains(catIdInt) || _isPropertyVertical()) {
+    if (_activeCategorySlug.isNotEmpty ||
+        _propertyFilterConfiguration != null) {
       Navigator.pushNamed(
         context,
         Routes.filterpage,
         arguments: {
           'category': activeCategory,
+          'categorySlug': _activeCategorySlug,
           'appliedFilter': filter,
           'isFromItemsList': true,
           'filterConfiguration': _propertyFilterConfiguration,
@@ -2095,9 +2220,6 @@ class ItemsListState extends State<ItemsList> {
   Widget _buildFilterChips() {
     final activeFiltersCount = _activeFiltersCount;
 
-    final isProp = _isPropertyVertical();
-    final isJob = _isJobsVertical();
-
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       physics: const BouncingScrollPhysics(),
@@ -2139,63 +2261,14 @@ class ItemsListState extends State<ItemsList> {
           ),
           const SizedBox(width: 8),
 
-          if (isProp) ...[
-            // Purpose (Rent, Buy, Off-plan, Rooms)
+          for (final apiFilter in _apiQuickFilters) ...[
             _buildQuickFilterPill(
-              label: _selectedRentSaleLabel,
-              isActive: _selectedRentSaleLabel != "Purpose",
-              onTap: _showPropertyPurposeQuickFilter,
+              label: _apiFilterLabel(apiFilter),
+              isActive:
+                  _isMeaningfulFilterValue(_customFilterValue(apiFilter.name!)),
+              onTap: () => _showApiQuickFilter(apiFilter),
             ),
             const SizedBox(width: 8),
-
-            // Property Type
-            _buildQuickFilterPill(
-              label: _selectedPropertyTypeLabel,
-              isActive: _selectedPropertyTypeLabel != "Property Type" &&
-                  _selectedPropertyTypeLabel != "All",
-              onTap: _showPropertyTypeQuickFilter,
-            ),
-            const SizedBox(width: 8),
-
-            // Price Range
-            _buildQuickFilterPill(
-              label: _selectedPriceRangeLabel,
-              isActive: _selectedPriceRangeLabel != "Price Range",
-              onTap: _showPriceRangeQuickFilter,
-            ),
-            const SizedBox(width: 8),
-
-            // Bedrooms / Rooms
-            _buildQuickFilterPill(
-              label: _selectedRoomsLabel,
-              isActive: _selectedRoomsLabel != "Bedrooms" &&
-                  _selectedRoomsLabel != "Rooms",
-              onTap: _showRoomsQuickFilter,
-            ),
-            const SizedBox(width: 8),
-
-            // Bathrooms
-            _buildQuickFilterPill(
-              label: _selectedBathroomsLabel,
-              isActive: _selectedBathroomsLabel != "Bathrooms",
-              onTap: _showBathroomsQuickFilter,
-            ),
-          ] else if (isJob) ...[
-            for (final jobFilter in _jobQuickFilters) ...[
-              _buildQuickFilterPill(
-                label: _jobFilterLabel(jobFilter),
-                isActive: _isMeaningfulFilterValue(
-                    _customFilterValue(jobFilter.name!)),
-                onTap: () => _showJobApiQuickFilter(jobFilter),
-              ),
-              const SizedBox(width: 8),
-            ],
-          ] else ...[
-            // General dynamic category chain chips
-            for (int i = 0; i < _currentChain.length; i++) ...[
-              _buildDynamicChip(i),
-              const SizedBox(width: 8),
-            ],
           ],
         ],
       ),
@@ -3504,6 +3577,58 @@ class ItemsListState extends State<ItemsList> {
                         }
                       }
 
+                      final catNameLower =
+                          (item.category?.name ?? '').toLowerCase();
+                      final catSlugLower =
+                          (item.category?.slug ?? '').toLowerCase();
+                      final widgetCatLower = widget.categoryName.toLowerCase();
+
+                      final isFurnitureOrClassifieds =
+                          catNameLower.contains('furniture') ||
+                              catSlugLower.contains('furniture') ||
+                              catNameLower.contains('classified') ||
+                              catSlugLower.contains('classified') ||
+                              widgetCatLower.contains('furniture') ||
+                              widgetCatLower.contains('classified');
+
+                      if (isFurnitureOrClassifieds) {
+                        return InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () => _openChat(context, item),
+                          child: Container(
+                            height: 38,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: const Color(0xFFDBEAFE),
+                                width: 1,
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.chat_outlined,
+                                  size: 16,
+                                  color: Color(0xFF2563EB),
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  "Chat",
+                                  style: TextStyle(
+                                    color: Color(0xFF2563EB),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
                       return Row(
                         children: [
                           // 1. Chat Button
@@ -4038,8 +4163,6 @@ class ItemsListState extends State<ItemsList> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildDynamicSegmentTabs(state.itemModel),
-            const SizedBox(height: 4),
             mainChildren(state.itemModel),
             if (state.isLoadingMore)
               Padding(

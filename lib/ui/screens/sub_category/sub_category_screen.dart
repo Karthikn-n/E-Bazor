@@ -1,8 +1,10 @@
 import 'package:Ebozor/data/cubits/category/fetch_sub_categories_cubit.dart';
 import 'package:Ebozor/data/model/motors_service_models.dart';
+import 'package:Ebozor/settings.dart';
 import 'package:Ebozor/ui/screens/home/widgets/jobs_bottom_sheet.dart';
 import 'package:Ebozor/ui/screens/sub_category/sub_category_filter_screen.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shimmer/shimmer.dart';
@@ -19,6 +21,7 @@ import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
 class SubCategoryScreenOne extends StatefulWidget {
   final List<CategoryModel> categoryList;
   final String catName;
+  final String? catSlug;
   final int catId;
   final List<String> categoryIds;
 
@@ -26,6 +29,7 @@ class SubCategoryScreenOne extends StatefulWidget {
       {super.key,
       required this.categoryList,
       required this.catName,
+      this.catSlug,
       required this.catId,
       required this.categoryIds});
 
@@ -40,6 +44,8 @@ class SubCategoryScreenOne extends StatefulWidget {
         child: SubCategoryScreenOne(
           categoryList: args?['categoryList'] ?? [],
           catName: args?['catName'] ?? "",
+          catSlug:
+              args?['categorySlug']?.toString() ?? args?['catSlug']?.toString(),
           catId: args?['catId'] ?? 0,
           categoryIds: args?['categoryIds'] ?? [],
         ),
@@ -75,12 +81,14 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
     }
   }
 
-  bool get _isMotorCategory {
-    final name = widget.catName.toLowerCase();
+  bool get _isMainMotorsCategory {
+    if (widget.categoryIds.length > 1) return false;
+    final name = widget.catName.trim().toLowerCase();
+    final slug = (widget.catSlug ?? '').trim().toLowerCase();
     return name == "motors" ||
         name == "motor" ||
-        name.contains("motor") ||
-        name.contains("car") ||
+        slug == "motors" ||
+        slug == "motor" ||
         widget.catId == 1;
   }
 
@@ -94,6 +102,7 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
         category: CategoryModel(
           id: widget.catId,
           name: widget.catName,
+          slug: widget.catSlug,
           children: widget.categoryList,
         ),
       );
@@ -139,6 +148,7 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
                             arguments: {
                               'catID': widget.catId.toString(),
                               'catName': widget.catName,
+                              'categorySlug': widget.catSlug,
                               "categoryIds": [...widget.categoryIds]
                             });
                       },
@@ -148,7 +158,7 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
                       height: 10,
                     ),
                     fetchSubCategoriesData(),
-                    if (_isMotorCategory) ...[
+                    if (_isMainMotorsCategory) ...[
                       const SizedBox(height: 20),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -209,6 +219,7 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
                   arguments: {
                     'catID': widget.catId.toString(),
                     'catName': widget.catName,
+                    'categorySlug': widget.catSlug,
                     "categoryIds": [...widget.categoryIds],
                   },
                 );
@@ -269,6 +280,7 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
                         arguments: {
                           "categoryList": category.children ?? [],
                           "catName": category.name ?? "",
+                          "categorySlug": category.slug,
                           "catId": category.id ?? 0,
                           "categoryIds": [
                             ...widget.categoryIds,
@@ -378,7 +390,22 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
           onTap: () {
-            Navigator.pushNamed(context, Routes.carSpecsFormScreen);
+            final defaultCategory = CategoryModel(
+              id: 6,
+              name: widget.catName.isNotEmpty ? widget.catName : "Motors",
+              slug: widget.catSlug ?? "motors",
+              children: [],
+              subcategoriesCount: 0,
+            );
+            Navigator.pushNamed(
+              context,
+              Routes.carSpecsFormScreen,
+              arguments: <String, dynamic>{
+                "category": defaultCategory,
+                "current": defaultCategory,
+                "breadcrumbs": [defaultCategory],
+              },
+            );
           },
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -397,16 +424,12 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
                 SizedBox(
                   width: 90,
                   height: 52,
-                  child: Image.asset(
-                    "assets/icons/sell_car_banner.png",
+                  child: CachedNetworkImage(
+                    imageUrl:
+                        "${AppSettings.hostUrl}:8003/_next/static/media/sellcar.eb9a34b8.png",
                     fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Icon(
-                        Icons.directions_car_filled_rounded,
-                        size: 40,
-                        color: context.color.territoryColor,
-                      );
-                    },
+                    placeholder: (context, url) => const SizedBox.shrink(),
+                    errorWidget: (context, url, error) => const SizedBox.shrink(),
                   ),
                 ),
               ],
@@ -455,19 +478,14 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 10,
       mainAxisSpacing: 10,
-      childAspectRatio: 2.1,
+      childAspectRatio: 2.5,
       children: [
         // 1. Car Inspection
         _buildServiceCard(
           context: context,
-          title: "Car\nInspection",
+          title: "Car Inspection",
           backgroundColor:
               isDark ? const Color(0xFF2C1E1E) : const Color(0xFFFDECEB),
-          iconWidget: Icon(
-            Icons.car_repair_rounded,
-            size: 32,
-            color: Colors.redAccent.shade200,
-          ),
           onTap: () => Navigator.pushNamed(
             context,
             Routes.motorsServiceScreen,
@@ -481,21 +499,6 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
           title: "Car Finance",
           backgroundColor:
               isDark ? const Color(0xFF192837) : const Color(0xFFE8F4FD),
-          iconWidget: Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.blue.shade600,
-            ),
-            child: const Center(
-              child: Icon(
-                Icons.percent_rounded,
-                size: 20,
-                color: Colors.white,
-              ),
-            ),
-          ),
           onTap: () => Navigator.pushNamed(
             context,
             Routes.motorsServiceScreen,
@@ -506,14 +509,9 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
         // 3. Car Evaluation
         _buildServiceCard(
           context: context,
-          title: "Car\nEvaluation",
+          title: "Car Evaluation",
           backgroundColor:
               isDark ? const Color(0xFF2E2718) : const Color(0xFFFFF4E5),
-          iconWidget: Icon(
-            Icons.assignment_turned_in_rounded,
-            size: 30,
-            color: Colors.amber.shade700,
-          ),
           onTap: () => Navigator.pushNamed(
             context,
             Routes.motorsServiceScreen,
@@ -528,7 +526,6 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
     required BuildContext context,
     required String title,
     required Color backgroundColor,
-    required Widget iconWidget,
     required VoidCallback onTap,
   }) {
     return Container(
@@ -542,23 +539,18 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                      color: context.color.textDefaultColor,
-                      height: 1.25,
-                    ),
-                  ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: context.color.textDefaultColor,
+                  height: 1.2,
                 ),
-                const SizedBox(width: 6),
-                iconWidget,
-              ],
+              ),
             ),
           ),
         ),

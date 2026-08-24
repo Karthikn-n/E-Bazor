@@ -352,7 +352,7 @@ class _SellerVerificationScreenState
           title: "phoneNumber",
           hintText: "phoneNumberHere".translate(context),
           controller: phoneController,
-          validator: CustomTextFieldValidator.phoneNumber,
+          // validator: CustomTextFieldValidator.phoneNumber,
           readOnly: false,
         ),
         buildTextField(

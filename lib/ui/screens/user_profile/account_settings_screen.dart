@@ -92,7 +92,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         backgroundColor: context.color.backgroundColor,
         appBar: UiUtils.buildAppBar(
           context,
-          title: "Account Settings",
+          title: "Account",
           showBackButton: true,
         ),
         body: SingleChildScrollView(
@@ -102,6 +102,13 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _buildItemTile(
+                  icon: Icons.phone_android_rounded,
+                  title: "Primary Phone Number",
+                  onTap: () {
+                    Navigator.pushNamed(context, Routes.phoneNumbersScreen);
+                  },
+                ),
                 _buildItemTile(
                   icon: Icons.location_on_outlined,
                   title: "Addresses",
@@ -125,13 +132,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                       : "My Reviews",
                   onTap: () {
                     Navigator.pushNamed(context, Routes.myReviewsScreen);
-                  },
-                ),
-                _buildItemTile(
-                  icon: Icons.favorite_border_rounded,
-                  title: "favorites".translate(context),
-                  onTap: () {
-                    Navigator.pushNamed(context, Routes.favoritesScreen);
                   },
                 ),
 

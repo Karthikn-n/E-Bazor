@@ -1,9 +1,11 @@
 import 'package:Ebozor/ui/screens/auth/sign_up/mobile_signup_screen.dart';
+import 'package:Ebozor/ui/screens/filter_screen.dart';
 import 'package:Ebozor/ui/screens/home/widgets/categoryFilterScreen.dart';
 import 'package:Ebozor/ui/screens/home/widgets/postedSinceFilter.dart';
 import 'package:Ebozor/ui/screens/home/widgets/subCategoryFilterScreen.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/pdf_viewer.dart';
 import 'package:Ebozor/ui/screens/item/viewAll.dart';
+import 'package:Ebozor/ui/screens/main_activity.dart';
 import 'package:Ebozor/ui/screens/sub_category/sub_category_filter_screen.dart';
 import 'package:Ebozor/ui/screens/sub_category/sub_category_screen.dart';
 import 'package:Ebozor/ui/screens/auth/login/forgot_password.dart';
@@ -45,10 +47,14 @@ import 'package:Ebozor/ui/screens/sold_out_bought_screen.dart';
 import 'package:Ebozor/ui/screens/user_profile/edit_profile.dart';
 import 'package:Ebozor/ui/screens/user_profile/saved_searches_screen.dart';
 import 'package:Ebozor/ui/screens/user_profile/account_settings_screen.dart';
+import 'package:Ebozor/ui/screens/user_profile/phone_numbers_screen.dart';
+import 'package:Ebozor/ui/screens/user_profile/choose_otp_method_screen.dart';
+import 'package:Ebozor/ui/screens/user_profile/confirm_phone_number_screen.dart';
 import 'package:Ebozor/ui/screens/user_profile/security_screen.dart';
 import 'package:Ebozor/ui/screens/help_me_buy/help_me_buy_screen.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:Ebozor/ui/screens/jobs/introduction_recording_screen.dart';
 import 'package:Ebozor/ui/screens/advertisement/my_advertisment_screen.dart';
 import 'package:Ebozor/ui/screens/auth/login/login_screen.dart';
 
@@ -82,12 +88,12 @@ import 'package:Ebozor/ui/screens/motors_services/motors_service_screen.dart';
 import 'package:Ebozor/ui/screens/motors_services/motors_service_request_screen.dart';
 import 'package:Ebozor/ui/screens/motors_services/motors_inspection_checkout_screen.dart';
 import 'package:Ebozor/ui/screens/motors_services/car_inspection_history_screen.dart';
+import 'package:Ebozor/ui/screens/motors_services/car_appointments_screen.dart';
 
-import 'package:Ebozor/ui/screens/filter_screen.dart';
-import 'package:Ebozor/ui/screens/main_activity.dart';
 import 'package:Ebozor/ui/screens/splash_screen.dart';
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
 import 'package:Ebozor/ui/screens/widgets/maintenance_mode.dart';
+import 'package:Ebozor/ui/screens/user_profile/profile_menu_screen.dart';
 import 'package:Ebozor/data/repositories/item/item_repository.dart';
 import 'package:Ebozor/data/model/data_output.dart';
 import 'package:Ebozor/data/model/item/item_model.dart';
@@ -188,17 +194,23 @@ class Routes {
   static const motorsInspectionCheckoutScreen =
       '/motorsInspectionCheckoutScreen';
   static const carInspectionHistoryScreen = '/carInspectionHistoryScreen';
+  static const carAppointmentsScreen = '/carAppointmentsScreen';
   static const savedSearchesScreen = '/savedSearchesScreen';
   static const sectionWiseItemsScreen = '/sectionWiseItemsScreen';
   static const blockedUserListScreen = '/blockedUserListScreen';
   static const accountSettingsScreen = '/accountSettingsScreen';
+  static const phoneNumbersScreen = '/phoneNumbersScreen';
+  static const chooseOtpMethodScreen = '/chooseOtpMethodScreen';
+  static const confirmPhoneNumberScreen = '/confirmPhoneNumberScreen';
   static const securityScreen = '/securityScreen';
   static const jobHomeScreen = '/jobHomeScreen';
   static const jobSearchScreen = '/jobSearchScreen';
   static const myJobApplicationsScreen = '/myJobApplicationsScreen';
   static const myJobProfileScreen = '/myJobProfileScreen';
   static const jobApplyFormScreen = '/jobApplyFormScreen';
+  static const introductionRecordingScreen = '/introductionRecordingScreen';
   static const helpMeBuyScreen = '/helpMeBuyScreen';
+  static const profileMenuScreen = '/profileMenuScreen';
   static const payStackWebViewScreen = '/payStackWebViewScreen';
 
   // static const myItemsScreen = '/myItemsScreen';
@@ -398,10 +410,18 @@ class Routes {
         return MotorsInspectionCheckoutScreen.route(routeSettings);
       case carInspectionHistoryScreen:
         return CarInspectionHistoryScreen.route(routeSettings);
+      case carAppointmentsScreen:
+        return CarAppointmentsScreen.route(routeSettings);
       case savedSearchesScreen:
         return SavedSearchesScreen.route(routeSettings);
       case accountSettingsScreen:
         return AccountSettingsScreen.route(routeSettings);
+      case phoneNumbersScreen:
+        return PhoneNumbersScreen.route(routeSettings);
+      case chooseOtpMethodScreen:
+        return ChooseOtpMethodScreen.route(routeSettings);
+      case confirmPhoneNumberScreen:
+        return ConfirmPhoneNumberScreen.route(routeSettings);
       case securityScreen:
         return SecurityScreen.route(routeSettings);
       case jobHomeScreen:
@@ -414,8 +434,15 @@ class Routes {
         return MyJobProfileScreen.route(routeSettings);
       case jobApplyFormScreen:
         return JobApplyFormScreen.route(routeSettings);
+      case introductionRecordingScreen:
+        final recType = routeSettings.arguments is RecordingType
+            ? routeSettings.arguments as RecordingType
+            : RecordingType.video;
+        return IntroductionRecordingScreen.route(recType);
       case helpMeBuyScreen:
         return HelpMeBuyScreen.route(routeSettings);
+      case profileMenuScreen:
+        return ProfileMenuScreen.route(routeSettings);
 
       /*case payStackWebViewScreen:
         return PaystackWebView.route(routeSettings);*/

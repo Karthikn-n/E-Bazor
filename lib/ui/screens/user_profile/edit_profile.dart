@@ -3,27 +3,25 @@ import 'dart:io';
 import 'package:country_picker/country_picker.dart';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/auth/auth_cubit.dart';
-import 'package:Ebozor/data/cubits/slider_cubit.dart';
+import 'package:Ebozor/data/cubits/auth/authentication_cubit.dart';
 import 'package:Ebozor/data/cubits/system/user_details.dart';
-import 'package:Ebozor/ui/screens/widgets/custom_text_form_field.dart';
+import 'package:Ebozor/data/model/user_model.dart';
+import 'package:Ebozor/data/repositories/job_repository.dart';
+import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
 import 'package:Ebozor/ui/screens/widgets/image_cropper.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
+import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/app_icon.dart';
 import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
-import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
-import 'package:Ebozor/utils/responsiveSize.dart';
+import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
-import 'package:Ebozor/data/cubits/auth/authentication_cubit.dart';
-import 'package:Ebozor/data/model/user_model.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
-
-import 'package:Ebozor/utils/helper_utils.dart';
-import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
+import 'package:intl/intl.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String from;
@@ -50,7 +48,8 @@ class UserProfileScreen extends StatefulWidget {
       builder: (_) => UserProfileScreen(
         from: (arguments?['from'] as String?) ?? "profile",
         popToCurrent: arguments?['popToCurrent'] as bool?,
-        type: (arguments?['type'] as AuthenticationType?) ?? AuthenticationType.email,
+        type: (arguments?['type'] as AuthenticationType?) ??
+            AuthenticationType.email,
         navigateToHome: arguments?['navigateToHome'] as bool?,
         extraData: arguments?['extraData'],
       ),
@@ -60,743 +59,753 @@ class UserProfileScreen extends StatefulWidget {
 
 class UserProfileScreenState extends State<UserProfileScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final JobRepository _jobRepository = JobRepository();
+
+  // Profile Name Controllers
+  final TextEditingController firstNameController = TextEditingController();
+  final TextEditingController lastNameController = TextEditingController();
+
+  // Account Details Fields
+  final TextEditingController dobController = TextEditingController();
+  final TextEditingController nationalityController = TextEditingController();
+  String? selectedGender; // "Male", "Female", "Prefer not to say"
+
+  // Other existing fields
   final TextEditingController phoneController = TextEditingController();
-  final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController addressController = TextEditingController();
-  dynamic size;
-  dynamic city, _state, country;
-  double? latitude, longitude;
-  String? name, email, address;
+
   File? fileUserimg;
   bool isNotificationsEnabled = true;
   bool isPersonalDetailShow = true;
-  bool? isLoading;
+  bool isLoading = false;
   String? countryCode = "+${Constant.defaultCountryCode}";
+  DateTime? selectedDateOfBirth;
+
+  final List<String> genderOptions = [
+    "Male",
+    "Female",
+    "Prefer not to say",
+  ];
 
   @override
   void initState() {
     super.initState();
+    _initializeData();
+  }
 
-    city = HiveUtils.getCityName();
-    _state = HiveUtils.getStateName();
-    country = HiveUtils.getCountryName();
-    latitude = HiveUtils.getLatitude();
-    longitude = HiveUtils.getLongitude();
+  void _initializeData() {
+    final userDetails = HiveUtils.getUserDetails();
+    final rawName = userDetails.name ?? "";
 
-    nameController.text = (HiveUtils.getUserDetails().name) ?? "";
-    emailController.text = HiveUtils.getUserDetails().email ?? "";
-    addressController.text = HiveUtils.getUserDetails().address ?? "";
-    if (widget.from == "login") {
-      isNotificationsEnabled = true;
-    } else {
-      isNotificationsEnabled =
-          HiveUtils.getUserDetails().notification == 1 ? true : false;
+    if (rawName.isNotEmpty) {
+      final parts = rawName.trim().split(" ");
+      firstNameController.text = parts.first;
+      if (parts.length > 1) {
+        lastNameController.text = parts.sublist(1).join(" ");
+      }
     }
 
+    emailController.text = userDetails.email ?? "";
+    addressController.text = userDetails.address ?? "";
+
     if (widget.from == "login") {
+      isNotificationsEnabled = true;
       isPersonalDetailShow = true;
     } else {
-      isPersonalDetailShow =
-          HiveUtils.getUserDetails().isPersonalDetailShow == 1 ? true : false;
+      isNotificationsEnabled = userDetails.notification == 1;
+      isPersonalDetailShow = userDetails.isPersonalDetailShow == 1;
     }
 
     if (HiveUtils.getCountryCode() != null) {
       countryCode = formatCountryCode(HiveUtils.getCountryCode()!);
-      final storedMobile = HiveUtils.getUserDetails().mobile ?? '';
+      final storedMobile = userDetails.mobile ?? '';
       phoneController.text = storedMobile.startsWith(countryCode!)
           ? storedMobile.substring(countryCode!.length)
           : storedMobile;
     } else {
-      phoneController.text = HiveUtils.getUserDetails().mobile != null
-          ? HiveUtils.getUserDetails().mobile!
-          : "";
+      phoneController.text = userDetails.mobile ?? "";
+    }
+
+    _loadUserDetailApi();
+  }
+
+  Future<void> _loadUserDetailApi() async {
+    try {
+      final userDetail = await _jobRepository.fetchUserDetail();
+      if (userDetail != null && mounted) {
+        setState(() {
+          if (userDetail['name'] != null &&
+              userDetail['name'].toString().isNotEmpty) {
+            firstNameController.text = userDetail['name'].toString();
+          }
+          if (userDetail['last_name'] != null &&
+              userDetail['last_name'].toString().isNotEmpty) {
+            lastNameController.text = userDetail['last_name'].toString();
+          }
+          if (userDetail['nationality'] != null &&
+              userDetail['nationality'].toString().isNotEmpty) {
+            nationalityController.text =
+                userDetail['nationality'].toString();
+          }
+          if (userDetail['date_of_birth'] != null &&
+              userDetail['date_of_birth'].toString().isNotEmpty) {
+            final rawDob = userDetail['date_of_birth'].toString();
+            try {
+              final parsed = DateTime.parse(rawDob);
+              selectedDateOfBirth = parsed;
+              dobController.text = DateFormat('MM/dd/yyyy').format(parsed);
+            } catch (_) {
+              dobController.text = rawDob;
+            }
+          }
+          if (userDetail['gender'] != null &&
+              userDetail['gender'].toString().isNotEmpty) {
+            final g = userDetail['gender'].toString().toLowerCase();
+            if (g == 'male') {
+              selectedGender = 'Male';
+            } else if (g == 'female') {
+              selectedGender = 'Female';
+            } else if (g.contains('prefer') || g.contains('other')) {
+              selectedGender = 'Prefer not to say';
+            } else {
+              selectedGender = userDetail['gender'].toString();
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching user detail in profile screen: $e");
     }
   }
 
   @override
   void dispose() {
-    super.dispose();
+    firstNameController.dispose();
+    lastNameController.dispose();
+    dobController.dispose();
+    nationalityController.dispose();
     phoneController.dispose();
-    nameController.dispose();
     emailController.dispose();
     addressController.dispose();
+    super.dispose();
   }
 
-  /* void _onTapChooseLocation() async {
-    FocusManager.instance.primaryFocus?.unfocus();
-
-    if (!const bool.fromEnvironment("force-disable-demo-mode",
-        defaultValue: false)) {
-      */ /*    if (Constant.isDemoModeOn) {
-        HelperUtils.showSnackBarMessage(context, "Not valid in demo mode");
-
-        return;
-      }*/ /*
+  String formatCountryCode(String code) {
+    if (!code.startsWith('+')) {
+      return '+$code';
     }
+    return code;
+  }
 
-    var result = await showModalBottomSheet(
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20), topRight: Radius.circular(20))),
+  Future<void> _selectDateOfBirth() async {
+    final DateTime initialDate = selectedDateOfBirth ?? DateTime(2000, 1, 1);
+    final DateTime? picked = await showDatePicker(
       context: context,
-      builder: (context) {
-        return const ChooseLocatonBottomSheet();
+      initialDate: initialDate,
+      firstDate: DateTime(1940),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: context.color.territoryColor,
+              onPrimary: Colors.white,
+              surface: context.color.secondaryColor,
+              onSurface: context.color.textDefaultColor,
+            ),
+          ),
+          child: child!,
+        );
       },
     );
-    if (result != null) {
-      GooglePlaceModel place = (result as GooglePlaceModel);
 
-      city = place.city;
-      country = place.country;
-      _state = place.state;
-      latitude = double.parse(place.latitude);
-      longitude = double.parse(place.longitude);
+    if (picked != null) {
+      setState(() {
+        selectedDateOfBirth = picked;
+        dobController.text = DateFormat('MM/dd/yyyy').format(picked);
+      });
     }
-  }*/
-
-  void _onTapVerifyPhoneNumber() {
-    //verify phone number before update
   }
 
-  @override
-  Widget build(BuildContext context) {
-    size = MediaQuery.of(context).size;
-
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: safeAreaCondition(
-        child: Scaffold(
-          backgroundColor: context.color.primaryColor,
-          appBar: widget.from == "login"
-              ? null
-              : UiUtils.buildAppBar(context, showBackButton: true),
-          body: Stack(
-            children: [
-              ScrollConfiguration(
-                behavior: RemoveGlow(),
-                child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Form(
-                          key: _formKey,
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                Align(
-                                  alignment: AlignmentDirectional.center,
-                                  child: buildProfilePicture(),
-                                ),
-                                buildTextField(
-                                  context,
-                                  title: "fullName",
-                                  controller: nameController,
-                                  validator: CustomTextFieldValidator.nullCheck,
-                                ),
-                                buildTextField(
-                                  context,
-                                  readOnly: HiveUtils.getUserDetails().type ==
-                                              AuthenticationType.email.name ||
-                                          HiveUtils.getUserDetails().type ==
-                                              AuthenticationType.google.name ||
-                                          HiveUtils.getUserDetails().type ==
-                                              AuthenticationType.apple.name
-                                      ? true
-                                      : false,
-                                  title: "emailAddress",
-                                  controller: emailController,
-                                  validator: CustomTextFieldValidator.email,
-                                ),
-                                phoneWidget(),
-                                buildAddressTextField(
-                                  context,
-                                  title: "addressLbl",
-                                  controller: addressController,
-                                ),
-                                SizedBox(
-                                  height: 10.rh(context),
-                                ),
-                                Text(
-                                  "notification".translate(context),
-                                ),
-                                SizedBox(
-                                  height: 10.rh(context),
-                                ),
-                                buildNotificationEnableDisableSwitch(context),
-                                SizedBox(
-                                  height: 10.rh(context),
-                                ),
-                                Text(
-                                  "showContactInfo".translate(context),
-                                ),
-                                SizedBox(
-                                  height: 10.rh(context),
-                                ),
-                                buildPersonalDetailEnableDisableSwitch(context),
-                                SizedBox(
-                                  height: 25.rh(context),
-                                ),
-                                UiUtils.buildButton(
-                                  context,
-                                  onPressed: () {
-                                    if (widget.from == 'login') {
-                                      validateData();
-                                    } else {
-                                      if (city != null && city != "") {
-                                        HiveUtils.setCurrentLocation(
-                                            city: city,
-                                            state: _state,
-                                            country: country,
-                                            latitude: latitude,
-                                            longitude: longitude);
-
-                                        context
-                                            .read<SliderCubit>()
-                                            .fetchSlider(context);
-                                      } else {
-                                        HiveUtils.clearLocation();
-
-                                        context
-                                            .read<SliderCubit>()
-                                            .fetchSlider(context);
-                                      }
-                                      validateData();
-                                    }
-                                  },
-                                  height: 48.rh(context),
-                                  buttonTitle:
-                                      "updateProfile".translate(context),
-                                )
-                              ])),
-                    )),
-              ),
-              if (isLoading != null && isLoading!)
-                Center(
-                  child: UiUtils.progress(
-                    normalProgressColor: context.color.territoryColor,
-                  ),
-                ),
-            ],
-          ),
-        ),
+  void _selectNationality() {
+    showCountryPicker(
+      context: context,
+      showWorldWide: false,
+      countryListTheme: CountryListThemeData(
+        backgroundColor: context.color.secondaryColor,
+        textStyle: TextStyle(color: context.color.textDefaultColor),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
       ),
+      onSelect: (Country country) {
+        setState(() {
+          nationalityController.text = country.name;
+        });
+      },
     );
   }
 
-  Widget phoneWidget() {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SizedBox(
-        height: 10.rh(context),
-      ),
-      Text("phoneNumber".translate(context))
-          .color(context.color.textDefaultColor),
-      SizedBox(
-        height: 10.rh(context),
-      ),
-      CustomTextFormField(
-        controller: phoneController,
-        validator: CustomTextFieldValidator.phoneNumber,
-        keyboard: TextInputType.phone,
-        isReadOnly:
-            HiveUtils.getUserDetails().type == AuthenticationType.phone.name
-                ? true
-                : false,
-        fillColor: context.color.secondaryColor,
-        // borderColor: context.color.borderColor.darken(10),
-        onChange: (value) {
-          setState(() {});
-        },
-        isMobileRequired: false,
-        phoneCountryCode: countryCode,
-        fixedPrefix: SizedBox(
-          width: 55,
-          child: Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: GestureDetector(
-                onTap: () {
-                  if (HiveUtils.getUserDetails().type !=
-                      AuthenticationType.phone.name) {
-                    showCountryCode();
-                  }
-                },
-                child: Container(
-                  // color: Colors.red,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8),
-                  child: Center(
-                      child: Text(formatCountryCode(countryCode!))
-                          .size(context.font.large)
-                          .centerAlign()),
-                ),
-              )),
-        ),
-        hintText: "phoneNumber".translate(context),
-      )
-    ]);
-  }
-
-  String formatCountryCode(String countryCode) {
-    if (!countryCode.startsWith('+')) {
-      return '+$countryCode';
-    }
-    return countryCode;
-  }
-
-  /* Widget locationWidget(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(
-        top: 10.0,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              height: 60,
-              decoration: BoxDecoration(
-                  color: context.color.secondaryColor,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: context.color.borderColor.darken(40),
-                    width: 1.5,
-                  )),
-              child: Row(
-                children: [
-                  Padding(
-                    padding: const EdgeInsetsDirectional.only(start: 10.0),
-                    child: Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: (city != "" && city != null)
-                            ? Text("$city,$_state,$country")
-                            : Text(
-                                "selectLocationOptional".translate(context))),
-                  ),
-                  const Spacer(),
-                  if (city != "" && city != null)
-                    Padding(
-                      padding: const EdgeInsetsDirectional.only(end: 10.0),
-                      child: GestureDetector(
-                        onTap: () {
-                          city = "";
-                          _state = "";
-                          country = "";
-                          latitude = null;
-                          longitude = null;
-                          setState(() {});
-                        },
-                        child: Icon(
-                          Icons.close,
-                          color: context.color.textColorDark,
-                        ),
-                      ),
-                    )
-                ],
-              ),
+  Widget _buildProfilePicture() {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
+          height: 110,
+          width: 110,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: context.color.territoryColor.withValues(alpha: 0.6),
+              width: 2,
             ),
           ),
-          const SizedBox(
-            width: 10,
+          child: Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: context.color.territoryColor.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            width: 98,
+            height: 98,
+            child: _getProfileImage(),
           ),
-          GestureDetector(
-            onTap: _onTapChooseLocation,
+        ),
+        Positioned(
+          bottom: 2,
+          right: 2,
+          child: InkWell(
+            onTap: _showPicker,
             child: Container(
-              height: 60,
-              width: 60,
+              height: 34,
+              width: 34,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
-                  color: context.color.secondaryColor,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: context.color.borderColor.darken(40),
-                    width: 1.5,
-                  )),
-              child: Icon(
-                Icons.location_searching_sharp,
+                border: Border.all(color: Colors.white, width: 2),
+                shape: BoxShape.circle,
                 color: context.color.territoryColor,
               ),
+              child: const Icon(
+                Icons.camera_alt_rounded,
+                size: 18,
+                color: Colors.white,
+              ),
             ),
           ),
-        ],
-      ),
-    );
-  }*/
-
-  Widget safeAreaCondition({required Widget child}) {
-    if (widget.from == "login") {
-      return SafeArea(child: child);
-    }
-    return child;
-  }
-
-  Widget buildNotificationEnableDisableSwitch(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-          border: Border.all(
-            color: context.color.borderColor.darken(40),
-            width: 1.5,
-          ),
-          borderRadius: BorderRadius.circular(10),
-          color: context.color.secondaryColor),
-      height: 60,
-      width: double.infinity,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Text((isNotificationsEnabled
-                        ? "enabled".translate(context)
-                        : "disabled".translate(context))
-                    .translate(context))
-                .size(context.font.large),
-          ),
-          CupertinoSwitch(
-            activeTrackColor: context.color.territoryColor,
-            value: isNotificationsEnabled,
-            onChanged: (value) {
-              isNotificationsEnabled = value;
-              setState(() {});
-            },
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget buildPersonalDetailEnableDisableSwitch(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-          border: Border.all(
-            color: context.color.borderColor.darken(40),
-            width: 1.5,
-          ),
-          borderRadius: BorderRadius.circular(10),
-          color: context.color.secondaryColor),
-      height: 60,
-      width: double.infinity,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Text((isPersonalDetailShow
-                        ? "enabled".translate(context)
-                        : "disabled".translate(context))
-                    .translate(context))
-                .size(context.font.large),
-          ),
-          CupertinoSwitch(
-            activeTrackColor: context.color.territoryColor,
-            value: isPersonalDetailShow,
-            onChanged: (value) {
-              isPersonalDetailShow = value;
-              setState(() {});
-            },
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget buildTextField(BuildContext context,
-      {required String title,
-      required TextEditingController controller,
-      CustomTextFieldValidator? validator,
-      bool? readOnly}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          height: 10.rh(context),
-        ),
-        Text(title.translate(context)).color(context.color.textDefaultColor),
-        SizedBox(
-          height: 10.rh(context),
-        ),
-        CustomTextFormField(
-          controller: controller,
-          isReadOnly: readOnly,
-          validator: validator,
-          // formaters: [FilteringTextInputFormatter.deny(RegExp(","))],
-          fillColor: context.color.secondaryColor,
         ),
       ],
     );
   }
 
-  Widget buildAddressTextField(BuildContext context,
-      {required String title,
-      required TextEditingController controller,
-      CustomTextFieldValidator? validator,
-      bool? readOnly}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          height: 10.rh(context),
-        ),
-        Text(title.translate(context)),
-        SizedBox(
-          height: 10.rh(context),
-        ),
-        CustomTextFormField(
-          controller: controller,
-          maxLine: 5,
-          action: TextInputAction.newline,
-          isReadOnly: readOnly,
-          fillColor: context.color.secondaryColor,
-        ),
-        /*const SizedBox(
-          width: 10,
-        ),
-        locationWidget(context),
-        const SizedBox(
-          height: 10,
-        ),
-        Text("enablesNewSection".translate(context))
-            .size(context.font.small)
-            .bold(weight: FontWeight.w300)
-            .color(
-          context.color.textColorDark
-              .withValues(alpha: 0.8),
-        ),*/
-      ],
-    );
-  }
-
-  Widget getProfileImage() {
+  Widget _getProfileImage() {
     if (fileUserimg != null) {
       return Image.file(
         fileUserimg!,
         fit: BoxFit.cover,
       );
     } else {
-      if (widget.from == "login") {
-        if (HiveUtils.getUserDetails().profile != "" &&
-            HiveUtils.getUserDetails().profile != null) {
-          return UiUtils.getImage(
-            HiveUtils.getUserDetails().profile!,
-            fit: BoxFit.cover,
-          );
-        }
-
-        return UiUtils.getSvg(
-          AppIcons.defaultPersonLogo,
-          color: context.color.territoryColor,
-          fit: BoxFit.none,
+      final user = HiveUtils.getUserDetails();
+      if (user.profile != null && user.profile!.isNotEmpty) {
+        return UiUtils.getImage(
+          user.profile!,
+          fit: BoxFit.cover,
         );
-      } else {
-        if ((HiveUtils.getUserDetails().profile ?? "").isEmpty) {
-          return UiUtils.getSvg(
-            AppIcons.defaultPersonLogo,
-            color: context.color.territoryColor,
-            fit: BoxFit.none,
-          );
-        } else {
-          return UiUtils.getImage(
-            HiveUtils.getUserDetails().profile!,
-            fit: BoxFit.cover,
-          );
-        }
       }
-    }
-  }
-
-  Widget buildProfilePicture() {
-    return Stack(
-      children: [
-        Container(
-          height: 124.rh(context),
-          width: 124.rw(context),
-          alignment: AlignmentDirectional.center,
-          decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border:
-                  Border.all(color: context.color.territoryColor, width: 2)),
-          child: Container(
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: context.color.territoryColor.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            width: 106.rw(context),
-            height: 106.rh(context),
-            child: getProfileImage(),
-          ),
-        ),
-        PositionedDirectional(
-          bottom: 0,
-          end: 0,
-          child: InkWell(
-            onTap: showPicker,
-            child: Container(
-                height: 37.rh(context),
-                width: 37.rw(context),
-                alignment: AlignmentDirectional.center,
-                decoration: BoxDecoration(
-                    border: Border.all(
-                        color: context.color.buttonColor, width: 1.5),
-                    shape: BoxShape.circle,
-                    color: context.color.territoryColor),
-                child: SizedBox(
-                    width: 15.rw(context),
-                    height: 15.rh(context),
-                    child: UiUtils.getSvg(AppIcons.edit))),
-          ),
-        )
-      ],
-    );
-  }
-
-  Future<void> validateData() async {
-    if (_formKey.currentState!.validate()) {
-      profileupdateprocess();
-    }
-  }
-
-  Future<void> profileupdateprocess() async {
-    setState(() {
-      isLoading = true;
-    });
-    try {
-      var response = await context.read<AuthCubit>().updateuserdata(context,
-          name: nameController.text.trim(),
-          email: emailController.text.trim(),
-          fileUserimg: fileUserimg,
-          address: addressController.text,
-          mobile: phoneController.text,
-          notification: isNotificationsEnabled == true ? "1" : "0",
-          countryCode: countryCode,
-          personalDetail: isPersonalDetailShow == true ? 1 : 0);
-
-      //HiveUtils.getUserDetails();
-
-      Future.delayed(
-        Duration.zero,
-        () {
-          context
-              .read<UserDetailsCubit>()
-              .copy(UserModel.fromJson(response['data']));
-        },
+      return UiUtils.getSvg(
+        AppIcons.defaultPersonLogo,
+        color: context.color.territoryColor,
+        fit: BoxFit.none,
       );
-
-      Future.delayed(
-        Duration.zero,
-        () {
-          setState(() {
-            isLoading = false;
-          });
-          HelperUtils.showSnackBarMessage(
-            context,
-            response['message'],
-          );
-          if (widget.from != "login") {
-            Navigator.pop(context);
-          }
-        },
-      );
-
-      if (widget.from == "login" && widget.popToCurrent != true) {
-        Future.delayed(
-          Duration.zero,
-          () {
-            Navigator.of(context).pushNamedAndRemoveUntil(
-                Routes.locationPermissionScreen, (route) => false);
-          },
-        );
-      } else if (widget.from == "login" && widget.popToCurrent == true) {
-        Future.delayed(Duration.zero, () {
-          Navigator.of(context)
-            ..pop()
-            ..pop();
-        });
-      }
-    } catch (e) {
-      Future.delayed(Duration.zero, () {
-        setState(() {
-          isLoading = false;
-        });
-        HelperUtils.showSnackBarMessage(context, e.toString());
-      });
     }
   }
 
-  void showPicker() {
+  void _showPicker() {
     showModalBottomSheet(
-        context: context,
-        shape: RoundedRectangleBorder(
-            side: const BorderSide(color: Colors.transparent),
-            borderRadius: BorderRadius.circular(10)),
-        builder: (BuildContext bc) {
-          return SafeArea(
-            child: Wrap(
-              children: <Widget>[
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      backgroundColor: context.color.secondaryColor,
+      builder: (BuildContext bc) {
+        return SafeArea(
+          child: Wrap(
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: Text("gallery".translate(context)),
+                onTap: () {
+                  _imgFromGallery(ImageSource.gallery);
+                  Navigator.of(context).pop();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: Text("camera".translate(context)),
+                onTap: () {
+                  _imgFromGallery(ImageSource.camera);
+                  Navigator.of(context).pop();
+                },
+              ),
+              if (fileUserimg != null)
                 ListTile(
-                    leading: const Icon(Icons.photo_library),
-                    title: Text("gallery".translate(context)),
-                    onTap: () {
-                      _imgFromGallery(ImageSource.gallery);
-                      Navigator.of(context).pop();
-                    }),
-                ListTile(
-                  leading: const Icon(Icons.photo_camera),
-                  title: Text("camera".translate(context)),
+                  leading: const Icon(Icons.delete_outline_rounded,
+                      color: Colors.red),
+                  title: Text(
+                    "lblremove".translate(context),
+                    style: const TextStyle(color: Colors.red),
+                  ),
                   onTap: () {
-                    _imgFromGallery(ImageSource.camera);
+                    setState(() {
+                      fileUserimg = null;
+                    });
                     Navigator.of(context).pop();
                   },
                 ),
-                if (fileUserimg != null && widget.from == 'login')
-                  ListTile(
-                    leading: const Icon(Icons.clear_rounded),
-                    title: Text("lblremove".translate(context)),
-                    onTap: () {
-                      fileUserimg = null;
-
-                      Navigator.of(context).pop();
-                      setState(() {});
-                    },
-                  ),
-              ],
-            ),
-          );
-        });
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _imgFromGallery(ImageSource imageSource) async {
     CropImage.init(context);
-
     final pickedFile = await ImagePicker().pickImage(source: imageSource);
 
     if (pickedFile != null) {
-      CroppedFile? croppedFile;
-      croppedFile = await CropImage.crop(
+      CroppedFile? croppedFile = await CropImage.crop(
         filePath: pickedFile.path,
       );
-      if (croppedFile == null) {
-        fileUserimg = null;
-      } else {
-        fileUserimg = File(croppedFile.path);
+      if (croppedFile != null) {
+        setState(() {
+          fileUserimg = File(croppedFile.path);
+        });
       }
-    } else {
-      fileUserimg = null;
     }
-    setState(() {});
   }
 
-  void showCountryCode() {
-    showCountryPicker(
-      context: context,
-      showWorldWide: false,
-      showPhoneCode: true,
-      countryListTheme:
-          CountryListThemeData(borderRadius: BorderRadius.circular(11)),
-      onSelect: (Country value) {
-        countryCode = value.phoneCode;
-        setState(() {});
-      },
+  InputDecoration _inputDecoration({String? label, String? hint, Widget? suffix}) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: TextStyle(
+        fontSize: 14,
+        color: context.color.textLightColor,
+      ),
+      hintText: hint,
+      hintStyle: TextStyle(
+        fontSize: 14,
+        color: context.color.textLightColor.withValues(alpha: 0.7),
+      ),
+      suffixIcon: suffix,
+      filled: true,
+      fillColor: context.color.secondaryColor,
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(
+          color: context.color.borderColor.withValues(alpha: 0.8),
+        ),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(
+          color: context.color.borderColor.withValues(alpha: 0.8),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(
+          color: context.color.territoryColor,
+          width: 1.5,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveChanges() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => isLoading = true);
+
+    final firstName = firstNameController.text.trim();
+    final lastName = lastNameController.text.trim();
+    final fullName =
+        lastName.isNotEmpty ? "$firstName $lastName" : firstName;
+    final formattedDobForApi = selectedDateOfBirth != null
+        ? DateFormat('yyyy-MM-dd').format(selectedDateOfBirth!)
+        : (dobController.text.trim().isNotEmpty
+            ? dobController.text.trim()
+            : null);
+
+    try {
+      // 1. Update Profile via AuthCubit (update-profile endpoint)
+      final response = await context.read<AuthCubit>().updateuserdata(
+            context,
+            name: fullName,
+            email: emailController.text.trim(),
+            fileUserimg: fileUserimg,
+            address: addressController.text,
+            mobile: phoneController.text,
+            notification: isNotificationsEnabled ? "1" : "0",
+            countryCode: countryCode,
+            personalDetail: isPersonalDetailShow ? 1 : 0,
+          );
+
+      if (response['data'] != null) {
+        context
+            .read<UserDetailsCubit>()
+            .copy(UserModel.fromJson(response['data']));
+      }
+
+      // 2. Also persist full detailed profile (add-user-detail endpoint)
+      final Map<String, dynamic> userDetailPayload = {
+        'name': firstName,
+        'last_name': lastName,
+        if (emailController.text.trim().isNotEmpty)
+          'email': emailController.text.trim(),
+        if (phoneController.text.trim().isNotEmpty)
+          'mobile': phoneController.text.trim(),
+        if (formattedDobForApi != null) 'date_of_birth': formattedDobForApi,
+        if (nationalityController.text.trim().isNotEmpty)
+          'nationality': nationalityController.text.trim(),
+        if (selectedGender != null) 'gender': selectedGender,
+      };
+
+      await _jobRepository.saveUserDetail(
+        userDetailPayload,
+        profileFile: fileUserimg,
+      );
+
+      if (mounted) {
+        setState(() => isLoading = false);
+        HelperUtils.showSnackBarMessage(
+          context,
+          response['message'] ?? "Profile updated successfully",
+          type: MessageType.success,
+        );
+
+        if (widget.from != "login") {
+          Navigator.pop(context);
+        } else {
+          if (widget.popToCurrent == true) {
+            Navigator.of(context)
+              ..pop()
+              ..pop();
+          } else {
+            Navigator.of(context).pushNamedAndRemoveUntil(
+                Routes.locationPermissionScreen, (route) => false);
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => isLoading = false);
+        HelperUtils.showSnackBarMessage(
+          context,
+          e.toString(),
+          type: MessageType.error,
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
+        backgroundColor: context.color.backgroundColor,
+        appBar: widget.from == "login"
+            ? null
+            : UiUtils.buildAppBar(
+                context,
+                title: "My Profile",
+                showBackButton: true,
+              ),
+        body: Stack(
+          children: [
+            SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+
+                    // =========================================================
+                    // Section 1: Profile Name
+                    // =========================================================
+                    Text(
+                      "Profile Name",
+                      style: TextStyle(
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.bold,
+                        color: context.color.textDefaultColor,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "This is displayed on your profile",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: context.color.textLightColor,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // First Name
+                    TextFormField(
+                      controller: firstNameController,
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? "First name is required"
+                          : null,
+                      decoration: _inputDecoration(
+                        label: "First Name",
+                        hint: "Enter first name",
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Last Name
+                    TextFormField(
+                      controller: lastNameController,
+                      decoration: _inputDecoration(
+                        label: "Last Name",
+                        hint: "Enter last name",
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // =========================================================
+                    // Section 2: Account details
+                    // =========================================================
+                    Text(
+                      "Account details",
+                      style: TextStyle(
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.bold,
+                        color: context.color.textDefaultColor,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "This is not visible to other users",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: context.color.textLightColor,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Date of birth
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today_outlined,
+                          size: 18,
+                          color: context.color.textDefaultColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Date of birth",
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.bold,
+                            color: context.color.textDefaultColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    InkWell(
+                      onTap: _selectDateOfBirth,
+                      borderRadius: BorderRadius.circular(10),
+                      child: IgnorePointer(
+                        child: TextFormField(
+                          controller: dobController,
+                          decoration: _inputDecoration(
+                            hint: "MM/DD/YYYY",
+                            suffix: const Icon(
+                              Icons.calendar_month_outlined,
+                              size: 20,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Nationality
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.public_outlined,
+                          size: 18,
+                          color: context.color.textDefaultColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Nationality",
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.bold,
+                            color: context.color.textDefaultColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    InkWell(
+                      onTap: _selectNationality,
+                      borderRadius: BorderRadius.circular(10),
+                      child: IgnorePointer(
+                        child: TextFormField(
+                          controller: nationalityController,
+                          decoration: _inputDecoration(
+                            hint: "Search",
+                            suffix: const Icon(
+                              Icons.arrow_drop_down_rounded,
+                              size: 24,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Gender
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.account_circle_outlined,
+                          size: 18,
+                          color: context.color.textDefaultColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Gender",
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.bold,
+                            color: context.color.textDefaultColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Column(
+                      children: genderOptions.map((opt) {
+                        final isSelected = selectedGender == opt;
+                        return InkWell(
+                          onTap: () {
+                            setState(() => selectedGender = opt);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 20,
+                                  height: 20,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? context.color.territoryColor
+                                          : context.color.textLightColor,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: isSelected
+                                      ? Center(
+                                          child: Container(
+                                            width: 10,
+                                            height: 10,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: context
+                                                  .color.territoryColor,
+                                            ),
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  opt,
+                                  style: TextStyle(
+                                    fontSize: 14.5,
+                                    color: context.color.textDefaultColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+
+                    /*
+                    // ---------------------------------------------------------
+                    // Notification & Contact Info toggles commented out as requested
+                    // ---------------------------------------------------------
+                    const SizedBox(height: 20),
+                    Text("notification".translate(context)),
+                    const SizedBox(height: 10),
+                    _buildNotificationSwitch(context),
+                    const SizedBox(height: 14),
+                    Text("showContactInfo".translate(context)),
+                    const SizedBox(height: 10),
+                    _buildPersonalDetailSwitch(context),
+                    */
+
+                    const SizedBox(height: 36),
+
+                    // Save Changes Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: context.color.territoryColor,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        onPressed: isLoading ? null : _saveChanges,
+                        child: isLoading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                "Save Changes",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1195,6 +1195,7 @@ class SearchScreenState extends State<SearchScreen>
       arguments: {
         'catID': categoryId.toString(),
         'catName': categoryName,
+        'categorySlug': categorySlug,
         'categoryIds': [categoryId.toString()],
         'selectedCategoryChain': [selectedCategory],
         'appliedFilter': appliedFilter,

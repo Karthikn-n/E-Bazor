@@ -122,6 +122,7 @@ class Api {
   static String searchBannerSuggestionApi = "search-banner-suggestion";
   static String getSimilarProductApi = "get-similar-product";
   static String addHelpMeBuyApi = "add-helpme-buy";
+  static String getJobDashboardProfileApi = "get-job-dashboard-profile";
   static String getMyJobApplicationApi = "get-my-job-application";
   static String getJobApplicationInfoApi = "get-job-application-info";
   static String addJobApplicationInfoApi = "add-job-application-info";
@@ -129,6 +130,7 @@ class Api {
   static String getUserDetailApi = "get-user-detail";
   static String getApplyInfoApi = "get-apply-info";
   static String getItemApi = "get-item";
+  static String getItemCountApi = "get-item-count";
   static String getMyItemApi = "my-items";
   static String getMyItemsCountApi = "my-items-count";
   static String getNotificationListApi = "get-notification-list";
@@ -191,6 +193,7 @@ class Api {
   static String editSavedSearchApi = "edit-saved-search";
   static String deleteSavedSearchApi = "delete-saved-search";
   static String getCarInspectionApi = "get-car-inspection";
+  static String getCarAppointmentDetailsApi = "get-car-appointment-details";
   static String carEvaluationsApi = "car-evaluations";
 
 //Chat module apis

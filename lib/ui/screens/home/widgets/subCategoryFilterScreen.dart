@@ -34,69 +34,112 @@ class _SubCategoryFilterScreenState extends State<SubCategoryFilterScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.color.backgroundColor,
-      appBar: UiUtils.buildAppBar(
-        context,
-        showBackButton: true,
-        title: "classifieds".translate(context),
+      appBar: AppBar(
+        backgroundColor: context.color.secondaryColor,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        titleSpacing: 0,
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            size: 20,
+            color: context.color.textDefaultColor,
+          ),
+        ),
+        title: Text(
+          'classifieds'.translate(context),
+          style: TextStyle(
+            color: context.color.textDefaultColor,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
       body: Padding(
-        padding: const EdgeInsets.only(top: 12),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         child: SizedBox(
             width: context.screenWidth,
             child: Padding(
               padding: const EdgeInsets.only(top: 5.0),
               child: Container(
-                color: context.color.secondaryColor,
+                color: Colors.transparent,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 18),
-                      child: Text(
-                        "allInClassified".translate(context),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      )
-                          .color(context.color.textDefaultColor)
-                          .size(context.font.normal)
-                          .bold(weight: FontWeight.w600),
-                    ),
-                    const Divider(
-                      thickness: 1.2,
-                      height: 10,
+                      padding: const EdgeInsets.fromLTRB(4, 8, 4, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'allInClassified'.translate(context),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: context.color.textDefaultColor,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.25,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            'Choose a category to continue',
+                            style: TextStyle(
+                              color: context.color.textLightColor,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     Expanded(
                       child: ListView.separated(
                         itemCount: widget.model.length,
-                        padding: EdgeInsets.zero,
+                        padding: const EdgeInsets.only(bottom: 24),
                         shrinkWrap: true,
                         separatorBuilder: (context, index) {
-                          return const Divider(
-                            thickness: 1.2,
-                            height: 10,
-                          );
+                          return const SizedBox(height: 10);
                         },
                         itemBuilder: (context, index) {
                           CategoryModel category = widget.model[index];
+                          final childCount = category.children?.length ??
+                              category.subcategoriesCount ??
+                              0;
 
                           return ListTile(
+                            tileColor: context.color.secondaryColor,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(
+                                color: context.color.borderColor
+                                    .withValues(alpha: 0.55),
+                              ),
+                            ),
                             onTap: () {
                               widget.selection.add(category);
                               Navigator.pop(context);
                               Navigator.pop(context);
                             },
                             leading: Container(
-                                width: 48,
-                                height: 48,
-                                padding: const EdgeInsets.all(9),
+                                width: 52,
+                                height: 52,
+                                padding: const EdgeInsets.all(11),
                                 decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
+                                    borderRadius: BorderRadius.circular(14),
                                     color: context.color.territoryColor
-                                        .withValues(alpha: 0.1)),
-                                child: (category.url != null && category.url!.trim().isNotEmpty)
+                                        .withValues(alpha: 0.09)),
+                                child: (category.url != null &&
+                                        category.url!.trim().isNotEmpty)
                                     ? UiUtils.imageType(
                                         category.url!,
                                         color: category.url!.endsWith('.svg')
@@ -110,23 +153,41 @@ class _SubCategoryFilterScreenState extends State<SubCategoryFilterScreen>
                                         size: 24,
                                       )),
                             title: Text(
-                              category.name ?? "",
+                              category.name ?? '',
                               textAlign: TextAlign.start,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                            )
-                                .color(context.color.textDefaultColor)
-                                .size(context.font.normal),
+                              style: TextStyle(
+                                color: context.color.textDefaultColor,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.1,
+                              ),
+                            ),
+                            subtitle: childCount > 0
+                                ? Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Text(
+                                      '$childCount subcategories',
+                                      style: TextStyle(
+                                        color: context.color.textLightColor,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w400,
+                                      ),
+                                    ),
+                                  )
+                                : null,
                             trailing: Container(
-                                width: 32,
-                                height: 32,
+                                width: 34,
+                                height: 34,
                                 decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8),
-                                    color:
-                                        context.color.borderColor.darken(10)),
+                                    shape: BoxShape.circle,
+                                    color: context.color.territoryColor
+                                        .withValues(alpha: 0.08)),
                                 child: Icon(
-                                  Icons.chevron_right_outlined,
-                                  color: context.color.textDefaultColor,
+                                  Icons.arrow_forward_ios_rounded,
+                                  size: 15,
+                                  color: context.color.territoryColor,
                                 )),
                           );
                         },

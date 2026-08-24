@@ -53,14 +53,19 @@ class CategoryWidgetHome extends StatelessWidget {
                     /// ✅ FILTER PAGE FOR PROPERTY
                     if (filterCategoryIds.contains(category.id) ||
                         (category.name != null &&
-                            (category.name!.toLowerCase().contains("property") ||
-                                category.name!.toLowerCase().contains("properties")))) {
+                            (category.name!
+                                    .toLowerCase()
+                                    .contains("property") ||
+                                category.name!
+                                    .toLowerCase()
+                                    .contains("properties")))) {
                       Navigator.pushNamed(
                         context,
                         Routes.filterpage,
                         arguments: category,
                       );
                     }
+
                     /// ✅ JOBS BOTTOM SHEET
                     else if (category.id == 4 ||
                         (category.name != null &&
@@ -69,6 +74,7 @@ class CategoryWidgetHome extends StatelessWidget {
                             category.slug!.toLowerCase() == 'jobs')) {
                       JobsBottomSheet.show(context, jobsCategory: category);
                     }
+
                     /// ✅ SUB CATEGORY (Inner categories flow via get-category-children-by-parent)
                     else {
                       Navigator.pushNamed(
@@ -77,6 +83,7 @@ class CategoryWidgetHome extends StatelessWidget {
                         arguments: {
                           "categoryList": category.children ?? [],
                           "catName": category.name ?? "",
+                          "categorySlug": category.slug,
                           "catId": category.id ?? 0,
                           "categoryIds": [category.id.toString()],
                         },

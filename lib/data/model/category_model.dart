@@ -39,10 +39,11 @@ class CategoryModel {
 
   factory CategoryModel.fromJson(Map<String, dynamic> json) {
     try {
-      List<dynamic> childData =
-          json['subcategories'] ?? json['children'] ?? [];
-      List<CategoryModel> children =
-          childData.map((child) => CategoryModel.fromJson(Map<String, dynamic>.from(child))).toList();
+      List<dynamic> childData = json['subcategories'] ?? json['children'] ?? [];
+      List<CategoryModel> children = childData
+          .map((child) =>
+              CategoryModel.fromJson(Map<String, dynamic>.from(child)))
+          .toList();
 
       int? catId = json['id'] != null
           ? int.tryParse(json['id'].toString())
@@ -196,9 +197,9 @@ class CategoryModel {
 // }
 
 class FilterCategory {
-  final int? id;        // ✅ nullable
-  final String? name;   // ✅ nullable
-  final String? slug;   // ✅ nullable
+  final int? id; // ✅ nullable
+  final String? name; // ✅ nullable
+  final String? slug; // ✅ nullable
   final List<FilterSubCategory> children;
   final List<FilterItem> filters;
 
@@ -212,9 +213,9 @@ class FilterCategory {
 
   factory FilterCategory.fromJson(Map<String, dynamic> json) {
     return FilterCategory(
-      id: json['category_id'] as int?,
-      name: json['name'] as String?,
-      slug: json['slug'] as String?,
+      id: int.tryParse(json['category_id']?.toString() ?? ''),
+      name: json['name']?.toString(),
+      slug: json['slug']?.toString(),
       children: (json['children'] as List? ?? [])
           .map((e) => FilterSubCategory.fromJson(e))
           .toList(),
@@ -226,9 +227,9 @@ class FilterCategory {
 }
 
 class FilterSubCategory {
-  final int? id;       // ✅ nullable
-  final String? name;  // ✅ nullable
-  final String? slug;  // ✅ nullable
+  final int? id; // ✅ nullable
+  final String? name; // ✅ nullable
+  final String? slug; // ✅ nullable
 
   FilterSubCategory({
     this.id,
@@ -238,9 +239,9 @@ class FilterSubCategory {
 
   factory FilterSubCategory.fromJson(Map<String, dynamic> json) {
     return FilterSubCategory(
-      id: json['category_id'] as int?,
-      name: json['name'] as String?,
-      slug: json['slug'] as String?,
+      id: int.tryParse(json['category_id']?.toString() ?? ''),
+      name: json['name']?.toString(),
+      slug: json['slug']?.toString(),
     );
   }
 }
@@ -272,23 +273,55 @@ class FilterItem {
   final String? name;
   final String? type;
   final List<String> values;
+  final List<Map<String, dynamic>> valuesObject;
   final bool multiSelect;
+  final int sortOrder;
+  final bool isActive;
   final String? placeholder; // ✅ add this
 
   FilterItem({
     this.name,
     this.type,
     required this.values,
+    this.valuesObject = const [],
     required this.multiSelect,
+    this.sortOrder = 0,
+    this.isActive = true,
     this.placeholder,
   });
 
   factory FilterItem.fromJson(Map<String, dynamic> json) {
+    final rawValues = json['values'];
+    final rawObjects = json['values_obj'];
+    final valuesObject = rawObjects is List
+        ? rawObjects
+            .whereType<Map>()
+            .map((value) => Map<String, dynamic>.from(value))
+            .toList()
+        : <Map<String, dynamic>>[];
+    final values = rawValues is List
+        ? rawValues
+            .where((value) => value != null)
+            .map((value) => value.toString())
+            .toList()
+        : <String>[];
+    if (values.isEmpty && valuesObject.isNotEmpty) {
+      values.addAll(valuesObject.map((value) =>
+          (value['label'] ?? value['name'] ?? value['value']).toString()));
+    }
     return FilterItem(
-      name: json['name'] as String?,
-      type: json['type'] as String?,
-      values: List<String>.from(json['values'] ?? []),
-      multiSelect: json['multiselect'] == true,
+      name: json['name']?.toString(),
+      type: json['type']?.toString().toLowerCase(),
+      values: values,
+      valuesObject: valuesObject,
+      multiSelect: json['multiselect'] == true ||
+          json['multiselect'] == 1 ||
+          json['multiselect'] == '1',
+      sortOrder: int.tryParse(json['sort_order']?.toString() ?? '') ?? 0,
+      isActive: json['is_active'] == null ||
+          json['is_active'] == true ||
+          json['is_active'] == 1 ||
+          json['is_active'] == '1',
       placeholder: json['placeholder'] as String?, // ✅ add this
     );
   }

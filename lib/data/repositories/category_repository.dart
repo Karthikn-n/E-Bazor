@@ -1,4 +1,3 @@
-
 import 'dart:developer';
 
 import 'package:Ebozor/data/model/category_model.dart';
@@ -94,7 +93,8 @@ class CategoryRepository {
           .map((e) => CategoryModel.fromJson(Map<String, dynamic>.from(e)))
           .toList();
 
-      print("📦 CATEGORIES COUNT FOR $apiUrl (parent_category_id: $categoryId) 👉 ${modelList.length}");
+      print(
+          "📦 CATEGORIES COUNT FOR $apiUrl (parent_category_id: $categoryId) 👉 ${modelList.length}");
 
       return DataOutput(
         total: modelList.length,
@@ -137,8 +137,10 @@ class CategoryRepository {
       return [];
     }
   }
-   /// GET /api/get-category-tree-by-slug
-  Future<dynamic> fetchCategoryTreeBySlug({required String categorySlug}) async {
+
+  /// GET /api/get-category-tree-by-slug
+  Future<dynamic> fetchCategoryTreeBySlug(
+      {required String categorySlug}) async {
     try {
       Map<String, dynamic> parameters = {
         'category_slug': categorySlug,
@@ -181,9 +183,17 @@ class FilterRepository {
 
         // ✅ raw = {"categories": [...]}
         // so get first item inside categories list
-        final categoryData = raw['categories'][0];
-
-        return FilterCategory.fromJson(categoryData);
+        final categories = raw is Map ? raw['categories'] : null;
+        if (categories is! List || categories.isEmpty) {
+          throw Exception("No filters found for category '$slug'");
+        }
+        final categoryData = categories.first;
+        if (categoryData is! Map) {
+          throw Exception("Invalid filter configuration for '$slug'");
+        }
+        return FilterCategory.fromJson(
+          Map<String, dynamic>.from(categoryData),
+        );
       } else {
         throw Exception("Failed to load filters");
       }
@@ -193,5 +203,3 @@ class FilterRepository {
     }
   }
 }
-
-

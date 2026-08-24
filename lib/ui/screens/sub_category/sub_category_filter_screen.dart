@@ -46,6 +46,8 @@ class FiltersPage extends StatefulWidget {
           CategoryModel(
             id: int.tryParse(args['catID']?.toString() ?? '65') ?? 65,
             name: args['catName']?.toString() ?? 'Properties',
+            slug:
+                args['categorySlug']?.toString() ?? args['catSlug']?.toString(),
           );
       initialFilter = args['appliedFilter'] as ItemFilterModel?;
       isFromItemsList = args['isFromItemsList'] == true;
@@ -111,6 +113,27 @@ class _FiltersPageState extends State<FiltersPage> {
   int _resultCount = 0;
   bool _isLoadingCount = false;
   Timer? _countDebounceTimer;
+  int _countRequestId = 0;
+
+  bool get _isPropertyCategory {
+    const propertyIds = {65, 68, 139, 143};
+    final id = widget.category.id;
+    final value = '${widget.category.name ?? ''} '
+            '${widget.category.slug ?? ''} '
+            '${widget.initialFilterConfiguration?.slug ?? ''}'
+        .toLowerCase();
+    return propertyIds.contains(id) ||
+        value.contains('property') ||
+        value.contains('residential') ||
+        value.contains('off-plan');
+  }
+
+  List<FilterItem> _sortedActiveFilters(FilterCategory category) {
+    final filters =
+        category.filters.where((filter) => filter.isActive).toList();
+    filters.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    return filters;
+  }
 
   @override
   void initState() {
@@ -148,8 +171,10 @@ class _FiltersPageState extends State<FiltersPage> {
                 ? selectedCategorySlug
                 : ((widget.category.children != null &&
                         widget.category.children!.isNotEmpty)
-                    ? (widget.category.children!.first.slug ?? "residential")
-                    : (widget.category.slug ?? "residential"));
+                    ? (widget.category.children!.first.slug ??
+                        widget.category.slug ??
+                        '')
+                    : (widget.category.slug ?? ''));
 
     if (widget.category.children != null) {
       final propertyTypeIndex = widget.category.children!.indexWhere(
@@ -165,7 +190,7 @@ class _FiltersPageState extends State<FiltersPage> {
     }
 
     selectedSlug = initialSlug;
-    cubit.fetchFilters(initialSlug);
+    if (initialSlug.isNotEmpty) cubit.fetchFilters(initialSlug);
 
     _locationController.text = widget.initialFilter?.city?.isNotEmpty == true
         ? widget.initialFilter!.city!
@@ -271,6 +296,7 @@ class _FiltersPageState extends State<FiltersPage> {
 
   void _updateItemCount() {
     _countDebounceTimer?.cancel();
+    final requestId = ++_countRequestId;
     _countDebounceTimer = Timer(const Duration(milliseconds: 350), () async {
       if (!mounted) return;
       setState(() {
@@ -355,21 +381,18 @@ class _FiltersPageState extends State<FiltersPage> {
         );
 
         final response =
-            await dio.get(Api.getItemApi, queryParameters: queryParams);
+            await dio.get(Api.getItemCountApi, queryParameters: queryParams);
 
-        if (response.statusCode == 200 && mounted) {
+        if (response.statusCode == 200 &&
+            mounted &&
+            requestId == _countRequestId) {
           final data = response.data['data'];
-          int total = 0;
-          if (data is Map && data.containsKey('total')) {
-            total = data['total'] is int
-                ? data['total']
-                : int.tryParse(data['total'].toString()) ?? 0;
-          } else if (response.data is Map &&
-              response.data.containsKey('total')) {
-            total = response.data['total'] is int
-                ? response.data['total']
-                : int.tryParse(response.data['total'].toString()) ?? 0;
-          }
+          final rawCount = data is Map
+              ? (data['count'] ?? data['total'])
+              : response.data is Map
+                  ? (response.data['count'] ?? response.data['total'])
+                  : null;
+          final total = int.tryParse(rawCount?.toString() ?? '') ?? 0;
 
           setState(() {
             _resultCount = total;
@@ -377,7 +400,7 @@ class _FiltersPageState extends State<FiltersPage> {
           });
         }
       } catch (e) {
-        if (mounted) {
+        if (mounted && requestId == _countRequestId) {
           setState(() {
             _isLoadingCount = false;
           });
@@ -457,10 +480,12 @@ class _FiltersPageState extends State<FiltersPage> {
     });
     final initialSlug = (widget.category.children != null &&
             widget.category.children!.isNotEmpty)
-        ? (widget.category.children!.first.slug ?? "residential")
-        : (widget.category.slug ?? "residential");
+        ? (widget.category.children!.first.slug ??
+            widget.category.slug ??
+            selectedSlug)
+        : (widget.category.slug ?? selectedSlug);
     selectedSlug = initialSlug;
-    cubit.fetchFilters(initialSlug);
+    if (initialSlug.isNotEmpty) cubit.fetchFilters(initialSlug);
     _onFilterChanged();
   }
 
@@ -540,6 +565,7 @@ class _FiltersPageState extends State<FiltersPage> {
       categoryChain.add(CategoryModel(
         id: int.tryParse(activeCategoryId) ?? 0,
         name: activeCategoryName,
+        slug: activeCategorySlug,
         children: [],
         subcategoriesCount: 0,
       ));
@@ -550,6 +576,7 @@ class _FiltersPageState extends State<FiltersPage> {
       Navigator.pop(context, {
         "catID": activeCategoryId,
         "catName": activeCategoryName,
+        "categorySlug": activeCategorySlug,
         "categoryIds": categoryIds,
         "selectedCategoryChain": categoryChain,
         "appliedFilter": appliedFilter,
@@ -565,6 +592,7 @@ class _FiltersPageState extends State<FiltersPage> {
       arguments: {
         "catID": activeCategoryId,
         "catName": activeCategoryName,
+        "categorySlug": activeCategorySlug,
         "categoryIds": categoryIds,
         "selectedCategoryChain": categoryChain,
         "appliedFilter": appliedFilter,
@@ -580,7 +608,9 @@ class _FiltersPageState extends State<FiltersPage> {
     return AppBar(
       backgroundColor: context.color.secondaryColor,
       surfaceTintColor: Colors.transparent,
-      elevation: 0.5,
+      shadowColor: Colors.transparent,
+      elevation: 0,
+      scrolledUnderElevation: 0,
       leading: IconButton(
         icon: Icon(
           Icons.arrow_back_ios_new_rounded,
@@ -1437,7 +1467,7 @@ class _FiltersPageState extends State<FiltersPage> {
       appBar: _buildAppBar(),
       body: Column(
         children: [
-          _buildTabBar(),
+          if (_isPropertyCategory) _buildTabBar(),
           Expanded(
             child: BlocConsumer<FilterCubit, FilterState>(
               listener: (context, state) {
@@ -1458,9 +1488,10 @@ class _FiltersPageState extends State<FiltersPage> {
                       _buildLocationSection(),
                       const SizedBox(height: 20),
 
-                      // Property Type Section
-                      _buildPropertyTypeSection(propertyTypes),
-                      const SizedBox(height: 20),
+                      if (_isPropertyCategory) ...[
+                        _buildPropertyTypeSection(propertyTypes),
+                        const SizedBox(height: 20),
+                      ],
 
                       if (state is FilterLoading)
                         Padding(
@@ -1496,7 +1527,7 @@ class _FiltersPageState extends State<FiltersPage> {
                         const SizedBox(height: 20),
 
                         // API-driven Dynamic Filters with RangeSliders
-                        ...state.data.filters.map((filter) {
+                        ..._sortedActiveFilters(state.data).map((filter) {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 20),
                             child: _buildDynamicFilterSection(filter),

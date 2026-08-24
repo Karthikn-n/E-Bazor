@@ -137,3 +137,131 @@ class MotorsServiceReview {
     required this.review,
   });
 }
+
+class CarAppointmentModel {
+  final int? id;
+  final int? userId;
+  final String appointmentNumber;
+  final String serviceType;
+  final String status;
+  final String carTitle;
+  final String? carMake;
+  final String? carModel;
+  final String? carYear;
+  final String? carTrim;
+  final String appointmentDate;
+  final String? appointmentTime;
+  final String? location;
+  final String? address;
+  final String? userName;
+  final String? userPhone;
+  final String? userEmail;
+  final String? notes;
+  final double? amount;
+  final String? paymentStatus;
+  final String? createdAt;
+  final String? updatedAt;
+
+  const CarAppointmentModel({
+    this.id,
+    this.userId,
+    this.appointmentNumber = '',
+    required this.serviceType,
+    required this.status,
+    required this.carTitle,
+    this.carMake,
+    this.carModel,
+    this.carYear,
+    this.carTrim,
+    required this.appointmentDate,
+    this.appointmentTime,
+    this.location,
+    this.address,
+    this.userName,
+    this.userPhone,
+    this.userEmail,
+    this.notes,
+    this.amount,
+    this.paymentStatus,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  bool get isPast {
+    final s = status.toLowerCase();
+    if (s == 'completed' ||
+        s == 'cancelled' ||
+        s == 'past' ||
+        s == 'rejected' ||
+        s == 'expired') {
+      return true;
+    }
+    if (appointmentDate.isNotEmpty) {
+      final date = DateTime.tryParse(appointmentDate);
+      if (date != null && date.isBefore(DateTime.now())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  factory CarAppointmentModel.fromJson(Map<String, dynamic> json) {
+    final make = json['car_make'] ?? json['make'] ?? json['car_make_name'];
+    final model = json['car_model'] ?? json['model'] ?? json['car_model_name'];
+    final year = json['car_year'] ?? json['year'];
+    final trim = json['car_trim'] ?? json['trim'];
+    final title = json['car_name'] ??
+        json['car_title'] ??
+        json['title'] ??
+        [if (year != null) year, if (make != null) make, if (model != null) model]
+            .join(' ')
+            .trim();
+
+    return CarAppointmentModel(
+      id: int.tryParse(json['id']?.toString() ?? ''),
+      userId: int.tryParse(json['user_id']?.toString() ?? ''),
+      appointmentNumber: (json['appointment_number'] ??
+              json['reference_number'] ??
+              (json['id'] != null ? '#APT-${json['id']}' : ''))
+          .toString(),
+      serviceType: (json['service_type'] ??
+              json['type'] ??
+              json['service_name'] ??
+              'Car Appointment')
+          .toString(),
+      status: (json['status'] ?? 'pending').toString(),
+      carTitle: title.isNotEmpty ? title : 'Car Appointment',
+      carMake: make?.toString(),
+      carModel: model?.toString(),
+      carYear: year?.toString(),
+      carTrim: trim?.toString(),
+      appointmentDate: (json['appointment_date'] ??
+              json['date'] ??
+              json['scheduled_at'] ??
+              json['created_at'] ??
+              '')
+          .toString(),
+      appointmentTime: (json['appointment_time'] ?? json['time'])?.toString(),
+      location: (json['location'] ??
+              json['hub_location'] ??
+              json['branch_name'] ??
+              json['city'])
+          ?.toString(),
+      address: json['address']?.toString(),
+      userName: (json['user_name'] ?? json['name'])?.toString(),
+      userPhone: (json['user_phone'] ??
+              json['user_number'] ??
+              json['phone_number'] ??
+              json['contact'])
+          ?.toString(),
+      userEmail: (json['user_email'] ?? json['email'])?.toString(),
+      notes: json['notes']?.toString(),
+      amount: double.tryParse(json['amount']?.toString() ??
+          json['price']?.toString() ??
+          ''),
+      paymentStatus: json['payment_status']?.toString(),
+      createdAt: json['created_at']?.toString(),
+      updatedAt: json['updated_at']?.toString(),
+    );
+  }
+}

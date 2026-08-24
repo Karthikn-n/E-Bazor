@@ -423,6 +423,7 @@ class _JobSearchScreenState extends State<JobSearchScreen> {
       arguments: {
         'catID': '4',
         'catName': 'Jobs',
+        'categorySlug': categorySlug,
         'categoryIds': ['4', leafCategoryId.toString()],
         'selectedCategoryChain': [jobsCategory, leafCategory],
         'appliedFilter': appliedFilter,

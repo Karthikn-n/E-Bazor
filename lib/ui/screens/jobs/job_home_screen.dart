@@ -65,7 +65,8 @@ class _JobHomeScreenState extends State<JobHomeScreen> {
       final results = await Future.wait([
         _jobRepository.fetchPopularJobs(categoryId: 4, city: _userCity),
         _jobRepository.fetchJobCategories(parentCategoryId: 356),
-        _jobRepository.fetchJobQualifications(parentCategoryId: 356, city: _userCity),
+        _jobRepository.fetchJobQualifications(
+            parentCategoryId: 356, city: _userCity),
         _jobRepository.fetchJobTypes(parentCategoryId: 356, city: _userCity),
       ]);
 
@@ -87,7 +88,6 @@ class _JobHomeScreenState extends State<JobHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    
     return AnnotatedRegion(
       value: UiUtils.getSystemUiOverlayStyle(
         context: context,
@@ -330,7 +330,9 @@ class _JobHomeScreenState extends State<JobHomeScreen> {
             color: isDark ? const Color(0xFF1E2433) : Colors.white,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.08),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.08),
               width: 1,
             ),
           ),
@@ -345,7 +347,9 @@ class _JobHomeScreenState extends State<JobHomeScreen> {
                     width: 42,
                     height: 42,
                     decoration: BoxDecoration(
-                      color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF4F5F7),
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.05)
+                          : const Color(0xFFF4F5F7),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
@@ -388,7 +392,8 @@ class _JobHomeScreenState extends State<JobHomeScreen> {
               const SizedBox(height: 14),
 
               // Metadata Rows
-              if (job.employmentType != null && job.employmentType!.isNotEmpty) ...[
+              if (job.employmentType != null &&
+                  job.employmentType!.isNotEmpty) ...[
                 Row(
                   children: [
                     Icon(
@@ -409,7 +414,8 @@ class _JobHomeScreenState extends State<JobHomeScreen> {
                 const SizedBox(height: 6),
               ],
 
-              if (job.monthlySalary != null && job.monthlySalary!.isNotEmpty) ...[
+              if (job.monthlySalary != null &&
+                  job.monthlySalary!.isNotEmpty) ...[
                 Row(
                   children: [
                     Icon(
@@ -459,15 +465,24 @@ class _JobHomeScreenState extends State<JobHomeScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final defaultCategoryImages = {
-      'accounting': 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=400&q=80',
-      'driver': 'https://images.unsplash.com/photo-1580674684081-7617fbf3d745?auto=format&fit=crop&w=400&q=80',
-      'cleaner': 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=400&q=80',
-      'handyman': 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=400&q=80',
-      'sales': 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=400&q=80',
-      'automobile': 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=400&q=80',
-      'beauty': 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=400&q=80',
-      'construction': 'https://images.unsplash.com/photo-1541888946425-d0fbb180c5f7?auto=format&fit=crop&w=400&q=80',
-      'design': 'https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?auto=format&fit=crop&w=400&q=80',
+      'accounting':
+          'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=400&q=80',
+      'driver':
+          'https://images.unsplash.com/photo-1580674684081-7617fbf3d745?auto=format&fit=crop&w=400&q=80',
+      'cleaner':
+          'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=400&q=80',
+      'handyman':
+          'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=400&q=80',
+      'sales':
+          'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=400&q=80',
+      'automobile':
+          'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=400&q=80',
+      'beauty':
+          'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=400&q=80',
+      'construction':
+          'https://images.unsplash.com/photo-1541888946425-d0fbb180c5f7?auto=format&fit=crop&w=400&q=80',
+      'design':
+          'https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?auto=format&fit=crop&w=400&q=80',
     };
 
     String getCategoryImage(String name, String slug) {
@@ -501,13 +516,15 @@ class _JobHomeScreenState extends State<JobHomeScreen> {
                   arguments: {
                     "categoryList": <CategoryModel>[],
                     "catName": "Find Jobs",
+                    "categorySlug": "find-jobs",
                     "catId": 356,
                     "categoryIds": ["4", "356"],
                   },
                 );
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
@@ -542,9 +559,10 @@ class _JobHomeScreenState extends State<JobHomeScreen> {
           ),
           itemBuilder: (context, index) {
             final category = _jobCategories[index];
-            final imgUrl = (category.image != null && category.image!.isNotEmpty)
-                ? category.image!
-                : getCategoryImage(category.name, category.slug);
+            final imgUrl =
+                (category.image != null && category.image!.isNotEmpty)
+                    ? category.image!
+                    : getCategoryImage(category.name, category.slug);
 
             return Material(
               color: Colors.transparent,
@@ -557,7 +575,12 @@ class _JobHomeScreenState extends State<JobHomeScreen> {
                     arguments: {
                       'catID': category.categoryId.toString(),
                       'catName': category.name,
-                      'categoryIds': ['4', '356', category.categoryId.toString()],
+                      'categorySlug': category.slug,
+                      'categoryIds': [
+                        '4',
+                        '356',
+                        category.categoryId.toString()
+                      ],
                     },
                   );
                 },
@@ -566,7 +589,9 @@ class _JobHomeScreenState extends State<JobHomeScreen> {
                     color: isDark ? const Color(0xFF1E2433) : Colors.white,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.08),
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : Colors.black.withValues(alpha: 0.08),
                       width: 1,
                     ),
                   ),
@@ -586,14 +611,18 @@ class _JobHomeScreenState extends State<JobHomeScreen> {
                             imgUrl,
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) => Container(
-                              color: isDark ? Colors.white12 : Colors.grey.shade200,
-                              child: const Icon(Icons.work_outline, size: 36, color: Colors.grey),
+                              color: isDark
+                                  ? Colors.white12
+                                  : Colors.grey.shade200,
+                              child: const Icon(Icons.work_outline,
+                                  size: 36, color: Colors.grey),
                             ),
                           ),
                         ),
                       ),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 8),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -609,7 +638,7 @@ class _JobHomeScreenState extends State<JobHomeScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              "${category.count > 0 ? category.count : '10+' } Jobs",
+                              "${category.count > 0 ? category.count : '10+'} Jobs",
                               style: TextStyle(
                                 fontSize: 12,
                                 color: context.color.textLightColor,
@@ -637,7 +666,8 @@ class _JobHomeScreenState extends State<JobHomeScreen> {
       final lower = name.toLowerCase();
       if (lower.contains("bachelor")) return Icons.account_balance_outlined;
       if (lower.contains("master")) return Icons.school_outlined;
-      if (lower.contains("phd") || lower.contains("doctor")) return Icons.emoji_objects_outlined;
+      if (lower.contains("phd") || lower.contains("doctor"))
+        return Icons.emoji_objects_outlined;
       return Icons.menu_book_outlined;
     }
 
@@ -656,7 +686,8 @@ class _JobHomeScreenState extends State<JobHomeScreen> {
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: _jobQualifications.length > 4 ? 4 : _jobQualifications.length,
+          itemCount:
+              _jobQualifications.length > 4 ? 4 : _jobQualifications.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             crossAxisSpacing: 12,
@@ -678,18 +709,22 @@ class _JobHomeScreenState extends State<JobHomeScreen> {
                     arguments: {
                       'catID': '356',
                       'catName': qual.name,
+                      'categorySlug': 'find-jobs',
                       'categoryIds': ['4', '356'],
                       'search': qual.name,
                     },
                   );
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF1E2433) : Colors.white,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.08),
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : Colors.black.withValues(alpha: 0.08),
                       width: 1,
                     ),
                   ),
@@ -777,18 +812,22 @@ class _JobHomeScreenState extends State<JobHomeScreen> {
                     arguments: {
                       'catID': '356',
                       'catName': type.name,
+                      'categorySlug': 'find-jobs',
                       'categoryIds': ['4', '356'],
                       'search': type.name,
                     },
                   );
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF1E2433) : Colors.white,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.08),
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : Colors.black.withValues(alpha: 0.08),
                       width: 1,
                     ),
                   ),
@@ -837,7 +876,9 @@ class _JobHomeScreenState extends State<JobHomeScreen> {
         color: isDark ? const Color(0xFF1C2434) : const Color(0xFFF3F6FD),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE1E8F8),
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : const Color(0xFFE1E8F8),
           width: 1,
         ),
       ),

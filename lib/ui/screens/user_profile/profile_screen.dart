@@ -241,32 +241,37 @@ class _ProfileScreenState extends State<ProfileScreen>
                       const SizedBox(height: 6),
                       if (isAuthenticated) ...[
                         if (isVerified)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: context.color.forthColor
-                                  .withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.verified_rounded,
-                                  size: 14,
-                                  color: context.color.forthColor,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  "verifiedLbl".translate(context),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.pushNamed(context, Routes.sellerVerificationScreen, arguments: {"isResubmitted": false});
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: context.color.forthColor
+                                    .withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.verified_rounded,
+                                    size: 14,
                                     color: context.color.forthColor,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    "verifiedLbl".translate(context),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: context.color.forthColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           )
                         else
@@ -1167,42 +1172,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                   // GROUP 1: Account & Profile
                   _buildMenuTile(
                     icon: Icons.person_outline_rounded,
-                    title: "My Profile",
-                    onTap: () {
-                      UiUtils.checkUser(
-                        onNotGuest: () {
-                          HelperUtils.goToNextPage(
-                            Routes.completeProfile,
-                            context,
-                            false,
-                            args: {"from": "profile"},
-                          );
-                        },
-                        context: context,
-                      );
-                    },
-                  ),
-                  _buildMenuTile(
-                    icon: Icons.badge_outlined,
-                    title: "My Job Profile",
+                    title: "Profile",
                     onTap: () {
                       UiUtils.checkUser(
                         onNotGuest: () {
                           Navigator.pushNamed(
-                              context, Routes.myJobProfileScreen);
-                        },
-                        context: context,
-                      );
-                    },
-                  ),
-                  _buildMenuTile(
-                    icon: Icons.business_center_outlined,
-                    title: "My Job Applications",
-                    onTap: () {
-                      UiUtils.checkUser(
-                        onNotGuest: () {
-                          Navigator.pushNamed(
-                              context, Routes.myJobApplicationsScreen);
+                              context, Routes.profileMenuScreen);
                         },
                         context: context,
                       );
@@ -1210,7 +1185,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                   _buildMenuTile(
                     icon: Icons.settings_outlined,
-                    title: "Account Settings",
+                    title: "Account",
                     onTap: () {
                       UiUtils.checkUser(
                         onNotGuest: () {
@@ -1223,7 +1198,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                   _buildMenuTile(
                     icon: Icons.notifications_none_rounded,
-                    title: "Notification Settings",
+                    title: "Notification",
                     onTap: () {
                       UiUtils.checkUser(
                         onNotGuest: () {
@@ -1258,8 +1233,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         onNotGuest: () {
                           Navigator.pushNamed(
                             context,
-                            Routes.motorsServiceRequestScreen,
-                            arguments: {"serviceType": "appointment"},
+                            Routes.carAppointmentsScreen,
                           );
                         },
                         context: context,

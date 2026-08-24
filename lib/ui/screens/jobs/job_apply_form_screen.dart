@@ -234,6 +234,21 @@ class _JobApplyFormScreenState extends State<JobApplyFormScreen> {
       context: context,
       showWorldWide: false,
       showPhoneCode: true,
+      favorite: const [
+        'AE',
+        'SA',
+        'QA',
+        'KW',
+        'OM',
+        'BH',
+        'IN',
+        'PK',
+        'EG',
+        'GB',
+        'US',
+        'CA',
+        'AU'
+      ],
       countryListTheme: CountryListThemeData(
         backgroundColor: context.color.secondaryColor,
         textStyle: TextStyle(color: context.color.textDefaultColor),
@@ -348,8 +363,7 @@ class _JobApplyFormScreenState extends State<JobApplyFormScreen> {
           : SafeArea(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.only(bottom: 40),
                 child: _isSubmitted ? _buildSuccessView() : _buildFormView(),
               ),
             ),
@@ -359,7 +373,7 @@ class _JobApplyFormScreenState extends State<JobApplyFormScreen> {
   Widget _buildSuccessView() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 10),
+        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -433,411 +447,523 @@ class _JobApplyFormScreenState extends State<JobApplyFormScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildJobHeaderCard(),
-          const SizedBox(height: 18),
+          // 1. Top Job Info Header Tile
+          _buildJobHeaderTile(),
 
-          // Section 1: Personal Information
-          _buildSectionCard(
-            title: "Personal Information",
-            icon: Icons.person_outline_rounded,
-            children: [
-              _buildFieldLabel("Full Name *"),
-              TextFormField(
-                controller: _nameController,
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? "Please enter full name" : null,
-                decoration: _inputDecoration("Enter your full name"),
-              ),
-              const SizedBox(height: 14),
-              _buildFieldLabel("Email Address *"),
-              TextFormField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                validator: (v) =>
-                    Validator.validateEmail(email: v, context: context),
-                decoration: _inputDecoration("Enter your email address"),
-              ),
-              const SizedBox(height: 14),
-              _buildFieldLabel("Phone Number *"),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  InkWell(
-                    onTap: _showCountryCodePicker,
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      height: 48,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      decoration: BoxDecoration(
-                        color: context.color.secondaryColor,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: context.color.borderColor.withValues(alpha: 0.8),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Text(_phoneCountryFlag,
-                              style: const TextStyle(fontSize: 16)),
-                          const SizedBox(width: 4),
-                          Text(
-                            "+$_phoneCountryCode",
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: context.color.textDefaultColor,
-                            ),
-                          ),
-                          const Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            size: 16,
-                          ),
-                        ],
-                      ),
+          const SizedBox(height: 12),
+
+          // 2. Main Sections in Unified Flat Tile Group
+          Container(
+            color: context.color.secondaryColor,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Section 1: Personal Information Tile
+                _buildSectionTile(
+                  title: "Personal Information",
+                  subtitle: "Your basic contact and identity details",
+                  icon: Icons.person_outline_rounded,
+                  children: [
+                    _buildFieldLabel("Full Name *"),
+                    TextFormField(
+                      controller: _nameController,
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? "Please enter full name"
+                          : null,
+                      decoration: _inputDecoration("Enter your full name"),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
+                    const SizedBox(height: 14),
+                    _buildFieldLabel("Email Address *"),
+                    TextFormField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
                       validator: (v) =>
-                          v == null || v.trim().isEmpty ? "Please enter phone" : null,
-                      decoration: _inputDecoration("Phone number"),
+                          Validator.validateEmail(email: v, context: context),
+                      decoration: _inputDecoration("Enter your email address"),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
+                    const SizedBox(height: 14),
+                    _buildFieldLabel("Phone Number *"),
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildFieldLabel("Gender *"),
-                        _buildDropdown(
-                          value: _gender,
-                          items: _genders,
-                          onChanged: (v) => setState(() => _gender = v!),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildFieldLabel("Nationality"),
-                        TextFormField(
-                          controller: _nationalityController,
-                          decoration: _inputDecoration("e.g. UAE, India"),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              _buildFieldLabel("Current Location (Country)"),
-              TextFormField(
-                controller: _locationController,
-                decoration: _inputDecoration("e.g. United Arab Emirates"),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Section 2: Professional Details
-          _buildSectionCard(
-            title: "Professional Details",
-            icon: Icons.work_outline_rounded,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildFieldLabel("Visa Status *"),
-                        _buildDropdown(
-                          value: _visaStatus,
-                          items: _visaStatuses,
-                          onChanged: (v) => setState(() => _visaStatus = v!),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildFieldLabel("Job Status *"),
-                        _buildDropdown(
-                          value: _jobStatus,
-                          items: _jobStatuses,
-                          onChanged: (v) => setState(() => _jobStatus = v!),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildFieldLabel("Education Level *"),
-                        _buildDropdown(
-                          value: _educationLevel,
-                          items: _educationLevels,
-                          onChanged: (v) =>
-                              setState(() => _educationLevel = v!),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildFieldLabel("Total Experience *"),
-                        _buildDropdown(
-                          value: _totalExperience,
-                          items: _experiences,
-                          onChanged: (v) =>
-                              setState(() => _totalExperience = v!),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              _buildFieldLabel("Job Category / Field *"),
-              _buildDropdown(
-                value: _jobCategory,
-                items: _categories,
-                onChanged: (v) => setState(() {
-                  _jobCategory = v!;
-                  _industry = v;
-                }),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Section 3: Current Employment
-          _buildSectionCard(
-            title: "Current Employment",
-            icon: Icons.business_outlined,
-            children: [
-              _buildFieldLabel("Current / Latest Company"),
-              TextFormField(
-                controller: _companyController,
-                decoration: _inputDecoration("Company name"),
-              ),
-              const SizedBox(height: 14),
-              _buildFieldLabel("Current / Latest Job Title"),
-              TextFormField(
-                controller: _positionController,
-                decoration: _inputDecoration("e.g. Senior Accountant"),
-              ),
-              const SizedBox(height: 14),
-              _buildFieldLabel("Notice Period *"),
-              _buildDropdown(
-                value: _noticePeriod,
-                items: _noticePeriods,
-                onChanged: (v) => setState(() => _noticePeriod = v!),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Section 4: Resume / CV
-          _buildSectionCard(
-            title: "Resume / CV Attachment",
-            icon: Icons.attach_file_rounded,
-            children: [
-              if (_existingResumeUrl != null &&
-                  _existingResumeUrl!.isNotEmpty &&
-                  _resumeFile == null)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: context.color.backgroundColor,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: context.color.borderColor,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.picture_as_pdf_rounded,
-                        color: context.color.territoryColor,
-                        size: 28,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "Saved Resume on Profile",
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w600,
-                                color: context.color.textDefaultColor,
+                        InkWell(
+                          onTap: _showCountryCodePicker,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            height: 48,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            decoration: BoxDecoration(
+                              color: context.color.backgroundColor,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: context.color.borderColor
+                                    .withValues(alpha: 0.8),
                               ),
                             ),
-                            Text(
-                              "Will be attached automatically unless replaced",
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                color: context.color.textLightColor,
+                            child: Row(
+                              children: [
+                                Text(_phoneCountryFlag,
+                                    style: const TextStyle(fontSize: 16)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  "+$_phoneCountryCode",
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: context.color.textDefaultColor,
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.keyboard_arrow_down_rounded,
+                                  size: 16,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _phoneController,
+                            keyboardType: TextInputType.phone,
+                            validator: (v) => v == null || v.trim().isEmpty
+                                ? "Please enter phone"
+                                : null,
+                            decoration: _inputDecoration("Phone number"),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildFieldLabel("Gender *"),
+                              _buildDropdown(
+                                value: _gender,
+                                items: _genders,
+                                onChanged: (v) =>
+                                    setState(() => _gender = v!),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildFieldLabel("Nationality"),
+                              TextFormField(
+                                controller: _nationalityController,
+                                decoration:
+                                    _inputDecoration("e.g. UAE, India"),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    _buildFieldLabel("Current Location (Country)"),
+                    TextFormField(
+                      controller: _locationController,
+                      decoration:
+                          _inputDecoration("e.g. United Arab Emirates"),
+                    ),
+                  ],
+                ),
+
+                _buildTileDivider(),
+
+                // Section 2: Professional Details Tile
+                _buildSectionTile(
+                  title: "Professional Details",
+                  subtitle: "Career status and educational background",
+                  icon: Icons.school_outlined,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildFieldLabel("Visa Status *"),
+                              _buildDropdown(
+                                value: _visaStatus,
+                                items: _visaStatuses,
+                                onChanged: (v) =>
+                                    setState(() => _visaStatus = v!),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildFieldLabel("Job Status *"),
+                              _buildDropdown(
+                                value: _jobStatus,
+                                items: _jobStatuses,
+                                onChanged: (v) =>
+                                    setState(() => _jobStatus = v!),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildFieldLabel("Education Level *"),
+                              _buildDropdown(
+                                value: _educationLevel,
+                                items: _educationLevels,
+                                onChanged: (v) =>
+                                    setState(() => _educationLevel = v!),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildFieldLabel("Total Experience *"),
+                              _buildDropdown(
+                                value: _totalExperience,
+                                items: _experiences,
+                                onChanged: (v) =>
+                                    setState(() => _totalExperience = v!),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    _buildFieldLabel("Job Category / Field *"),
+                    _buildDropdown(
+                      value: _jobCategory,
+                      items: _categories,
+                      onChanged: (v) => setState(() {
+                        _jobCategory = v!;
+                        _industry = v;
+                      }),
+                    ),
+                  ],
+                ),
+
+                _buildTileDivider(),
+
+                // Section 3: Current Employment Tile
+                _buildSectionTile(
+                  title: "Current Employment",
+                  subtitle: "Present company and joining availability",
+                  icon: Icons.work_outline_rounded,
+                  children: [
+                    _buildFieldLabel("Current / Latest Company"),
+                    TextFormField(
+                      controller: _companyController,
+                      decoration: _inputDecoration("Company name"),
+                    ),
+                    const SizedBox(height: 14),
+                    _buildFieldLabel("Current / Latest Job Title"),
+                    TextFormField(
+                      controller: _positionController,
+                      decoration: _inputDecoration("e.g. Senior Accountant"),
+                    ),
+                    const SizedBox(height: 14),
+                    _buildFieldLabel("Notice Period *"),
+                    _buildDropdown(
+                      value: _noticePeriod,
+                      items: _noticePeriods,
+                      onChanged: (v) =>
+                          setState(() => _noticePeriod = v!),
+                    ),
+                  ],
+                ),
+
+                _buildTileDivider(),
+
+                // Section 4: Resume / CV Tile
+                _buildSectionTile(
+                  title: "Resume / CV Attachment",
+                  subtitle: "Upload or use your saved resume file",
+                  icon: Icons.description_outlined,
+                  children: [
+                    if (_existingResumeUrl != null &&
+                        _existingResumeUrl!.isNotEmpty &&
+                        _resumeFile == null)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: context.color.backgroundColor,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: context.color.borderColor,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: context.color.territoryColor
+                                    .withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.description_outlined,
+                                color: context.color.territoryColor,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Profile Saved Resume",
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: context.color.textDefaultColor,
+                                    ),
+                                  ),
+                                  Text(
+                                    "Will be attached automatically",
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: context.color.textLightColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () async {
+                                final uri = Uri.parse(_existingResumeUrl!);
+                                if (await canLaunchUrl(uri)) {
+                                  await launchUrl(uri,
+                                      mode: LaunchMode.externalApplication);
+                                }
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                child: Text(
+                                  "Preview",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: context.color.territoryColor,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.remove_red_eye_outlined),
-                        tooltip: "Preview Resume",
-                        color: context.color.territoryColor,
-                        onPressed: () async {
-                          final uri = Uri.parse(_existingResumeUrl!);
-                          if (await canLaunchUrl(uri)) {
-                            await launchUrl(uri,
-                                mode: LaunchMode.externalApplication);
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              InkWell(
-                onTap: _pickResumeFile,
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                      vertical: 18, horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: context.color.backgroundColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _resumeFile != null
-                          ? context.color.territoryColor
-                          : context.color.borderColor,
-                      style: BorderStyle.solid,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        _resumeFile != null
-                            ? Icons.check_circle_rounded
-                            : Icons.cloud_upload_outlined,
-                        size: 36,
-                        color: _resumeFile != null
-                            ? Colors.green
-                            : context.color.territoryColor,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _resumeFile != null
-                            ? _resumeFile!.path.split(Platform.pathSeparator).last
-                            : "Upload Custom CV for this Job (PDF / DOCX)",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
-                          color: context.color.textDefaultColor,
+                    InkWell(
+                      onTap: _pickResumeFile,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 16, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: context.color.backgroundColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _resumeFile != null
+                                ? const Color(0xFF10B981)
+                                : context.color.borderColor,
+                            width: _resumeFile != null ? 1.5 : 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: _resumeFile != null
+                                    ? const Color(0xFF10B981)
+                                        .withValues(alpha: 0.12)
+                                    : context.color.territoryColor
+                                        .withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                _resumeFile != null
+                                    ? Icons.check_circle_rounded
+                                    : Icons.cloud_upload_outlined,
+                                size: 22,
+                                color: _resumeFile != null
+                                    ? const Color(0xFF10B981)
+                                    : context.color.territoryColor,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _resumeFile != null
+                                        ? _resumeFile!.path
+                                            .split(Platform.pathSeparator)
+                                            .last
+                                        : "Upload Custom CV for this Job",
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: context.color.textDefaultColor,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _resumeFile != null
+                                        ? "Tap to replace document"
+                                        : "PDF, DOC, DOCX (Max 10MB)",
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: context.color.textLightColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 14,
+                              color: context.color.textLightColor,
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "Max file size 10MB • PDF, DOC, DOCX",
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: context.color.textLightColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          // Submit Application Button
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: context.color.territoryColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              onPressed: _isSubmitting ? null : _submitApplication,
-              child: _isSubmitting
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text(
-                      "Submit Application",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
                     ),
+                  ],
+                ),
+              ],
             ),
           ),
+
           const SizedBox(height: 24),
+
+          // Security Note
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.lock_outline_rounded,
+                  size: 14,
+                  color: context.color.textLightColor,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  "Your application is securely sent to the employer",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: context.color.textLightColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Submit Application Button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: context.color.territoryColor,
+                  foregroundColor: Colors.white,
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: _isSubmitting ? null : _submitApplication,
+                child: _isSubmitting
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        "Submit Application",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
         ],
       ),
     );
   }
 
-  Widget _buildJobHeaderCard() {
+  Widget _buildJobHeaderTile() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
         color: context.color.secondaryColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: context.color.borderColor.withValues(alpha: 0.6),
+        border: Border(
+          bottom: BorderSide(
+            color: context.color.borderColor.withValues(alpha: 0.5),
+          ),
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
-              color: context.color.territoryColor.withValues(alpha: 0.1),
+              color: isDark
+                  ? context.color.territoryColor.withValues(alpha: 0.15)
+                  : const Color(0xFFE0F2FE),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
+            child: const Icon(
               Icons.work_outline_rounded,
-              color: context.color.territoryColor,
-              size: 28,
+              color: Color(0xFF2563EB),
+              size: 24,
             ),
           ),
           const SizedBox(width: 14),
@@ -856,12 +982,33 @@ class _JobApplyFormScreenState extends State<JobApplyFormScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  widget.categoryName ?? "Jobs",
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    color: context.color.textLightColor,
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        widget.categoryName ?? "Jobs",
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2563EB),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      "• Quick Apply",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.color.textLightColor,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -871,41 +1018,71 @@ class _JobApplyFormScreenState extends State<JobApplyFormScreen> {
     );
   }
 
-  Widget _buildSectionCard({
+  Widget _buildSectionTile({
     required String title,
+    required String subtitle,
     required IconData icon,
     required List<Widget> children,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.color.secondaryColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: context.color.borderColor.withValues(alpha: 0.6),
-        ),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 20, color: context.color.territoryColor),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: context.color.textDefaultColor,
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: context.color.territoryColor.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  size: 19,
+                  color: context.color.territoryColor,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.bold,
+                        color: context.color.textDefaultColor,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.color.textLightColor,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           ...children,
         ],
       ),
+    );
+  }
+
+  Widget _buildTileDivider() {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      indent: 16,
+      endIndent: 16,
+      color: context.color.borderColor.withValues(alpha: 0.4),
     );
   }
 
@@ -914,9 +1091,12 @@ class _JobApplyFormScreenState extends State<JobApplyFormScreen> {
     required List<String> items,
     required ValueChanged<String?> onChanged,
   }) {
-    final effectiveValue = items.contains(value) ? value : items.first;
+    final effectiveValue = items.contains(value)
+        ? value
+        : (items.isNotEmpty ? items.first : null);
     return DropdownButtonFormField<String>(
-      value: effectiveValue,
+      isExpanded: true,
+      initialValue: effectiveValue,
       dropdownColor: context.color.secondaryColor,
       decoration: _inputDecoration(""),
       items: items.map((item) {
@@ -924,6 +1104,8 @@ class _JobApplyFormScreenState extends State<JobApplyFormScreen> {
           value: item,
           child: Text(
             item,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 13.5,
               color: context.color.textDefaultColor,

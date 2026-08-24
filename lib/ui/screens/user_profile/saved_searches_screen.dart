@@ -297,6 +297,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
         arguments: {
           'catID': catIdStr,
           'catName': search.title ?? "Search Results",
+          'categorySlug': search.categorySlug,
           'categoryIds': [catIdStr],
         },
       );
@@ -503,12 +504,11 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
                     ),
                   ),
                   trailing: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? context.color.territoryColor
-                              .withValues(alpha: 0.15)
+                          ? context.color.territoryColor.withValues(alpha: 0.15)
                           : Colors.grey.shade200,
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -563,7 +563,8 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
               totalAllCount,
             ),
             child: Padding(
-              padding: const EdgeInsets.only(left: 14, right: 12, top: 12, bottom: 12),
+              padding: const EdgeInsets.only(
+                  left: 14, right: 12, top: 12, bottom: 12),
               child: Icon(
                 Icons.menu_rounded,
                 color: context.color.textDefaultColor,
@@ -647,9 +648,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 5.5, vertical: 1.5),
               decoration: BoxDecoration(
-                color: isSelected
-                    ? Colors.grey.shade300
-                    : Colors.grey.shade200,
+                color: isSelected ? Colors.grey.shade300 : Colors.grey.shade200,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -670,14 +669,13 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
   List<SavedSearchModel> _applySort(List<SavedSearchModel> list) {
     final sorted = List<SavedSearchModel>.from(list);
     if (_selectedSort == "newest") {
-      sorted.sort((a, b) =>
-          (b.createdAt ?? "").compareTo(a.createdAt ?? ""));
+      sorted.sort((a, b) => (b.createdAt ?? "").compareTo(a.createdAt ?? ""));
     } else if (_selectedSort == "oldest") {
-      sorted.sort((a, b) =>
-          (a.createdAt ?? "").compareTo(b.createdAt ?? ""));
+      sorted.sort((a, b) => (a.createdAt ?? "").compareTo(b.createdAt ?? ""));
     } else if (_selectedSort == "name_asc") {
-      sorted.sort((a, b) =>
-          (a.title ?? "").toLowerCase().compareTo((b.title ?? "").toLowerCase()));
+      sorted.sort((a, b) => (a.title ?? "")
+          .toLowerCase()
+          .compareTo((b.title ?? "").toLowerCase()));
     }
     return sorted;
   }
@@ -797,8 +795,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
             }
 
             if (state is FetchSavedSearchesSuccess) {
-              final displayedSearches =
-                  _applySort(state.filteredSearches);
+              final displayedSearches = _applySort(state.filteredSearches);
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1122,7 +1119,8 @@ class _SwipeableSavedSearchTileState extends State<_SwipeableSavedSearchTile>
                               // Image Thumbnails Row (if any)
                               if (search.photos.isNotEmpty)
                                 Row(
-                                  children: search.photos.take(3).map((photoUrl) {
+                                  children:
+                                      search.photos.take(3).map((photoUrl) {
                                     return Container(
                                       margin: const EdgeInsets.only(right: 6),
                                       width: 46,
@@ -1199,8 +1197,8 @@ class _SwipeableSavedSearchTileState extends State<_SwipeableSavedSearchTile>
                                       SizedBox(width: 10),
                                       Text(
                                         "Delete",
-                                        style: TextStyle(
-                                            color: Colors.redAccent),
+                                        style:
+                                            TextStyle(color: Colors.redAccent),
                                       ),
                                     ],
                                   ),

@@ -73,9 +73,7 @@ class JobsBottomSheet {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 16),
                     decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF1E2433)
-                          : Colors.white,
+                      color: isDark ? const Color(0xFF1E2433) : Colors.white,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: isDark
@@ -144,6 +142,7 @@ class JobsBottomSheet {
                       arguments: {
                         "categoryList": <CategoryModel>[],
                         "catName": "Hire Talent",
+                        "categorySlug": "hire-talent",
                         "catId": 357,
                         "categoryIds": ["4", "357"],
                       },
@@ -153,9 +152,7 @@ class JobsBottomSheet {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 16),
                     decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF1E2433)
-                          : Colors.white,
+                      color: isDark ? const Color(0xFF1E2433) : Colors.white,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: isDark

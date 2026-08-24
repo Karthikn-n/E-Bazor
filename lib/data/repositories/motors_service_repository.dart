@@ -131,4 +131,42 @@ class MotorsServiceRepository {
             ))
         .toList(growable: false);
   }
+
+  Future<List<CarAppointmentModel>> fetchCarAppointments(
+    dynamic userId, {
+    String filter = 'latest_first',
+  }) async {
+    try {
+      Map<String, dynamic> response;
+      try {
+        response = await Api.get(
+          url: Api.getCarAppointmentDetailsApi,
+          queryParameters: {'user_id': userId, 'filter': filter},
+        );
+      } catch (_) {
+        response = await Api.post(
+          url: Api.getCarAppointmentDetailsApi,
+          parameter: {'user_id': userId, 'filter': filter},
+        );
+      }
+
+      dynamic data = response['data'];
+      if (data is Map) {
+        data = data['data'] ??
+            data['appointments'] ??
+            data['car_appointments'] ??
+            data['records'] ??
+            data['items'];
+      }
+      if (data is! List) return const [];
+      return data
+          .whereType<Map>()
+          .map((json) => CarAppointmentModel.fromJson(
+                Map<String, dynamic>.from(json),
+              ))
+          .toList(growable: false);
+    } catch (_) {
+      return const [];
+    }
+  }
 }

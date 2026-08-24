@@ -99,8 +99,12 @@ class _CategoryListState extends State<CategoryList> {
                             const filterCategoryIds = [65, 68, 139, 143];
                             if (filterCategoryIds.contains(category.id) ||
                                 (category.name != null &&
-                                    (category.name!.toLowerCase().contains("property") ||
-                                        category.name!.toLowerCase().contains("properties")))) {
+                                    (category.name!
+                                            .toLowerCase()
+                                            .contains("property") ||
+                                        category.name!
+                                            .toLowerCase()
+                                            .contains("properties")))) {
                               Navigator.pushNamed(
                                 context,
                                 Routes.filterpage,
@@ -111,7 +115,8 @@ class _CategoryListState extends State<CategoryList> {
                                     category.name!.toLowerCase() == 'jobs') ||
                                 (category.slug != null &&
                                     category.slug!.toLowerCase() == 'jobs')) {
-                              JobsBottomSheet.show(context, jobsCategory: category);
+                              JobsBottomSheet.show(context,
+                                  jobsCategory: category);
                             } else {
                               Navigator.pushNamed(
                                 context,
@@ -119,6 +124,7 @@ class _CategoryListState extends State<CategoryList> {
                                 arguments: {
                                   "categoryList": category.children ?? [],
                                   "catName": category.name ?? "",
+                                  "categorySlug": category.slug,
                                   "catId": category.id ?? 0,
                                   "categoryIds": [
                                     category.id.toString(),

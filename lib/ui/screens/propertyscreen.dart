@@ -64,7 +64,8 @@ class _PropertyFilterScreenState extends State<PropertyFilterScreen> {
         _onPropertyTypeSelected(firstTabCategory.children!.first);
       } else {
         // If even the first tab is empty, fetch it
-        _propertyTypesCubit.fetchSubCategories(categoryId: firstTabCategory.id!);
+        _propertyTypesCubit.fetchSubCategories(
+            categoryId: firstTabCategory.id!);
       }
     }
   }
@@ -76,8 +77,7 @@ class _PropertyFilterScreenState extends State<PropertyFilterScreen> {
     });
 
     // If this property type has children already loaded, we don't need to fetch.
-    if (propertyType.children != null &&
-        propertyType.children!.isNotEmpty) {
+    if (propertyType.children != null && propertyType.children!.isNotEmpty) {
       // Children already available
     } else {
       // Check if it's supposed to have children?
@@ -122,7 +122,8 @@ class _PropertyFilterScreenState extends State<PropertyFilterScreen> {
               child: Text(
                 "Reset".translate(context),
                 style: TextStyle(
-                    color: context.color.textDefaultColor.withValues(alpha: 0.5)),
+                    color:
+                        context.color.textDefaultColor.withValues(alpha: 0.5)),
               ),
             )
           ],
@@ -172,13 +173,15 @@ class _PropertyFilterScreenState extends State<PropertyFilterScreen> {
                 setState(() {
                   _selectedTabIndex = index;
                   // Reset lower selections when switching tabs
-                  if (category.children != null && category.children!.isNotEmpty) {
+                  if (category.children != null &&
+                      category.children!.isNotEmpty) {
                     _onPropertyTypeSelected(category.children!.first);
                   } else {
                     _selectedPropertyType = null;
                     _selectedSubCategory = null;
                     // Fetch if empty
-                    _propertyTypesCubit.fetchSubCategories(categoryId: category.id!);
+                    _propertyTypesCubit.fetchSubCategories(
+                        categoryId: category.id!);
                   }
                 });
               },
@@ -187,8 +190,8 @@ class _PropertyFilterScreenState extends State<PropertyFilterScreen> {
                 decoration: BoxDecoration(
                   border: isSelected
                       ? Border(
-                      bottom: BorderSide(
-                          color: context.color.territoryColor, width: 2))
+                          bottom: BorderSide(
+                              color: context.color.territoryColor, width: 2))
                       : null,
                 ),
                 child: Text(
@@ -199,7 +202,7 @@ class _PropertyFilterScreenState extends State<PropertyFilterScreen> {
                         ? context.color.territoryColor
                         : context.color.textDefaultColor,
                     fontWeight:
-                    isSelected ? FontWeight.bold : FontWeight.normal,
+                        isSelected ? FontWeight.bold : FontWeight.normal,
                     fontSize: 14,
                   ),
                 ),
@@ -256,7 +259,8 @@ class _PropertyFilterScreenState extends State<PropertyFilterScreen> {
       child: BlocBuilder<FetchSubCategoriesCubit, FetchSubCategoriesState>(
         builder: (context, state) {
           if (state is FetchSubCategoriesInProgress) {
-            return Center(child: Padding(
+            return Center(
+                child: Padding(
               padding: const EdgeInsets.all(8.0),
               child: UiUtils.progress(),
             ));
@@ -340,8 +344,9 @@ class _PropertyFilterScreenState extends State<PropertyFilterScreen> {
                               color: isSelected
                                   ? context.color.blackColor
                                   : context.color.textDefaultColor,
-                              fontWeight:
-                              isSelected ? FontWeight.w600 : FontWeight.normal,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
                               height: 1.2, // 🔥 line height control
                             ),
                           ),
@@ -349,7 +354,6 @@ class _PropertyFilterScreenState extends State<PropertyFilterScreen> {
                       ],
                     ),
                   ),
-
                 ),
               );
             }).toList(),
@@ -422,7 +426,6 @@ class _PropertyFilterScreenState extends State<PropertyFilterScreen> {
                         ? context.color.blackColor
                         : context.color.borderColor,
                   ),
-
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(5), // 👈 change value
                   ),
@@ -445,7 +448,6 @@ class _PropertyFilterScreenState extends State<PropertyFilterScreen> {
     );
   }
 
-
   Widget _buildBottomButton() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -459,7 +461,8 @@ class _PropertyFilterScreenState extends State<PropertyFilterScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         child: Text(
           "Show Results",
-          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+              color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
         ),
       ),
     );
@@ -492,12 +495,16 @@ class _PropertyFilterScreenState extends State<PropertyFilterScreen> {
 
     // Determine the "final" category to show in the header or as main context
     // Usually the most specific one.
-    CategoryModel targetCat = _selectedSubCategory ?? _selectedPropertyType ?? _currentTabCategory ?? widget.categoryList[0];
+    CategoryModel targetCat = _selectedSubCategory ??
+        _selectedPropertyType ??
+        _currentTabCategory ??
+        widget.categoryList[0];
 
     if (widget.from == "itemsList") {
       Navigator.pop(context, {
         'catID': targetCat.id.toString(),
         'catName': targetCat.name,
+        'categorySlug': targetCat.slug,
         "categoryIds": accumulatedIds,
         "selectedCategoryChain": accumulatedModels,
       });
@@ -507,8 +514,10 @@ class _PropertyFilterScreenState extends State<PropertyFilterScreen> {
     Navigator.pushNamed(context, Routes.itemsList, arguments: {
       'catID': targetCat.id.toString(),
       'catName': targetCat.name,
+      'categorySlug': targetCat.slug,
       "categoryIds": accumulatedIds, // Passing the full chain IDs
-      "selectedCategoryChain": accumulatedModels // Passing the full chain Models
+      "selectedCategoryChain":
+          accumulatedModels // Passing the full chain Models
     });
   }
 }

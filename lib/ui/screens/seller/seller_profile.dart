@@ -21,6 +21,8 @@ import 'package:Ebozor/ui/screens/home/widgets/home_sections_adapter.dart';
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
 import 'dart:ui' as ui;
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/no_data_found.dart';
 import 'package:Ebozor/ui/screens/widgets/shimmerLoadingContainer.dart';
 
@@ -148,6 +150,37 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
               ),
               //automaticallyImplyLeading: false,
               pinned: true,
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 14.0),
+                  child: Center(
+                    child: InkWell(
+                      onTap: () {
+                        Share.share(
+                            "Check out ${widget.model.name ?? 'Seller'}'s profile on ${Constant.appName}");
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: context.color.borderColor
+                                .withValues(alpha: 0.8),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.share_outlined,
+                          size: 20,
+                          color: context.color.textDefaultColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
 
               expandedHeight: (widget.model.createdAt != null &&
                       widget.model.createdAt != '')
@@ -260,9 +293,9 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
                             .textTheme
                             .titleMedium!
                             .copyWith(fontWeight: FontWeight.w500),
-                        tabs: [
-                          Tab(text: 'liveAds'.translate(context)),
-                          Tab(text: 'ratings'.translate(context)),
+                        tabs: const [
+                          Tab(text: 'Ads'),
+                          Tab(text: 'Ratings'),
                         ],
                       ),
                       Divider(
@@ -307,12 +340,53 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
         print("state loading more${state.isLoadingMore}");
         if (state.items.isEmpty) {
           return Center(
-            child: NoDataFound(
-              onTap: () {
-                context
-                    .read<FetchSellerItemsCubit>()
-                    .fetch(sellerId: widget.model.id!);
-              },
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 30),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 20),
+                  const CactusIllustration(),
+                  const SizedBox(height: 24),
+                  Text(
+                    "You don't have any ads that\nare live.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: context.color.textColorDark,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: 200,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: context.color.territoryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 0,
+                      ),
+                      onPressed: () {
+                        Navigator.pushNamed(
+                            context, Routes.selectItemTypeScreen);
+                      },
+                      child: const Text(
+                        "Post ad now",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }
@@ -1056,7 +1130,7 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
               child: TabBarView(
                 children: [
                   liveAdsWidget(),
-                  Container(),
+                  ratingsListWidget(),
                 ],
               ),
             ),
@@ -1224,3 +1298,135 @@ class CustomRatingBar extends StatelessWidget {
     );
   }
 }
+
+class CactusIllustration extends StatelessWidget {
+  const CactusIllustration({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 140,
+      height: 140,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Background soft moon circle
+          Container(
+            width: 110,
+            height: 110,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Color(0xFFF1F5F9),
+            ),
+          ),
+          // Decorative small dots
+          Positioned(
+            top: 24,
+            left: 54,
+            child: Container(
+              width: 5,
+              height: 5,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF3B82F6),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 42,
+            right: 28,
+            child: Container(
+              width: 3,
+              height: 3,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF60A5FA),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 48,
+            left: 32,
+            child: Container(
+              width: 3,
+              height: 3,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF93C5FD),
+              ),
+            ),
+          ),
+          // Cactus Graphic
+          CustomPaint(
+            size: const Size(90, 80),
+            painter: CactusPainter(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class CactusPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF0284C7), Color(0xFF10B981), Color(0xFF059669)],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
+      ..style = PaintingStyle.fill;
+
+    // Main Stem
+    final mainStemRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+          size.width * 0.38, 0, size.width * 0.24, size.height * 0.95),
+      const Radius.circular(14),
+    );
+    canvas.drawRRect(mainStemRect, paint);
+
+    // Left Arm
+    final leftPath = Path();
+    leftPath.moveTo(size.width * 0.38, size.height * 0.45);
+    leftPath.lineTo(size.width * 0.16, size.height * 0.45);
+    leftPath.quadraticBezierTo(
+        size.width * 0.08, size.height * 0.45, size.width * 0.08, size.height * 0.38);
+    leftPath.lineTo(size.width * 0.08, size.height * 0.20);
+    leftPath.quadraticBezierTo(
+        size.width * 0.08, size.height * 0.12, size.width * 0.16, size.height * 0.12);
+    leftPath.quadraticBezierTo(
+        size.width * 0.24, size.height * 0.12, size.width * 0.24, size.height * 0.20);
+    leftPath.lineTo(size.width * 0.24, size.height * 0.34);
+    leftPath.lineTo(size.width * 0.38, size.height * 0.34);
+    leftPath.close();
+    canvas.drawPath(leftPath, paint);
+
+    // Right Arm
+    final rightPath = Path();
+    rightPath.moveTo(size.width * 0.62, size.height * 0.30);
+    rightPath.lineTo(size.width * 0.82, size.height * 0.30);
+    rightPath.quadraticBezierTo(
+        size.width * 0.92, size.height * 0.30, size.width * 0.92, size.height * 0.22);
+    rightPath.lineTo(size.width * 0.92, size.height * 0.08);
+    rightPath.quadraticBezierTo(size.width * 0.92, 0, size.width * 0.84, 0);
+    rightPath.quadraticBezierTo(
+        size.width * 0.76, 0, size.width * 0.76, size.height * 0.08);
+    rightPath.lineTo(size.width * 0.76, size.height * 0.19);
+    rightPath.lineTo(size.width * 0.62, size.height * 0.19);
+    rightPath.close();
+    canvas.drawPath(rightPath, paint);
+
+    // Base Stand
+    final baseRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+          size.width * 0.28, size.height * 0.90, size.width * 0.44, size.height * 0.10),
+      const Radius.circular(3),
+    );
+    canvas.drawRRect(baseRect, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+

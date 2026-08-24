@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:Ebozor/data/model/category_model.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-
 class CategoryFilterScreen extends StatefulWidget {
   final List<CategoryModel> categoryList;
 
@@ -122,20 +121,26 @@ class _CategoryFilterScreenState extends State<CategoryFilterScreen>
 
                                   if (filterCategoryIds.contains(cat.id) ||
                                       (cat.name != null &&
-                                          (cat.name!.toLowerCase().contains("property") ||
-                                              cat.name!.toLowerCase().contains("properties")))) {
+                                          (cat.name!
+                                                  .toLowerCase()
+                                                  .contains("property") ||
+                                              cat.name!
+                                                  .toLowerCase()
+                                                  .contains("properties")))) {
                                     Navigator.pushNamed(
                                       context,
                                       Routes.filterpage,
                                       arguments: cat,
                                     );
-                                  } else if (cat.children?.isNotEmpty ?? false) {
+                                  } else if (cat.children?.isNotEmpty ??
+                                      false) {
                                     Navigator.pushNamed(
                                       context,
                                       Routes.subCategoryScreen,
                                       arguments: {
                                         "categoryList": cat.children,
                                         "catName": cat.name,
+                                        "categorySlug": cat.slug,
                                         "catId": cat.id,
                                         "categoryIds": [cat.id.toString()],
                                       },
@@ -145,26 +150,27 @@ class _CategoryFilterScreenState extends State<CategoryFilterScreen>
                                   }
                                 },
                                 leading: Container(
-                                    width: 40,
-                                    height: 40,
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(20),
-                                        color: context.color.territoryColor
-                                            .withValues(alpha: 0.1)),
-                                    child: (category.url != null && category.url!.trim().isNotEmpty)
-                                        ? UiUtils.imageType(
-                                            category.url!,
-                                            color: category.url!.endsWith('.svg')
-                                                ? context.color.territoryColor
-                                                : null,
-                                            fit: BoxFit.contain,
-                                          )
-                                        : Icon(
-                                            Icons.category_outlined,
-                                            color: context.color.territoryColor,
-                                            size: 20,
-                                          ),
+                                  width: 40,
+                                  height: 40,
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(20),
+                                      color: context.color.territoryColor
+                                          .withValues(alpha: 0.1)),
+                                  child: (category.url != null &&
+                                          category.url!.trim().isNotEmpty)
+                                      ? UiUtils.imageType(
+                                          category.url!,
+                                          color: category.url!.endsWith('.svg')
+                                              ? context.color.territoryColor
+                                              : null,
+                                          fit: BoxFit.contain,
+                                        )
+                                      : Icon(
+                                          Icons.category_outlined,
+                                          color: context.color.territoryColor,
+                                          size: 20,
+                                        ),
                                 ),
                                 title: Text(
                                   category.name!,
@@ -183,7 +189,8 @@ class _CategoryFilterScreenState extends State<CategoryFilterScreen>
                             },
                           ),
                         ),
-                        if (state.isLoadingMore) Center(child: UiUtils.progress())
+                        if (state.isLoadingMore)
+                          Center(child: UiUtils.progress())
                       ],
                     ),
                   ),
