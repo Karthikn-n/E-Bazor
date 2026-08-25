@@ -100,7 +100,7 @@ class HiveUtils {
     Hive.box(HiveKeys.themeBox).put(HiveKeys.currentTheme, newTheme);
   }
 
-  static void setUserData(Map data) async {
+  static Future<void> setUserData(Map data) async {
     await Hive.box(HiveKeys.userDetailsBox).putAll(data);
   }
 
@@ -171,7 +171,7 @@ class HiveUtils {
     return Hive.box(HiveKeys.userDetailsBox).get(HiveKeys.longitudeKey);
   }
 
-  static void setJWT(String token) async {
+  static Future<void> setJWT(String token) async {
     await Hive.box(HiveKeys.userDetailsBox).put(HiveKeys.jwtToken, token);
   }
 
@@ -180,8 +180,8 @@ class HiveUtils {
         Map.from(Hive.box(HiveKeys.userDetailsBox).toMap()));
   }
 
-  static void setUserIsAuthenticated(bool value) {
-    Hive.box(HiveKeys.authBox).put(HiveKeys.isAuthenticated, value);
+  static Future<void> setUserIsAuthenticated(bool value) {
+    return Hive.box(HiveKeys.authBox).put(HiveKeys.isAuthenticated, value);
   }
 
   static void setEmailVerificationPending(bool value) {
@@ -217,7 +217,7 @@ class HiveUtils {
     }
   }
 
-  static void setLocation(
+  static Future<void> setLocation(
       {String? city,
       String? state,
       String? country,
@@ -339,7 +339,7 @@ class HiveUtils {
       await Hive.box(HiveKeys.jwtToken).clear();
     } catch (_) {}
 
-    HiveUtils.setUserIsAuthenticated(false);
+    await HiveUtils.setUserIsAuthenticated(false);
     HiveUtils.setEmailVerificationPending(false);
 
     try {
@@ -361,7 +361,7 @@ class HiveUtils {
     );
   }
 
-  static void clear() async {
+  static Future<void> clear() async {
     try {
       await Hive.box(HiveKeys.userDetailsBox).clear();
     } catch (_) {}
@@ -372,7 +372,7 @@ class HiveUtils {
       await Hive.box(HiveKeys.jwtToken).clear();
     } catch (_) {}
 
-    HiveUtils.setUserIsAuthenticated(false);
+    await HiveUtils.setUserIsAuthenticated(false);
     HiveUtils.setEmailVerificationPending(false);
 
     try {

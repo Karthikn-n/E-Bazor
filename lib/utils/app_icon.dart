@@ -17,13 +17,10 @@ class AppIcons {
     return "$_basePath$name.svg";
   }
 
-
-
   static String splashLogo = "assets/svg/Logo/splashlogo.png";
-  static String notificatinicon="assets/svg/Logo/splashlogo.png";
+  static String notificatinicon = "assets/svg/Logo/splashlogo.png";
 
-
-  //static String bin = _svgPath("bin");
+  static String safety = _svgPath("safety");
   static String update = _svgPath("update");
   static String companyLogo = _svgPath("Logo/company_logo");
   static String home = _svgPath("home");
@@ -141,8 +138,8 @@ class AppIcons {
   static const String profileNavFilledPng = "assets/icons/profile_filled.png";
 
   ///
-
 }
+
 //  below bng images
 class MainIcons {
   ////////

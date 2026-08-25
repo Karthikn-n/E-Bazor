@@ -69,7 +69,7 @@ class SignupAuthListener extends StatelessWidget {
         );
   }
 
-  void _onLoginState(BuildContext context, LoginState state) {
+  Future<void> _onLoginState(BuildContext context, LoginState state) async {
     if (!Widgets.isCurrentOrLoaderOwner(context)) return;
     if (state is LoginInProgress) {
       Widgets.showLoader(context);
@@ -85,7 +85,8 @@ class SignupAuthListener extends StatelessWidget {
     if (state is! LoginSuccess) return;
 
     Widgets.hideLoder(context);
-    HiveUtils.setUserIsAuthenticated(true);
+    await HiveUtils.setUserIsAuthenticated(true);
+    if (!context.mounted) return;
     HiveUtils.setEmailVerificationPending(false);
     context.read<UserDetailsCubit>().fill(HiveUtils.getUserDetails());
 

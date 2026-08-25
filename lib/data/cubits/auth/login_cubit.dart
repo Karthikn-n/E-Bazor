@@ -137,7 +137,7 @@ class LoginCubit extends Cubit<LoginState> {
       );
 
       // Storing data to local database {HIVE}
-      HiveUtils.setJWT(result['token']);
+      await HiveUtils.setJWT(result['token']);
 
       if ((result['data']['name'] == "" || result['data']['name'] == null) ||
           (result['data']['email'] == "" || result['data']['email'] == null)) {
@@ -145,7 +145,7 @@ class LoginCubit extends Cubit<LoginState> {
 
         var data = result['data'];
         // data['countryCode'] = countryCode;
-        HiveUtils.setUserData(data);
+        await HiveUtils.setUserData(data);
         emit(LoginSuccess(
           apiResponse: Map<String, dynamic>.from(result['data']),
           isProfileCompleted: false,
@@ -155,7 +155,7 @@ class LoginCubit extends Cubit<LoginState> {
       } else {
         var data = result['data'];
         // data['countryCode'] = countryCode;
-        HiveUtils.setUserData(data);
+        await HiveUtils.setUserData(data);
         emit(LoginSuccess(
           apiResponse: Map<String, dynamic>.from(result['data']),
           isProfileCompleted: true,

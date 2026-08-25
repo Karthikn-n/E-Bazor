@@ -101,7 +101,7 @@ class LocationPermissionScreenState extends State<LocationPermissionScreen>
           UiUtils.setDefaultLocationValue(
               isCurrent: false, isHomeUpdate: false, context: context);
         } else {
-          HiveUtils.setLocation(
+          await HiveUtils.setLocation(
             area: placemark.subLocality,
             city: placemark.locality!,
             state: placemark.administrativeArea!,
@@ -111,7 +111,10 @@ class LocationPermissionScreenState extends State<LocationPermissionScreen>
           );
         }
 
-        HelperUtils.killPreviousPages(context, Routes.main, {"from": "login"});
+        if (mounted) {
+          HelperUtils.killPreviousPages(
+              context, Routes.main, {"from": "login"});
+        }
       }
     } catch (e) {
       print("Error getting current location: $e");
@@ -142,8 +145,9 @@ class LocationPermissionScreenState extends State<LocationPermissionScreen>
   Future<void> _getCurrentLocationAndNavigate() async {
     try {
       Position position = await Geolocator.getCurrentPosition(
-            locationSettings: LocationSettings(
-                accuracy: LocationAccuracy.high,));
+          locationSettings: LocationSettings(
+        accuracy: LocationAccuracy.high,
+      ));
 
       List<Placemark> placemarks = await placemarkFromCoordinates(
         position.latitude,
@@ -156,7 +160,7 @@ class LocationPermissionScreenState extends State<LocationPermissionScreen>
           UiUtils.setDefaultLocationValue(
               isCurrent: false, isHomeUpdate: false, context: context);
         } else {
-          HiveUtils.setLocation(
+          await HiveUtils.setLocation(
             area: placemark.subLocality,
             city: placemark.locality!,
             state: placemark.administrativeArea!,
@@ -166,7 +170,10 @@ class LocationPermissionScreenState extends State<LocationPermissionScreen>
           );
         }
 
-        HelperUtils.killPreviousPages(context, Routes.main, {"from": "login"});
+        if (mounted) {
+          HelperUtils.killPreviousPages(
+              context, Routes.main, {"from": "login"});
+        }
       }
     } catch (e) {
       print("Error getting current location: $e");
@@ -193,7 +200,6 @@ class LocationPermissionScreenState extends State<LocationPermissionScreen>
                   Container(
                       height: 300,
                       child: UiUtils.getSvg(AppIcons.locationAccessIcon)),
-
                   const SizedBox(height: 19),
                   Text(
                     "whatsYourLocation".translate(context),
@@ -206,13 +212,14 @@ class LocationPermissionScreenState extends State<LocationPermissionScreen>
                           .translate(context),
                     )
                         .size(context.font.larger)
-                        .color(context.color.textDefaultColor.withValues(alpha: 0.65))
+                        .color(context.color.textDefaultColor
+                            .withValues(alpha: 0.65))
                         .centerAlign(),
                   ),
                   const SizedBox(height: 58),
                   Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12.0, vertical: 12),
                     child: UiUtils.buildButton(context,
                         showElevation: false,
                         buttonColor: context.color.territoryColor,
@@ -225,15 +232,15 @@ class LocationPermissionScreenState extends State<LocationPermissionScreen>
                         buttonTitle: "findMyLocation".translate(context)),
                   ),
                   Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12.0, vertical: 12),
                     child: UiUtils.buildButton(context,
                         showElevation: false,
                         buttonColor: context.color.backgroundColor,
                         border: BorderSide(color: context.color.territoryColor),
                         textColor: context.color.territoryColor, onPressed: () {
                       Navigator.pushNamed(context, Routes.countriesScreen,
-                          arguments: {"from": "location"});
+                          arguments: {"from": "login"});
                     },
                         radius: 8,
                         height: 46,

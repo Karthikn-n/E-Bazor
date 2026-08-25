@@ -81,7 +81,8 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Location services are disabled.'.translate(context)),
+              content:
+                  Text('Location services are disabled.'.translate(context)),
               action: SnackBarAction(
                 label: 'Enable'.translate(context),
                 textColor: context.color.secondaryColor,
@@ -100,7 +101,8 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Location permissions are denied'.translate(context)),
+                content:
+                    Text('Location permissions are denied'.translate(context)),
               ),
             );
           }
@@ -113,7 +115,8 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Location permissions are permanently denied.'.translate(context),
+                'Location permissions are permanently denied.'
+                    .translate(context),
               ),
               action: SnackBarAction(
                 label: 'Settings'.translate(context),
@@ -183,7 +186,7 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
             });
           }
         } else {
-          HiveUtils.setLocation(
+          await HiveUtils.setLocation(
             city: city,
             state: state,
             country: country,
@@ -271,7 +274,8 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
         } catch (_) {
           results.add(LocationSearchResult(
             title: trimmed,
-            subtitle: "${loc.latitude.toStringAsFixed(4)}, ${loc.longitude.toStringAsFixed(4)}",
+            subtitle:
+                "${loc.latitude.toStringAsFixed(4)}, ${loc.longitude.toStringAsFixed(4)}",
             latitude: loc.latitude,
             longitude: loc.longitude,
           ));
@@ -311,8 +315,12 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
 
       if (marks.isNotEmpty) {
         final mark = marks.first;
-        area = mark.subLocality?.isNotEmpty == true ? mark.subLocality : mark.thoroughfare;
-        city = mark.locality?.isNotEmpty == true ? mark.locality : mark.subAdministrativeArea;
+        area = mark.subLocality?.isNotEmpty == true
+            ? mark.subLocality
+            : mark.thoroughfare;
+        city = mark.locality?.isNotEmpty == true
+            ? mark.locality
+            : mark.subAdministrativeArea;
         state = mark.administrativeArea;
         country = mark.country;
       }
@@ -330,7 +338,7 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
           });
         }
       } else {
-        HiveUtils.setLocation(
+        await HiveUtils.setLocation(
           city: city,
           state: state,
           country: country,
@@ -365,7 +373,8 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
         settings: RouteSettings(arguments: {
           'from': widget.from,
           'latitude': HiveUtils.getLatitude() ?? HiveUtils.getCurrentLatitude(),
-          'longitude': HiveUtils.getLongitude() ?? HiveUtils.getCurrentLongitude(),
+          'longitude':
+              HiveUtils.getLongitude() ?? HiveUtils.getCurrentLongitude(),
           'city': HiveUtils.getCityName(),
           'state': HiveUtils.getStateName(),
           'country': HiveUtils.getCountryName(),
@@ -478,7 +487,8 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
                   fontWeight: FontWeight.w500,
                 ),
                 decoration: InputDecoration(
-                  hintText: "Search city, area, or address...".translate(context),
+                  hintText:
+                      "Search city, area, or address...".translate(context),
                   hintStyle: TextStyle(
                     color: context.color.textLightColor,
                     fontSize: 14,
@@ -610,7 +620,8 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: context.color.territoryColor.withValues(alpha: 0.15),
+                        color: context.color.territoryColor
+                            .withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
@@ -713,7 +724,8 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
                   ? "Detecting your precise GPS location...".translate(context)
                   : (_currentGpsAddress.isNotEmpty
                       ? _currentGpsAddress
-                      : "Tap to fetch accurate location via GPS".translate(context)),
+                      : "Tap to fetch accurate location via GPS"
+                          .translate(context)),
               trailing: _isLocatingCurrent
                   ? SizedBox(
                       width: 18,
@@ -737,7 +749,8 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
               icon: Icons.map_rounded,
               iconColor: Colors.teal,
               title: "Pick on Interactive Map".translate(context),
-              subtitle: "Drag and pin exact location on full map".translate(context),
+              subtitle:
+                  "Drag and pin exact location on full map".translate(context),
               trailing: Icon(
                 Icons.arrow_forward_ios_rounded,
                 size: 16,
@@ -754,7 +767,8 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
               title: "Nearby Listings Radius".translate(context),
               subtitle: activeRadius != null
                   ? "Active radius: ${activeRadius} km".translate(context)
-                  : "Filter items within custom radius (1km - 100km)".translate(context),
+                  : "Filter items within custom radius (1km - 100km)"
+                      .translate(context),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -766,7 +780,8 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: context.color.territoryColor.withValues(alpha: 0.12),
+                        color: context.color.territoryColor
+                            .withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -794,7 +809,8 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
               icon: Icons.public_rounded,
               iconColor: Colors.orangeAccent,
               title: "Browse Countries & Cities".translate(context),
-              subtitle: "Select from structured regional categories".translate(context),
+              subtitle: "Select from structured regional categories"
+                  .translate(context),
               trailing: Icon(
                 Icons.arrow_forward_ios_rounded,
                 size: 16,

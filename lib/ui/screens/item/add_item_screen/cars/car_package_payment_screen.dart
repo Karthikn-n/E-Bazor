@@ -1,9 +1,7 @@
 import 'dart:developer';
-import 'package:Ebozor/data/cubits/item/fetch_my_promoted_items_cubit.dart';
 import 'package:Ebozor/ui/screens/advertisement/my_advertisment_screen.dart';
 import 'package:Ebozor/ui/screens/item/my_item_tab_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/model/cars/car_models.dart';
 import 'package:Ebozor/data/model/item/item_model.dart';
@@ -591,16 +589,12 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
     // Refresh MyAds cubits and screens
     try {
       MyAdvertisementScreen.refreshCallback?.call();
-      FetchMyPromotedItemsCubit.globalInstance?.addItem(createdItem);
-      FetchMyPromotedItemsCubit.globalInstance?.fetchMyPromotedItems();
       myAdsCubitReference[""]?.addItem(createdItem);
       myAdsCubitReference[""]?.fetchMyItems(getItemsWithStatus: "");
       myAdsCubitReference["approved"]
           ?.fetchMyItems(getItemsWithStatus: "approved");
       myAdsCubitReference["inactive"]
           ?.fetchMyItems(getItemsWithStatus: "inactive");
-      context.read<FetchMyPromotedItemsCubit>().addItem(createdItem);
-      context.read<FetchMyPromotedItemsCubit>().fetchMyPromotedItems();
     } catch (_) {}
 
     Navigator.pushNamedAndRemoveUntil(

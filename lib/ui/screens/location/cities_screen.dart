@@ -143,7 +143,7 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
     return null;
   }
 
-  void _applyLocationDirectly() {
+  Future<void> _applyLocationDirectly() async {
     final cityName = effectiveCityName;
     final lat = effectiveLatitude;
     final lng = effectiveLongitude;
@@ -159,7 +159,7 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
         "longitude": lng,
       });
     } else {
-      HiveUtils.setLocation(
+      await HiveUtils.setLocation(
         city: cityName,
         state: widget.stateName,
         country: widget.countryName,
@@ -168,6 +168,7 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
         longitude: lng,
       );
 
+      if (!mounted) return;
       if (widget.from == "login") {
         Navigator.pushNamedAndRemoveUntil(
           context,
@@ -224,7 +225,9 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
         onPressed: () => Navigator.pop(context),
       ),
       title: Text(
-        widget.stateName.isNotEmpty ? widget.stateName : "Select City".translate(context),
+        widget.stateName.isNotEmpty
+            ? widget.stateName
+            : "Select City".translate(context),
         style: TextStyle(
           color: context.color.textDefaultColor,
           fontWeight: FontWeight.w700,
@@ -389,7 +392,8 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
               children: [
                 // 1. Quick Select: Entire State / Custom City Pill
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -412,7 +416,8 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
                                     (manualCityName == widget.stateName ||
                                         (manualCityName == null &&
                                             searchText.isEmpty)))
-                                ? context.color.territoryColor.withValues(alpha: 0.12)
+                                ? context.color.territoryColor
+                                    .withValues(alpha: 0.12)
                                 : context.color.secondaryColor,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
@@ -421,7 +426,8 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
                                           (manualCityName == null &&
                                               searchText.isEmpty)))
                                   ? context.color.territoryColor
-                                  : context.color.borderColor.withValues(alpha: 0.6),
+                                  : context.color.borderColor
+                                      .withValues(alpha: 0.6),
                             ),
                           ),
                           child: Row(
@@ -474,13 +480,15 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
                             ),
                             decoration: BoxDecoration(
                               color: (manualCityName == searchText)
-                                  ? context.color.territoryColor.withValues(alpha: 0.12)
+                                  ? context.color.territoryColor
+                                      .withValues(alpha: 0.12)
                                   : context.color.secondaryColor,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: (manualCityName == searchText)
                                     ? context.color.territoryColor
-                                    : context.color.borderColor.withValues(alpha: 0.6),
+                                    : context.color.borderColor
+                                        .withValues(alpha: 0.6),
                               ),
                             ),
                             child: Row(
@@ -572,13 +580,15 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
                             ),
                             decoration: BoxDecoration(
                               color: isSelected
-                                  ? context.color.territoryColor.withValues(alpha: 0.12)
+                                  ? context.color.territoryColor
+                                      .withValues(alpha: 0.12)
                                   : context.color.secondaryColor,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: isSelected
                                     ? context.color.territoryColor
-                                    : context.color.borderColor.withValues(alpha: 0.6),
+                                    : context.color.borderColor
+                                        .withValues(alpha: 0.6),
                                 width: isSelected ? 1.5 : 1.0,
                               ),
                             ),

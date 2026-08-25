@@ -9,7 +9,6 @@ import 'package:Ebozor/data/model/data_output.dart';
 import 'package:Ebozor/data/model/item/item_model.dart';
 import 'package:path/path.dart' as path;
 
-
 class ItemRepository {
   Future<ItemModel> createItem(
     Map<String, dynamic> itemDetails,
@@ -52,7 +51,8 @@ class ItemRepository {
       if (response['error'] == true) {
         final errDetails = response['details']?.toString() ?? '';
         final errMsg = response['message']?.toString() ?? 'Error Occurred';
-        throw ApiException(errDetails.isNotEmpty ? "$errMsg: $errDetails" : errMsg);
+        throw ApiException(
+            errDetails.isNotEmpty ? "$errMsg: $errDetails" : errMsg);
       }
 
       dynamic resData = response['data'];
@@ -135,10 +135,9 @@ class ItemRepository {
               int.tryParse(data['payment_pending']?.toString() ?? '0') ?? 0,
           "under_review":
               int.tryParse(data['under_review']?.toString() ?? '0') ?? 0,
-          "rejected":
-              int.tryParse(data['rejected']?.toString() ?? '0') ?? 0,
-          "expired":
-              int.tryParse(data['expired']?.toString() ?? '0') ?? 0,
+          "inactive": int.tryParse(data['inactive']?.toString() ?? '0') ?? 0,
+          "rejected": int.tryParse(data['rejected']?.toString() ?? '0') ?? 0,
+          "expired": int.tryParse(data['expired']?.toString() ?? '0') ?? 0,
         };
       }
       return {};
@@ -147,7 +146,8 @@ class ItemRepository {
     }
   }
 
-  Future<DataOutput<ItemModel>> fetchItemFromItemId(int id, {int? categoryId}) async {
+  Future<DataOutput<ItemModel>> fetchItemFromItemId(int id,
+      {int? categoryId}) async {
     Map<String, dynamic> parameters = {
       Api.id: id,
     };
@@ -169,8 +169,9 @@ class ItemRepository {
       rawList = [response['data']];
     }
 
-    List<ItemModel> modelList =
-        rawList.map((e) => ItemModel.fromJson(Map<String, dynamic>.from(e))).toList();
+    List<ItemModel> modelList = rawList
+        .map((e) => ItemModel.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
 
     return DataOutput(total: modelList.length, modelList: modelList);
   }
@@ -194,8 +195,9 @@ class ItemRepository {
       rawList = [response['data']];
     }
 
-    List<ItemModel> modelList =
-        rawList.map((e) => ItemModel.fromJson(Map<String, dynamic>.from(e))).toList();
+    List<ItemModel> modelList = rawList
+        .map((e) => ItemModel.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
 
     return DataOutput(total: modelList.length, modelList: modelList);
   }
@@ -445,10 +447,8 @@ class ItemRepository {
   ///////////////
   /// search api called here
   Future<DataOutput<ItemModel>> searchItem(
-      String query,
-      ItemFilterModel? filter,
-      {required int page})
-  async {
+      String query, ItemFilterModel? filter,
+      {required int page}) async {
     Map<String, dynamic> parameters = {
       Api.search: query,
       Api.page: page,
@@ -461,9 +461,10 @@ class ItemRepository {
         parameters['radius'] = filter.radius;
       }
     } else {
-      String? effCountry = (filter?.country != null && filter!.country!.isNotEmpty)
-          ? filter.country
-          : HiveUtils.getCountryName();
+      String? effCountry =
+          (filter?.country != null && filter!.country!.isNotEmpty)
+              ? filter.country
+              : HiveUtils.getCountryName();
       String? effState = (filter?.state != null && filter!.state!.isNotEmpty)
           ? filter.state
           : HiveUtils.getStateName();
@@ -473,13 +474,17 @@ class ItemRepository {
       int? effAreaId = filter?.areaId ?? HiveUtils.getAreaId();
 
       if (effCity != null && effCity.isNotEmpty) parameters['city'] = effCity;
-      if (effState != null && effState.isNotEmpty) parameters['state'] = effState;
-      if (effCountry != null && effCountry.isNotEmpty) parameters['country'] = effCountry;
+      if (effState != null && effState.isNotEmpty)
+        parameters['state'] = effState;
+      if (effCountry != null && effCountry.isNotEmpty)
+        parameters['country'] = effCountry;
       if (effAreaId != null) parameters['area_id'] = effAreaId;
     }
 
     if (filter != null) {
-      if (filter.minPrice != null && filter.minPrice!.isNotEmpty && filter.minPrice != '0') {
+      if (filter.minPrice != null &&
+          filter.minPrice!.isNotEmpty &&
+          filter.minPrice != '0') {
         parameters['min_price'] = filter.minPrice;
       }
       if (filter.maxPrice != null && filter.maxPrice!.isNotEmpty) {

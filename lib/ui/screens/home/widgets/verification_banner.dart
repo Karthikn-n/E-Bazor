@@ -8,7 +8,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:Ebozor/ui/screens/widgets/phone_verification_dialog.dart';
 
 class VerificationBanner extends StatefulWidget {
-  const VerificationBanner({super.key});
+  final EdgeInsetsGeometry padding;
+
+  const VerificationBanner({
+    super.key,
+    this.padding = const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+  });
 
   @override
   State<VerificationBanner> createState() => _VerificationBannerState();
@@ -67,7 +72,7 @@ class _VerificationBannerState extends State<VerificationBanner> {
         return GestureDetector(
           onTap: _handleBannerTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            padding: widget.padding,
             child: Material(
               elevation: 6,
               color: Colors.transparent,

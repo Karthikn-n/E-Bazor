@@ -73,7 +73,10 @@ class NearbyLocationScreenState extends State<NearbyLocationScreen>
     // 2. Set fast initial coordinates immediately so map loads instantly
     latitude = HiveUtils.getLatitude() ?? HiveUtils.getCurrentLatitude();
     longitude = HiveUtils.getLongitude() ?? HiveUtils.getCurrentLongitude();
-    if (latitude == null || longitude == null || latitude == 0 || longitude == 0) {
+    if (latitude == null ||
+        longitude == null ||
+        latitude == 0 ||
+        longitude == 0) {
       latitude = double.tryParse(Constant.defaultLatitude) ?? 25.2048;
       longitude = double.tryParse(Constant.defaultLongitude) ?? 55.2708;
     }
@@ -137,9 +140,10 @@ class NearbyLocationScreenState extends State<NearbyLocationScreen>
       bearing: 0,
     );
     _addCircle(LatLng(latitude!, longitude!), radius);
-    if (mounted) setState(() {
-      isMapLoading = false;
-    });
+    if (mounted)
+      setState(() {
+        isMapLoading = false;
+      });
   }
 
   Future<void> preFillLocationWhileEdit() async {
@@ -310,9 +314,9 @@ class NearbyLocationScreenState extends State<NearbyLocationScreen>
     );
   }
 
-  void applyOnPressed() {
+  Future<void> applyOnPressed() async {
     if (widget.from == "home") {
-      HiveUtils.setLocation(
+      await HiveUtils.setLocation(
           city: formatedAddress!.city,
           state: formatedAddress!.state,
           area: formatedAddress!.area,
@@ -339,7 +343,7 @@ class NearbyLocationScreenState extends State<NearbyLocationScreen>
 
       Navigator.popUntil(context, (route) => route.isFirst);
     } else if (widget.from == "location") {
-      HiveUtils.setLocation(
+      await HiveUtils.setLocation(
           city: formatedAddress!.city,
           state: formatedAddress!.state,
           area: formatedAddress!.area,

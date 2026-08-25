@@ -2,13 +2,11 @@ import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:Ebozor/app/routes.dart';
-import 'package:Ebozor/data/cubits/item/fetch_my_promoted_items_cubit.dart';
 import 'package:Ebozor/data/helper/widgets.dart';
 import 'package:Ebozor/data/model/category_model.dart';
 import 'package:Ebozor/data/model/custom_field/custom_field_model.dart';
@@ -29,7 +27,6 @@ import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/posting_form_shar
 class PropertyPostingFormScreen extends StatefulWidget {
   final CategoryModel? category;
   final List<CategoryModel>? breadcrumbs;
-  final String? initialTitle;
   final List<CustomFieldModel>? customFields;
   final bool isEdit;
   final ItemModel? item;
@@ -38,7 +35,6 @@ class PropertyPostingFormScreen extends StatefulWidget {
     super.key,
     this.category,
     this.breadcrumbs,
-    this.initialTitle,
     this.customFields,
     this.isEdit = false,
     this.item,
@@ -51,7 +47,6 @@ class PropertyPostingFormScreen extends StatefulWidget {
       builder: (context) => PropertyPostingFormScreen(
         category: arguments?['category'] ?? arguments?['current'],
         breadcrumbs: arguments?['breadcrumbs'] ?? arguments?['breadCrumbItems'],
-        initialTitle: arguments?['initialTitle'],
         customFields: arguments?['customFields'],
         isEdit: arguments?['isEdit'] ?? false,
         item: arguments?['item'],
@@ -109,10 +104,9 @@ class _PropertyPostingFormScreenState
   @override
   void initState() {
     super.initState();
-    final prefilled = widget.initialTitle ??
-        widget.item?.name ??
-        getCloudData("prefilled_listing_title")?.toString() ??
-        "";
+    // New ads must always be titled explicitly on this form. Existing titles
+    // are retained only while editing an item.
+    final prefilled = widget.item?.name ?? "";
     _titleController = TextEditingController(text: prefilled);
 
     final savedCode = HiveUtils.getCountryCode();
@@ -149,7 +143,8 @@ class _PropertyPostingFormScreenState
         _phoneController.text = item.contact.toString();
       }
       _youtubeUrlController.text = item.videoLink ?? "";
-      _showPhoneNumber = item.hidePhoneNumber != 1 && item.hidePhoneNumber != true;
+      _showPhoneNumber =
+          item.hidePhoneNumber != 1 && item.hidePhoneNumber != true;
       if (item.latitude != null && item.longitude != null) {
         _location = PostingLocationData(
           coordinates: LatLng(item.latitude!, item.longitude!),
@@ -166,7 +161,9 @@ class _PropertyPostingFormScreenState
       if (item.galleryImages != null) {
         for (final g in item.galleryImages!) {
           final gUrl = g.image?.trim();
-          if (gUrl != null && gUrl.isNotEmpty && !_existingNetworkImages.contains(gUrl)) {
+          if (gUrl != null &&
+              gUrl.isNotEmpty &&
+              !_existingNetworkImages.contains(gUrl)) {
             _existingNetworkImages.add(gUrl);
           }
         }
@@ -339,7 +336,9 @@ class _PropertyPostingFormScreenState
 
     final isEditMode = widget.isEdit || widget.item != null;
 
-    if (!isEditMode && _selectedImages.isEmpty && _existingNetworkImages.isEmpty) {
+    if (!isEditMode &&
+        _selectedImages.isEmpty &&
+        _existingNetworkImages.isEmpty) {
       HelperUtils.showSnackBarMessage(
         context,
         "Please upload at least 1 image",
@@ -375,17 +374,21 @@ class _PropertyPostingFormScreenState
             : 2);
 
     final allCategoryIds =
-        widget.breadcrumbs != null && widget.breadcrumbs!.isNotEmpty
-            ? widget.breadcrumbs!
-                .map((b) => b.id)
-                .where((id) => id != null)
-                .join(',')
-            : (widget.item?.allCategoryIds ?? "$categoryId");
+        isEditMode && (widget.item?.allCategoryIds?.trim().isNotEmpty ?? false)
+            ? widget.item!.allCategoryIds!
+            : widget.breadcrumbs != null && widget.breadcrumbs!.isNotEmpty
+                ? widget.breadcrumbs!
+                    .map((b) => b.id)
+                    .where((id) => id != null)
+                    .join(',')
+                : (widget.item?.allCategoryIds ?? "$categoryId");
 
     final mergedCustomFields = _adminFieldsController.toSubmissionMap();
 
     final itemDetails = <String, dynamic>{
       if (isEditMode && widget.item?.id != null) 'id': widget.item!.id,
+      if (isEditMode && (widget.item?.status?.trim().isNotEmpty ?? false))
+        'status': widget.item!.status,
       'name': _titleController.text.trim(),
       'slug': _titleController.text
           .trim()
@@ -417,9 +420,8 @@ class _PropertyPostingFormScreenState
         );
         final mainImg =
             _selectedImages.isNotEmpty ? _selectedImages.first : null;
-        final otherImgs = _selectedImages.length > 1
-            ? _selectedImages.sublist(1)
-            : null;
+        final otherImgs =
+            _selectedImages.length > 1 ? _selectedImages.sublist(1) : null;
         await ItemRepository().editItem(itemDetails, mainImg, otherImgs);
       } catch (e) {
         log("Property edit API error: $e");
@@ -445,10 +447,8 @@ class _PropertyPostingFormScreenState
       );
       try {
         MyAdvertisementScreen.refreshCallback?.call();
-        FetchMyPromotedItemsCubit.globalInstance?.fetchMyPromotedItems();
       } catch (_) {}
-      Navigator.of(context).popUntil(
-          (route) => route.settings.name == Routes.myAdvertisment || route.isFirst);
+      Navigator.of(context).pop(true);
       return;
     }
 
@@ -490,7 +490,6 @@ class _PropertyPostingFormScreenState
     }
 
     try {
-      context.read<FetchMyPromotedItemsCubit>().fetchMyPromotedItems();
       MyAdvertisementScreen.refreshCallback?.call();
     } catch (_) {}
 

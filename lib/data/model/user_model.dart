@@ -14,6 +14,7 @@ class UserModel {
   String? type;
   String? mobile;
   String? name;
+  String? lastName;
   int? isPersonalDetailShow;
   int? notification;
   String? profile;
@@ -34,6 +35,7 @@ class UserModel {
       this.type,
       this.mobile,
       this.name,
+      this.lastName,
       this.notification,
       this.profile,
       this.token,
@@ -54,6 +56,7 @@ class UserModel {
     type = json['type'];
     mobile = json['mobile'];
     name = json['name'];
+    lastName = json['last_name'];
     //notification = json['notification'];
 
     notification = (json['notification'] != null
@@ -86,6 +89,7 @@ class UserModel {
     data['type'] = type;
     data['mobile'] = mobile;
     data['name'] = name;
+    data['last_name'] = lastName;
     data['notification'] = notification;
     data['profile'] = profile;
     data['token'] = token;
@@ -93,6 +97,17 @@ class UserModel {
     data['show_personal_details'] = isPersonalDetailShow;
     data['is_verified'] = isVerified;
     return data;
+  }
+
+  String get displayName {
+    final first = name?.trim() ?? '';
+    final last = lastName?.trim() ?? '';
+    if (first.isEmpty) return last;
+    final nameParts = first.toLowerCase().split(RegExp(r'\s+'));
+    if (last.isEmpty || nameParts.last == last.toLowerCase()) {
+      return first;
+    }
+    return '$first $last';
   }
 
   @override

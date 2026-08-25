@@ -7,7 +7,6 @@ import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-
 abstract class AuthState {}
 
 class AuthInitial extends AuthState {}
@@ -93,7 +92,7 @@ class AuthCubit extends Cubit<AuthState> {
       var response =
           await Api.post(url: Api.updateProfileApi, parameter: parameters);
       if (!response[Api.error]) {
-        HiveUtils.setUserData(response['data']);
+        await HiveUtils.setUserData(response['data']);
         //checkIsAuthenticated();
       }
 

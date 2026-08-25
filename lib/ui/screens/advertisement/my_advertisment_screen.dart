@@ -1,6 +1,7 @@
 import 'dart:developer';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/item/fetch_my_promoted_items_cubit.dart';
+import 'package:Ebozor/data/cubits/seller/fetch_verification_request_cubit.dart';
 import 'package:Ebozor/data/model/category_model.dart';
 import 'package:Ebozor/data/model/item/item_model.dart';
 import 'package:Ebozor/data/helper/widgets.dart';
@@ -10,7 +11,9 @@ import 'package:Ebozor/ui/screens/widgets/errors/no_internet.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
 import 'package:Ebozor/ui/screens/widgets/intertitial_ads_screen.dart';
 import 'package:Ebozor/ui/screens/widgets/shimmerLoadingContainer.dart';
+import 'package:Ebozor/ui/screens/home/widgets/verification_banner.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
+import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/cloudState/cloud_state.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
@@ -67,7 +70,11 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
   final List<Map<String, String>> _tabs = [
     {"label": "All Ads", "key": "all_ads", "status": ""},
     {"label": "Live", "key": "live", "status": "approved"},
-    {"label": "Payment Pending", "key": "payment_pending", "status": "pending payment"},
+    {
+      "label": "Payment Pending",
+      "key": "payment_pending",
+      "status": "pending payment"
+    },
     {"label": "Under Review", "key": "under_review", "status": "review"},
     {"label": "Inactive", "key": "inactive", "status": "inactive"},
     {"label": "Drafts", "key": "drafts", "status": "drafts"},
@@ -91,7 +98,9 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
   void _loadData() {
     _fetchCounts();
     final status = _tabs[_selectedTab]["status"];
-    context.read<FetchMyPromotedItemsCubit>().fetchMyPromotedItems(status: status);
+    context
+        .read<FetchMyPromotedItemsCubit>()
+        .fetchMyPromotedItems(status: status);
   }
 
   Future<void> _fetchCounts() async {
@@ -118,7 +127,7 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
 
   @override
   void dispose() {
-     MyAdvertisementScreen.refreshCallback = null;
+    MyAdvertisementScreen.refreshCallback = null;
     _pageScrollController.dispose();
     super.dispose();
   }
@@ -134,7 +143,9 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
       _selectedTab = index;
     });
     final status = _tabs[index]["status"];
-    context.read<FetchMyPromotedItemsCubit>().fetchMyPromotedItems(status: status);
+    context
+        .read<FetchMyPromotedItemsCubit>()
+        .fetchMyPromotedItems(status: status);
     _fetchCounts();
   }
 
@@ -167,7 +178,8 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
 
   void _toggleSelectAll(List<ItemModel> items) {
     setState(() {
-      final validIds = items.where((e) => e.id != null).map((e) => e.id!).toSet();
+      final validIds =
+          items.where((e) => e.id != null).map((e) => e.id!).toSet();
       if (_selectedItemIds.containsAll(validIds)) {
         _selectedItemIds.clear();
         _isSelectionMode = false;
@@ -187,7 +199,8 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            const Icon(Icons.delete_sweep_outlined, color: Colors.red, size: 24),
+            const Icon(Icons.delete_sweep_outlined,
+                color: Colors.red, size: 24),
             const SizedBox(width: 8),
             Text(
               "Delete $count ${count > 1 ? 'Ads' : 'Ad'}",
@@ -223,7 +236,8 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
             child: Text(
               "Delete ($count)",
@@ -241,9 +255,9 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
     try {
       await Future.wait(
         idsToDelete.map((id) => Api.post(
-          url: Api.deleteItemApi,
-          parameter: {"id": id},
-        )),
+              url: Api.deleteItemApi,
+              parameter: {"id": id},
+            )),
       );
       for (var id in idsToDelete) {
         context.read<FetchMyPromotedItemsCubit>().delete(id);
@@ -347,7 +361,8 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
         status: newStatus,
       );
       if (response['error'] == true) {
-        final msg = response['message']?.toString() ?? "Failed to update status";
+        final msg =
+            response['message']?.toString() ?? "Failed to update status";
         if (mounted) {
           HelperUtils.showSnackBarMessage(
             context,
@@ -359,7 +374,9 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
       }
       if (mounted) {
         // Silently update item in cubit without full shimmer reload
-        context.read<FetchMyPromotedItemsCubit>().updateItemStatus(item.id!, newStatus);
+        context
+            .read<FetchMyPromotedItemsCubit>()
+            .updateItemStatus(item.id!, newStatus);
         _fetchCounts();
         HelperUtils.showSnackBarMessage(
           context,
@@ -386,7 +403,8 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 22),
+            const Icon(Icons.delete_outline_rounded,
+                color: Colors.red, size: 22),
             const SizedBox(width: 8),
             Text(
               "Delete Ad",
@@ -422,7 +440,8 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
             child: const Text(
               "Delete",
@@ -515,8 +534,8 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                   ]
                 : [
                     TextButton.icon(
-                      onPressed: () =>
-                          Navigator.pushNamed(context, Routes.selectCategoryScreen),
+                      onPressed: () => Navigator.pushNamed(
+                          context, Routes.selectCategoryScreen),
                       icon: Icon(
                         Icons.add_circle_outline_rounded,
                         size: 18,
@@ -588,7 +607,11 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+
+          const _MyAdsBannerCarousel(),
+
+          const SizedBox(height: 12),
 
           if (state is FetchMyPromotedItemsSuccess) ...[
             if (state.itemModel.isEmpty)
@@ -597,7 +620,7 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
               ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.only(bottom: 4),
                 itemCount: state.itemModel.length,
                 separatorBuilder: (_, __) => Divider(
                   height: 1,
@@ -672,6 +695,9 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
         if ((fullItem.image ?? '').trim().isEmpty) {
           fullItem.image = item.image;
         }
+        if ((fullItem.status ?? '').trim().isEmpty) {
+          fullItem.status = item.status;
+        }
         if ((fullItem.galleryImages == null ||
                 fullItem.galleryImages!.isEmpty) &&
             item.galleryImages != null) {
@@ -689,7 +715,8 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
     addCloudData("edit_request", fullItem);
     addCloudData("edit_from", fullItem.status);
 
-    final allCategoryIds = fullItem.allCategoryIds ?? "${fullItem.categoryId ?? ''}";
+    final allCategoryIds =
+        fullItem.allCategoryIds ?? "${fullItem.categoryId ?? ''}";
     final catIdList = allCategoryIds.split(',').map((e) => e.trim()).toList();
     final catSlug = (fullItem.category?.slug ?? '').toLowerCase();
     final catName = (fullItem.category?.name ?? '').toLowerCase();
@@ -703,34 +730,13 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
         catName.contains('car');
 
     // Check if Property
-    final isProperty = catIdList.contains('65') ||
-        catIdList.contains('66') ||
-        catIdList.contains('85') ||
-        catIdList.contains('139') ||
-        catIdList.contains('140') ||
-        catIdList.contains('68') ||
-        catIdList.contains('143') ||
-        catSlug.contains('property') ||
-        catName.contains('property');
+    final isProperty = fullItem.isPropertyCategory;
 
     // Check if Motor (non-car)
-    final isMotor = catIdList.contains('1') ||
-        catIdList.contains('13') ||
-        catIdList.contains('14') ||
-        catIdList.contains('37') ||
-        catIdList.contains('38') ||
-        catIdList.contains('53') ||
-        catIdList.contains('54') ||
-        catSlug.contains('motor') ||
-        catName.contains('motor') ||
-        catSlug.contains('bike') ||
-        catName.contains('bike') ||
-        catSlug.contains('boat') ||
-        catName.contains('boat') ||
-        catSlug.contains('truck') ||
-        catName.contains('truck');
+    final isMotor = !isCar && fullItem.isMotorsCategory;
 
-    final breadcrumbs = fullItem.category != null ? [fullItem.category!] : <CategoryModel>[];
+    final breadcrumbs =
+        fullItem.category != null ? [fullItem.category!] : <CategoryModel>[];
 
     if (isCar) {
       Navigator.pushNamed(
@@ -850,6 +856,20 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
 
     final isSelected = item.id != null && _selectedItemIds.contains(item.id);
     final specsSnippet = _extractSpecsSnippet(item);
+    final hasBadge = badgeLabel.trim().isNotEmpty;
+
+    Widget buildTitle() {
+      return Text(
+        item.name?.firstUpperCase() ?? "",
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: context.color.textDefaultColor,
+        ),
+      );
+    }
 
     return Material(
       color: isSelected
@@ -947,39 +967,41 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                         // Status Badge + Views + Popup Menu
                         Row(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 7, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: badgeBg,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                badgeLabel,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: badgeFg,
+                            if (hasBadge)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: badgeBg,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  badgeLabel,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: badgeFg,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const Spacer(),
-                            if (item.views != null && !_isSelectionMode) ...[
-                              Icon(
-                                Icons.visibility_outlined,
-                                size: 13,
-                                color: context.color.textLightColor,
-                              ),
-                              const SizedBox(width: 3),
-                              Text(
-                                "${item.views}",
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: context.color.textLightColor,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                            ],
+                            if (!hasBadge) Expanded(child: buildTitle()),
+                            if (hasBadge) const Spacer(),
+                            // if (item.views != null && !_isSelectionMode) ...[
+                            //   Icon(
+                            //     Icons.visibility_outlined,
+                            //     size: 13,
+                            //     color: context.color.textLightColor,
+                            //   ),
+                            //   const SizedBox(width: 3),
+                            //   Text(
+                            //     "${item.views}",
+                            //     style: TextStyle(
+                            //       fontSize: 11,
+                            //       color: context.color.textLightColor,
+                            //     ),
+                            //   ),
+                            //   const SizedBox(width: 4),
+                            // ],
                             if (!_isSelectionMode)
                               PopupMenuButton<String>(
                                 padding: EdgeInsets.zero,
@@ -1008,14 +1030,13 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                                     _updateItemStatus(
                                         context, item, "sold out");
                                   } else if (val == "activate") {
-                                    _updateItemStatus(
-                                        context, item, "active");
+                                    _updateItemStatus(context, item, "active");
                                   } else if (val == "pay") {
                                     Navigator.pushNamed(
-                                        context,
-                                        Routes.carPackagePaymentScreen,
-                                        arguments: {'model': item},
-                                      );
+                                      context,
+                                      Routes.carPackagePaymentScreen,
+                                      arguments: {'model': item},
+                                    );
                                   } else if (val == "renew") {
                                     _renewExpiredAd(context, item);
                                   } else if (val == "delete") {
@@ -1030,14 +1051,13 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                                     "View Details",
                                     context.color.textDefaultColor,
                                   ),
-                                  if (isLive || isInactive || isSoldOut || isReview)
-                                    _buildMenuItem(
-                                      context,
-                                      "edit",
-                                      Icons.edit_outlined,
-                                      "Edit Ad",
-                                      context.color.textDefaultColor,
-                                    ),
+                                  _buildMenuItem(
+                                    context,
+                                    "edit",
+                                    Icons.edit_outlined,
+                                    "Edit Ad",
+                                    context.color.textDefaultColor,
+                                  ),
                                   if (isLive) ...[
                                     _buildMenuItem(
                                       context,
@@ -1091,19 +1111,10 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                               ),
                           ],
                         ),
-                        const SizedBox(height: 3),
-
-                        // Title
-                        Text(
-                          item.name?.firstUpperCase() ?? "",
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: context.color.textDefaultColor,
-                          ),
-                        ),
+                        if (hasBadge) ...[
+                          const SizedBox(height: 3),
+                          buildTitle(),
+                        ],
 
                         // Specs / Category snippet
                         if (specsSnippet.isNotEmpty) ...[
@@ -1152,8 +1163,8 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
               if (isPaymentPending && !_isSelectionMode) ...[
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.orange.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
@@ -1204,8 +1215,8 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
               if (isExpired && !_isSelectionMode) ...[
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.amber.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
@@ -1315,6 +1326,29 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
   }
 
   Widget _buildEmptyState() {
+    final tabKey = _tabs[_selectedTab]['key'] ?? 'all_ads';
+    final emptyTitles = <String, String>{
+      'all_ads': "You haven't placed any ads yet!",
+      'live': "You don't have any live ads.",
+      'payment_pending': 'No ads are awaiting payment.',
+      'under_review': 'No ads are currently under review.',
+      'inactive': "You don't have any inactive ads.",
+      'drafts': "You don't have any saved drafts.",
+      'rejected': "You don't have any rejected ads.",
+      'expired': "You don't have any expired ads.",
+    };
+    final emptyDescriptions = <String, String>{
+      'all_ads': 'Create your first listing and reach interested buyers.',
+      'live': 'Approved ads that are visible to buyers will appear here.',
+      'payment_pending': 'Ads that still require payment will appear here.',
+      'under_review': 'Ads waiting for approval will appear here.',
+      'inactive': 'Ads you deactivate will appear here.',
+      'drafts': 'Listings saved before posting will appear here.',
+      'rejected': 'Ads that need changes after review will appear here.',
+      'expired':
+          'Listings that have reached their expiry date will appear here.',
+    };
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
@@ -1354,12 +1388,22 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
           ),
           const SizedBox(height: 24),
           Text(
-            "You haven't placed any ads yet!",
+            emptyTitles[tabKey]!,
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 16.5,
               fontWeight: FontWeight.bold,
               color: context.color.textDefaultColor,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            emptyDescriptions[tabKey]!,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13.5,
+              height: 1.4,
+              color: context.color.textLightColor,
             ),
           ),
           const SizedBox(height: 28),
@@ -1426,6 +1470,137 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+class _MyAdsBannerCarousel extends StatelessWidget {
+  const _MyAdsBannerCarousel();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<FetchVerificationRequestsCubit,
+        FetchVerificationRequestState>(
+      builder: (context, state) {
+        final requestApproved = state is FetchVerificationRequestSuccess &&
+            state.data.status?.toLowerCase() == 'approved';
+        final isVerified =
+            requestApproved || HiveUtils.getUserDetails().isVerified == 1;
+
+        if (isVerified) {
+          return const _InsightsBanner();
+        }
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final cardWidth = constraints.maxWidth - 36;
+            final cardHeight = cardWidth * 155 / 320;
+
+            return SizedBox(
+              height: cardHeight + 28,
+              child: PageView(
+                children: const [
+                  VerificationBanner(),
+                  _InsightsBanner(),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _InsightsBanner extends StatelessWidget {
+  const _InsightsBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      child: AspectRatio(
+        aspectRatio: 320 / 155,
+        child: Material(
+          color: const Color(0xFFE7F0FC),
+          borderRadius: BorderRadius.circular(15),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned(
+                top: 0,
+                right: 0,
+                bottom: 0,
+                width: 190,
+                child: UiUtils.getSvg(
+                  'assets/svg/insights.svg',
+                  fit: BoxFit.cover,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 74, 18),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Get detailed insights for your ads',
+                              style: TextStyle(
+                                color: Color(0xFF344054),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3B82F6),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Text(
+                            'NEW',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'See how many people are interested in your ad',
+                        style: TextStyle(
+                          color: Color(0xFF8A8178),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

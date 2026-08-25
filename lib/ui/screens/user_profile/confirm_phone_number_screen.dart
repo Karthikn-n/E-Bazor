@@ -1,14 +1,17 @@
 import 'dart:async';
 import 'package:Ebozor/app/routes.dart';
+import 'package:Ebozor/utils/app_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:Ebozor/data/cubits/auth/auth_cubit.dart';
+import 'package:Ebozor/data/cubits/seller/fetch_verification_request_cubit.dart';
 import 'package:Ebozor/data/repositories/job_repository.dart';
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
+import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
@@ -17,12 +20,16 @@ class ConfirmPhoneNumberScreen extends StatefulWidget {
   final String phoneNumber;
   final String sid;
   final String channel;
+  final String verificationPurpose;
+  final VoidCallback? onVerified;
 
   const ConfirmPhoneNumberScreen({
     super.key,
     required this.phoneNumber,
     required this.sid,
     this.channel = "WhatsApp",
+    this.verificationPurpose = 'updatePhone',
+    this.onVerified,
   });
 
   static Route route(RouteSettings routeSettings) {
@@ -32,6 +39,9 @@ class ConfirmPhoneNumberScreen extends StatefulWidget {
         phoneNumber: (args?['phoneNumber'] as String?) ?? "",
         sid: (args?['sid'] as String?) ?? "",
         channel: (args?['channel'] as String?) ?? "WhatsApp",
+        verificationPurpose:
+            (args?['verificationPurpose'] as String?) ?? 'updatePhone',
+        onVerified: args?['onVerified'] as VoidCallback?,
       ),
     );
   }
@@ -76,6 +86,10 @@ class _ConfirmPhoneNumberScreenState extends State<ConfirmPhoneNumberScreen> {
     setState(() => _countdownSeconds = 56);
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
       if (_countdownSeconds > 0) {
         setState(() => _countdownSeconds--);
       } else {
@@ -84,8 +98,7 @@ class _ConfirmPhoneNumberScreenState extends State<ConfirmPhoneNumberScreen> {
     });
   }
 
-  String get _otpCode =>
-      _otpControllers.map((c) => c.text.trim()).join();
+  String get _otpCode => _otpControllers.map((c) => c.text.trim()).join();
 
   Future<void> _resendOtp() async {
     if (_countdownSeconds > 0 || _isResending) return;
@@ -170,18 +183,39 @@ class _ConfirmPhoneNumberScreenState extends State<ConfirmPhoneNumberScreen> {
         return;
       }
 
-      // Update phone number on AuthCubit and Job profile
-      try {
-        await context.read<AuthCubit>().updateuserdata(
-              context,
-              mobile: widget.phoneNumber,
-            );
-        await _jobRepository.saveUserDetail({
-          'mobile': widget.phoneNumber,
-        });
-      } catch (err) {
-        debugPrint("Notice: profile sync after phone verification: $err");
+      if (widget.verificationPurpose == 'updatePhone') {
+        try {
+          final existingUser = HiveUtils.getUserDetails();
+          await context.read<AuthCubit>().updateuserdata(
+                context,
+                name: existingUser.name,
+                email: existingUser.email,
+                address: existingUser.address?.toString(),
+                fcmToken: existingUser.fcmId,
+                notification: existingUser.notification?.toString(),
+                mobile: widget.phoneNumber,
+                countryCode: HiveUtils.getCountryCode(),
+                personalDetail: existingUser.isPersonalDetailShow,
+              );
+          await _jobRepository.saveUserDetail({
+            'mobile': widget.phoneNumber,
+          });
+        } catch (err) {
+          debugPrint("Notice: profile sync after phone verification: $err");
+        }
       }
+
+      final user = HiveUtils.getUserDetails();
+      user.mobile = widget.phoneNumber;
+      user.isVerified = 1;
+      await HiveUtils.setUserData(user.toJson());
+
+      try {
+        context
+            .read<FetchVerificationRequestsCubit>()
+            .fetchVerificationRequests();
+      } catch (_) {}
+      widget.onVerified?.call();
 
       if (mounted) {
         HelperUtils.showSnackBarMessage(
@@ -190,8 +224,7 @@ class _ConfirmPhoneNumberScreenState extends State<ConfirmPhoneNumberScreen> {
           type: MessageType.success,
         );
 
-        // Pop back to Phone Numbers or Account screen
-        Navigator.pop(context);
+        Navigator.pop(context, true);
       }
     } catch (e) {
       HelperUtils.showSnackBarMessage(
@@ -247,39 +280,7 @@ class _ConfirmPhoneNumberScreenState extends State<ConfirmPhoneNumberScreen> {
 
               // Shield Badge Graphic from Screenshot 2
               Center(
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF1F5F9),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Icon(
-                          Icons.shield_outlined,
-                          size: 60,
-                          color: const Color(0xFF94A3B8).withValues(alpha: 0.5),
-                        ),
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF2563EB),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.check_rounded,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                child: UiUtils.getSvg(AppIcons.safety),
               ),
 
               const SizedBox(height: 24),
@@ -314,7 +315,8 @@ class _ConfirmPhoneNumberScreenState extends State<ConfirmPhoneNumberScreen> {
                       ),
                     ),
                     TextSpan(
-                      text: " via ${widget.channel}. Please enter the OTP below:",
+                      text:
+                          " via ${widget.channel}. Please enter the OTP below:",
                     ),
                   ],
                 ),
@@ -480,27 +482,6 @@ class _ConfirmPhoneNumberScreenState extends State<ConfirmPhoneNumberScreen> {
               ),
 
               const SizedBox(height: 18),
-
-              // Receive a phone call instead
-              TextButton(
-                onPressed: () {
-                  HelperUtils.showSnackBarMessage(
-                    context,
-                    "Phone call verification will be available shortly.",
-                    type: MessageType.warning,
-                  );
-                },
-                child: Text(
-                  "Receive a phone call instead",
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    color: context.color.textLightColor,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 10),
 
               // Need help? Customer Support
               Row(

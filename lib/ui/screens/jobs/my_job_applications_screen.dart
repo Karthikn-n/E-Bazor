@@ -88,6 +88,7 @@ class _MyJobApplicationsScreenState extends State<MyJobApplicationsScreen> {
             slug: app.itemDetails!.slug,
             image: app.itemDetails!.image,
           ),
+          'jobApplicationStatus': app.applicationStatus ?? 'Under Review',
         },
       );
     } else {
@@ -501,8 +502,7 @@ class _MyJobApplicationsScreenState extends State<MyJobApplicationsScreen> {
                       app.educationLevel!.isNotEmpty &&
                       app.educationLevel != "N/A")
                     _buildChip(Icons.school_outlined, app.educationLevel!),
-                  if (app.noticePeriod != null &&
-                      app.noticePeriod!.isNotEmpty)
+                  if (app.noticePeriod != null && app.noticePeriod!.isNotEmpty)
                     _buildChip(Icons.schedule_rounded, app.noticePeriod!),
                   if (app.currentlyLocated != null &&
                       app.currentlyLocated!.isNotEmpty)

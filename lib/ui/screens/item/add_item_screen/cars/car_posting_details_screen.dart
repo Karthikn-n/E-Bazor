@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:Ebozor/data/cubits/item/fetch_my_promoted_items_cubit.dart';
 import 'package:Ebozor/data/helper/widgets.dart';
 import 'package:Ebozor/data/model/item/item_model.dart';
 import 'package:Ebozor/data/repositories/item/item_repository.dart';
@@ -72,13 +71,13 @@ class _CarPostingDetailsScreenState extends State<CarPostingDetailsScreen> {
       if (item.galleryImages != null) {
         for (final g in item.galleryImages!) {
           final gUrl = g.image?.trim();
-          if (gUrl != null && gUrl.isNotEmpty && !_existingNetworkImages.contains(gUrl)) {
+          if (gUrl != null &&
+              gUrl.isNotEmpty &&
+              !_existingNetworkImages.contains(gUrl)) {
             _existingNetworkImages.add(gUrl);
           }
         }
       }
-    } else {
-      _titleController.text = widget.specsData.displayName;
     }
 
     _detailsFieldsController
@@ -152,7 +151,9 @@ class _CarPostingDetailsScreenState extends State<CarPostingDetailsScreen> {
 
     final isEditMode = widget.specsData.isEdit || widget.specsData.item != null;
 
-    if (!isEditMode && _selectedImages.isEmpty && _existingNetworkImages.isEmpty) {
+    if (!isEditMode &&
+        _selectedImages.isEmpty &&
+        _existingNetworkImages.isEmpty) {
       HelperUtils.showSnackBarMessage(
         context,
         "Please add at least 1 photo for your ad",
@@ -177,16 +178,18 @@ class _CarPostingDetailsScreenState extends State<CarPostingDetailsScreen> {
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim(),
     );
-    final categoryId = widget.specsData.category?.id ??
-        widget.specsData.item?.categoryId ??
-        1;
-    final allCategoryIds = widget.specsData.breadcrumbs != null &&
-            widget.specsData.breadcrumbs!.isNotEmpty
-        ? widget.specsData.breadcrumbs!
-            .map((b) => b.id)
-            .where((id) => id != null)
-            .join(',')
-        : (widget.specsData.item?.allCategoryIds ?? "$categoryId");
+    final categoryId =
+        widget.specsData.category?.id ?? widget.specsData.item?.categoryId ?? 1;
+    final allCategoryIds = isEditMode &&
+            (widget.specsData.item?.allCategoryIds?.trim().isNotEmpty ?? false)
+        ? widget.specsData.item!.allCategoryIds!
+        : widget.specsData.breadcrumbs != null &&
+                widget.specsData.breadcrumbs!.isNotEmpty
+            ? widget.specsData.breadcrumbs!
+                .map((b) => b.id)
+                .where((id) => id != null)
+                .join(',')
+            : (widget.specsData.item?.allCategoryIds ?? "$categoryId");
     final customFields = {
       ...widget.specsData.customFields,
       ..._detailsFieldsController.toSubmissionMap(),
@@ -196,6 +199,9 @@ class _CarPostingDetailsScreenState extends State<CarPostingDetailsScreen> {
     final itemDetails = <String, dynamic>{
       if (isEditMode && widget.specsData.item?.id != null)
         'id': widget.specsData.item!.id,
+      if (isEditMode &&
+          (widget.specsData.item?.status?.trim().isNotEmpty ?? false))
+        'status': widget.specsData.item!.status,
       'name': _titleController.text.trim(),
       'slug': _titleController.text
           .trim()
@@ -209,8 +215,7 @@ class _CarPostingDetailsScreenState extends State<CarPostingDetailsScreen> {
       'hide_phone_number': widget.specsData.showPhoneNumber ? 0 : 1,
       'car_make': widget.specsData.make.id,
       'car_model': widget.specsData.model.id,
-      if (widget.specsData.trim != null)
-        'car_trim': widget.specsData.trim!.id,
+      if (widget.specsData.trim != null) 'car_trim': widget.specsData.trim!.id,
       'car_make_id': widget.specsData.make.id,
       'car_model_id': widget.specsData.model.id,
       if (widget.specsData.trim != null)
@@ -228,9 +233,8 @@ class _CarPostingDetailsScreenState extends State<CarPostingDetailsScreen> {
         );
         final mainImg =
             _selectedImages.isNotEmpty ? _selectedImages.first : null;
-        final otherImgs = _selectedImages.length > 1
-            ? _selectedImages.sublist(1)
-            : null;
+        final otherImgs =
+            _selectedImages.length > 1 ? _selectedImages.sublist(1) : null;
         await ItemRepository().editItem(itemDetails, mainImg, otherImgs);
       } catch (e) {
         Widgets.hideLoder(context);
@@ -253,10 +257,8 @@ class _CarPostingDetailsScreenState extends State<CarPostingDetailsScreen> {
       );
       try {
         MyAdvertisementScreen.refreshCallback?.call();
-        FetchMyPromotedItemsCubit.globalInstance?.fetchMyPromotedItems();
       } catch (_) {}
-      Navigator.of(context).popUntil(
-          (route) => route.settings.name == Routes.myAdvertisment || route.isFirst);
+      Navigator.of(context).pop(true);
       return;
     }
 
@@ -375,8 +377,8 @@ class _CarPostingDetailsScreenState extends State<CarPostingDetailsScreen> {
                         existingImages: _existingNetworkImages,
                         onAdd: _pickImages,
                         onRemove: _removeImage,
-                        onRemoveExisting: (index) =>
-                            setState(() => _existingNetworkImages.removeAt(index)),
+                        onRemoveExisting: (index) => setState(
+                            () => _existingNetworkImages.removeAt(index)),
                       ),
                       const SizedBox(height: 20),
 

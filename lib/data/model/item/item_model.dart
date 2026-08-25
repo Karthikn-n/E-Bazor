@@ -2,7 +2,6 @@ import 'package:Ebozor/data/model/category_model.dart';
 import 'package:Ebozor/data/model/custom_field/custom_field_model.dart';
 import 'package:Ebozor/data/model/seller_ratings_model.dart';
 
-
 class ItemModel {
   int? id;
   String? name;
@@ -50,6 +49,54 @@ class ItemModel {
   String? carMakeName;
   String? carModelName;
   String? carTrimName;
+
+  Set<int> get categoryPathIds {
+    final ids = <int>{};
+    if (categoryId != null) ids.add(categoryId!);
+    for (final rawId in (allCategoryIds ?? '').split(',')) {
+      final parsed = int.tryParse(rawId.trim());
+      if (parsed != null) ids.add(parsed);
+    }
+    return ids;
+  }
+
+  String get _categorySearchText =>
+      '${category?.name ?? ''} ${category?.slug ?? ''}'.toLowerCase();
+
+  /// Root category IDs from the API are the most reliable way to decide which
+  /// contact actions belong to an item. Text checks keep older payloads that do
+  /// not include `all_category_ids` working.
+  bool get isMotorsCategory =>
+      categoryPathIds.contains(1) ||
+      _categorySearchText.contains('motor') ||
+      _categorySearchText.contains('car') ||
+      _categorySearchText.contains('bike');
+
+  bool get isPropertyCategory =>
+      categoryPathIds.contains(3) ||
+      _categorySearchText.contains('property') ||
+      _categorySearchText.contains('residential') ||
+      _categorySearchText.contains('commercial');
+
+  bool get isJobsCategory =>
+      categoryPathIds.contains(4) || _categorySearchText.contains('job');
+
+  bool get isClassifiedsCategory =>
+      categoryPathIds.contains(2) ||
+      _categorySearchText.contains('classified') ||
+      _categorySearchText.contains('mobile phone');
+
+  bool get supportsChatContact => isMotorsCategory || isClassifiedsCategory;
+
+  String? get sellerPhone {
+    final itemPhone = contact?.trim();
+    if (itemPhone != null && itemPhone.isNotEmpty) return itemPhone;
+    final userPhone = user?.mobile?.trim();
+    return userPhone != null && userPhone.isNotEmpty ? userPhone : null;
+  }
+
+  bool get hasVisiblePhoneNumber =>
+      hidePhoneNumber != true && sellerPhone != null;
 
   double? get latitude => _latitude;
 
@@ -303,13 +350,15 @@ class ItemModel {
         itemOffers!.add(ItemOffers.fromJson(v));
       });
     }
-    if (json['custom_fields'] is List && (json['custom_fields'] as List).isNotEmpty) {
+    if (json['custom_fields'] is List &&
+        (json['custom_fields'] as List).isNotEmpty) {
       customFields = <CustomFieldModel>[];
       for (final v in (json['custom_fields'] as List)) {
         if (v is Map<String, dynamic>) {
           customFields!.add(CustomFieldModel.fromMap(v));
         } else if (v is Map) {
-          customFields!.add(CustomFieldModel.fromMap(Map<String, dynamic>.from(v)));
+          customFields!
+              .add(CustomFieldModel.fromMap(Map<String, dynamic>.from(v)));
         }
       }
     } else if (json['item_custom_field_values'] is List &&

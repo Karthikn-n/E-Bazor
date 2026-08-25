@@ -1,26 +1,37 @@
-import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
+import 'package:Ebozor/utils/app_icon.dart';
+import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
+import 'package:country_picker/country_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class ChooseOtpMethodScreen extends StatefulWidget {
   final String phoneNumber;
+  final String verificationPurpose;
+  final VoidCallback? onVerified;
 
   const ChooseOtpMethodScreen({
     super.key,
     required this.phoneNumber,
+    this.verificationPurpose = 'updatePhone',
+    this.onVerified,
   });
 
   static Route route(RouteSettings routeSettings) {
     final args = routeSettings.arguments as Map?;
     return BlurredRouter(
       builder: (_) => ChooseOtpMethodScreen(
-        phoneNumber: (args?['phoneNumber'] as String?) ?? "",
+        phoneNumber: (args?['phoneNumber'] as String?) ?? '',
+        verificationPurpose:
+            (args?['verificationPurpose'] as String?) ?? 'updatePhone',
+        onVerified: args?['onVerified'] as VoidCallback?,
       ),
     );
   }
@@ -30,56 +41,115 @@ class ChooseOtpMethodScreen extends StatefulWidget {
 }
 
 class _ChooseOtpMethodScreenState extends State<ChooseOtpMethodScreen> {
+  late final TextEditingController _phoneController;
+  late String _countryCode;
   bool _isLoading = false;
+  bool _whatsAppSelected = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _countryCode = '+${Constant.defaultCountryCode.replaceAll('+', '')}';
+    _phoneController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  String get _fullPhoneNumber {
+    final localNumber =
+        _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '').replaceFirst(
+              RegExp(r'^0+'),
+              '',
+            );
+    return '${_countryCode.replaceAll(' ', '')}$localNumber';
+  }
+
+  void _selectCountry() {
+    showCountryPicker(
+      context: context,
+      showPhoneCode: true,
+      countryListTheme: CountryListThemeData(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        backgroundColor: context.color.secondaryColor,
+        textStyle: TextStyle(color: context.color.textDefaultColor),
+      ),
+      onSelect: (country) {
+        setState(() => _countryCode = '+${country.phoneCode}');
+      },
+    );
+  }
 
   Future<void> _sendOtpViaWhatsApp() async {
+    final localNumber = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (localNumber.length < 6) {
+      HelperUtils.showSnackBarMessage(
+        context,
+        'Please enter a valid phone number',
+        type: MessageType.warning,
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       final response = await Api.post(
         url: Api.sendOtpApi,
         parameter: {
-          "number": widget.phoneNumber,
-          "channel": "whatsapp",
-          "method": "whatsapp",
+          'number': _fullPhoneNumber,
+          'channel': 'whatsapp',
+          'method': 'whatsapp',
         },
       );
 
-      String sid = "";
-      if (response['data'] != null && response['data'] is Map) {
-        sid = response['data']['sid']?.toString() ??
-            response['data']['id']?.toString() ??
-            "";
-      }
-      if (sid.isEmpty) {
-        sid = response['sid']?.toString() ?? "";
-      }
-      if (sid.isEmpty && response['data'] is String) {
-        sid = response['data'].toString();
-      }
-
       if (response['error'] == true) {
-        final msg = response['message']?.toString() ?? "Failed to send OTP";
-        HelperUtils.showSnackBarMessage(context, msg, type: MessageType.error);
+        final message = response['message']?.toString() ?? 'Failed to send OTP';
+        if (mounted) {
+          HelperUtils.showSnackBarMessage(
+            context,
+            message,
+            type: MessageType.error,
+          );
+        }
         return;
       }
 
+      var sid = '';
+      if (response['data'] is Map) {
+        sid = response['data']['sid']?.toString() ??
+            response['data']['id']?.toString() ??
+            '';
+      } else if (response['data'] is String) {
+        sid = response['data'].toString();
+      }
+      sid = sid.isNotEmpty ? sid : response['sid']?.toString() ?? '';
+
+      if (!mounted) return;
+      final verified = await Navigator.pushNamed(
+        context,
+        Routes.confirmPhoneNumberScreen,
+        arguments: {
+          'phoneNumber': _fullPhoneNumber,
+          'sid': sid,
+          'channel': 'WhatsApp',
+          'verificationPurpose': widget.verificationPurpose,
+          'onVerified': widget.onVerified,
+        },
+      );
+      if (mounted && verified == true) {
+        Navigator.pop(context, true);
+      }
+    } catch (error) {
       if (mounted) {
-        Navigator.pushReplacementNamed(
+        HelperUtils.showSnackBarMessage(
           context,
-          Routes.confirmPhoneNumberScreen,
-          arguments: {
-            'phoneNumber': widget.phoneNumber,
-            'sid': sid,
-            'channel': 'WhatsApp',
-          },
+          'Error sending OTP: $error',
+          type: MessageType.error,
         );
       }
-    } catch (e) {
-      HelperUtils.showSnackBarMessage(
-        context,
-        "Error sending OTP: $e",
-        type: MessageType.error,
-      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -93,191 +163,205 @@ class _ChooseOtpMethodScreenState extends State<ChooseOtpMethodScreen> {
         statusBarColor: context.color.secondaryColor,
       ),
       child: Scaffold(
-        backgroundColor: context.color.backgroundColor,
+        backgroundColor: context.color.secondaryColor,
         appBar: AppBar(
           backgroundColor: context.color.secondaryColor,
+          surfaceTintColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: Icon(
-              Icons.close_rounded,
-              color: context.color.textDefaultColor,
-              size: 24,
-            ),
+            icon: Icon(Icons.close, color: context.color.textDefaultColor),
             onPressed: () => Navigator.pop(context),
           ),
           centerTitle: true,
           title: Text(
-            "Choose OTP Method",
+            'Confirm Phone Number',
             style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
               color: context.color.textDefaultColor,
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
-        body: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
-          child: Column(
-            children: [
-              const SizedBox(height: 30),
-
-              // Illustration Graphic with Shield & Lock
-              Center(
-                child: Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
-                    shape: BoxShape.circle,
+        body: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 36, 20, 24),
+            child: Column(
+              children: [
+                UiUtils.getSvg(AppIcons.safety, width: 132, height: 132),
+                const SizedBox(height: 22),
+                Text(
+                  'Safety first',
+                  style: TextStyle(
+                    color: context.color.textDefaultColor,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
                   ),
-                  child: Stack(
-                    alignment: Alignment.center,
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'To keep everyone safe on Ebozor, only phone-verified users can connect with sellers.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: context.color.textLightColor,
+                    fontSize: 14.5,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 28),
+                Container(
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: context.color.secondaryColor,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: context.color.borderColor),
+                  ),
+                  child: Row(
                     children: [
-                      Container(
-                        width: 70,
-                        height: 90,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE2E8F0),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFCBD5E1), width: 1.5),
+                      InkWell(
+                        onTap: _selectCountry,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Row(
+                            children: [
+                              Text(
+                                _countryCode,
+                                style: TextStyle(
+                                  color: context.color.textDefaultColor,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(width: 3),
+                              Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                size: 18,
+                                color: context.color.textLightColor,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      Positioned(
-                        top: 22,
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF1E293B),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.lock_outline_rounded,
-                            color: Colors.white,
-                            size: 16,
+                      Container(
+                          height: 28,
+                          width: 1,
+                          color: context.color.borderColor),
+                      Expanded(
+                        child: TextField(
+                          controller: _phoneController,
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly
+                          ],
+                          decoration: const InputDecoration(
+                            hintText: '5X XXX XXXX',
+                            border: InputBorder.none,
+                            contentPadding:
+                                EdgeInsets.symmetric(horizontal: 12),
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 36),
-
-              // Title matching Screenshot 3
-              Text(
-                "Choose OTP Method",
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: context.color.textDefaultColor,
-                ),
-              ),
-              const SizedBox(height: 14),
-
-              // Subtitle with highlighted phone number
-              RichText(
-                textAlign: TextAlign.center,
-                text: TextSpan(
-                  style: TextStyle(
-                    fontSize: 14.5,
-                    color: context.color.textLightColor,
-                    height: 1.45,
+                const SizedBox(height: 24),
+                Align(
+                  alignment: Alignment.center,
+                  child: Text(
+                    'Select how you would like to receive the code',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: context.color.textDefaultColor,
+                      fontSize: 13.5,
+                    ),
                   ),
-                  children: [
-                    const TextSpan(text: "A verification code will be sent to "),
-                    TextSpan(
-                      text: widget.phoneNumber,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFFDC2626), // Red accent
+                ),
+                const SizedBox(height: 14),
+                Align(
+                  alignment: Alignment.center,
+                  child: ChoiceChip(
+                    selected: _whatsAppSelected,
+                    onSelected: (selected) {
+                      setState(() => _whatsAppSelected = selected);
+                    },
+                    avatar: const FaIcon(
+                      FontAwesomeIcons.whatsapp,
+                      color: Color(0xFF16A34A),
+                      size: 18,
+                    ),
+                    label: const Text('WhatsApp'),
+                    backgroundColor: context.color.secondaryColor,
+                    selectedColor: const Color(0xFFF0FDF4),
+                    side: BorderSide(
+                      color: _whatsAppSelected
+                          ? const Color(0xFF16A34A)
+                          : context.color.borderColor,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 26),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isLoading || !_whatsAppSelected
+                        ? null
+                        : _sendOtpViaWhatsApp,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: context.color.territoryColor,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor:
+                          context.color.textLightColor.withValues(alpha: 0.15),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    const TextSpan(
-                      text: ". Please select your verification method.",
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Send verification code',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 28),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  children: [
+                    Text(
+                      'Need help? Please contact our ',
+                      style: TextStyle(
+                        color: context.color.textLightColor,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () =>
+                          Navigator.pushNamed(context, Routes.contactUs),
+                      child: const Text(
+                        'Customer Support',
+                        style: TextStyle(
+                          color: Color(0xFF2563EB),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ),
-
-              const SizedBox(height: 36),
-
-              // Option 1: WhatsApp Button (Active)
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(
-                          color: const Color(0xFF22C55E).withValues(alpha: 0.5),
-                          width: 1.5,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        backgroundColor: context.color.secondaryColor,
-                      ),
-                      onPressed: _isLoading ? null : _sendOtpViaWhatsApp,
-                      icon: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const FaIcon(
-                              FontAwesomeIcons.whatsapp,
-                              color: Color(0xFF22C55E),
-                              size: 20,
-                            ),
-                      label: Text(
-                        "WhatsApp",
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: context.color.textDefaultColor,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-
-                  // Option 2: SMS Button (Hidden as requested: "there only show the whatsapp option for now (add sms but hide that)")
-                  /*
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(
-                          color: context.color.borderColor,
-                          width: 1.5,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        backgroundColor: context.color.secondaryColor,
-                      ),
-                      onPressed: null, // Disabled / Hidden
-                      icon: const Icon(
-                        Icons.message_outlined,
-                        color: Colors.grey,
-                        size: 20,
-                      ),
-                      label: const Text(
-                        "SMS",
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ),
-                  ),
-                  */
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

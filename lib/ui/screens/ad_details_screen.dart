@@ -71,10 +71,12 @@ import 'package:Ebozor/ui/screens/widgets/dialogs/seller_contact_dialog.dart';
 
 class AdDetailsScreen extends StatefulWidget {
   final ItemModel model;
+  final String? jobApplicationStatus;
 
   const AdDetailsScreen({
     super.key,
     required this.model,
+    this.jobApplicationStatus,
   });
 
   @override
@@ -84,28 +86,30 @@ class AdDetailsScreen extends StatefulWidget {
     Map? arguments = routeSettings.arguments as Map?;
     return BlurredRouter(
         builder: (_) => MultiBlocProvider(
-          providers: [
-            BlocProvider(
-              create: (context) => FetchMyItemsCubit(),
-            ),
-            BlocProvider(
-              create: (context) => CreateFeaturedAdCubit(),
-            ),
-            BlocProvider(
-              create: (context) => FetchItemReportReasonsListCubit(),
-            ),
-            BlocProvider(
-              create: (context) => ItemReportCubit(),
-            ),
-            BlocProvider(
-              create: (context) => MakeAnOfferItemCubit(),
-            ),
-          ],
-          child: AdDetailsScreen(
-            model: arguments?['model'],
-            // from: arguments?['from'],
-          ),
-        ));
+              providers: [
+                BlocProvider(
+                  create: (context) => FetchMyItemsCubit(),
+                ),
+                BlocProvider(
+                  create: (context) => CreateFeaturedAdCubit(),
+                ),
+                BlocProvider(
+                  create: (context) => FetchItemReportReasonsListCubit(),
+                ),
+                BlocProvider(
+                  create: (context) => ItemReportCubit(),
+                ),
+                BlocProvider(
+                  create: (context) => MakeAnOfferItemCubit(),
+                ),
+              ],
+              child: AdDetailsScreen(
+                model: arguments?['model'],
+                jobApplicationStatus:
+                    arguments?['jobApplicationStatus']?.toString(),
+                // from: arguments?['from'],
+              ),
+            ));
   }
 }
 
@@ -122,20 +126,20 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   final PageController pageController = PageController();
   final List<String?> images = [];
   final Completer<GoogleMapController> _controller =
-  Completer<GoogleMapController>();
+      Completer<GoogleMapController>();
   late final ScrollController _pageScrollController = ScrollController();
   List<ReportReason>? reasons = [];
   late int selectedId;
   final TextEditingController _reportmessageController =
-  TextEditingController();
+      TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey();
   int? _selectedPackageIndex;
 
   late ItemModel model = widget.model;
 
   late bool isAddedByMe = (widget.model.user?.id != null
-      ? widget.model.user!.id.toString()
-      : (widget.model.userId?.toString() ?? '')) ==
+          ? widget.model.user!.id.toString()
+          : (widget.model.userId?.toString() ?? '')) ==
       HiveUtils.getUserId();
 
   bool isFeaturedWidget = true;
@@ -303,109 +307,112 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
-      ),
-      child: Scaffold(
-        backgroundColor: context.color.secondaryDetailsColor,
-        extendBodyBehindAppBar: true,
-        bottomNavigationBar: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            child: bottomButtonWidget()),
-        body: MediaQuery.removePadding(
-          context: context,
-          removeTop: true,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                // Edge-to-Edge Image viewer under status bar
-                setImageViewer(),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (isAddedByMe) setLikesAndViewsCount(),
-                    // Price and status widget
-                    setPriceAndStatus(),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4.0, bottom: 2.0),
-                      child: Text(model.name ?? "")
-                          .size(context.font.large)
-                          .bold(weight: FontWeight.w700)
-                          .setMaxLines(lines: 2)
-                          .color(context.color.textDefaultColor),
-                    ),
-                    _buildKeyHighlights(),
-
-                    if (isAddedByMe) setRejectedReason(),
-
-                    if (Constant.isGoogleBannerAdsEnabled == "1") ...[
-                      Divider(
-                          thickness: 1,
-                          color: context.color.textDefaultColor.withValues(alpha: 0.1)),
-                      Container(
-                        alignment: AlignmentDirectional.center,
-                        child: AdBannerWidget(),
-                      ),
-                    ],
-
-                    if (isAddedByMe && model.isFeature != true) createFeaturesAds(),
-
-                    // Car / Item Overview (2-column key-value with Show More / Show Less)
-                    _buildOverviewSection(),
-
-                    // Property Amenities Grid (3 per row with Show More)
-                    _buildAmenitiesSection(),
-
-                    // Description with Read More & Posted On date
-                    _buildDescriptionSection(),
-
-                    // Features (expandable accordion categories with checkmarks)
-                    _buildFeaturesSection(),
-
-                    // Car Finance Calculator (shown for Cars / Motors listings with price > 0)
-                    if (_isCarListing() && (model.price != null && model.price! > 0))
-                      CarFinanceCalculator(
-                        initialPrice: model.price ?? 0.0,
-                        carName: model.name,
-                        showApplyButton: false,
-                      ),
-
-                    // Location section with map preview
-                    _buildLocationSection(),
-
-                    // Seller details section with verified checkmark & view profile
-                    if (!isAddedByMe) _buildSellerSection(),
-
-                    if (Constant.isGoogleBannerAdsEnabled == "1") ...[
-                      const SizedBox(height: 10),
-                      Container(
-                        alignment: AlignmentDirectional.center,
-                        child: AdBannerWidget(),
-                      ),
-                    ],
-
-                    // Report ad widget
-                    if (!isAddedByMe) _buildReportAdRow(),
-
-                    const SizedBox(height: 12),
-                    // Similar ads widget
-                    relatedAds(),
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
-            ],
-          ),
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
         ),
-      ),
-      )
-    );
+        child: Scaffold(
+          backgroundColor: context.color.secondaryDetailsColor,
+          extendBodyBehindAppBar: true,
+          bottomNavigationBar: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              child: bottomButtonWidget()),
+          body: MediaQuery.removePadding(
+            context: context,
+            removeTop: true,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  // Edge-to-Edge Image viewer under status bar
+                  setImageViewer(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14.0, vertical: 10.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (isAddedByMe) setLikesAndViewsCount(),
+                        // Price and status widget
+                        setPriceAndStatus(),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4.0, bottom: 2.0),
+                          child: Text(model.name ?? "")
+                              .size(context.font.large)
+                              .bold(weight: FontWeight.w700)
+                              .setMaxLines(lines: 2)
+                              .color(context.color.textDefaultColor),
+                        ),
+                        _buildKeyHighlights(),
+
+                        if (isAddedByMe) setRejectedReason(),
+
+                        if (Constant.isGoogleBannerAdsEnabled == "1") ...[
+                          Divider(
+                              thickness: 1,
+                              color: context.color.textDefaultColor
+                                  .withValues(alpha: 0.1)),
+                          Container(
+                            alignment: AlignmentDirectional.center,
+                            child: AdBannerWidget(),
+                          ),
+                        ],
+
+                        if (isAddedByMe && model.isFeature != true)
+                          createFeaturesAds(),
+
+                        // Car / Item Overview (2-column key-value with Show More / Show Less)
+                        _buildOverviewSection(),
+
+                        // Property Amenities Grid (3 per row with Show More)
+                        _buildAmenitiesSection(),
+
+                        // Description with Read More & Posted On date
+                        _buildDescriptionSection(),
+
+                        // Features (expandable accordion categories with checkmarks)
+                        _buildFeaturesSection(),
+
+                        // Car Finance Calculator (shown for Cars / Motors listings with price > 0)
+                        if (_isCarListing() &&
+                            (model.price != null && model.price! > 0))
+                          CarFinanceCalculator(
+                            initialPrice: model.price ?? 0.0,
+                            carName: model.name,
+                            showApplyButton: false,
+                          ),
+
+                        // Location section with map preview
+                        _buildLocationSection(),
+
+                        // Seller details section with verified checkmark & view profile
+                        if (!isAddedByMe) _buildSellerSection(),
+
+                        if (Constant.isGoogleBannerAdsEnabled == "1") ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            alignment: AlignmentDirectional.center,
+                            child: AdBannerWidget(),
+                          ),
+                        ],
+
+                        // Report ad widget
+                        if (!isAddedByMe) _buildReportAdRow(),
+
+                        const SizedBox(height: 12),
+                        // Similar ads widget
+                        relatedAds(),
+                        const SizedBox(height: 20),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ));
   }
 
   bool _isCarListing() {
@@ -621,9 +628,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     }
 
     final List<dynamic> allAmenities = amenityField.value!;
-    final displayedAmenities = _showAllAmenities
-        ? allAmenities
-        : allAmenities.take(6).toList();
+    final displayedAmenities =
+        _showAllAmenities ? allAmenities : allAmenities.take(6).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -787,16 +793,25 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
 
   IconData _getFeatureCategoryIcon(String name) {
     final lower = name.toLowerCase();
-    if (lower.contains("safety") || lower.contains("assist") || lower.contains("driver")) {
+    if (lower.contains("safety") ||
+        lower.contains("assist") ||
+        lower.contains("driver")) {
       return Icons.shield_outlined;
     }
-    if (lower.contains("entertain") || lower.contains("tech") || lower.contains("audio") || lower.contains("screen")) {
+    if (lower.contains("entertain") ||
+        lower.contains("tech") ||
+        lower.contains("audio") ||
+        lower.contains("screen")) {
       return Icons.devices_other_outlined;
     }
-    if (lower.contains("comfort") || lower.contains("convenien") || lower.contains("seat")) {
+    if (lower.contains("comfort") ||
+        lower.contains("convenien") ||
+        lower.contains("seat")) {
       return Icons.airline_seat_recline_extra_outlined;
     }
-    if (lower.contains("exterior") || lower.contains("wheel") || lower.contains("roof")) {
+    if (lower.contains("exterior") ||
+        lower.contains("wheel") ||
+        lower.contains("roof")) {
       return Icons.directions_car_outlined;
     }
     if (lower.contains("interior")) {
@@ -835,7 +850,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        "${model.category?.name != null ? "${model.category!.name!} " : ""}Overview".translate(context),
+                        "${model.category?.name != null ? "${model.category!.name!} " : ""}Overview"
+                            .translate(context),
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.bold,
@@ -928,7 +944,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
       if (_isPropertyListing() && name.contains("amenit")) {
         return false;
       }
-      return _isOverviewSpecField(cf.name ?? "", cf.value!.length) || cf.value!.length <= 1;
+      return _isOverviewSpecField(cf.name ?? "", cf.value!.length) ||
+          cf.value!.length <= 1;
     }).toList();
 
     if (overviewFields.isEmpty) return const SizedBox.shrink();
@@ -1015,7 +1032,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          "Show More (${overviewFields.length - 6} more)".translate(context),
+                          "Show More (${overviewFields.length - 6} more)"
+                              .translate(context),
                           style: TextStyle(
                             color: context.color.territoryColor,
                             fontWeight: FontWeight.bold,
@@ -1066,8 +1084,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
               style: TextStyle(
                 fontSize: 14,
                 height: 1.5,
-                color:
-                    context.color.textDefaultColor.withValues(alpha: 0.75),
+                color: context.color.textDefaultColor.withValues(alpha: 0.75),
               ),
             ),
             if ((model.description?.length ?? 0) > 160) ...[
@@ -1113,8 +1130,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                 "Posted On: ${model.created!.formatDate(format: "d MMMM, yyyy")}",
                 style: TextStyle(
                   fontSize: 12,
-                  color: context.color.textDefaultColor
-                      .withValues(alpha: 0.45),
+                  color: context.color.textDefaultColor.withValues(alpha: 0.45),
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -1328,8 +1344,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                 model.address ?? "",
                 style: TextStyle(
                   fontSize: 14,
-                  color: context.color.textDefaultColor
-                      .withValues(alpha: 0.8),
+                  color: context.color.textDefaultColor.withValues(alpha: 0.8),
                 ),
               ),
             ),
@@ -1468,9 +1483,9 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                               .totalSellerRatings() ??
                           0,
                       "rating": context
-                              .read<FetchSellerRatingsCubit>()
-                              .sellerData()
-                              ?.averageRating
+                          .read<FetchSellerRatingsCubit>()
+                          .sellerData()
+                          ?.averageRating
                     });
               },
               child: const Padding(
@@ -1498,9 +1513,9 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                               .totalSellerRatings() ??
                           0,
                       "rating": context
-                              .read<FetchSellerRatingsCubit>()
-                              .sellerData()
-                              ?.averageRating
+                          .read<FetchSellerRatingsCubit>()
+                          .sellerData()
+                          ?.averageRating
                     });
               },
               child: Padding(
@@ -1521,8 +1536,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                     Icon(
                       Icons.chevron_right_rounded,
                       size: 16,
-                      color: context.color.textDefaultColor
-                          .withValues(alpha: 0.7),
+                      color:
+                          context.color.textDefaultColor.withValues(alpha: 0.7),
                     ),
                   ],
                 ),
@@ -1560,8 +1575,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
               Icon(
                 Icons.flag_outlined,
                 size: 18,
-                color:
-                    context.color.textDefaultColor.withValues(alpha: 0.7),
+                color: context.color.textDefaultColor.withValues(alpha: 0.7),
               ),
               const SizedBox(width: 8),
               Text(
@@ -1569,8 +1583,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: context.color.textDefaultColor
-                      .withValues(alpha: 0.8),
+                  color: context.color.textDefaultColor.withValues(alpha: 0.8),
                 ),
               ),
             ],
@@ -1584,7 +1597,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     return BlocBuilder<UpdatedReportItemCubit, UpdatedReportItemState>(
       builder: (context, state) {
         bool isItemInCubit =
-        context.read<UpdatedReportItemCubit>().containsItem(model.id!);
+            context.read<UpdatedReportItemCubit>().containsItem(model.id!);
 
         if (!isItemInCubit) {
           if (model.isAlreadyReported != null && !model.isAlreadyReported!) {
@@ -1602,39 +1615,39 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   Widget relatedAds() {
     return BlocBuilder<FetchRelatedItemsCubit, FetchRelatedItemsState>(
         builder: (context, state) {
-          if (state is FetchRelatedItemsInProgress) {
-            return relatedItemShimmer();
+      if (state is FetchRelatedItemsInProgress) {
+        return relatedItemShimmer();
+      }
+      if (state is FetchRelatedItemsFailure) {
+        if (state.errorMessage is ApiException) {
+          if (state.errorMessage == "no-internet") {
+            return NoInternet(
+              onRetry: () {
+                context.read<FetchRelatedItemsCubit>().fetchRelatedItems(
+                    categoryId: categoryId!,
+                    itemId: model.id ?? widget.model.id,
+                    city: HiveUtils.getCityName(),
+                    areaId: HiveUtils.getAreaId(),
+                    country: HiveUtils.getCountryName(),
+                    state: HiveUtils.getStateName());
+              },
+            );
           }
-          if (state is FetchRelatedItemsFailure) {
-            if (state.errorMessage is ApiException) {
-              if (state.errorMessage == "no-internet") {
-                return NoInternet(
-                  onRetry: () {
-                    context.read<FetchRelatedItemsCubit>().fetchRelatedItems(
-                        categoryId: categoryId!,
-                        itemId: model.id ?? widget.model.id,
-                        city: HiveUtils.getCityName(),
-                        areaId: HiveUtils.getAreaId(),
-                        country: HiveUtils.getCountryName(),
-                        state: HiveUtils.getStateName());
-                  },
-                );
-              }
-            }
+        }
 
-            return const SomethingWentWrong();
-          }
+        return const SomethingWentWrong();
+      }
 
-          if (state is FetchRelatedItemsSuccess) {
-            if (state.itemModel.isEmpty || state.itemModel.length == 1) {
-              return SizedBox.shrink();
-            }
+      if (state is FetchRelatedItemsSuccess) {
+        if (state.itemModel.isEmpty || state.itemModel.length == 1) {
+          return SizedBox.shrink();
+        }
 
-            return buildRelatedListWidget(state);
-          }
+        return buildRelatedListWidget(state);
+      }
 
-          return const SizedBox.square();
-        });
+      return const SizedBox.square();
+    });
   }
 
   Widget buildRelatedListWidget(FetchRelatedItemsSuccess state) {
@@ -1662,7 +1675,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                 Expanded(
                   child: Text(model.address ?? "")
                       .size(context.font.small)
-                      .color(context.color.textDefaultColor.withValues(alpha: 0.5)),
+                      .color(context.color.textDefaultColor
+                          .withValues(alpha: 0.5)),
                 ),
               ],
             ),
@@ -1763,19 +1777,19 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                         ),
                         isAcceptContainesPush: true,
                         onAccept: () => Future.value().then((_) {
-                          Future.delayed(
-                            Duration.zero,
+                              Future.delayed(
+                                Duration.zero,
                                 () {
-                              context
-                                  .read<CreateFeaturedAdCubit>()
-                                  .createFeaturedAds(
-                                itemId: model.id!,
+                                  context
+                                      .read<CreateFeaturedAdCubit>()
+                                      .createFeaturedAds(
+                                        itemId: model.id!,
+                                      );
+                                  Navigator.pop(context);
+                                  return;
+                                },
                               );
-                              Navigator.pop(context);
-                              return;
-                            },
-                          );
-                        })),
+                            })),
                   );
                 }
               },
@@ -1792,7 +1806,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                     borderRadius: BorderRadius.circular(10),
                     color: context.color.territoryColor.withValues(alpha: 0.1),
                     border:
-                    Border.all(color: context.color.borderColor.darken(30)),
+                        Border.all(color: context.color.borderColor.darken(30)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
@@ -1824,7 +1838,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                                 context
                                     .read<FetchUserPackageLimitCubit>()
                                     .fetchUserPackageLimit(
-                                    packageType: "advertisement");
+                                        packageType: "advertisement");
                               },
                               child: Container(
                                 height: 33,
@@ -1887,8 +1901,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(5),
-                          child: UiUtils.imageType(
-                              field.image ?? "",
+                          child: UiUtils.imageType(field.image ?? "",
                               fit: BoxFit.cover),
                         ),
                       ),
@@ -1904,7 +1917,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                                   .setMaxLines(lines: 1)
                                   .size(context.font.small)
                                   .color(context.color.textDefaultColor
-                                  .withValues(alpha: 0.5)),
+                                      .withValues(alpha: 0.5)),
                             ),
                             valueContent(field.value),
                             const SizedBox(
@@ -1941,31 +1954,30 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(5),
-                          child: UiUtils.imageType(
-                              field.image ?? "",
+                          child: UiUtils.imageType(field.image ?? "",
                               fit: BoxFit.cover),
                         ),
                       ),
                       const SizedBox(width: 7),
                       Expanded(
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Tooltip(
-                                message: field.name ?? "",
-                                child: Text(field.name ?? "")
-                                    .setMaxLines(lines: 1)
-                                    .size(context.font.small)
-                                    .color(context.color.textDefaultColor
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Tooltip(
+                            message: field.name ?? "",
+                            child: Text(field.name ?? "")
+                                .setMaxLines(lines: 1)
+                                .size(context.font.small)
+                                .color(context.color.textDefaultColor
                                     .withValues(alpha: 0.5)),
-                              ),
-                              valueContent(field.value),
-                              const SizedBox(
-                                height: 12,
-                              )
-                            ],
-                          )),
+                          ),
+                          valueContent(field.value),
+                          const SizedBox(
+                            height: 12,
+                          )
+                        ],
+                      )),
                     ],
                   ),
                 );
@@ -2034,7 +2046,9 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
 
     // Default text if not a supported format or not a URL
     return Text(
-      value.length == 1 ? valStr : value.map((e) => e?.toString() ?? '').join(','),
+      value.length == 1
+          ? valStr
+          : value.map((e) => e?.toString() ?? '').join(','),
     ).color(context.color.textDefaultColor);
   }
 
@@ -2077,10 +2091,11 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   border: Border.all(
                       color: index == _selectedPackageIndex
                           ? context.color.territoryColor
-                          : context.color.textDefaultColor.withValues(alpha: 0.1),
+                          : context.color.textDefaultColor
+                              .withValues(alpha: 0.1),
                       width: 1.5)),
               child:
-              !model.isActive! ? adsWidget(model) : activeAdsWidget(model),
+                  !model.isActive! ? adsWidget(model) : activeAdsWidget(model),
             ),
           ),
         ],
@@ -2110,14 +2125,16 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                     '${model.limit == "unlimited" ? "unlimitedLbl".translate(context) : model.limit.toString()}\t${"adsLbl".translate(context)}\t\t·\t\t',
                     overflow: TextOverflow.ellipsis,
                     softWrap: true,
-                  ).color(context.color.textDefaultColor.withValues(alpha: 0.5)),
+                  ).color(
+                      context.color.textDefaultColor.withValues(alpha: 0.5)),
                   Flexible(
                     child: Text(
                       '${model.duration.toString()}\t${"days".translate(context)}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       softWrap: true,
-                    ).color(context.color.textDefaultColor.withValues(alpha: 0.5)),
+                    ).color(
+                        context.color.textDefaultColor.withValues(alpha: 0.5)),
                   ),
                 ],
               ),
@@ -2164,20 +2181,21 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                           ? "${"unlimitedLbl".translate(context)}\t${"adsLbl".translate(context)}\t\t·\t\t"
                           : '',
                       style: TextStyle(
-                        color: context.color.textDefaultColor.withValues(alpha: 0.5),
+                        color: context.color.textDefaultColor
+                            .withValues(alpha: 0.5),
                       ),
                       children: [
                         if (model.limit != "unlimited")
                           TextSpan(
                             text:
-                            '${model.userPurchasedPackages![0].remainingItemLimit}',
+                                '${model.userPurchasedPackages![0].remainingItemLimit}',
                             style: TextStyle(
                                 color: context.color.textDefaultColor),
                           ),
                         if (model.limit != "unlimited")
                           TextSpan(
                             text:
-                            '/${model.limit.toString()}\t${"adsLbl".translate(context)}\t\t·\t\t',
+                                '/${model.limit.toString()}\t${"adsLbl".translate(context)}\t\t·\t\t',
                           ),
                       ],
                     ),
@@ -2191,21 +2209,21 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                             ? "${"unlimitedLbl".translate(context)}\t${"days".translate(context)}"
                             : '',
                         style: TextStyle(
-                          color:
-                          context.color.textDefaultColor.withValues(alpha: 0.5),
+                          color: context.color.textDefaultColor
+                              .withValues(alpha: 0.5),
                         ),
                         children: [
                           if (model.duration != "unlimited")
                             TextSpan(
                               text:
-                              '${model.userPurchasedPackages![0].remainingDays}',
+                                  '${model.userPurchasedPackages![0].remainingDays}',
                               style: TextStyle(
                                   color: context.color.textDefaultColor),
                             ),
                           if (model.duration != "unlimited")
                             TextSpan(
                               text:
-                              '/${model.duration.toString()}\t${"days".translate(context)}',
+                                  '/${model.duration.toString()}\t${"days".translate(context)}',
                             ),
                         ],
                       ),
@@ -2349,70 +2367,70 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
 
           return StatefulBuilder(
               builder: (BuildContext context, StateSetter setStater) {
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Expanded(
-                      child: ListView.builder(
-                          shrinkWrap: true,
-                          padding: EdgeInsets.symmetric(horizontal: 18),
-                          itemBuilder: (context, index) {
-                            return itemData(index,
-                                state.subscriptionPackages[index], setStater);
-                          },
-                          itemCount: state.subscriptionPackages.length),
-                    ),
-                    Builder(builder: (context) {
-                      return BlocListener<RenewItemCubit, RenewItemState>(
-                        listener: (context, changeState) {
-                          if (changeState is RenewItemInSuccess) {
-                            HelperUtils.showSnackBarMessage(
-                                context, changeState.responseMessage);
-                            Future.delayed(Duration.zero, () {
-                              Navigator.pop(context);
-                              Navigator.pop(context, "refresh");
-                            });
-                          } else if (changeState is RenewItemFailure) {
-                            Navigator.pop(context);
-                            HelperUtils.showSnackBarMessage(
-                                context, changeState.error);
-                          }
-                        },
-                        child: UiUtils.buildButton(context, onPressed: () {
-                          if (state.subscriptionPackages[_selectedPackageIndex!]
-                              .isActive!) {
-                            Future.delayed(Duration.zero, () {
-                              context.read<RenewItemCubit>().renewItem(
-                                  packageId: state
-                                      .subscriptionPackages[_selectedPackageIndex!]
-                                      .id!,
-                                  itemId: model.id!);
-                            });
-                          } else {
-                            Navigator.pop(context);
-                            HelperUtils.showSnackBarMessage(context,
-                                "pleasePurchasePackage".translate(context));
-                            Navigator.pushNamed(
-                                context, Routes.subscriptionPackageListRoute);
-                          }
-                        },
-                            radius: 10,
-                            height: 46,
-                            disabled: _selectedPackageIndex == null,
-                            disabledColor:
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                      shrinkWrap: true,
+                      padding: EdgeInsets.symmetric(horizontal: 18),
+                      itemBuilder: (context, index) {
+                        return itemData(index,
+                            state.subscriptionPackages[index], setStater);
+                      },
+                      itemCount: state.subscriptionPackages.length),
+                ),
+                Builder(builder: (context) {
+                  return BlocListener<RenewItemCubit, RenewItemState>(
+                    listener: (context, changeState) {
+                      if (changeState is RenewItemInSuccess) {
+                        HelperUtils.showSnackBarMessage(
+                            context, changeState.responseMessage);
+                        Future.delayed(Duration.zero, () {
+                          Navigator.pop(context);
+                          Navigator.pop(context, "refresh");
+                        });
+                      } else if (changeState is RenewItemFailure) {
+                        Navigator.pop(context);
+                        HelperUtils.showSnackBarMessage(
+                            context, changeState.error);
+                      }
+                    },
+                    child: UiUtils.buildButton(context, onPressed: () {
+                      if (state.subscriptionPackages[_selectedPackageIndex!]
+                          .isActive!) {
+                        Future.delayed(Duration.zero, () {
+                          context.read<RenewItemCubit>().renewItem(
+                              packageId: state
+                                  .subscriptionPackages[_selectedPackageIndex!]
+                                  .id!,
+                              itemId: model.id!);
+                        });
+                      } else {
+                        Navigator.pop(context);
+                        HelperUtils.showSnackBarMessage(context,
+                            "pleasePurchasePackage".translate(context));
+                        Navigator.pushNamed(
+                            context, Routes.subscriptionPackageListRoute);
+                      }
+                    },
+                        radius: 10,
+                        height: 46,
+                        disabled: _selectedPackageIndex == null,
+                        disabledColor:
                             context.color.textLightColor.withValues(alpha: 0.3),
-                            fontSize: context.font.large,
-                            buttonColor: context.color.territoryColor,
-                            textColor: context.color.secondaryColor,
-                            buttonTitle: "renewItem".translate(context),
+                        fontSize: context.font.large,
+                        buttonColor: context.color.territoryColor,
+                        textColor: context.color.secondaryColor,
+                        buttonTitle: "renewItem".translate(context),
 
-                            //TODO: change title to Your Current Plan according to condition
-                            outerPadding: const EdgeInsets.all(20)),
-                      );
-                    })
-                  ],
-                );
-              });
+                        //TODO: change title to Your Current Plan according to condition
+                        outerPadding: const EdgeInsets.all(20)),
+                  );
+                })
+              ],
+            );
+          });
         }
 
         return Container();
@@ -2464,36 +2482,13 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
         catName.contains('car');
 
     // Check if Property
-    final isProperty = catIdList.contains('65') ||
-        catIdList.contains('66') ||
-        catIdList.contains('85') ||
-        catIdList.contains('139') ||
-        catIdList.contains('140') ||
-        catIdList.contains('68') ||
-        catIdList.contains('143') ||
-        catSlug.contains('property') ||
-        catName.contains('property');
+    final isProperty = fullItem.isPropertyCategory;
 
     // Check if Motor (non-car)
-    final isMotor = catIdList.contains('1') ||
-        catIdList.contains('13') ||
-        catIdList.contains('14') ||
-        catIdList.contains('37') ||
-        catIdList.contains('38') ||
-        catIdList.contains('53') ||
-        catIdList.contains('54') ||
-        catSlug.contains('motor') ||
-        catName.contains('motor') ||
-        catSlug.contains('bike') ||
-        catName.contains('bike') ||
-        catSlug.contains('boat') ||
-        catName.contains('boat') ||
-        catSlug.contains('truck') ||
-        catName.contains('truck');
+    final isMotor = !isCar && fullItem.isMotorsCategory;
 
-    final breadcrumbs = fullItem.category != null
-        ? [fullItem.category!]
-        : <CategoryModel>[];
+    final breadcrumbs =
+        fullItem.category != null ? [fullItem.category!] : <CategoryModel>[];
 
     if (isCar) {
       Navigator.pushNamed(
@@ -2506,8 +2501,10 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
           'isEdit': true,
           'customFields': fullItem.customFields,
         },
-      ).then((_) {
-        Navigator.pop(context, "refresh");
+      ).then((updated) {
+        if (updated == true && context.mounted) {
+          Navigator.pop(context, "refresh");
+        }
       });
     } else if (isProperty) {
       Navigator.pushNamed(
@@ -2520,8 +2517,10 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
           'isEdit': true,
           'customFields': fullItem.customFields,
         },
-      ).then((_) {
-        Navigator.pop(context, "refresh");
+      ).then((updated) {
+        if (updated == true && context.mounted) {
+          Navigator.pop(context, "refresh");
+        }
       });
     } else if (isMotor) {
       Navigator.pushNamed(
@@ -2534,8 +2533,10 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
           'isEdit': true,
           'customFields': fullItem.customFields,
         },
-      ).then((_) {
-        Navigator.pop(context, "refresh");
+      ).then((updated) {
+        if (updated == true && context.mounted) {
+          Navigator.pop(context, "refresh");
+        }
       });
     } else {
       // Classifieds / Jobs / Other
@@ -2549,8 +2550,10 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
           'isEdit': true,
           'customFields': fullItem.customFields,
         },
-      ).then((_) {
-        Navigator.pop(context, "refresh");
+      ).then((updated) {
+        if (updated == true && context.mounted) {
+          Navigator.pop(context, "refresh");
+        }
       });
     }
   }
@@ -2589,7 +2592,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                     child: _buildButton("lblremove".translate(context), () {
                       Future.delayed(
                         Duration.zero,
-                            () {
+                        () {
                           /*  if (Constant.isDemoModeOn) {
                             HelperUtils.showSnackBarMessage(
                                 context,
@@ -2652,7 +2655,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
               child: _buildButton("lblremove".translate(context), () {
                 Future.delayed(
                   Duration.zero,
-                      () {
+                  () {
                     context.read<DeleteItemCubit>().deleteItem(model.id!);
                   },
                 );
@@ -2690,7 +2693,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                     child: _buildButton("lblremove".translate(context), () {
                       Future.delayed(
                         Duration.zero,
-                            () {
+                        () {
                           context.read<DeleteItemCubit>().deleteItem(model.id!);
                         },
                       );
@@ -2710,11 +2713,15 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   }
 
   bool _isJobAd() {
-    final allCategoryIds = model.allCategoryIds ?? widget.model.allCategoryIds ?? '';
+    if (model.isJobsCategory || widget.model.isJobsCategory) return true;
+    final allCategoryIds =
+        model.allCategoryIds ?? widget.model.allCategoryIds ?? '';
     final catIdList = allCategoryIds.split(',').map((e) => e.trim()).toList();
     final catId = model.categoryId ?? widget.model.categoryId;
-    final catSlug = (model.category?.slug ?? widget.model.category?.slug ?? '').toLowerCase();
-    final catName = (model.category?.name ?? widget.model.category?.name ?? '').toLowerCase();
+    final catSlug = (model.category?.slug ?? widget.model.category?.slug ?? '')
+        .toLowerCase();
+    final catName = (model.category?.name ?? widget.model.category?.name ?? '')
+        .toLowerCase();
 
     return catIdList.contains('4') ||
         catIdList.contains('356') ||
@@ -2727,11 +2734,14 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   }
 
   bool _isHireTalentAd() {
-    final allCategoryIds = model.allCategoryIds ?? widget.model.allCategoryIds ?? '';
+    final allCategoryIds =
+        model.allCategoryIds ?? widget.model.allCategoryIds ?? '';
     final catIdList = allCategoryIds.split(',').map((e) => e.trim()).toList();
     final catId = model.categoryId ?? widget.model.categoryId;
-    final catSlug = (model.category?.slug ?? widget.model.category?.slug ?? '').toLowerCase();
-    final catName = (model.category?.name ?? widget.model.category?.name ?? '').toLowerCase();
+    final catSlug = (model.category?.slug ?? widget.model.category?.slug ?? '')
+        .toLowerCase();
+    final catName = (model.category?.name ?? widget.model.category?.name ?? '')
+        .toLowerCase();
 
     return catIdList.contains('357') ||
         catId == 357 ||
@@ -2743,8 +2753,13 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
 
   bool _isPropertyAd() {
     if (_isJobAd()) return false;
-    final catSlug = (model.category?.slug ?? widget.model.category?.slug ?? '').toLowerCase();
-    final catName = (model.category?.name ?? widget.model.category?.name ?? '').toLowerCase();
+    if (model.isPropertyCategory || widget.model.isPropertyCategory) {
+      return true;
+    }
+    final catSlug = (model.category?.slug ?? widget.model.category?.slug ?? '')
+        .toLowerCase();
+    final catName = (model.category?.name ?? widget.model.category?.name ?? '')
+        .toLowerCase();
 
     if (catSlug.contains('property') ||
         catSlug.contains('rent') ||
@@ -2752,7 +2767,9 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
         catSlug.contains('commercial') ||
         catName.contains('property') ||
         catName.contains('rent') ||
-        (catName.contains('sale') && !catSlug.contains('car') && !catSlug.contains('motor'))) {
+        (catName.contains('sale') &&
+            !catSlug.contains('car') &&
+            !catSlug.contains('motor'))) {
       return true;
     }
     return false;
@@ -2760,8 +2777,11 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
 
   bool _isMotorsAd() {
     if (_isJobAd() || _isPropertyAd()) return false;
-    final catSlug = (model.category?.slug ?? widget.model.category?.slug ?? '').toLowerCase();
-    final catName = (model.category?.name ?? widget.model.category?.name ?? '').toLowerCase();
+    if (model.isMotorsCategory || widget.model.isMotorsCategory) return true;
+    final catSlug = (model.category?.slug ?? widget.model.category?.slug ?? '')
+        .toLowerCase();
+    final catName = (model.category?.name ?? widget.model.category?.name ?? '')
+        .toLowerCase();
 
     if (catSlug.contains('motor') ||
         catSlug.contains('car') ||
@@ -2773,14 +2793,14 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
         catName.contains('vehicle') ||
         catName.contains('bike') ||
         model.customFields?.any((f) =>
-            f.name?.toLowerCase().contains('kilometer') == true ||
-            f.name?.toLowerCase().contains('engine') == true) == true) {
+                f.name?.toLowerCase().contains('kilometer') == true ||
+                f.name?.toLowerCase().contains('engine') == true) ==
+            true) {
       return true;
     }
     return false;
   }
 
-  
   void _showCandidateDetailsAndCvModal(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -2820,9 +2840,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
               f.type == "fileinput") {
             return false;
           }
-          final val = (f.value is List)
-              ? f.value!.join(', ')
-              : f.value.toString();
+          final val =
+              (f.value is List) ? f.value!.join(', ') : f.value.toString();
           if (val.startsWith("http") &&
               (val.endsWith(".jpg") ||
                   val.endsWith(".png") ||
@@ -2886,7 +2905,9 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            model.name ?? model.user?.name ?? "Candidate Profile",
+                            model.name ??
+                                model.user?.name ??
+                                "Candidate Profile",
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
@@ -2937,7 +2958,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1E88E5).withValues(alpha: 0.12),
+                            color:
+                                const Color(0xFF1E88E5).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Center(
@@ -3172,13 +3194,53 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   Widget _buildBottomContactButtons() {
     final isPhoneHidden =
         model.hidePhoneNumber == true || widget.model.hidePhoneNumber == true;
-    final phone = model.contact ??
-        model.user?.mobile ??
-        widget.model.contact ??
-        widget.model.user?.mobile;
+    final phone = model.sellerPhone ?? widget.model.sellerPhone;
+    final canShowPhoneActions =
+        !isPhoneHidden && phone != null && phone.trim().isNotEmpty;
 
     // 0. Jobs Actions (Apply or See CV)
     if (_isJobAd()) {
+      final applicationStatus = widget.jobApplicationStatus?.trim();
+      if (applicationStatus != null && applicationStatus.isNotEmpty) {
+        final normalizedStatus = applicationStatus.toLowerCase();
+        final isRejected = normalizedStatus.contains('reject');
+        final isReview = normalizedStatus.contains('review') ||
+            normalizedStatus.contains('pending');
+        final statusColor = isRejected
+            ? Colors.red
+            : isReview
+                ? Colors.blue.shade700
+                : Colors.green.shade700;
+
+        return Container(
+          width: double.infinity,
+          height: 48,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: statusColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: statusColor.withValues(alpha: 0.25),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.work_history_outlined, size: 19, color: statusColor),
+              const SizedBox(width: 8),
+              Text(
+                'Application status: $applicationStatus',
+                style: TextStyle(
+                  color: statusColor,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
       if (_isHireTalentAd()) {
         return SizedBox(
           width: double.infinity,
@@ -3503,25 +3565,44 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
       // 1) Properties (Property for Sale, Property for Rent) -> Inquiry, Call, WhatsApp
       buttons = [
         buildInquiryButton(),
-        const SizedBox(width: 6),
-        buildCallButton(),
-        const SizedBox(width: 6),
-        buildWhatsAppButton(),
+        if (canShowPhoneActions) ...[
+          const SizedBox(width: 6),
+          buildCallButton(),
+          const SizedBox(width: 6),
+          buildWhatsAppButton(),
+        ],
       ];
     } else if (isMot) {
-      // 2) Motors -> Phone number (Call), WhatsApp
+      // 2) Motors -> Chat, plus phone actions when the number is visible.
       buttons = [
-        buildCallButton(),
-        const SizedBox(width: 8),
-        buildWhatsAppButton(),
+        buildChatButton(),
+        if (canShowPhoneActions) ...[
+          const SizedBox(width: 6),
+          buildCallButton(),
+          const SizedBox(width: 6),
+          buildWhatsAppButton(),
+        ],
       ];
-    } else {
-      // 3) Classifieds -> Chat only
+    } else if (model.isClassifiedsCategory ||
+        widget.model.isClassifiedsCategory) {
+      // 3) Classifieds and mobiles -> Chat only
       buttons = [
         buildChatButton(),
       ];
+    } else {
+      // Unknown/service categories never receive chat implicitly.
+      buttons = [
+        buildInquiryButton(),
+        if (canShowPhoneActions) ...[
+          const SizedBox(width: 8),
+          buildCallButton(),
+          const SizedBox(width: 8),
+          buildWhatsAppButton(),
+        ],
+      ];
     }
 
+    if (buttons.isEmpty) return const SizedBox.shrink();
     return Row(
       children: buttons,
     );
@@ -3543,8 +3624,6 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
       width: 10.rw(context),
     );
   }
-
-
 
 //ImageView
   Widget setImageViewer() {
@@ -3685,7 +3764,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                       HelperUtils.showSnackBarMessage(
                           context, "deleteItemSuccessMsg".translate(context));
                       context.read<FetchMyItemsCubit>().deleteItem(model);
-                      FetchMyPromotedItemsCubit.globalInstance?.delete(model.id);
+                      FetchMyPromotedItemsCubit.globalInstance
+                          ?.delete(model.id);
                       Navigator.pop(context, "refresh");
                     } else if (deleteState is DeleteItemFailure) {
                       HelperUtils.showSnackBarMessage(
@@ -3817,8 +3897,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                                   const SizedBox(width: 8),
                                   Text("Edit Ad",
                                       style: TextStyle(
-                                          color:
-                                              context.color.textDefaultColor,
+                                          color: context.color.textDefaultColor,
                                           fontSize: 13.5)),
                                 ],
                               ),
@@ -3829,8 +3908,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                                 child: Row(
                                   children: [
                                     Icon(Icons.pause_circle_outline_rounded,
-                                        size: 18,
-                                        color: Colors.amber.shade800),
+                                        size: 18, color: Colors.amber.shade800),
                                     const SizedBox(width: 8),
                                     Text("Deactivate Ad",
                                         style: TextStyle(
@@ -3891,8 +3969,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                                 child: Row(
                                   children: [
                                     Icon(Icons.refresh_rounded,
-                                        size: 18,
-                                        color: Colors.amber.shade800),
+                                        size: 18, color: Colors.amber.shade800),
                                     const SizedBox(width: 8),
                                     Text("Renew Ad",
                                         style: TextStyle(
@@ -3911,8 +3988,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                                   SizedBox(width: 8),
                                   Text("Delete Ad",
                                       style: TextStyle(
-                                          color: Colors.red,
-                                          fontSize: 13.5)),
+                                          color: Colors.red, fontSize: 13.5)),
                                 ],
                               ),
                             ),
@@ -3931,8 +4007,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
             bottom: 14,
             left: 14,
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(20),
@@ -4001,8 +4076,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
             BlocBuilder<FavoriteCubit, FavoriteState>(
               bloc: context.read<FavoriteCubit>(),
               builder: (context, favState) {
-                bool isLike = context.select((FavoriteCubit cubit) =>
-                    cubit.isItemFavorite(model.id!));
+                bool isLike = context.select(
+                    (FavoriteCubit cubit) => cubit.isItemFavorite(model.id!));
 
                 return BlocConsumer<UpdateFavoriteCubit, UpdateFavoriteState>(
                   bloc: context.read<UpdateFavoriteCubit>(),
@@ -4043,9 +4118,9 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                                   context
                                       .read<UpdateFavoriteCubit>()
                                       .setFavoriteItem(
-                                    item: model,
-                                    type: 0,
-                                  );
+                                        item: model,
+                                        type: 0,
+                                      );
                                   HelperUtils.showSnackBarMessage(
                                     context,
                                     "Removed from Favorites".translate(context),
@@ -4054,10 +4129,11 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                                   context
                                       .read<UpdateFavoriteCubit>()
                                       .setFavoriteItem(
-                                    item: model,
-                                    type: 1,
-                                  );
-                                  SaveToFavoriteBottomSheet.show(context, item: model);
+                                        item: model,
+                                        type: 1,
+                                      );
+                                  SaveToFavoriteBottomSheet.show(context,
+                                      item: model);
                                 }
                               },
                               context: context);
@@ -4067,8 +4143,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                               ? const SizedBox(
                                   width: 18,
                                   height: 18,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2),
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : Icon(
                                   isLike
@@ -4120,10 +4196,10 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
 
   Widget setTopRowItem(
       {required AlignmentDirectional alignment,
-        required double marginVal,
-        required double cornerRadius,
-        required Color backgroundColor,
-        required Widget childWidget}) {
+      required double marginVal,
+      required double cornerRadius,
+      required Color backgroundColor,
+      required Widget childWidget}) {
     return Align(
         alignment: alignment,
         child: Container(
@@ -4133,8 +4209,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                 borderRadius: BorderRadius.circular(cornerRadius),
                 color: backgroundColor),
             child: childWidget)
-      //TODO: swap icons according to liked and non-liked -- favorite_border_rounded and favorite_rounded
-    );
+        //TODO: swap icons according to liked and non-liked -- favorite_border_rounded and favorite_rounded
+        );
   }
 
   Widget buildDot(int index) {
@@ -4162,8 +4238,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                           width: 1,
-                          color:
-                          context.color.textDefaultColor.withValues(alpha: 0.1))),
+                          color: context.color.textDefaultColor
+                              .withValues(alpha: 0.1))),
                   padding: const EdgeInsets.symmetric(horizontal: 5),
                   height: 46.rh(context),
                   child: Row(
@@ -4175,8 +4251,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                         width: 8,
                       ),
                       Text(model.views != null ? model.views!.toString() : "0")
-                          .color(
-                          context.color.textDefaultColor.withValues(alpha: 0.8))
+                          .color(context.color.textDefaultColor
+                              .withValues(alpha: 0.8))
                           .size(context.font.large)
                     ],
                   ))),
@@ -4187,8 +4263,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                           width: 1,
-                          color:
-                          context.color.textDefaultColor.withValues(alpha: 0.1))),
+                          color: context.color.textDefaultColor
+                              .withValues(alpha: 0.1))),
                   padding: const EdgeInsets.symmetric(horizontal: 5),
                   height: 46.rh(context),
                   //alignment: AlignmentDirectional.center,
@@ -4201,10 +4277,10 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                         width: 8,
                       ),
                       Text(model.totalLikes == null
-                          ? "0"
-                          : model.totalLikes.toString())
-                          .color(
-                          context.color.textDefaultColor.withValues(alpha: 0.8))
+                              ? "0"
+                              : model.totalLikes.toString())
+                          .color(context.color.textDefaultColor
+                              .withValues(alpha: 0.8))
                           .size(context.font.large)
                     ],
                   ))),
@@ -4227,7 +4303,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
         margin: const EdgeInsets.symmetric(vertical: 15),
         padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
         child: Row(
-          //crossAxisAlignment: CrossAxisAlignment.center,
+            //crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
@@ -4273,8 +4349,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
             child: Text(
               _getStatusText(model.status)!,
             ).size(context.font.normal).color(
-              _getStatusTextColor(model.status),
-            ),
+                  _getStatusTextColor(model.status),
+                ),
           )
 
         //TODO: change color according to status - confirm,pending,etc..
@@ -4346,13 +4422,13 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
       padding: const EdgeInsets.symmetric(vertical: 5.0),
       child: Row(
         mainAxisAlignment:
-        (isDate) ? MainAxisAlignment.spaceBetween : MainAxisAlignment.start,
+            (isDate) ? MainAxisAlignment.spaceBetween : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SvgPicture.asset(
             AppIcons.location,
             colorFilter:
-            ColorFilter.mode(context.color.textLightColor, BlendMode.srcIn),
+                ColorFilter.mode(context.color.textLightColor, BlendMode.srcIn),
           ),
           Expanded(
             flex: 3,
@@ -4364,9 +4440,10 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
           ),
           (isDate && model.created != null)
               ? Expanded(
-              child: Text(model.created!.formatDate(format: "d MMM yyyy"))
-                  .setMaxLines(lines: 1)
-                  .color(context.color.textDefaultColor.withValues(alpha: 0.5)))
+                  child: Text(model.created!.formatDate(format: "d MMM yyyy"))
+                      .setMaxLines(lines: 1)
+                      .color(context.color.textDefaultColor
+                          .withValues(alpha: 0.5)))
               : const SizedBox.shrink()
           //TODO: add DATE from model
         ],
@@ -4378,7 +4455,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("aboutThisItemLbl".translate(context)).bold().size(context.font.large), //TODO: replace label with your own - aboutThisPropLbl
+        Text("aboutThisItemLbl".translate(context)).bold().size(context
+            .font.large), //TODO: replace label with your own - aboutThisPropLbl
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 5.0),
           child: Text(model.description ?? "")
@@ -4387,8 +4465,6 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
       ],
     );
   }
-
-
 
   void _navigateToGoogleMapScreen(BuildContext context) {
     Navigator.push(
@@ -4407,7 +4483,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   }
 
   Widget setLocation() {
-    final LatLng currentPosition = LatLng(model.latitude ?? 0.0, model.longitude ?? 0.0);
+    final LatLng currentPosition =
+        LatLng(model.latitude ?? 0.0, model.longitude ?? 0.0);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -4429,12 +4506,13 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   compassEnabled: false,
                   mapToolbarEnabled: false,
                   liteModeEnabled: true,
-                  zoomGesturesEnabled: false, // Changed to false to prevent map from consuming event
+                  zoomGesturesEnabled:
+                      false, // Changed to false to prevent map from consuming event
                   scrollGesturesEnabled: false,
                   rotateGesturesEnabled: false,
                   tiltGesturesEnabled: false,
                   initialCameraPosition:
-                  CameraPosition(target: currentPosition, zoom: 14),
+                      CameraPosition(target: currentPosition, zoom: 14),
                   mapType: MapType.normal,
                   markers: {
                     Marker(
@@ -4523,8 +4601,6 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     );
   }
 
-
-
   Future<void> _bottomSheet(int itemId) async {
     await ReportListingDialog.show(
       context,
@@ -4559,7 +4635,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
         Navigator.pushNamed(context, Routes.sellerProfileScreen, arguments: {
           "model": model.user!,
           "total":
-          context.read<FetchSellerRatingsCubit>().totalSellerRatings() ?? 0,
+              context.read<FetchSellerRatingsCubit>().totalSellerRatings() ?? 0,
           "rating": context
               .read<FetchSellerRatingsCubit>()
               .sellerData()
@@ -4578,20 +4654,22 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
               child: ClipRRect(
                   borderRadius: BorderRadius.circular(30),
                   child: model.user?.profile != null &&
-                      model.user!.profile != ""
+                          model.user!.profile != ""
                       ? UiUtils.getImage(model.user!.profile!, fit: BoxFit.fill)
                       : UiUtils.getSvg(
-                    AppIcons.defaultPersonLogo,
-                    color: context.color.territoryColor,
-                    fit: BoxFit.none,
-                  ))),
+                          AppIcons.defaultPersonLogo,
+                          color: context.color.territoryColor,
+                          fit: BoxFit.none,
+                        ))),
           Expanded(
             child: Padding(
               padding: const EdgeInsetsDirectional.only(start: 20.0),
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(model.user?.name ?? "").bold().size(context.font.large),
+                    Text(model.user?.name ?? "")
+                        .bold()
+                        .size(context.font.large),
                     Text("Owner")
                         .size(context.font.small)
                         .bold(weight: FontWeight.w500)
@@ -4627,7 +4705,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   assetName,
                   colorFilter: color == null
                       ? ColorFilter.mode(
-                      context.color.territoryColor, BlendMode.srcIn)
+                          context.color.territoryColor, BlendMode.srcIn)
                       : ColorFilter.mode(color, BlendMode.srcIn),
                 ))));
   }

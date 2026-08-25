@@ -90,7 +90,8 @@ class StatesScreenState extends State<StatesScreen> {
   }
 
   void _loadMoreStates() {
-    if (widget.countryId > 0 && context.read<FetchStatesCubit>().hasMoreData()) {
+    if (widget.countryId > 0 &&
+        context.read<FetchStatesCubit>().hasMoreData()) {
       context.read<FetchStatesCubit>().fetchStatesMore(
             countryId: widget.countryId,
             search: searchController.text.trim(),
@@ -152,7 +153,7 @@ class StatesScreenState extends State<StatesScreen> {
     });
   }
 
-  void _applyStateDirectly() {
+  Future<void> _applyStateDirectly() async {
     final stateName = effectiveStateName;
 
     if (widget.from == "addItem") {
@@ -164,13 +165,14 @@ class StatesScreenState extends State<StatesScreen> {
         "country": widget.countryName,
       });
     } else {
-      HiveUtils.setLocation(
+      await HiveUtils.setLocation(
         city: stateName,
         state: stateName,
         country: widget.countryName,
         area: null,
       );
 
+      if (!mounted) return;
       Navigator.pushNamedAndRemoveUntil(
         context,
         Routes.main,
@@ -194,7 +196,9 @@ class StatesScreenState extends State<StatesScreen> {
         onPressed: () => Navigator.pop(context),
       ),
       title: Text(
-        widget.countryName.isNotEmpty ? widget.countryName : "Select State".translate(context),
+        widget.countryName.isNotEmpty
+            ? widget.countryName
+            : "Select State".translate(context),
         style: TextStyle(
           color: context.color.textDefaultColor,
           fontWeight: FontWeight.w700,
@@ -359,7 +363,8 @@ class StatesScreenState extends State<StatesScreen> {
               children: [
                 // 1. Quick Select: Entire Country / Custom State
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -381,7 +386,8 @@ class StatesScreenState extends State<StatesScreen> {
                                     (manualStateName == widget.countryName ||
                                         (manualStateName == null &&
                                             searchText.isEmpty)))
-                                ? context.color.territoryColor.withValues(alpha: 0.12)
+                                ? context.color.territoryColor
+                                    .withValues(alpha: 0.12)
                                 : context.color.secondaryColor,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
@@ -390,7 +396,8 @@ class StatesScreenState extends State<StatesScreen> {
                                           (manualStateName == null &&
                                               searchText.isEmpty)))
                                   ? context.color.territoryColor
-                                  : context.color.borderColor.withValues(alpha: 0.6),
+                                  : context.color.borderColor
+                                      .withValues(alpha: 0.6),
                             ),
                           ),
                           child: Row(
@@ -424,7 +431,6 @@ class StatesScreenState extends State<StatesScreen> {
                           ),
                         ),
                       ),
-
                       if (searchText.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         InkWell(
@@ -442,13 +448,15 @@ class StatesScreenState extends State<StatesScreen> {
                             ),
                             decoration: BoxDecoration(
                               color: (manualStateName == searchText)
-                                  ? context.color.territoryColor.withValues(alpha: 0.12)
+                                  ? context.color.territoryColor
+                                      .withValues(alpha: 0.12)
                                   : context.color.secondaryColor,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: (manualStateName == searchText)
                                     ? context.color.territoryColor
-                                    : context.color.borderColor.withValues(alpha: 0.6),
+                                    : context.color.borderColor
+                                        .withValues(alpha: 0.6),
                               ),
                             ),
                             child: Row(
@@ -540,13 +548,15 @@ class StatesScreenState extends State<StatesScreen> {
                             ),
                             decoration: BoxDecoration(
                               color: isSelected
-                                  ? context.color.territoryColor.withValues(alpha: 0.12)
+                                  ? context.color.territoryColor
+                                      .withValues(alpha: 0.12)
                                   : context.color.secondaryColor,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: isSelected
-                                  ? context.color.territoryColor
-                                  : context.color.borderColor.withValues(alpha: 0.6),
+                                    ? context.color.territoryColor
+                                    : context.color.borderColor
+                                        .withValues(alpha: 0.6),
                                 width: isSelected ? 1.5 : 1.0,
                               ),
                             ),

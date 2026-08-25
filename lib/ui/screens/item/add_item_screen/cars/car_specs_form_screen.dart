@@ -134,7 +134,8 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
       if (item.contact != null && item.contact.toString().isNotEmpty) {
         _phoneController.text = item.contact.toString();
       }
-      _showPhoneNumber = item.hidePhoneNumber != 1 && item.hidePhoneNumber != true;
+      _showPhoneNumber =
+          item.hidePhoneNumber != 1 && item.hidePhoneNumber != true;
       if (item.city != null && item.city.toString().isNotEmpty) {
         _selectedEmirate = item.city.toString();
       }
@@ -221,13 +222,17 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
       final item = widget.item;
       if (item != null) {
         final targetMakeId = item.carMake;
-        final targetMakeName = item.carMakeName?.toString().toLowerCase().trim();
+        final targetMakeName =
+            item.carMakeName?.toString().toLowerCase().trim();
         if (targetMakeId != null) {
           final match = _makes.where((m) => m.id == targetMakeId);
           if (match.isNotEmpty) _selectedMake = match.first;
         }
-        if (_selectedMake == null && targetMakeName != null && targetMakeName.isNotEmpty) {
-          final match = _makes.where((m) => m.name.toLowerCase().trim() == targetMakeName);
+        if (_selectedMake == null &&
+            targetMakeName != null &&
+            targetMakeName.isNotEmpty) {
+          final match = _makes
+              .where((m) => m.name.toLowerCase().trim() == targetMakeName);
           if (match.isNotEmpty) _selectedMake = match.first;
         }
       }
@@ -250,13 +255,17 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
       final item = widget.item;
       if (item != null && _selectedModel == null) {
         final targetModelId = item.carModel;
-        final targetModelName = item.carModelName?.toString().toLowerCase().trim();
+        final targetModelName =
+            item.carModelName?.toString().toLowerCase().trim();
         if (targetModelId != null) {
           final match = _models.where((m) => m.id == targetModelId);
           if (match.isNotEmpty) _selectedModel = match.first;
         }
-        if (_selectedModel == null && targetModelName != null && targetModelName.isNotEmpty) {
-          final match = _models.where((m) => m.name.toLowerCase().trim() == targetModelName);
+        if (_selectedModel == null &&
+            targetModelName != null &&
+            targetModelName.isNotEmpty) {
+          final match = _models
+              .where((m) => m.name.toLowerCase().trim() == targetModelName);
           if (match.isNotEmpty) _selectedModel = match.first;
         }
       }
@@ -281,13 +290,17 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
       final item = widget.item;
       if (item != null && _selectedTrim == null) {
         final targetTrimId = item.carTrim;
-        final targetTrimName = item.carTrimName?.toString().toLowerCase().trim();
+        final targetTrimName =
+            item.carTrimName?.toString().toLowerCase().trim();
         if (targetTrimId != null) {
           final match = _trims.where((t) => t.id == targetTrimId);
           if (match.isNotEmpty) _selectedTrim = match.first;
         }
-        if (_selectedTrim == null && targetTrimName != null && targetTrimName.isNotEmpty) {
-          final match = _trims.where((t) => t.name.toLowerCase().trim() == targetTrimName);
+        if (_selectedTrim == null &&
+            targetTrimName != null &&
+            targetTrimName.isNotEmpty) {
+          final match = _trims
+              .where((t) => t.name.toLowerCase().trim() == targetTrimName);
           if (match.isNotEmpty) _selectedTrim = match.first;
         }
       }
@@ -328,7 +341,7 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
     return widget.category?.name ?? 'Listing';
   }
 
-  void _validateAndProceed() {
+  Future<void> _validateAndProceed() async {
     if (_selectedMake == null) {
       HelperUtils.showSnackBarMessage(
         context,
@@ -408,13 +421,16 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
       item: widget.item,
     );
 
-    Navigator.pushNamed(
+    final wasUpdated = await Navigator.pushNamed(
       context,
       Routes.carPostingDetailsScreen,
       arguments: {
         'specsData': specsData,
       },
     );
+    if (mounted && wasUpdated == true && specsData.isEdit) {
+      Navigator.pop(context, true);
+    }
   }
 
   @override

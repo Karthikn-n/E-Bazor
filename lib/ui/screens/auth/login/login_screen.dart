@@ -336,14 +336,15 @@ class LoginScreenState extends State<LoginScreen> {
                     ? termAndPolicyTxt()
                     : SizedBox.shrink(),
                 body: BlocListener<LoginCubit, LoginState>(
-                  listener: (context, state) {
+                  listener: (context, state) async {
                     if (!Widgets.isCurrentOrLoaderOwner(context)) return;
                     AppLog.i('LoginCubit state: $state', name: 'LoginScreen');
                     if (state is LoginSuccess) {
                       AppLog.i(
                           'LoginSuccess. isProfileCompleted=${state.isProfileCompleted}',
                           name: 'LoginScreen');
-                      HiveUtils.setUserIsAuthenticated(true);
+                      await HiveUtils.setUserIsAuthenticated(true);
+                      if (!context.mounted) return;
                       //GuestChecker.set(isGuest: false);
                       //context.read<AuthCubit>().updateFCM(context);
 

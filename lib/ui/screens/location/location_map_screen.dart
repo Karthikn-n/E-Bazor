@@ -62,8 +62,10 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
     super.initState();
 
     // Fast initial setup: Set fallback or cached position immediately so GoogleMap mounts in 0ms
-    double initialLat = HiveUtils.getLatitude() ?? HiveUtils.getCurrentLatitude() ?? 0.0;
-    double initialLng = HiveUtils.getLongitude() ?? HiveUtils.getCurrentLongitude() ?? 0.0;
+    double initialLat =
+        HiveUtils.getLatitude() ?? HiveUtils.getCurrentLatitude() ?? 0.0;
+    double initialLng =
+        HiveUtils.getLongitude() ?? HiveUtils.getCurrentLongitude() ?? 0.0;
 
     if (initialLat == 0.0 || initialLng == 0.0) {
       initialLat = double.tryParse(Constant.defaultLatitude) ?? 25.2048;
@@ -300,7 +302,8 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
         } catch (_) {
           results.add(LocationSearchResult(
             title: trimmedQuery,
-            subtitle: "${loc.latitude.toStringAsFixed(4)}, ${loc.longitude.toStringAsFixed(4)}",
+            subtitle:
+                "${loc.latitude.toStringAsFixed(4)}, ${loc.longitude.toStringAsFixed(4)}",
             latitude: loc.latitude,
             longitude: loc.longitude,
           ));
@@ -366,7 +369,6 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       backgroundColor: context.color.backgroundColor,
       appBar: AppBar(
@@ -467,7 +469,8 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                                 ],
                               ),
                               child: Text(
-                                "Move map to choose location".translate(context),
+                                "Move map to choose location"
+                                    .translate(context),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 11,
@@ -506,7 +509,8 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: context.color.secondaryColor.withValues(alpha: 0.92),
+                              color: context.color.secondaryColor
+                                  .withValues(alpha: 0.92),
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
@@ -531,7 +535,8 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                                 Text(
                                   _isFetchingLocation
                                       ? "Locating...".translate(context)
-                                      : "Updating address...".translate(context),
+                                      : "Updating address..."
+                                          .translate(context),
                                   style: TextStyle(
                                     color: context.color.textDefaultColor,
                                     fontSize: 12,
@@ -599,7 +604,8 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                           color: context.color.backgroundColor,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: context.color.borderColor.withValues(alpha: 0.5),
+                            color: context.color.borderColor
+                                .withValues(alpha: 0.5),
                           ),
                         ),
                         child: Row(
@@ -608,7 +614,8 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: context.color.territoryColor.withValues(alpha: 0.12),
+                                color: context.color.territoryColor
+                                    .withValues(alpha: 0.12),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
@@ -637,9 +644,13 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    _buildFormattedAddressString(formatedAddress).isEmpty
-                                        ? "Pin your desired location on the map".translate(context)
-                                        : _buildFormattedAddressString(formatedAddress),
+                                    _buildFormattedAddressString(
+                                                formatedAddress)
+                                            .isEmpty
+                                        ? "Pin your desired location on the map"
+                                            .translate(context)
+                                        : _buildFormattedAddressString(
+                                            formatedAddress),
                                     style: TextStyle(
                                       color: context.color.textLightColor,
                                       fontSize: 12,
@@ -662,7 +673,7 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                             flex: 1,
                             child: UiUtils.buildButton(
                               context,
-                              onPressed: () {
+                              onPressed: () async {
                                 _getCurrentLocation();
                               },
                               buttonTitle: "Reset".translate(context),
@@ -680,7 +691,7 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                             flex: 2,
                             child: UiUtils.buildButton(
                               context,
-                              onPressed: () {
+                              onPressed: () async {
                                 if (from == "addItem") {
                                   if (formatedAddress != null) {
                                     Navigator.pop(context, {
@@ -704,7 +715,7 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                                     });
                                   }
                                 } else if (formatedAddress != null) {
-                                  HiveUtils.setLocation(
+                                  await HiveUtils.setLocation(
                                     city: formatedAddress!.city,
                                     state: formatedAddress!.state,
                                     country: formatedAddress!.country,
@@ -720,10 +731,11 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                                       arguments: {"from": "login"},
                                     );
                                   } else {
-                                    Navigator.popUntil(context, (route) => route.isFirst);
+                                    Navigator.popUntil(
+                                        context, (route) => route.isFirst);
                                   }
                                 } else {
-                                  HiveUtils.setLocation(
+                                  await HiveUtils.setLocation(
                                     latitude: latitude,
                                     longitude: longitude,
                                   );
@@ -735,7 +747,8 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                                       arguments: {"from": "login"},
                                     );
                                   } else {
-                                    Navigator.popUntil(context, (route) => route.isFirst);
+                                    Navigator.popUntil(
+                                        context, (route) => route.isFirst);
                                   }
                                 }
                               },
@@ -798,7 +811,8 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                       fontWeight: FontWeight.w500,
                     ),
                     decoration: InputDecoration(
-                      hintText: "Search city, area or landmark...".translate(context),
+                      hintText:
+                          "Search city, area or landmark...".translate(context),
                       hintStyle: TextStyle(
                         color: context.color.textLightColor,
                         fontSize: 14,

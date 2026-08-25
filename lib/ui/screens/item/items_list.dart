@@ -620,16 +620,19 @@ class ItemsListState extends State<ItemsList> {
     }
   }
 
-  void _launchSMS(String? phone) async {
-    if (phone == null || phone.trim().isEmpty) {
-      HelperUtils.showSnackBarMessage(context, "Phone number not available");
-      return;
-    }
-    final url = Uri.parse("sms:${phone.trim()}");
+  void _launchWhatsApp(ItemModel item) async {
+    final phone = item.sellerPhone;
+    if (!item.hasVisiblePhoneNumber || phone == null) return;
+
+    final cleanPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    final message = Uri.encodeComponent(
+      "Hi, I am interested in your ad '${item.name ?? ''}' on ${Constant.appName}.",
+    );
+    final url = Uri.parse('https://wa.me/$cleanPhone?text=$message');
     if (await canLaunchUrl(url)) {
-      await launchUrl(url);
-    } else {
-      HelperUtils.showSnackBarMessage(context, "Could not open SMS app");
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else if (mounted) {
+      HelperUtils.showSnackBarMessage(context, 'Could not open WhatsApp');
     }
   }
 
@@ -3417,181 +3420,71 @@ class ItemsListState extends State<ItemsList> {
 
                       if (isJobItem) {
                         if (isHireTalent) {
-                          return Row(
-                            children: [
-                              Expanded(
-                                flex: 2,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(8),
-                                  onTap: () =>
-                                      _navigateToDetails(context, item),
-                                  child: Container(
-                                    height: 38,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF1E88E5),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.description_outlined,
-                                          size: 16,
-                                          color: Colors.white,
-                                        ),
-                                        SizedBox(width: 6),
-                                        Text(
-                                          "See CV & Details",
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12.5,
-                                          ),
-                                        ),
-                                      ],
+                          return InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () => _navigateToDetails(context, item),
+                            child: Container(
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E88E5),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.description_outlined,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    "See CV & Details",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12.5,
                                     ),
                                   ),
-                                ),
+                                ],
                               ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(8),
-                                  onTap: () => _launchCall(
-                                      item.contact ?? item.user?.mobile),
-                                  child: Container(
-                                    height: 38,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFEF2F2),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: const Color(0xFFFEE2E2),
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: const Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.phone_outlined,
-                                          size: 16,
-                                          color: Color(0xFFDC2626),
-                                        ),
-                                        SizedBox(width: 5),
-                                        Text(
-                                          "Call",
-                                          style: TextStyle(
-                                            color: Color(0xFFDC2626),
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
                           );
                         } else {
-                          return Row(
-                            children: [
-                              Expanded(
-                                flex: 2,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(8),
-                                  onTap: () =>
-                                      _navigateToDetails(context, item),
-                                  child: Container(
-                                    height: 38,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFD31027),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.assignment_turned_in_outlined,
-                                          size: 16,
-                                          color: Colors.white,
-                                        ),
-                                        SizedBox(width: 6),
-                                        Text(
-                                          "Apply Now",
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13.5,
-                                          ),
-                                        ),
-                                      ],
+                          return InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () => _navigateToDetails(context, item),
+                            child: Container(
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFD31027),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.assignment_turned_in_outlined,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    "Apply Now",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13.5,
                                     ),
                                   ),
-                                ),
+                                ],
                               ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(8),
-                                  onTap: () => _launchCall(
-                                      item.contact ?? item.user?.mobile),
-                                  child: Container(
-                                    height: 38,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFEF2F2),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: const Color(0xFFFEE2E2),
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: const Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.phone_outlined,
-                                          size: 16,
-                                          color: Color(0xFFDC2626),
-                                        ),
-                                        SizedBox(width: 5),
-                                        Text(
-                                          "Call",
-                                          style: TextStyle(
-                                            color: Color(0xFFDC2626),
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
                           );
                         }
                       }
 
-                      final catNameLower =
-                          (item.category?.name ?? '').toLowerCase();
-                      final catSlugLower =
-                          (item.category?.slug ?? '').toLowerCase();
-                      final widgetCatLower = widget.categoryName.toLowerCase();
-
-                      final isFurnitureOrClassifieds =
-                          catNameLower.contains('furniture') ||
-                              catSlugLower.contains('furniture') ||
-                              catNameLower.contains('classified') ||
-                              catSlugLower.contains('classified') ||
-                              widgetCatLower.contains('furniture') ||
-                              widgetCatLower.contains('classified');
-
-                      if (isFurnitureOrClassifieds) {
+                      if (item.isClassifiedsCategory) {
                         return InkWell(
                           borderRadius: BorderRadius.circular(8),
                           onTap: () => _openChat(context, item),
@@ -3629,125 +3522,131 @@ class ItemsListState extends State<ItemsList> {
                         );
                       }
 
+                      if (!item.hasVisiblePhoneNumber &&
+                          !item.isMotorsCategory) {
+                        return const SizedBox.shrink();
+                      }
+
                       return Row(
                         children: [
-                          // 1. Chat Button
-                          Expanded(
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(8),
-                              onTap: () => _openChat(context, item),
-                              child: Container(
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFEFF6FF),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: const Color(0xFFDBEAFE),
-                                    width: 1,
+                          if (item.hasVisiblePhoneNumber) ...[
+                            Expanded(
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: () => _launchCall(item.sellerPhone),
+                                child: Container(
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF2F2),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: const Color(0xFFFEE2E2),
+                                      width: 1,
+                                    ),
                                   ),
-                                ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.chat_outlined,
-                                      size: 16,
-                                      color: Color(0xFF2563EB),
-                                    ),
-                                    SizedBox(width: 5),
-                                    Text(
-                                      "Chat",
-                                      style: TextStyle(
-                                        color: Color(0xFF2563EB),
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-
-                          // 2. Call Button
-                          Expanded(
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(8),
-                              onTap: () => _launchCall(
-                                  item.contact ?? item.user?.mobile),
-                              child: Container(
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFEF2F2),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: const Color(0xFFFEE2E2),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.phone_outlined,
-                                      size: 16,
-                                      color: Color(0xFFDC2626),
-                                    ),
-                                    SizedBox(width: 5),
-                                    Text(
-                                      "Call",
-                                      style: TextStyle(
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.phone_outlined,
+                                        size: 16,
                                         color: Color(0xFFDC2626),
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-
-                          // 3. SMS Button
-                          Expanded(
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(8),
-                              onTap: () =>
-                                  _launchSMS(item.contact ?? item.user?.mobile),
-                              child: Container(
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFEFF6FF),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: const Color(0xFFDBEAFE),
-                                    width: 1,
+                                      SizedBox(width: 5),
+                                      Text(
+                                        "Call",
+                                        style: TextStyle(
+                                          color: Color(0xFFDC2626),
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.sms_outlined,
-                                      size: 16,
-                                      color: Color(0xFF2563EB),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+
+                            // WhatsApp is available only when the seller
+                            // exposes the item phone number.
+                            Expanded(
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: () => _launchWhatsApp(item),
+                                child: Container(
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF0FDF4),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: const Color(0xFFDCFCE7),
+                                      width: 1,
                                     ),
-                                    SizedBox(width: 5),
-                                    Text(
-                                      "SMS",
-                                      style: TextStyle(
-                                        color: Color(0xFF2563EB),
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
+                                  ),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.chat_outlined,
+                                        size: 16,
+                                        color: Color(0xFF16A34A),
                                       ),
-                                    ),
-                                  ],
+                                      SizedBox(width: 5),
+                                      Text(
+                                        "WhatsApp",
+                                        style: TextStyle(
+                                          color: Color(0xFF16A34A),
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
+                          ],
+                          if (item.isMotorsCategory) ...[
+                            if (item.hasVisiblePhoneNumber)
+                              const SizedBox(width: 8),
+                            Expanded(
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: () => _openChat(context, item),
+                                child: Container(
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF5F3FF),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: const Color(0xFFEDE9FE),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.forum_outlined,
+                                        size: 16,
+                                        color: Color(0xFF7C3AED),
+                                      ),
+                                      SizedBox(width: 5),
+                                      Text(
+                                        'Chat',
+                                        style: TextStyle(
+                                          color: Color(0xFF7C3AED),
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       );
                     },

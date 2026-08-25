@@ -228,7 +228,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                     children: [
                       Text(
                         isAuthenticated
-                            ? (user.name ?? 'User')
+                            ? (user.displayName.isNotEmpty
+                                ? user.displayName
+                                : 'User')
                             : "anonymous".translate(context),
                         style: TextStyle(
                           fontSize: 18,
@@ -243,7 +245,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                         if (isVerified)
                           GestureDetector(
                             onTap: () {
-                              Navigator.pushNamed(context, Routes.sellerVerificationScreen, arguments: {"isResubmitted": false});
+                              Navigator.pushNamed(
+                                context,
+                                Routes.sellerVerificationScreen,
+                                arguments: {"isResubmitted": false},
+                              );
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -448,80 +454,11 @@ class _ProfileScreenState extends State<ProfileScreen>
     required VoidCallback onTap,
     String? badgeText,
   }) {
-    final redColor = context.color.territoryColor;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
-          decoration: BoxDecoration(
-            color: context.color.secondaryColor,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: context.color.borderColor.withValues(alpha: 0.5),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              if (badgeText != null)
-                Positioned(
-                  top: -8,
-                  right: -4,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: redColor,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      badgeText,
-                      style: const TextStyle(
-                        fontSize: 8.5,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ),
-                ),
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      icon,
-                      size: 26,
-                      color: redColor,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: context.color.textColorDark,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return _ProfileQuickActionCard(
+      icon: icon,
+      title: title,
+      onTap: onTap,
+      badgeText: badgeText,
     );
   }
 
@@ -551,8 +488,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               Icon(
                 icon,
                 size: 22,
-                color: iconColor ??
-                    (textColor ?? context.color.textColorDark),
+                color: iconColor ?? (textColor ?? context.color.textColorDark),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -578,8 +514,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                 )
               else if (badgeText != null) ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: context.color.territoryColor,
                     borderRadius: BorderRadius.circular(10),
@@ -1214,8 +1150,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     onTap: () {
                       UiUtils.checkUser(
                         onNotGuest: () {
-                          Navigator.pushNamed(
-                              context, Routes.securityScreen);
+                          Navigator.pushNamed(context, Routes.securityScreen);
                         },
                         context: context,
                       );
@@ -1321,8 +1256,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     onTap: () {
                       UiUtils.checkUser(
                         onNotGuest: () {
-                          Navigator.pushNamed(
-                              context, Routes.blogsScreenRoute);
+                          Navigator.pushNamed(context, Routes.blogsScreenRoute);
                         },
                         context: context,
                       );
@@ -1447,6 +1381,128 @@ class _ProfileScreenState extends State<ProfileScreen>
         cancelTextColor: context.color.textColorDark,
         svgImagePath: AppIcons.logoutIcon,
         content: Text("confirmLogOutMsg".translate(context)),
+      ),
+    );
+  }
+}
+
+class _ProfileQuickActionCard extends StatefulWidget {
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+  final String? badgeText;
+
+  const _ProfileQuickActionCard({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+    this.badgeText,
+  });
+
+  @override
+  State<_ProfileQuickActionCard> createState() =>
+      _ProfileQuickActionCardState();
+}
+
+class _ProfileQuickActionCardState extends State<_ProfileQuickActionCard> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final accentColor = context.color.territoryColor;
+    final radius = BorderRadius.circular(14);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 130),
+      curve: Curves.easeOut,
+      transform: Matrix4.translationValues(0, _isPressed ? 2 : 0, 0),
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: _isPressed ? 0.06 : 0.14),
+            blurRadius: _isPressed ? 4 : 12,
+            offset: Offset(0, _isPressed ? 1 : 5),
+          ),
+        ],
+      ),
+      child: Material(
+        color: context.color.secondaryColor,
+        borderRadius: radius,
+        clipBehavior: Clip.antiAlias,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            border: Border.all(
+              color: context.color.borderColor.withValues(alpha: 0.5),
+              width: 1,
+            ),
+          ),
+          child: InkWell(
+            onTap: widget.onTap,
+            onHighlightChanged: (isHighlighted) {
+              if (_isPressed != isHighlighted) {
+                setState(() => _isPressed = isHighlighted);
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                vertical: 18,
+                horizontal: 12,
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  if (widget.badgeText != null)
+                    Positioned(
+                      top: -8,
+                      right: -4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: accentColor,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          widget.badgeText!,
+                          style: const TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ),
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          widget.icon,
+                          size: 26,
+                          color: accentColor,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          widget.title,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: context.color.textColorDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

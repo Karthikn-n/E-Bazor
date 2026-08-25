@@ -198,11 +198,12 @@ class SplashScreenState extends State<SplashScreen> {
       return NoInternet(onRetry: _checkConnectivityAndLoad);
     }
     return BlocListener<LoginCubit, LoginState>(
-      listener: (context, state) {
+      listener: (context, state) async {
         if (!_verificationRecoveryRunning) return;
         if (state is LoginSuccess) {
           HiveUtils.setEmailVerificationPending(false);
-          HiveUtils.setUserIsAuthenticated(true);
+          await HiveUtils.setUserIsAuthenticated(true);
+          if (!context.mounted) return;
           context.read<UserDetailsCubit>().fill(HiveUtils.getUserDetails());
           Navigator.of(context).pushNamedAndRemoveUntil(
               Routes.locationPermissionScreen, (route) => false);

@@ -707,7 +707,6 @@ class _SelectNestedCategoryState extends CloudState<SelectNestedCategory> {
             ...breadCrumbData,
             category,
           ],
-          "initialTitle": getCloudData("prefilled_listing_title"),
           "customFields": customFields,
         },
       ).then((value) {
@@ -738,7 +737,6 @@ class _SelectNestedCategoryState extends CloudState<SelectNestedCategory> {
             ...breadCrumbData,
             category,
           ],
-          "initialTitle": getCloudData("prefilled_listing_title"),
           "customFields": customFields,
         },
       ).then((value) {
