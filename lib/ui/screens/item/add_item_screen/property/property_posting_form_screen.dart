@@ -414,6 +414,7 @@ class _PropertyPostingFormScreenState
     Widgets.showLoader(context);
 
     if (isEditMode) {
+      late final ItemModel updatedItem;
       try {
         itemDetails.addAll(
           await _adminFieldsController.toFileSubmissionMap(),
@@ -422,7 +423,8 @@ class _PropertyPostingFormScreenState
             _selectedImages.isNotEmpty ? _selectedImages.first : null;
         final otherImgs =
             _selectedImages.length > 1 ? _selectedImages.sublist(1) : null;
-        await ItemRepository().editItem(itemDetails, mainImg, otherImgs);
+        updatedItem =
+            await ItemRepository().editItem(itemDetails, mainImg, otherImgs);
       } catch (e) {
         log("Property edit API error: $e");
         Widgets.hideLoder(context);
@@ -448,7 +450,7 @@ class _PropertyPostingFormScreenState
       try {
         MyAdvertisementScreen.refreshCallback?.call();
       } catch (_) {}
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(updatedItem);
       return;
     }
 

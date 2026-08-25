@@ -72,11 +72,13 @@ import 'package:Ebozor/ui/screens/widgets/dialogs/seller_contact_dialog.dart';
 class AdDetailsScreen extends StatefulWidget {
   final ItemModel model;
   final String? jobApplicationStatus;
+  final String? editStatus;
 
   const AdDetailsScreen({
     super.key,
     required this.model,
     this.jobApplicationStatus,
+    this.editStatus,
   });
 
   @override
@@ -107,6 +109,7 @@ class AdDetailsScreen extends StatefulWidget {
                 model: arguments?['model'],
                 jobApplicationStatus:
                     arguments?['jobApplicationStatus']?.toString(),
+                editStatus: arguments?['editStatus']?.toString(),
                 // from: arguments?['from'],
               ),
             ));
@@ -150,6 +153,10 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   @override
   void initState() {
     super.initState();
+    final routedStatus = widget.editStatus?.trim() ?? '';
+    if ((model.status?.trim().isEmpty ?? true) && routedStatus.isNotEmpty) {
+      model.status = routedStatus;
+    }
 
     _fetchFullItemDetails();
 
@@ -193,6 +200,9 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
       final res = await ItemRepository().fetchItemFromItemId(widget.model.id!);
       if (res.modelList.isNotEmpty && mounted) {
         final fullModel = res.modelList.first;
+        if (fullModel.status?.trim().isEmpty ?? true) {
+          fullModel.status = _editStatusFor(fullModel);
+        }
         setState(() {
           model = fullModel;
           isAddedByMe = (fullModel.user?.id != null
@@ -2438,7 +2448,26 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     );
   }
 
+  bool _isPaymentPendingStatus(String status) {
+    final normalized = status.trim().toLowerCase().replaceAll('_', ' ');
+    return normalized == 'pending payment' || normalized == 'pending';
+  }
+
+  String _editStatusFor(ItemModel item) {
+    final routedStatus = widget.editStatus?.trim() ?? '';
+    if (routedStatus.isNotEmpty) return routedStatus;
+    final currentStatus = item.status?.trim() ?? '';
+    if (currentStatus.isNotEmpty) return currentStatus;
+    final initialStatus = widget.model.status?.trim() ?? '';
+    if (initialStatus.isNotEmpty) return initialStatus;
+
+    // Unpaid owned ads can be returned with a blank status until a package is
+    // assigned. Preserve that flow when editing directly from Ad Details.
+    return isAddedByMe ? 'pending payment' : '';
+  }
+
   Future<void> _navigateToEditAd(BuildContext context, ItemModel item) async {
+    final editStatus = _editStatusFor(item);
     Widgets.showLoader(context);
     ItemModel fullItem = item;
     try {
@@ -2449,6 +2478,9 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
         fullItem = res.modelList.first;
         if ((fullItem.image ?? '').trim().isEmpty) {
           fullItem.image = item.image;
+        }
+        if ((fullItem.status ?? '').trim().isEmpty) {
+          fullItem.status = editStatus;
         }
         if ((fullItem.galleryImages == null ||
                 fullItem.galleryImages!.isEmpty) &&
@@ -2464,8 +2496,9 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
 
     if (!context.mounted) return;
 
+    fullItem.status = editStatus;
     addCloudData("edit_request", fullItem);
-    addCloudData("edit_from", fullItem.status);
+    addCloudData("edit_from", editStatus);
 
     final allCategoryIds =
         fullItem.allCategoryIds ?? "${fullItem.categoryId ?? ''}";
@@ -2490,78 +2523,72 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     final breadcrumbs =
         fullItem.category != null ? [fullItem.category!] : <CategoryModel>[];
 
-    if (isCar) {
-      Navigator.pushNamed(
-        context,
-        Routes.carSpecsFormScreen,
-        arguments: {
-          'category': fullItem.category,
-          'breadcrumbs': breadcrumbs,
-          'item': fullItem,
-          'isEdit': true,
-          'customFields': fullItem.customFields,
-        },
-      ).then((updated) {
-        if (updated == true && context.mounted) {
-          Navigator.pop(context, "refresh");
-        }
-      });
-    } else if (isProperty) {
-      Navigator.pushNamed(
-        context,
-        Routes.propertyPostingFormScreen,
-        arguments: {
-          'category': fullItem.category,
-          'breadcrumbs': breadcrumbs,
-          'item': fullItem,
-          'isEdit': true,
-          'customFields': fullItem.customFields,
-        },
-      ).then((updated) {
-        if (updated == true && context.mounted) {
-          Navigator.pop(context, "refresh");
-        }
-      });
-    } else if (isMotor) {
-      Navigator.pushNamed(
-        context,
-        Routes.motorPostingFormScreen,
-        arguments: {
-          'category': fullItem.category,
-          'breadcrumbs': breadcrumbs,
-          'item': fullItem,
-          'isEdit': true,
-          'customFields': fullItem.customFields,
-        },
-      ).then((updated) {
-        if (updated == true && context.mounted) {
-          Navigator.pop(context, "refresh");
-        }
-      });
-    } else {
-      // Classifieds / Jobs / Other
-      Navigator.pushNamed(
-        context,
-        Routes.classifiedsPostingFormScreen,
-        arguments: {
-          'category': fullItem.category,
-          'breadcrumbs': breadcrumbs,
-          'item': fullItem,
-          'isEdit': true,
-          'customFields': fullItem.customFields,
-        },
-      ).then((updated) {
-        if (updated == true && context.mounted) {
-          Navigator.pop(context, "refresh");
-        }
-      });
+    final routeName = isCar
+        ? Routes.carSpecsFormScreen
+        : isProperty
+            ? Routes.propertyPostingFormScreen
+            : isMotor
+                ? Routes.motorPostingFormScreen
+                : Routes.classifiedsPostingFormScreen;
+    final editResult = await Navigator.pushNamed(
+      context,
+      routeName,
+      arguments: {
+        'category': fullItem.category,
+        'breadcrumbs': breadcrumbs,
+        'item': fullItem,
+        'isEdit': true,
+        'customFields': fullItem.customFields,
+      },
+    );
+
+    if (!context.mounted || editResult == null) return;
+    if (editResult is ItemModel) {
+      editResult.status = editStatus;
+      if (_isPaymentPendingStatus(editStatus)) {
+        await Navigator.pushNamed(
+          context,
+          Routes.carPackagePaymentScreen,
+          arguments: {'model': editResult},
+        );
+        return;
+      }
     }
+
+    if (context.mounted) Navigator.pop(context, "refresh");
+  }
+
+  Widget _buildPaymentPendingOwnerActions(ItemModel item) {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildButton('editBtnLbl'.translate(context), () {
+            _navigateToEditAd(context, item);
+          }, context.color.secondaryColor, context.color.territoryColor),
+        ),
+        SizedBox(width: 10.rw(context)),
+        Expanded(
+          child: _buildButton('Pay & Activate', () {
+            Navigator.pushNamed(
+              context,
+              Routes.carPackagePaymentScreen,
+              arguments: {'model': item},
+            );
+          }, null, null),
+        ),
+      ],
+    );
   }
 
   Widget bottomButtonWidget() {
     if (isAddedByMe) {
-      final model = widget.model;
+      final model = this.model;
       final contextColor = context.color;
+      final editStatus = _editStatusFor(model);
+      if (_isPaymentPendingStatus(editStatus)) {
+        model.status = editStatus;
+        return _buildPaymentPendingOwnerActions(model);
+      }
 
       if (model.status == "review") {
         return Row(

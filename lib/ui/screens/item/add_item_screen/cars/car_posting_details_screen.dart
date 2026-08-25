@@ -227,6 +227,7 @@ class _CarPostingDetailsScreenState extends State<CarPostingDetailsScreen> {
     Widgets.showLoader(context);
 
     if (isEditMode) {
+      late final ItemModel updatedItem;
       try {
         itemDetails.addAll(
           await _detailsFieldsController.toFileSubmissionMap(),
@@ -235,7 +236,8 @@ class _CarPostingDetailsScreenState extends State<CarPostingDetailsScreen> {
             _selectedImages.isNotEmpty ? _selectedImages.first : null;
         final otherImgs =
             _selectedImages.length > 1 ? _selectedImages.sublist(1) : null;
-        await ItemRepository().editItem(itemDetails, mainImg, otherImgs);
+        updatedItem =
+            await ItemRepository().editItem(itemDetails, mainImg, otherImgs);
       } catch (e) {
         Widgets.hideLoder(context);
         if (mounted) {
@@ -258,7 +260,7 @@ class _CarPostingDetailsScreenState extends State<CarPostingDetailsScreen> {
       try {
         MyAdvertisementScreen.refreshCallback?.call();
       } catch (_) {}
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(updatedItem);
       return;
     }
 

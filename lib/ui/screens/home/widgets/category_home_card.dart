@@ -40,10 +40,10 @@ class CategoryHomeCard extends StatelessWidget {
                 width: 52,
                 height: 52,
                 padding: const EdgeInsets.all(9),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: context.color.territoryColor.withValues(alpha: 0.1),
-                ),
+                // decoration: BoxDecoration(
+                //   shape: BoxShape.circle,
+                //   color: context.color.territoryColor.withValues(alpha: 0.1),
+                // ),
                 child: hasValidUrl
                     ? UiUtils.imageType(
                         url,

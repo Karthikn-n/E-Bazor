@@ -423,7 +423,28 @@ class ItemRepository {
       parameter: parameters, /* useAuthToken: true*/
     );
 
-    return ItemModel.fromJson(response['data'][0]);
+    final editedItem = ItemModel.fromJson(response['data'][0]);
+    final requestedStatus = itemDetails[Api.status]?.toString().trim() ?? '';
+
+    // update-item currently returns a blank status for some unpaid ads even
+    // when the request contains `status`. Restore it through the dedicated
+    // status endpoint and always keep the edit result consistent locally.
+    if (requestedStatus.isNotEmpty &&
+        (editedItem.status?.trim().isEmpty ?? true) &&
+        editedItem.id != null) {
+      try {
+        await changeMyItemStatus(
+          itemId: editedItem.id!,
+          status: requestedStatus,
+        );
+      } catch (_) {
+        // The content edit succeeded. Payment-pending items can still be
+        // represented as a blank status by the API until package assignment.
+      }
+      editedItem.status = requestedStatus;
+    }
+
+    return editedItem;
   }
 
   Future<void> deleteItem(int id) async {

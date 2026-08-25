@@ -625,7 +625,7 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                 separatorBuilder: (_, __) => Divider(
                   height: 1,
                   thickness: 0.8,
-                  indent: 106,
+                  indent: 118,
                   endIndent: 16,
                   color: context.color.borderColor.withValues(alpha: 0.35),
                 ),
@@ -683,7 +683,25 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
     );
   }
 
+  bool _isPaymentPendingStatus(String status) {
+    final normalized = status.trim().toLowerCase().replaceAll('_', ' ');
+    return normalized == 'pending payment' || normalized == 'pending';
+  }
+
+  String _editStatusFor(ItemModel item) {
+    final itemStatus = item.status?.trim() ?? '';
+    if (itemStatus.isNotEmpty) return itemStatus;
+
+    final tabStatus = _tabs[_selectedTab]['status']?.trim() ?? '';
+    if (tabStatus.isNotEmpty) return tabStatus;
+
+    // The API represents some unpaid items with a blank status even though
+    // my-items-count includes them under payment_pending.
+    return 'pending payment';
+  }
+
   Future<void> _navigateToEditAd(BuildContext context, ItemModel item) async {
+    final editStatus = _editStatusFor(item);
     Widgets.showLoader(context);
     ItemModel fullItem = item;
     try {
@@ -696,7 +714,7 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
           fullItem.image = item.image;
         }
         if ((fullItem.status ?? '').trim().isEmpty) {
-          fullItem.status = item.status;
+          fullItem.status = editStatus;
         }
         if ((fullItem.galleryImages == null ||
                 fullItem.galleryImages!.isEmpty) &&
@@ -713,7 +731,8 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
     if (!context.mounted) return;
 
     addCloudData("edit_request", fullItem);
-    addCloudData("edit_from", fullItem.status);
+    fullItem.status = editStatus;
+    addCloudData("edit_from", editStatus);
 
     final allCategoryIds =
         fullItem.allCategoryIds ?? "${fullItem.categoryId ?? ''}";
@@ -738,63 +757,38 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
     final breadcrumbs =
         fullItem.category != null ? [fullItem.category!] : <CategoryModel>[];
 
-    if (isCar) {
-      Navigator.pushNamed(
-        context,
-        Routes.carSpecsFormScreen,
-        arguments: {
-          'category': fullItem.category,
-          'breadcrumbs': breadcrumbs,
-          'item': fullItem,
-          'isEdit': true,
-          'customFields': fullItem.customFields,
-        },
-      ).then((_) {
-        MyAdvertisementScreen.refreshCallback?.call();
-      });
-    } else if (isProperty) {
-      Navigator.pushNamed(
-        context,
-        Routes.propertyPostingFormScreen,
-        arguments: {
-          'category': fullItem.category,
-          'breadcrumbs': breadcrumbs,
-          'item': fullItem,
-          'isEdit': true,
-          'customFields': fullItem.customFields,
-        },
-      ).then((_) {
-        MyAdvertisementScreen.refreshCallback?.call();
-      });
-    } else if (isMotor) {
-      Navigator.pushNamed(
-        context,
-        Routes.motorPostingFormScreen,
-        arguments: {
-          'category': fullItem.category,
-          'breadcrumbs': breadcrumbs,
-          'item': fullItem,
-          'isEdit': true,
-          'customFields': fullItem.customFields,
-        },
-      ).then((_) {
-        MyAdvertisementScreen.refreshCallback?.call();
-      });
-    } else {
-      // Classifieds / Jobs / Other
-      Navigator.pushNamed(
-        context,
-        Routes.classifiedsPostingFormScreen,
-        arguments: {
-          'category': fullItem.category,
-          'breadcrumbs': breadcrumbs,
-          'item': fullItem,
-          'isEdit': true,
-          'customFields': fullItem.customFields,
-        },
-      ).then((_) {
-        MyAdvertisementScreen.refreshCallback?.call();
-      });
+    final routeName = isCar
+        ? Routes.carSpecsFormScreen
+        : isProperty
+            ? Routes.propertyPostingFormScreen
+            : isMotor
+                ? Routes.motorPostingFormScreen
+                : Routes.classifiedsPostingFormScreen;
+    final editResult = await Navigator.pushNamed(
+      context,
+      routeName,
+      arguments: {
+        'category': fullItem.category,
+        'breadcrumbs': breadcrumbs,
+        'item': fullItem,
+        'isEdit': true,
+        'customFields': fullItem.customFields,
+      },
+    );
+
+    if (!context.mounted || editResult == null) return;
+    MyAdvertisementScreen.refreshCallback?.call();
+
+    if (editResult is ItemModel) {
+      editResult.status = editStatus;
+      if (_isPaymentPendingStatus(editStatus)) {
+        await Navigator.pushNamed(
+          context,
+          Routes.carPackagePaymentScreen,
+          arguments: {'model': editResult},
+        );
+        if (context.mounted) _loadData();
+      }
     }
   }
 
@@ -815,6 +809,8 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
     final isReview = statusStr == "review" || statusStr == "under_review";
     final isRejected = statusStr == "rejected";
     final isExpired = statusStr == "expired";
+
+    final requiresPayment = _isPaymentPendingStatus(_editStatusFor(item));
 
     Color badgeBg;
     Color badgeFg;
@@ -864,8 +860,8 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
           color: context.color.textDefaultColor,
         ),
       );
@@ -888,7 +884,10 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
             Navigator.pushNamed(
               context,
               Routes.adDetailsScreen,
-              arguments: {'model': item},
+              arguments: {
+                'model': item,
+                'editStatus': _editStatusFor(item),
+              },
             );
           }
         },
@@ -918,10 +917,10 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
 
                   // Thumbnail Image Tile
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(13),
                     child: Container(
-                      width: 78,
-                      height: 78,
+                      width: 86,
+                      height: 86,
                       color: context.color.backgroundColor,
                       child: Stack(
                         fit: StackFit.expand,
@@ -929,8 +928,8 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                           UiUtils.getImage(
                             item.image ?? "",
                             fit: BoxFit.cover,
-                            width: 78,
-                            height: 78,
+                            width: 86,
+                            height: 86,
                           ),
                           if (item.isFeature == true)
                             Positioned(
@@ -970,16 +969,16 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                             if (hasBadge)
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 7, vertical: 2),
+                                    horizontal: 9, vertical: 3),
                                 decoration: BoxDecoration(
                                   color: badgeBg,
-                                  borderRadius: BorderRadius.circular(4),
+                                  borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
                                   badgeLabel,
                                   style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w700,
                                     color: badgeFg,
                                   ),
                                 ),
@@ -1019,7 +1018,10 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                                     Navigator.pushNamed(
                                       context,
                                       Routes.adDetailsScreen,
-                                      arguments: {'model': item},
+                                      arguments: {
+                                        'model': item,
+                                        'editStatus': _editStatusFor(item),
+                                      },
                                     );
                                   } else if (val == "edit") {
                                     _navigateToEditAd(context, item);
@@ -1082,7 +1084,7 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                                       "Activate Ad",
                                       Colors.green,
                                     ),
-                                  if (isPaymentPending)
+                                  if (requiresPayment)
                                     _buildMenuItem(
                                       context,
                                       "pay",
@@ -1124,7 +1126,7 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 11.5,
+                              fontSize: 12,
                               color: context.color.textLightColor,
                             ),
                           ),
@@ -1138,7 +1140,7 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                             Text(
                               _formatPrice(item.price),
                               style: TextStyle(
-                                fontSize: 14.5,
+                                fontSize: 15,
                                 fontWeight: FontWeight.bold,
                                 color: context.color.territoryColor,
                               ),
@@ -1147,7 +1149,7 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                               Text(
                                 item.created.toString().formatDate(),
                                 style: TextStyle(
-                                  fontSize: 10.5,
+                                  fontSize: 11,
                                   color: context.color.textLightColor,
                                 ),
                               ),
@@ -1160,7 +1162,7 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
               ),
 
               // Inline Action for Payment Pending
-              if (isPaymentPending && !_isSelectionMode) ...[
+              if (requiresPayment && !_isSelectionMode) ...[
                 const SizedBox(height: 8),
                 Container(
                   padding:

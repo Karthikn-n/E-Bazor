@@ -421,15 +421,15 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
       item: widget.item,
     );
 
-    final wasUpdated = await Navigator.pushNamed(
+    final editResult = await Navigator.pushNamed(
       context,
       Routes.carPostingDetailsScreen,
       arguments: {
         'specsData': specsData,
       },
     );
-    if (mounted && wasUpdated == true && specsData.isEdit) {
-      Navigator.pop(context, true);
+    if (mounted && editResult is ItemModel && specsData.isEdit) {
+      Navigator.pop(context, editResult);
     }
   }
 
