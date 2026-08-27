@@ -43,12 +43,10 @@ class FetchHomeScreenCubit extends Cubit<FetchHomeScreenState>
   }
 
   FetchHomeScreenState? fromJson(Map<String, dynamic> json) {
-    // TODO: implement fromJson
     return null;
   }
 
   Map<String, dynamic>? toJson(FetchHomeScreenState state) {
-    // TODO: implement toJson
     return null;
   }
 }

@@ -22,7 +22,6 @@ import 'package:Ebozor/data/cubits/fetch_my_reviews_cubit.dart';
 
 import 'package:Ebozor/data/cubits/my_item_review_report_cubit.dart';
 import 'package:Ebozor/data/helper/widgets.dart';
-import 'package:Ebozor/ui/screens/widgets/errors/no_data_found.dart';
 import 'package:Ebozor/ui/screens/widgets/shimmerLoadingContainer.dart';
 
 class MyReviewScreen extends StatefulWidget {
@@ -173,10 +172,33 @@ class MyReviewScreenState extends State<MyReviewScreen>
       if (state is FetchMyRatingsSuccess) {
         if (state.ratings.isEmpty) {
           return Center(
-            child: NoDataFound(
-              onTap: () {
-                context.read<FetchMyRatingsCubit>().fetch();
-              },
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 30),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 20),
+                  Image.asset(
+                    AppIcons.noRatingsPlaceholder,
+                    width: 140,
+                    height: 140,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    "youDontHaveAnyRatings".translate(context),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: context.color.textDefaultColor,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }

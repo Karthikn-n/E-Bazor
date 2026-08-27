@@ -58,7 +58,8 @@ class CategorySlider {
 
   CategorySlider.fromJson(Map<String, dynamic> json) {
     id = json['id'];
-    name = json['translated_name'];
+    final trans = json['translated_name']?.toString().trim();
+    name = (trans != null && trans.isNotEmpty) ? trans : json['name']?.toString();
     subCategoriesCount = json['subcategories_count'];
     parentCategoryId = json['parent_category_id'];
   }

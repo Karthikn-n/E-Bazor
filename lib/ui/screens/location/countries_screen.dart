@@ -10,6 +10,7 @@ import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
 import 'package:Ebozor/ui/screens/widgets/shimmerLoadingContainer.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_keys.dart';
+import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
@@ -53,6 +54,9 @@ class CountriesScreenState extends State<CountriesScreen> {
   CountriesModel? selectedCountry;
   List<String> recentSearches = [];
   bool isLocationLoading = false;
+
+  bool get _returnsLocationSelection =>
+      widget.from == "addItem" || widget.from == "filter";
 
   @override
   void initState() {
@@ -174,7 +178,7 @@ class CountriesScreenState extends State<CountriesScreen> {
               }),
             ),
           ).then((value) {
-            if (value != null && widget.from == "addItem") {
+            if (value != null && _returnsLocationSelection) {
               Navigator.pop(context, value);
             }
           });
@@ -664,40 +668,120 @@ class CountriesScreenState extends State<CountriesScreen> {
             ),
             const SizedBox(height: 10),
 
-            // Continue Button
-            UiUtils.buildButton(
-              context,
-              onPressed: () {
-                if (selectedCountry != null) {
-                  _addToRecentSearches(selectedCountry!.name!);
-                  Navigator.pushNamed(
-                    context,
-                    Routes.statesScreen,
-                    arguments: {
-                      "countryId": selectedCountry!.id!,
-                      "countryName": selectedCountry!.name!,
-                      "from": widget.from,
-                    },
-                  ).then((value) {
-                    if (value != null && widget.from == "addItem") {
-                      Navigator.pop(context, value);
-                    }
-                  });
-                }
-              },
-              buttonTitle: "Continue".translate(context),
-              textColor: Colors.white,
-              buttonColor: selectedCountry != null
-                  ? context.color.territoryColor
-                  : context.color.territoryColor.withValues(alpha: 0.4),
-              radius: 10,
-              height: 48,
-              disabled: selectedCountry == null,
-            ),
+            // Actions Button Row
+            if (selectedCountry != null)
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _applyCountryDirectly,
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: context.color.territoryColor),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                      child: Text(
+                        "Apply ${selectedCountry!.name}",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: context.color.territoryColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: UiUtils.buildButton(
+                      context,
+                      onPressed: _navigateToStates,
+                      buttonTitle: "States".translate(context),
+                      textColor: Colors.white,
+                      buttonColor: context.color.territoryColor,
+                      radius: 10,
+                      height: 48,
+                    ),
+                  ),
+                ],
+              )
+            else
+              UiUtils.buildButton(
+                context,
+                onPressed: () {},
+                buttonTitle: "Select a Country".translate(context),
+                textColor: Colors.white,
+                buttonColor:
+                    context.color.territoryColor.withValues(alpha: 0.4),
+                radius: 10,
+                height: 48,
+                disabled: true,
+              ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _applyCountryDirectly() async {
+    if (selectedCountry == null) return;
+    _addToRecentSearches(selectedCountry!.name!);
+
+    if (_returnsLocationSelection) {
+      Navigator.pop(context, {
+        "area_id": null,
+        "area": null,
+        "city": null,
+        "state": null,
+        "country": selectedCountry!.name,
+        "latitude": null,
+        "longitude": null,
+      });
+    } else {
+      await HiveUtils.setLocation(
+        city: null,
+        state: null,
+        country: selectedCountry!.name,
+        area: null,
+        areaId: null,
+        latitude: null,
+        longitude: null,
+      );
+
+      if (!mounted) return;
+      if (widget.from == "login") {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          Routes.main,
+          (route) => false,
+          arguments: {"from": "login"},
+        );
+      } else {
+        Navigator.popUntil(context, (route) => route.isFirst);
+      }
+    }
+  }
+
+  void _navigateToStates() {
+    if (selectedCountry != null) {
+      _addToRecentSearches(selectedCountry!.name!);
+      Navigator.pushNamed(
+        context,
+        Routes.statesScreen,
+        arguments: {
+          "countryId": selectedCountry!.id!,
+          "countryName": selectedCountry!.name!,
+          "from": widget.from,
+        },
+      ).then((value) {
+        if (value != null && _returnsLocationSelection) {
+          Navigator.pop(context, value);
+        }
+      });
+    }
   }
 
   @override

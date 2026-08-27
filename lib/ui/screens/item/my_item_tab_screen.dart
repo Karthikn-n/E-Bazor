@@ -1,7 +1,6 @@
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/ui/screens/home/home_screen.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
-import 'package:Ebozor/utils/app_icon.dart';
 import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
@@ -10,7 +9,6 @@ import 'package:Ebozor/data/model/item/item_model.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_svg/svg.dart';
 
 import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/cloudState/cloud_state.dart';
@@ -279,6 +277,19 @@ class _MyItemTabState extends CloudState<MyItemTab> {
                     },
                     itemBuilder: (context, index) {
                       ItemModel item = state.items[index];
+                      final isJob = item.isJobsCategory;
+                      final hasImage = item.image?.trim().isNotEmpty == true;
+                      final location = <String>[
+                        item.area ?? '',
+                        item.city ?? '',
+                        item.state ?? '',
+                        item.country ?? '',
+                      ]
+                          .where((value) => value.trim().isNotEmpty)
+                          .toSet()
+                          .join(', ');
+                      final hasPrice = !isJob && (item.price ?? 0) > 0;
+
                       return InkWell(
                         onTap: () {
                           Navigator.pushNamed(context, Routes.adDetailsScreen,
@@ -316,9 +327,27 @@ class _MyItemTabState extends CloudState<MyItemTab> {
                                   child: SizedBox(
                                     width: 116,
                                     height: double.infinity,
-                                    child: UiUtils.getImage(item.image ?? "",
-                                        height: double.infinity,
-                                        fit: BoxFit.cover),
+                                    child: hasImage
+                                        ? UiUtils.getImage(
+                                            item.image!.trim(),
+                                            height: double.infinity,
+                                            fit: BoxFit.cover,
+                                          )
+                                        : Container(
+                                            color: context.color.territoryColor
+                                                .withValues(alpha: 0.08),
+                                            alignment: Alignment.center,
+                                            child: Icon(
+                                              isJob
+                                                  ? Icons
+                                                      .business_center_outlined
+                                                  : Icons.image_outlined,
+                                              size: 38,
+                                              color: context
+                                                  .color.territoryColor
+                                                  .withValues(alpha: 0.75),
+                                            ),
+                                          ),
                                   ),
                                 ),
                                 Expanded(
@@ -336,11 +365,32 @@ class _MyItemTabState extends CloudState<MyItemTab> {
                                         Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Text("${Constant.currencySymbol}\t${item.price}")
-                                                .color(context
-                                                    .color.territoryColor)
-                                                .bold(),
-                                            Spacer(),
+                                            if (hasPrice)
+                                              Text(
+                                                "${Constant.currencySymbol}\t${item.price}",
+                                              )
+                                                  .color(context
+                                                      .color.territoryColor)
+                                                  .bold()
+                                            else
+                                              Flexible(
+                                                child: Text(
+                                                  item.category?.name ??
+                                                      item.itemType ??
+                                                      '',
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    color: context
+                                                        .color.territoryColor,
+                                                    fontSize: 12.5,
+                                                    fontWeight:
+                                                        FontWeight.w700,
+                                                  ),
+                                                ),
+                                              ),
+                                            const Spacer(),
                                             showStatus(item)
                                           ],
                                         ),
@@ -349,64 +399,61 @@ class _MyItemTabState extends CloudState<MyItemTab> {
                                             .setMaxLines(lines: 2)
                                             .firstUpperCaseWidget(),
                                         //SizedBox(height: 12,),
-                                        Row(
-                                          //mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Flexible(
-                                              flex: 1,
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  SvgPicture.asset(AppIcons.eye,
-                                                      width: 14,
-                                                      height: 14,
-                                                      colorFilter: ColorFilter.mode(
-                                                          context.color
-                                                              .textDefaultColor,
-                                                          BlendMode.srcIn)),
-                                                  const SizedBox(
-                                                    width: 4,
-                                                  ),
-                                                  Text("${"views".translate(context)}:${item.views}")
-                                                      .size(context.font.small)
-                                                      .color(context
-                                                          .color.textColorDark
-                                                          .withValues(alpha: 0.5)),
-                                                ],
+                                        if (location.isNotEmpty)
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.location_on_outlined,
+                                                size: 15,
+                                                color: context
+                                                    .color.textLightColor,
                                               ),
-                                            ),
-                                            SizedBox(
-                                              width: 20,
-                                            ),
-                                            Flexible(
-                                              flex: 1,
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  SvgPicture.asset(
-                                                      AppIcons.heart,
-                                                      width: 14,
-                                                      height: 14,
-                                                      colorFilter: ColorFilter.mode(
-                                                          context.color
-                                                              .textDefaultColor,
-                                                          BlendMode.srcIn)),
-                                                  const SizedBox(
-                                                    width: 4,
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Text(
+                                                  location,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    color: context
+                                                        .color.textLightColor,
+                                                    fontSize: 12,
                                                   ),
-                                                  Text("${"like".translate(context)}:${item.totalLikes.toString()}")
-                                                      .size(context.font.small)
-                                                      .color(context
-                                                          .color.textColorDark
-                                                          .withValues(alpha: 0.5)),
-                                                ],
+                                                ),
                                               ),
-                                            ),
-                                          ],
-                                        )
+                                            ],
+                                          )
+                                        else if (item.created
+                                                ?.trim()
+                                                .isNotEmpty ==
+                                            true)
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.schedule_outlined,
+                                                size: 14,
+                                                color: context
+                                                    .color.textLightColor,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Text(
+                                                  item.created!.formatDate(
+                                                    format: "d MMM yyyy",
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    color: context
+                                                        .color.textLightColor,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                       ],
                                     ),
                                   ),

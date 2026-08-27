@@ -62,6 +62,9 @@ class StatesScreenState extends State<StatesScreen> {
   StatesModel? selectedState;
   String? manualStateName;
 
+  bool get _returnsLocationSelection =>
+      widget.from == "addItem" || widget.from == "filter";
+
   @override
   void initState() {
     super.initState();
@@ -117,19 +120,19 @@ class StatesScreenState extends State<StatesScreen> {
     setState(() {});
   }
 
-  String get effectiveStateName {
-    if (selectedState != null) return selectedState!.name ?? "";
+  String? get selectedStateName {
+    if (selectedState != null) return selectedState!.name;
     if (manualStateName != null && manualStateName!.trim().isNotEmpty) {
       return manualStateName!.trim();
     }
     if (searchController.text.trim().isNotEmpty) {
       return searchController.text.trim();
     }
-    return widget.countryName;
+    return null;
   }
 
   void _openMapForLocation() {
-    final stateName = effectiveStateName;
+    final stateName = selectedStateName;
 
     Navigator.push(
       context,
@@ -139,7 +142,7 @@ class StatesScreenState extends State<StatesScreen> {
           arguments: {
             'area_id': null,
             'area': null,
-            'city': stateName,
+            'city': null,
             'state': stateName,
             'country': widget.countryName,
             'from': widget.from,
@@ -147,38 +150,47 @@ class StatesScreenState extends State<StatesScreen> {
         ),
       ),
     ).then((value) {
-      if (value != null && widget.from == "addItem") {
+      if (value != null && _returnsLocationSelection) {
         Navigator.pop(context, value);
       }
     });
   }
 
   Future<void> _applyStateDirectly() async {
-    final stateName = effectiveStateName;
+    final stateName = selectedStateName;
 
-    if (widget.from == "addItem") {
+    if (_returnsLocationSelection) {
       Navigator.pop(context, {
         "area_id": null,
         "area": null,
-        "city": stateName,
+        "city": null,
         "state": stateName,
         "country": widget.countryName,
+        "latitude": null,
+        "longitude": null,
       });
     } else {
       await HiveUtils.setLocation(
-        city: stateName,
+        city: null,
         state: stateName,
         country: widget.countryName,
         area: null,
+        areaId: null,
+        latitude: null,
+        longitude: null,
       );
 
       if (!mounted) return;
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        Routes.main,
-        (route) => false,
-        arguments: {"from": "login"},
-      );
+      if (widget.from == "login") {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          Routes.main,
+          (route) => false,
+          arguments: {"from": "login"},
+        );
+      } else {
+        Navigator.popUntil(context, (route) => route.isFirst);
+      }
     }
   }
 
@@ -612,8 +624,6 @@ class StatesScreenState extends State<StatesScreen> {
   }
 
   Widget _buildBottomBar() {
-    final stateName = effectiveStateName;
-
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: BoxDecoration(
@@ -630,7 +640,30 @@ class StatesScreenState extends State<StatesScreen> {
         top: false,
         child: Row(
           children: [
-            // Continue to Cities
+            if (selectedState != null)
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _applyStateDirectly,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: context.color.territoryColor),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                  child: Text(
+                    "Apply ${selectedState!.name}",
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: context.color.territoryColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+            if (selectedState != null) const SizedBox(width: 10),
             Expanded(
               child: UiUtils.buildButton(
                 context,
@@ -647,7 +680,7 @@ class StatesScreenState extends State<StatesScreen> {
                         "countryId": widget.countryId,
                       },
                     ).then((value) {
-                      if (value != null && widget.from == "addItem") {
+                      if (value != null && _returnsLocationSelection) {
                         Navigator.pop(context, value);
                       }
                     });
@@ -656,8 +689,8 @@ class StatesScreenState extends State<StatesScreen> {
                   }
                 },
                 buttonTitle: selectedState != null
-                    ? "Next (Cities)"
-                    : "Apply $stateName",
+                    ? "Next (Cities)".translate(context)
+                    : "Apply ${widget.countryName}",
                 textColor: Colors.white,
                 buttonColor: context.color.territoryColor,
                 radius: 10,

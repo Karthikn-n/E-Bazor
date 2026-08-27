@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:Ebozor/ui/screens/chat/chat_audio/widgets/chat_widget.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/notification/chat_message_handler.dart';
@@ -14,31 +15,36 @@ class ChatSocketService {
 
   IO.Socket? _socket;
   Timer? _presenceTimer;
+  bool _isConnecting = false;
+  final Set<int> _joinedOfferIds = <int>{};
 
   bool get isConnected => _socket?.connected ?? false;
   final ValueNotifier<bool> isOtherUserTyping = ValueNotifier(false);
 
   /// Connect socket safely
   void connect() {
-    // If socket is alive and connected, do nothing
-    if (_socket != null && _socket!.connected) return;
+    if (_socket?.connected == true || _isConnecting) return;
 
-    // If socket exists but might be stale, clean it
+    // Reuse the existing Socket.IO instance so repeated join calls while the
+    // handshake is in progress cannot tear it down and lose the room join.
     if (_socket != null) {
-      _socket!.off("message");
-      _socket!.disconnect();
-      _socket = null;
+      _isConnecting = true;
+      _socket!.connect();
+      return;
     }
+
+    _isConnecting = true;
 
     _socket = IO.io(
       "http://143.110.251.34:6002",
       IO.OptionBuilder()
           .setTransports(['websocket'])
-          .disableAutoConnect() // manual connect
+          .disableAutoConnect()
+          .enableReconnection()
+          .setReconnectionDelay(1000)
           .setAuth({"token": "Bearer ${HiveUtils.getJWT()}"})
           .build(),
     );
-
 
     _socket!.on("typing", (data) {
       final myId = HiveUtils.getUserId();
@@ -55,85 +61,149 @@ class ChatSocketService {
       }
     });
 
-
-
     // Add listeners once
     _socket!.off("message");
     _socket!.on("message", _onMessageReceived);
 
     _socket!.onConnect((_) {
+      _isConnecting = false;
+      for (final offerId in _joinedOfferIds) {
+        _emitJoin(offerId);
+      }
       print("🔥 Socket Connected");
       _startPresencePing();
     });
 
     _socket!.onDisconnect((_) {
+      _isConnecting = false;
       print("🔥 Socket Disconnected");
       _stopPresencePing();
+    });
+
+    _socket!.onConnectError((error) {
+      _isConnecting = false;
+      print("Socket connection error: $error");
+    });
+
+    _socket!.onError((error) {
+      print("Socket error: $error");
     });
 
     _socket!.connect();
   }
 
-
-
-
   /// Handle incoming messages
   void _onMessageReceived(dynamic data) {
-    final senderId = data['sender_id'].toString();
+    final payload = _messagePayload(data);
+    if (payload == null) return;
+
+    final senderId = _asInt(payload['sender_id'] ?? payload['senderId']);
+    final itemOfferId = _asInt(payload['item_offer_id'] ?? payload['offerId']);
+    if (senderId == null || itemOfferId == null) return;
+    if (!_joinedOfferIds.contains(itemOfferId)) return;
+
     final myId = HiveUtils.getUserId();
 
     // Ignore own messages
-    if (senderId == myId) {
+    if (senderId.toString() == myId) {
       print("🔥 Ignored own message");
       return;
     }
 
+    final now = DateTime.now().toUtc().toIso8601String();
+    final messageId = _asInt(payload['id']);
+
     final chat = ChatMessage(
-      key: ValueKey(data['id']),
-      message: data['message'] ?? "",
-      senderId: int.parse(senderId),
-      createdAt: data['created_at'],
-      updatedAt: data['updated_at'],
-      itemOfferId: data['item_offer_id'],
-      file: data['file'] ?? "",
-      audio: data['audio'] ?? "",
+      key: ValueKey(
+          messageId ?? '${itemOfferId}_${payload['created_at'] ?? now}'),
+      id: messageId,
+      message: payload['message']?.toString() ?? "",
+      senderId: senderId,
+      createdAt: payload['created_at']?.toString() ?? now,
+      updatedAt: payload['updated_at']?.toString() ?? now,
+      itemOfferId: itemOfferId,
+      file: payload['file']?.toString() ?? "",
+      audio: payload['audio']?.toString() ?? "",
+      messageType: payload['message_type']?.toString(),
     );
 
     ChatMessageHandler.add(chat);
   }
 
+  Map<String, dynamic>? _messagePayload(dynamic data) {
+    dynamic decoded = data;
+    if (decoded is String) {
+      try {
+        decoded = jsonDecode(decoded);
+      } catch (_) {
+        return null;
+      }
+    }
+    if (decoded is! Map) return null;
+
+    var payload = Map<String, dynamic>.from(decoded);
+    if (payload['data'] is Map) {
+      payload = Map<String, dynamic>.from(payload['data'] as Map);
+    }
+    return payload;
+  }
+
+  int? _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
   /// Join a specific offer room
   void joinOffer(int offerId) {
-    if (_socket == null || !_socket!.connected) connect();
+    _joinedOfferIds.add(offerId);
+    if (_socket?.connected == true) {
+      _emitJoin(offerId);
+    } else {
+      connect();
+    }
+  }
+
+  void _emitJoin(int offerId) {
     print("🔥 Emitting join: {offerId: $offerId}");
-    _socket?.emit("join", {"offerId": offerId});
+    _socket?.emit("join", {
+      "offerId": offerId,
+      "item_offer_id": offerId,
+    });
   }
 
   /// Send a chat message
   void sendMessage(int offerId, String message) {
-    if (_socket == null || !_socket!.connected) connect();
+    if (_socket?.connected != true) {
+      connect();
+      return;
+    }
     print("🔥 Emitting message: {offerId: $offerId, message: $message}");
     _socket?.emit("message", {
       "offerId": offerId,
+      "item_offer_id": offerId,
       "message": message,
     });
   }
 
   /// Typing indicators
   void typingStart(int offerId) {
+    if (_socket?.connected != true) return;
     _socket?.emit("typing", {
       "offerId": offerId,
+      "item_offer_id": offerId,
       "status": "start",
     });
   }
 
   void typingStop(int offerId) {
+    if (_socket?.connected != true) return;
     _socket?.emit("typing", {
       "offerId": offerId,
+      "item_offer_id": offerId,
       "status": "stop",
     });
   }
-
 
   /// Presence ping
   void _startPresencePing() {
@@ -150,9 +220,13 @@ class ChatSocketService {
 
   /// Leave a specific offer room
   void leaveOffer(int offerId) {
+    _joinedOfferIds.remove(offerId);
     if (_socket != null && _socket!.connected) {
       print("🔥 Emitting leave: {offerId: $offerId}");
-      _socket?.emit("leave", {"offerId": offerId});
+      _socket?.emit("leave", {
+        "offerId": offerId,
+        "item_offer_id": offerId,
+      });
     }
   }
 
@@ -168,7 +242,8 @@ class ChatSocketService {
   }
 
   /// GET /api/ws/can-join?item_offer_id={id}
-  static Future<Map<String, dynamic>> wsCanJoin({required int itemOfferId}) async {
+  static Future<Map<String, dynamic>> wsCanJoin(
+      {required int itemOfferId}) async {
     try {
       return await Api.get(
         url: Api.wsCanJoinApi,
@@ -217,7 +292,8 @@ class ChatSocketService {
       Map<String, dynamic> parameters = {
         "item_offer_id": itemOfferId,
       };
-      if (message != null && message.isNotEmpty) parameters["message"] = message;
+      if (message != null && message.isNotEmpty)
+        parameters["message"] = message;
       if (file != null) parameters["file"] = file;
       if (audio != null) parameters["audio"] = audio;
 
@@ -230,6 +306,8 @@ class ChatSocketService {
   /// Disconnect socket safely
   void disconnect() {
     _stopPresencePing();
+    _isConnecting = false;
+    _joinedOfferIds.clear();
     _socket?.off("message");
     _socket?.disconnect();
     _socket = null;

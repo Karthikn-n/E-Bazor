@@ -62,19 +62,21 @@ class Api {
   //   }
   // }
 
-//Place API
   static Map<String, dynamic> headers() {
     final language = HiveUtils.getLanguage();
     final jwtToken = HiveUtils.getJWT();
+    final langCode = language?['code']?.toString().trim() ?? "";
 
-    // NOTE: token presence logged, not the token value itself (security)
     AppLog.i(
-        'headers() — auth: ${jwtToken != null}, lang: ${language?["code"]}',
+        'headers() — auth: ${jwtToken != null}, lang: $langCode',
         name: 'Api');
 
     Map<String, dynamic> header = {
       "Accept": "application/json",
-      "Content-Language": language?['code'] ?? ""
+      "Content-Language": langCode,
+      if (langCode.isNotEmpty) "Accept-Language": langCode,
+      if (langCode.isNotEmpty) "X-Localization": langCode,
+      if (langCode.isNotEmpty) "Language": langCode,
     };
 
     if (HiveUtils.isUserAuthenticated() && jwtToken != null) {
@@ -177,13 +179,16 @@ class Api {
   static String getVerificationFieldApi = "verification-fields";
   static String sendVerificationRequestApi = "send-verification-request";
   static String getVerificationRequestApi = "verification-request";
+  static String setUserPhoneNumberApi = "set-user-phonenumber";
   static String getMyReviewApi = "my-review";
   static String addReviewReportApi = "add-review-report";
   static String renewItemApi = "renew-item";
   static String postContactUsApi = "contact-us";
   static String getUserAddressApi = "get-user-address";
   static String userAddressChangesApi = "user-address-changes";
+  @Deprecated("Use Firebase Phone Auth SMS OTP instead")
   static String sendOtpApi = "send-otp";
+  @Deprecated("Use Firebase Phone Auth SMS OTP and set-user-phonenumber instead")
   static String verifyOtpApi = "verify-otp";
   static String getCategoriesApi = "get-categories";
   static String getHomeCategoriesApi = "get-home-categories";

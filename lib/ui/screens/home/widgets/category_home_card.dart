@@ -1,4 +1,3 @@
-
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:flutter/material.dart';
@@ -25,21 +24,21 @@ class CategoryHomeCard extends StatelessWidget {
       elevation: 0.5,
       color: context.color.secondaryColor,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
           child: Column(
             mainAxisSize: MainAxisSize.max,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 52,
-                height: 52,
-                padding: const EdgeInsets.all(9),
+                width: 40,
+                height: 40,
+                padding: const EdgeInsets.all(6),
                 // decoration: BoxDecoration(
                 //   shape: BoxShape.circle,
                 //   color: context.color.territoryColor.withValues(alpha: 0.1),
@@ -58,19 +57,17 @@ class CategoryHomeCard extends StatelessWidget {
                         color: context.color.territoryColor,
                       ),
               ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: Center(
-                  child: Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: context.font.small,
-                      color: context.color.textDefaultColor,
-                      fontWeight: FontWeight.w600,
-                    ),
+              const SizedBox(height: 4),
+              Center(
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    color: context.color.textDefaultColor,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -81,6 +78,3 @@ class CategoryHomeCard extends StatelessWidget {
     );
   }
 }
-
-
-

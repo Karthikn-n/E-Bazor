@@ -16,7 +16,6 @@ import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -520,7 +519,7 @@ class UserProfileScreenState extends State<UserProfileScreen> {
             ? null
             : UiUtils.buildAppBar(
                 context,
-                title: "My Profile",
+                title: "myProfile".translate(context),
                 showBackButton: true,
               ),
         body: Stack(
@@ -539,7 +538,7 @@ class UserProfileScreenState extends State<UserProfileScreen> {
                     // Section 1: Profile Name
                     // =========================================================
                     Text(
-                      "Profile Name",
+                      "profileName".translate(context),
                       style: TextStyle(
                         fontSize: 16.5,
                         fontWeight: FontWeight.bold,
@@ -563,7 +562,7 @@ class UserProfileScreenState extends State<UserProfileScreen> {
                           ? "First name is required"
                           : null,
                       decoration: _inputDecoration(
-                        label: "First Name",
+                        label: "firstName".translate(context),
                         hint: "Enter first name",
                       ),
                     ),
@@ -573,7 +572,7 @@ class UserProfileScreenState extends State<UserProfileScreen> {
                     TextFormField(
                       controller: lastNameController,
                       decoration: _inputDecoration(
-                        label: "Last Name",
+                        label: "lastName".translate(context),
                         hint: "Enter last name",
                       ),
                     ),
@@ -583,7 +582,7 @@ class UserProfileScreenState extends State<UserProfileScreen> {
                     // Section 2: Account details
                     // =========================================================
                     Text(
-                      "Account details",
+                      "accountDetails".translate(context),
                       style: TextStyle(
                         fontSize: 16.5,
                         fontWeight: FontWeight.bold,
@@ -610,7 +609,7 @@ class UserProfileScreenState extends State<UserProfileScreen> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          "Date of birth",
+                          "dateOfBirth".translate(context),
                           style: TextStyle(
                             fontSize: 14.5,
                             fontWeight: FontWeight.bold,
@@ -649,7 +648,7 @@ class UserProfileScreenState extends State<UserProfileScreen> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          "Nationality",
+                          "nationality".translate(context),
                           style: TextStyle(
                             fontSize: 14.5,
                             fontWeight: FontWeight.bold,
@@ -688,7 +687,7 @@ class UserProfileScreenState extends State<UserProfileScreen> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          "Gender",
+                          "gender".translate(context),
                           style: TextStyle(
                             fontSize: 14.5,
                             fontWeight: FontWeight.bold,

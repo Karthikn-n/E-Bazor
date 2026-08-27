@@ -208,7 +208,6 @@ class _ItemListingSubscriptionPlansItemState
                               padding: EdgeInsets.all(30),
 
                               color: context.color.primaryColor,
-                              //TODO: replace url below with model data response
                               child: UiUtils.imageType(widget.model.icon!,
                                   fit: BoxFit.contain),
                             ),
@@ -297,8 +296,6 @@ class _ItemListingSubscriptionPlansItemState
                                   : context.color.secondaryColor,
                               buttonTitle:
                                   "purchaseThisPackage".translate(context),
-
-                              //TODO: change title to Your Current Plan according to condition
                               outerPadding: const EdgeInsets.all(20))
                         ],
                       ),
@@ -467,7 +464,7 @@ class _ItemListingSubscriptionPlansItemState
               size: 8,
             ),
           ),
-          //  const Icon(Icons.check_box_rounded, size: 25.0, color: Colors.cyan), //TODO: change it to given icon and fill according to status passed
+          //  const Icon(Icons.check_box_rounded, size: 25.0, color: Colors.cyan),
           SizedBox(width: 15),
           Expanded(
               child: Text(

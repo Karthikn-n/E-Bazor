@@ -245,8 +245,6 @@ class _FeaturedAdsSubscriptionPlansItemState
                                   0
                               ? "${"payLbl".translate(context)}\t${Constant.currencySymbol}${widget.modelList[selectedIndex!].finalPrice!.toDouble()}"
                               : "purchaseThisPackage".translate(context),
-
-                          //TODO: change title to Your Current Plan according to condition
                           outerPadding: const EdgeInsets.all(20))),
                 );
               })

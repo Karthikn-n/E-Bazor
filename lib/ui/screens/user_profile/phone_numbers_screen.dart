@@ -146,7 +146,7 @@ class _PhoneNumbersScreenState extends State<PhoneNumbersScreen> {
         backgroundColor: context.color.backgroundColor,
         appBar: UiUtils.buildAppBar(
           context,
-          title: "Primary Phone Number",
+          title: "primaryPhoneNumber".translate(context),
           showBackButton: true,
         ),
         body: SingleChildScrollView(

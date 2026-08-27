@@ -1,5 +1,7 @@
 import 'package:Ebozor/data/cubits/category/fetch_sub_categories_cubit.dart';
+import 'package:Ebozor/data/cubits/category/subcategory_filters_cubit.dart';
 import 'package:Ebozor/data/model/motors_service_models.dart';
+import 'package:Ebozor/data/repositories/category_repository.dart';
 import 'package:Ebozor/settings.dart';
 import 'package:Ebozor/ui/screens/home/widgets/jobs_bottom_sheet.dart';
 import 'package:Ebozor/ui/screens/sub_category/sub_category_filter_screen.dart';
@@ -12,6 +14,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/model/category_model.dart';
+import 'package:Ebozor/data/model/property_filter_category_resolver.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/no_internet.dart';
@@ -94,17 +97,16 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
 
   @override
   Widget build(BuildContext context) {
-    const filterCategoryIds = [65, 68, 139, 143];
-    if (widget.catName.toLowerCase() == "property" ||
-        widget.catName.toLowerCase() == "properties" ||
-        filterCategoryIds.contains(widget.catId)) {
-      return FiltersPage(
-        category: CategoryModel(
-          id: widget.catId,
-          name: widget.catName,
-          slug: widget.catSlug,
-          children: widget.categoryList,
-        ),
+    final currentCategory = CategoryModel(
+      id: widget.catId,
+      name: widget.catName,
+      slug: widget.catSlug,
+      children: widget.categoryList,
+    );
+    if (PropertyFilterCategoryResolver.isPropertyCategory(currentCategory)) {
+      return BlocProvider(
+        create: (_) => FilterCubit(FilterRepository()),
+        child: FiltersPage(category: currentCategory),
       );
     }
 
@@ -154,7 +156,7 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
                       },
                     ),
                     const Divider(
-                      thickness: 1.2,
+                      thickness: 0.5,
                       height: 10,
                     ),
                     fetchSubCategoriesData(),
@@ -239,8 +241,8 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
                 shrinkWrap: true,
                 separatorBuilder: (context, index) {
                   return const Divider(
-                    thickness: 1.2,
-                    height: 10,
+                    thickness: 0.5,
+                    // height: 10,
                   );
                 },
                 itemBuilder: (context, index) {
@@ -248,15 +250,8 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
 
                   return ListTile(
                     onTap: () {
-                      const filterCategoryIds = [65, 68, 139, 143];
-                      if (filterCategoryIds.contains(category.id) ||
-                          (category.name != null &&
-                              (category.name!
-                                      .toLowerCase()
-                                      .contains("property") ||
-                                  category.name!
-                                      .toLowerCase()
-                                      .contains("properties")))) {
+                      if (PropertyFilterCategoryResolver.isPropertyCategory(
+                          category)) {
                         Navigator.pushNamed(
                           context,
                           Routes.filterpage,
@@ -289,30 +284,30 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
                         },
                       );
                     },
-                    leading: Container(
-                      width: 48,
-                      height: 48,
-                      padding: const EdgeInsets.all(9),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color:
-                            context.color.territoryColor.withValues(alpha: 0.1),
-                      ),
-                      child: (category.url != null &&
-                              category.url!.trim().isNotEmpty)
-                          ? UiUtils.imageType(
-                              category.url!,
-                              color: category.url!.endsWith('.svg')
-                                  ? context.color.territoryColor
-                                  : null,
-                              fit: BoxFit.contain,
-                            )
-                          : Icon(
-                              Icons.category_outlined,
-                              size: 24,
-                              color: context.color.territoryColor,
-                            ),
-                    ),
+                    // leading: Container(
+                    //   width: 48,
+                    //   height: 48,
+                    //   padding: const EdgeInsets.all(9),
+                    //   decoration: BoxDecoration(
+                    //     shape: BoxShape.circle,
+                    //     color:
+                    //         context.color.territoryColor.withValues(alpha: 0.1),
+                    //   ),
+                    //   child: (category.url != null &&
+                    //           category.url!.trim().isNotEmpty)
+                    //       ? UiUtils.imageType(
+                    //           category.url!,
+                    //           color: category.url!.endsWith('.svg')
+                    //               ? context.color.territoryColor
+                    //               : null,
+                    //           fit: BoxFit.contain,
+                    //         )
+                    //       : Icon(
+                    //           Icons.category_outlined,
+                    //           size: 24,
+                    //           color: context.color.territoryColor,
+                    //         ),
+                    // ),
                     title: Text(
                       category.name ?? "No Name",
                       textAlign: TextAlign.start,
@@ -321,16 +316,10 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
                     )
                         .color(context.color.textDefaultColor)
                         .size(context.font.normal),
-                    trailing: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            color: context.color.borderColor.darken(10)),
-                        child: Icon(
-                          Icons.chevron_right_outlined,
-                          color: context.color.textDefaultColor,
-                        )),
+                    trailing: Icon(
+                      Icons.chevron_right_outlined,
+                      color: context.color.textDefaultColor,
+                    ),
                   );
                 },
               ),
@@ -348,22 +337,41 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: 15,
+      itemCount: 6,
       separatorBuilder: (context, index) {
         return const Divider(
-          thickness: 1.2,
-          height: 10,
+          thickness: 0.5,
+          height: 1,
         );
       },
       itemBuilder: (context, index) {
         return Shimmer.fromColors(
           baseColor: Theme.of(context).colorScheme.shimmerBaseColor,
           highlightColor: Theme.of(context).colorScheme.shimmerHighlightColor,
-          child: Container(
-            padding: EdgeInsets.all(5),
-            width: double.maxFinite,
-            height: 56,
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(5)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 16.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 48),
+                Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -429,7 +437,8 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
                         "${AppSettings.hostUrl}:8003/_next/static/media/sellcar.eb9a34b8.png",
                     fit: BoxFit.contain,
                     placeholder: (context, url) => const SizedBox.shrink(),
-                    errorWidget: (context, url, error) => const SizedBox.shrink(),
+                    errorWidget: (context, url, error) =>
+                        const SizedBox.shrink(),
                   ),
                 ),
               ],

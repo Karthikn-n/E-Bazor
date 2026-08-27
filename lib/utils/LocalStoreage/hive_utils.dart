@@ -382,4 +382,36 @@ class HiveUtils {
 
     Constant.favoriteItemList.clear();
   }
+
+  static void setAudioIntroPath(String? path) {
+    try {
+      final userId = getUserId() ?? 'guest';
+      Hive.box(HiveKeys.userDetailsBox).put("audio_intro_$userId", path);
+    } catch (_) {}
+  }
+
+  static String? getAudioIntroPath() {
+    try {
+      final userId = getUserId() ?? 'guest';
+      return Hive.box(HiveKeys.userDetailsBox).get("audio_intro_$userId");
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static void setVideoIntroPath(String? path) {
+    try {
+      final userId = getUserId() ?? 'guest';
+      Hive.box(HiveKeys.userDetailsBox).put("video_intro_$userId", path);
+    } catch (_) {}
+  }
+
+  static String? getVideoIntroPath() {
+    try {
+      final userId = getUserId() ?? 'guest';
+      return Hive.box(HiveKeys.userDetailsBox).get("video_intro_$userId");
+    } catch (_) {
+      return null;
+    }
+  }
 }

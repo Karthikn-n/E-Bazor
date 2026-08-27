@@ -189,7 +189,9 @@ class JobRepository {
       final data = response['data'];
       if (data is Map<String, dynamic>) {
         return JobApplicationInfoModel.fromJson(data);
-      } else if (data is List && data.isNotEmpty && data.first is Map<String, dynamic>) {
+      } else if (data is List &&
+          data.isNotEmpty &&
+          data.first is Map<String, dynamic>) {
         return JobApplicationInfoModel.fromJson(data.first);
       }
       return null;
@@ -258,6 +260,8 @@ class JobRepository {
     Map<String, dynamic> details, {
     File? resumeFile,
     File? profileFile,
+    File? audioFile,
+    File? videoFile,
   }) async {
     try {
       final user = HiveUtils.getUserDetails();
@@ -282,6 +286,28 @@ class JobRepository {
         );
       }
 
+      if (audioFile != null && audioFile.existsSync()) {
+        parameters['audio_introduction'] = await MultipartFile.fromFile(
+          audioFile.path,
+          filename: path.basename(audioFile.path),
+        );
+        parameters['audio'] = await MultipartFile.fromFile(
+          audioFile.path,
+          filename: path.basename(audioFile.path),
+        );
+      }
+
+      if (videoFile != null && videoFile.existsSync()) {
+        parameters['video_introduction'] = await MultipartFile.fromFile(
+          videoFile.path,
+          filename: path.basename(videoFile.path),
+        );
+        parameters['video'] = await MultipartFile.fromFile(
+          videoFile.path,
+          filename: path.basename(videoFile.path),
+        );
+      }
+
       final response = await Api.post(
         url: Api.addUserDetailApi,
         parameter: parameters,
@@ -290,6 +316,26 @@ class JobRepository {
       return response;
     } catch (e) {
       log("⚠️ [JOB REPO] saveUserDetail error: $e");
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> removeProfilePhoto() async {
+    try {
+      final user = HiveUtils.getUserDetails();
+      final userId = user.id ?? HiveUtils.getUserId();
+
+      final response = await Api.post(
+        url: Api.addUserDetailApi,
+        parameter: {
+          if (userId != null) 'user_id': userId,
+          'profile': null,
+        },
+      );
+
+      return response;
+    } catch (e) {
+      log("⚠️ [JOB REPO] removeProfilePhoto error: $e");
       rethrow;
     }
   }

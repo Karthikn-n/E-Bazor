@@ -18,7 +18,8 @@ class SaveToFavoriteBottomSheet extends StatefulWidget {
     required this.item,
   });
 
-  static Future<void> show(BuildContext context, {required ItemModel item}) async {
+  static Future<void> show(BuildContext context,
+      {required ItemModel item}) async {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -36,7 +37,8 @@ class SaveToFavoriteBottomSheet extends StatefulWidget {
   }
 
   @override
-  State<SaveToFavoriteBottomSheet> createState() => _SaveToFavoriteBottomSheetState();
+  State<SaveToFavoriteBottomSheet> createState() =>
+      _SaveToFavoriteBottomSheetState();
 }
 
 class _SaveToFavoriteBottomSheetState extends State<SaveToFavoriteBottomSheet> {
@@ -178,15 +180,19 @@ class _SaveToFavoriteBottomSheetState extends State<SaveToFavoriteBottomSheet> {
                       style: TextStyle(color: context.color.textDefaultColor),
                       decoration: InputDecoration(
                         hintText: "Enter list title...".translate(context),
-                        hintStyle: TextStyle(color: context.color.textLightColor),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        hintStyle:
+                            TextStyle(color: context.color.textLightColor),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: context.color.borderColor),
+                          borderSide:
+                              BorderSide(color: context.color.borderColor),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: context.color.territoryColor),
+                          borderSide:
+                              BorderSide(color: context.color.territoryColor),
                         ),
                       ),
                       validator: (val) {
@@ -220,13 +226,20 @@ class _SaveToFavoriteBottomSheetState extends State<SaveToFavoriteBottomSheet> {
                           if (!formKey.currentState!.validate()) return;
                           setDialogState(() => isCreating = true);
                           final name = controller.text.trim();
-                          final success = await context.read<FavoriteListingsCubit>().createListing(name);
+                          final success = await context
+                              .read<FavoriteListingsCubit>()
+                              .createListing(name);
                           if (success && widget.item.id != null) {
                             // Fetch fresh listings
-                            await context.read<FavoriteListingsCubit>().fetchListings();
-                            final listings = context.read<FavoriteListingsCubit>().currentListings;
+                            await context
+                                .read<FavoriteListingsCubit>()
+                                .fetchListings();
+                            final listings = context
+                                .read<FavoriteListingsCubit>()
+                                .currentListings;
                             final created = listings.firstWhere(
-                              (l) => l.title.toLowerCase() == name.toLowerCase(),
+                              (l) =>
+                                  l.title.toLowerCase() == name.toLowerCase(),
                               orElse: () => listings.last,
                             );
                             if (created.favouritelistingId != null) {
@@ -241,11 +254,13 @@ class _SaveToFavoriteBottomSheetState extends State<SaveToFavoriteBottomSheet> {
                       ? const SizedBox(
                           width: 16,
                           height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
                         )
                       : Text(
                           "Create".translate(context),
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                 ),
               ],
@@ -305,7 +320,8 @@ class _SaveToFavoriteBottomSheetState extends State<SaveToFavoriteBottomSheet> {
             Flexible(
               child: ListView(
                 shrinkWrap: true,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 children: [
                   // Top "All Favorites" Tile
                   Material(
@@ -317,7 +333,8 @@ class _SaveToFavoriteBottomSheetState extends State<SaveToFavoriteBottomSheet> {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: context.color.borderColor.withValues(alpha: 0.5),
+                          color:
+                              context.color.borderColor.withValues(alpha: 0.5),
                         ),
                       ),
                       child: Row(
@@ -328,11 +345,14 @@ class _SaveToFavoriteBottomSheetState extends State<SaveToFavoriteBottomSheet> {
                               width: 52,
                               height: 52,
                               color: Colors.grey.shade200,
-                              child: widget.item.image != null && widget.item.image!.isNotEmpty
+                              child: widget.item.image != null &&
+                                      widget.item.image!.isNotEmpty
                                   ? CachedNetworkImage(
                                       imageUrl: widget.item.image!,
                                       fit: BoxFit.cover,
-                                      errorWidget: (_, __, ___) => const Icon(Icons.image, color: Colors.grey),
+                                      errorWidget: (_, __, ___) => const Icon(
+                                          Icons.image,
+                                          color: Colors.grey),
                                     )
                                   : const Icon(Icons.image, color: Colors.grey),
                             ),
@@ -351,82 +371,33 @@ class _SaveToFavoriteBottomSheetState extends State<SaveToFavoriteBottomSheet> {
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF2563EB),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        "Default".translate(context),
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF2563EB),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    "Default".translate(context),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
                                     ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      "Saved".translate(context),
-                                      style: const TextStyle(
-                                        color: Color(0xFF10B981),
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               ],
                             ),
                           ),
-                          Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(8),
-                              onTap: () async {
-                                try {
-                                  await FavoriteRepository().manageFavorites(widget.item.id!);
-                                  if (mounted) {
-                                    context
-                                        .read<FavoriteCubit>()
-                                        .removeFavoriteItem(widget.item);
-                                    Navigator.pop(context);
-                                    HelperUtils.showSnackBarMessage(
-                                      context,
-                                      "Removed from Favorites".translate(context),
-                                    );
-                                  }
-                                } catch (e) {
-                                  if (mounted) {
-                                    HelperUtils.showSnackBarMessage(context, e.toString());
-                                  }
-                                }
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.delete_outline_rounded,
-                                      size: 16,
-                                      color: Color(0xFFEF4444),
-                                    ),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      "Remove".translate(context),
-                                      style: const TextStyle(
-                                        color: Color(0xFFEF4444),
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                          const Padding(
+                            padding: EdgeInsets.all(8),
+                            child: Icon(
+                              Icons.favorite_rounded,
+                              size: 24,
+                              color: Color(0xFFE53935),
                             ),
                           ),
                         ],
@@ -450,7 +421,8 @@ class _SaveToFavoriteBottomSheetState extends State<SaveToFavoriteBottomSheet> {
                       ),
                       TextButton.icon(
                         style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           foregroundColor: context.color.territoryColor,
                         ),
                         onPressed: _showCreateListDialog,
@@ -485,7 +457,8 @@ class _SaveToFavoriteBottomSheetState extends State<SaveToFavoriteBottomSheet> {
                             padding: const EdgeInsets.symmetric(vertical: 20.0),
                             child: Center(
                               child: Text(
-                                "No custom lists yet. Tap + New List to create one!".translate(context),
+                                "No custom lists yet. Tap + New List to create one!"
+                                    .translate(context),
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: context.color.textLightColor,
@@ -500,29 +473,37 @@ class _SaveToFavoriteBottomSheetState extends State<SaveToFavoriteBottomSheet> {
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: customLists.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 10),
                           itemBuilder: (context, index) {
                             final list = customLists[index];
                             final listId = list.favouritelistingId;
-                            final isSaving = listId != null && _savingListIds.contains(listId);
-                            final isAdded = listId != null && _addedListIds.contains(listId);
+                            final isSaving = listId != null &&
+                                _savingListIds.contains(listId);
+                            final isAdded = listId != null &&
+                                _addedListIds.contains(listId);
 
                             return Material(
                               color: isAdded
-                                  ? context.color.territoryColor.withValues(alpha: 0.05)
+                                  ? context.color.territoryColor
+                                      .withValues(alpha: 0.05)
                                   : context.color.backgroundColor,
                               borderRadius: BorderRadius.circular(12),
                               clipBehavior: Clip.antiAlias,
                               child: InkWell(
-                                onTap: isSaving ? null : () => _toggleItemInList(list),
+                                onTap: isSaving
+                                    ? null
+                                    : () => _toggleItemInList(list),
                                 child: Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                       color: isAdded
-                                          ? context.color.territoryColor.withValues(alpha: 0.6)
-                                          : context.color.borderColor.withValues(alpha: 0.5),
+                                          ? context.color.territoryColor
+                                              .withValues(alpha: 0.6)
+                                          : context.color.borderColor
+                                              .withValues(alpha: 0.5),
                                       width: isAdded ? 1.5 : 1.0,
                                     ),
                                   ),
@@ -534,36 +515,46 @@ class _SaveToFavoriteBottomSheetState extends State<SaveToFavoriteBottomSheet> {
                                           width: 54,
                                           height: 54,
                                           color: Colors.grey.shade200,
-                                          child: list.latestItem?.image != null &&
-                                                  list.latestItem!.image!.isNotEmpty
+                                          child: list.latestItem?.image !=
+                                                      null &&
+                                                  list.latestItem!.image!
+                                                      .isNotEmpty
                                               ? CachedNetworkImage(
-                                                  imageUrl: list.latestItem!.image!,
+                                                  imageUrl:
+                                                      list.latestItem!.image!,
                                                   fit: BoxFit.cover,
                                                   errorWidget: (_, __, ___) =>
-                                                      const Icon(Icons.image, color: Colors.grey),
+                                                      const Icon(Icons.image,
+                                                          color: Colors.grey),
                                                 )
-                                              : const Icon(Icons.bookmark_border_rounded, color: Colors.grey),
+                                              : const Icon(
+                                                  Icons.bookmark_border_rounded,
+                                                  color: Colors.grey),
                                         ),
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               list.title,
                                               style: TextStyle(
                                                 fontSize: 14.5,
                                                 fontWeight: FontWeight.bold,
-                                                color: context.color.textDefaultColor,
+                                                color: context
+                                                    .color.textDefaultColor,
                                               ),
                                             ),
                                             const SizedBox(height: 3),
                                             Text(
-                                              "${list.count} saved ads • Private".translate(context),
+                                              "${list.count} saved ads • Private"
+                                                  .translate(context),
                                               style: TextStyle(
                                                 fontSize: 12,
-                                                color: context.color.textLightColor,
+                                                color: context
+                                                    .color.textLightColor,
                                               ),
                                             ),
                                           ],
@@ -573,11 +564,13 @@ class _SaveToFavoriteBottomSheetState extends State<SaveToFavoriteBottomSheet> {
                                         const SizedBox(
                                           width: 24,
                                           height: 24,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2),
                                         )
                                       else
                                         AnimatedContainer(
-                                          duration: const Duration(milliseconds: 200),
+                                          duration:
+                                              const Duration(milliseconds: 200),
                                           width: 32,
                                           height: 32,
                                           decoration: BoxDecoration(
@@ -588,7 +581,9 @@ class _SaveToFavoriteBottomSheetState extends State<SaveToFavoriteBottomSheet> {
                                           ),
                                           child: Icon(
                                             isAdded ? Icons.check : Icons.add,
-                                            color: isAdded ? Colors.white : Colors.black87,
+                                            color: isAdded
+                                                ? Colors.white
+                                                : Colors.black87,
                                             size: 18,
                                           ),
                                         ),

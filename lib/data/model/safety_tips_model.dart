@@ -21,8 +21,10 @@ class SafetyTipsModel {
     id = json['id'];
     tipId = json['tip_id'];
     languageId = json['language_id'];
-    translatedName = json['translated_name'];
-    //description = json['description'];
+    final trans = json['translated_name']?.toString().trim();
+    translatedName = (trans != null && trans.isNotEmpty)
+        ? trans
+        : (json['name'] ?? json['tip'] ?? '').toString();
     createdAt = json['created_at'];
     updatedAt = json['updated_at'];
   }

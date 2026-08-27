@@ -1,11 +1,10 @@
+import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/seller/fetch_verification_request_cubit.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-import 'package:Ebozor/ui/screens/widgets/phone_verification_dialog.dart';
 
 class VerificationBanner extends StatefulWidget {
   final EdgeInsetsGeometry padding;
@@ -46,13 +45,35 @@ class _VerificationBannerState extends State<VerificationBanner> {
       return;
     }
 
-    PhoneVerificationDialog.show(
+    final requestState = context.read<FetchVerificationRequestsCubit>().state;
+    if (requestState is FetchVerificationRequestSuccess) {
+      final status =
+          requestState.data.status?.trim().toLowerCase().replaceAll('_', ' ');
+      if (status == 'pending' || status == 'under review') {
+        HelperUtils.showSnackBarMessage(
+          context,
+          'Your verification request is currently under review.',
+          type: MessageType.warning,
+        );
+        return;
+      }
+      if (status == 'rejected') {
+        Navigator.pushNamed(
+          context,
+          Routes.sellerVerificationScreen,
+          arguments: {'isResubmitted': true},
+        );
+        return;
+      }
+    }
+
+    Navigator.pushNamed(
       context,
-      onVerified: () {
-        setState(() {});
-        context
-            .read<FetchVerificationRequestsCubit>()
-            .fetchVerificationRequests();
+      Routes.chooseOtpMethodScreen,
+      arguments: {
+        'phoneNumber': HiveUtils.getUserDetails().mobile ?? '',
+        'verificationPurpose': 'sellerVerification',
+        'isFromSellerVerification': true,
       },
     );
   }

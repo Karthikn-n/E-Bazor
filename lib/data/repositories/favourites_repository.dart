@@ -1,12 +1,12 @@
-
-
 import 'package:Ebozor/data/model/data_output.dart';
 import 'package:Ebozor/data/model/favorite_listing_model.dart';
 import 'package:Ebozor/data/model/item/item_model.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
+import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 
 class FavoriteRepository {
-  Future<Map<String, dynamic>> manageFavorites(int id, {int? favouritelistingId}) async {
+  Future<Map<String, dynamic>> manageFavorites(int id,
+      {int? favouritelistingId}) async {
     Map<String, dynamic> parameters = {
       Api.itemId: id,
       if (favouritelistingId != null) 'favouritelisting_id': favouritelistingId,
@@ -18,6 +18,96 @@ class FavoriteRepository {
       useBaseUrl: true,
     );
     return response;
+  }
+
+  Future<Set<int?>> fetchFavoriteMembershipIdsForItem({
+    required int itemId,
+  }) async {
+    final currentUserId = HiveUtils.getUserId()?.toString();
+    var page = 1;
+
+    while (true) {
+      final response = await Api.get(
+        url: Api.getFavoriteItemApi,
+        queryParameters: {Api.page: page},
+        useBaseUrl: true,
+      );
+      final pagination = response['data'];
+      final rawItems = pagination is Map && pagination['data'] is List
+          ? pagination['data'] as List
+          : const <dynamic>[];
+
+      for (final rawItem in rawItems) {
+        if (rawItem is! Map || rawItem['id']?.toString() != itemId.toString()) {
+          continue;
+        }
+
+        final memberships = <int?>{};
+        final rawFavorites = rawItem['favourites'];
+        if (rawFavorites is List) {
+          for (final rawFavorite in rawFavorites) {
+            if (rawFavorite is! Map ||
+                !rawFavorite.containsKey('favouritelisting_id')) {
+              continue;
+            }
+            final membershipUserId = rawFavorite['user_id']?.toString();
+            if (currentUserId != null &&
+                membershipUserId != null &&
+                membershipUserId != currentUserId) {
+              continue;
+            }
+
+            final rawListingId = rawFavorite['favouritelisting_id'];
+            if (rawListingId == null) {
+              memberships.add(null);
+            } else {
+              final listingId = int.tryParse(rawListingId.toString());
+              if (listingId != null) memberships.add(listingId);
+            }
+          }
+        }
+        return memberships;
+      }
+
+      final currentPage = pagination is Map
+          ? int.tryParse(pagination['current_page'].toString())
+          : 1;
+      final lastPage = pagination is Map
+          ? int.tryParse(pagination['last_page'].toString())
+          : 1;
+      if (rawItems.isEmpty ||
+          (currentPage ?? page) >= (lastPage ?? currentPage ?? page)) {
+        return <int?>{};
+      }
+      page++;
+    }
+  }
+
+  Future<Map<String, dynamic>> removeFavoriteEverywhere(int itemId) async {
+    final memberships = await fetchFavoriteMembershipIdsForItem(itemId: itemId);
+    if (memberships.isEmpty) {
+      throw StateError('No favorite-list membership was found for this item.');
+    }
+
+    Map<String, dynamic> lastResponse = <String, dynamic>{};
+    for (final listingId in memberships) {
+      lastResponse = await manageFavorites(
+        itemId,
+        favouritelistingId: listingId,
+      );
+    }
+
+    final remaining = await fetchFavoriteMembershipIdsForItem(itemId: itemId);
+    if (remaining.isNotEmpty) {
+      throw StateError(
+          'The item could not be removed from every favorite list.');
+    }
+
+    return {
+      ...lastResponse,
+      'message': 'Removed from all Favorites',
+      'removed_membership_count': memberships.length,
+    };
   }
 
   Future<DataOutput<ItemModel>> fetchFavorites({
@@ -83,7 +173,8 @@ class FavoriteRepository {
     return containingListingIds;
   }
 
-  Future<List<FavoriteListingModel>> fetchFavoriteListings({required String userId}) async {
+  Future<List<FavoriteListingModel>> fetchFavoriteListings(
+      {required String userId}) async {
     Map<String, dynamic> parameters = {
       'user_id': userId,
     };

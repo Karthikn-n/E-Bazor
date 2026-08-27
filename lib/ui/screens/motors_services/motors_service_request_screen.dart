@@ -507,6 +507,7 @@ class _MotorsServiceRequestScreenState
         response['message']?.toString() ?? 'Callback request submitted',
         type: MessageType.success,
       );
+      Navigator.pop(context);
     } catch (error) {
       if (mounted) {
         HelperUtils.showSnackBarMessage(
@@ -826,6 +827,11 @@ class _MotorsServiceRequestScreenState
   }) {
     return InputDecoration(
       hintText: hint,
+      hintStyle: TextStyle(
+        fontSize: 14,
+        color: context.color.textLightColor.withValues(alpha: 0.5),
+        fontWeight: FontWeight.normal,
+      ),
       prefixText: prefixText,
       prefixIcon: prefixIcon,
       prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 48),

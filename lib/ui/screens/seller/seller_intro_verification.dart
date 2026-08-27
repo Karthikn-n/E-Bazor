@@ -1,4 +1,5 @@
 import 'package:Ebozor/ui/theme/theme.dart';
+import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
@@ -68,8 +69,12 @@ class _SellerIntroVerificationScreenState
               onPressed: () {
             Navigator.pushNamed(
               context,
-              Routes.sellerVerificationScreen,
-                arguments: {"isResubmitted":widget.isResubmitted}
+              Routes.chooseOtpMethodScreen,
+              arguments: {
+                "phoneNumber": HiveUtils.getUserDetails().mobile ?? "",
+                "verificationPurpose": "sellerVerification",
+                "isFromSellerVerification": true,
+              },
             );
           }, buttonTitle: "startVerification".translate(context)),
         ),

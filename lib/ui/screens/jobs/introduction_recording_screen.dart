@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:video_player/video_player.dart';
+import 'package:Ebozor/data/repositories/job_repository.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
@@ -49,6 +50,7 @@ class _IntroductionRecordingScreenState
   bool _hasRecorded = false;
   bool _isPlaying = false;
   bool _isVideoPlaying = false;
+  bool _isSaving = false;
   int _recordSeconds = 0;
   int _playProgressSeconds = 0;
   Timer? _timer;
@@ -767,24 +769,68 @@ class _IntroductionRecordingScreenState
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        onPressed: _hasRecorded
-                            ? () {
-                                Navigator.pop(context, {
-                                  'type': widget.type == RecordingType.video
-                                      ? 'video'
-                                      : 'audio',
-                                  'filePath': _recordedFilePath,
-                                  'duration': _recordSeconds,
-                                });
+                        onPressed: (_hasRecorded && !_isSaving)
+                            ? () async {
+                                if (_recordedFilePath == null) return;
+                                setState(() => _isSaving = true);
+                                try {
+                                  final file = File(_recordedFilePath!);
+                                  if (widget.type == RecordingType.audio) {
+                                    await JobRepository().saveUserDetail(
+                                      {},
+                                      audioFile: file,
+                                    );
+                                  } else {
+                                    await JobRepository().saveUserDetail(
+                                      {},
+                                      videoFile: file,
+                                    );
+                                  }
+                                  if (context.mounted) {
+                                    HelperUtils.showSnackBarMessage(
+                                      context,
+                                      "${widget.type == RecordingType.audio ? 'Audio' : 'Video'} introduction uploaded successfully!",
+                                      type: MessageType.success,
+                                    );
+                                    Navigator.pop(context, {
+                                      'type': widget.type == RecordingType.video
+                                          ? 'video'
+                                          : 'audio',
+                                      'filePath': _recordedFilePath,
+                                      'duration': _recordSeconds,
+                                    });
+                                  }
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    HelperUtils.showSnackBarMessage(
+                                      context,
+                                      "Failed to upload introduction: $e",
+                                      type: MessageType.error,
+                                    );
+                                  }
+                                } finally {
+                                  if (mounted) {
+                                    setState(() => _isSaving = false);
+                                  }
+                                }
                               }
                             : null,
-                        child: const Text(
-                          "Save",
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: _isSaving
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                "Save",
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                       ),
                     ),
                   ),

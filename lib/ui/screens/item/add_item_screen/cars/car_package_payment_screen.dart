@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'package:Ebozor/data/repositories/item/item_repository.dart';
 import 'package:Ebozor/ui/screens/advertisement/my_advertisment_screen.dart';
 import 'package:Ebozor/ui/screens/item/my_item_tab_screen.dart';
 import 'package:flutter/material.dart';
@@ -21,12 +22,14 @@ class CarPackagePaymentScreen extends StatefulWidget {
   final CarPostingData? postingData;
   final Map<String, dynamic>? genericAdData;
   final ItemModel? model;
+  final bool isEdit;
 
   const CarPackagePaymentScreen({
     super.key,
     this.postingData,
     this.genericAdData,
     this.model,
+    this.isEdit = false,
   });
 
   static Route route(RouteSettings settings) {
@@ -37,6 +40,7 @@ class CarPackagePaymentScreen extends StatefulWidget {
         postingData: arguments?['postingData'],
         genericAdData: arguments?['genericAdData'] ?? arguments,
         model: arguments?['model'],
+        isEdit: arguments?['isEdit'] ?? false,
       ),
     );
   }
@@ -297,54 +301,71 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
                     const SizedBox(height: 18),
 
                     // Stripe Only Card Tile
-                    Container(
-                      decoration: BoxDecoration(
-                        color: context.color.territoryColor
-                            .withValues(alpha: 0.08),
+                    Material(
+                      color: context.color.territoryColor
+                          .withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(14),
+                      shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
+                        side: BorderSide(
                           color: context.color.territoryColor,
                           width: 1.5,
                         ),
                       ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 4),
-                        leading: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: context.color.secondaryColor,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Center(
-                            child: Icon(Icons.credit_card_rounded,
-                                color: Color(0xFF635BFF), size: 24),
-                          ),
-                        ),
-                        title: Text(
-                          'Credit / Debit Card (Stripe)',
-                          style: TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w600,
-                            color: context.color.textDefaultColor,
-                          ),
-                        ),
-                        subtitle: Text(
-                          "Instant & Secure Checkout",
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: context.color.textLightColor,
-                          ),
-                        ),
-                        trailing: Icon(
-                          Icons.check_circle_rounded,
-                          color: context.color.territoryColor,
-                          size: 22,
-                        ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(14),
                         onTap: () {
                           setModalState(() => localSelectedGateway = "stripe");
                         },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: context.color.secondaryColor,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Center(
+                                  child: Icon(Icons.credit_card_rounded,
+                                      color: Color(0xFF635BFF), size: 24),
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Credit / Debit Card (Stripe)',
+                                      style: TextStyle(
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: context.color.textDefaultColor,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      "Instant & Secure Checkout",
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: context.color.textLightColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(
+                                Icons.check_circle_rounded,
+                                color: context.color.territoryColor,
+                                size: 22,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 22),
@@ -556,6 +577,11 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
 
     if (!paymentSuccess || !mounted) return;
 
+    final isEditMode = widget.isEdit ||
+        (widget.model != null &&
+            widget.model!.id != null &&
+            widget.model!.id! > 0);
+
     final title = widget.model?.name ??
         widget.postingData?.title ??
         widget.genericAdData?['title'] ??
@@ -575,6 +601,11 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
             ? widget.postingData!.imageFiles.first.path
             : (widget.genericAdData?['image']?.toString()));
 
+    if (widget.model != null) {
+      widget.model!.status = "approved";
+      widget.model!.active = true;
+    }
+
     final createdItem = widget.model ??
         ItemModel(
           id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
@@ -584,7 +615,21 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
           image: imagePath,
           city: city,
           status: "approved",
+          active: true,
         );
+
+    createdItem.status = "approved";
+    createdItem.active = true;
+
+    // Sync status to backend if item exists
+    if (createdItem.id != null) {
+      try {
+        await ItemRepository().changeMyItemStatus(
+          itemId: createdItem.id!,
+          status: "approved",
+        );
+      } catch (_) {}
+    }
 
     // Refresh MyAds cubits and screens
     try {
@@ -597,15 +642,26 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
           ?.fetchMyItems(getItemsWithStatus: "inactive");
     } catch (_) {}
 
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      Routes.successItemScreen,
-      (route) => route.isFirst,
-      arguments: {
-        'model': createdItem,
-        'isEdit': false,
-      },
-    );
+    if (isEditMode) {
+      Navigator.pushReplacementNamed(
+        context,
+        Routes.successItemScreen,
+        arguments: {
+          'model': createdItem,
+          'isEdit': true,
+        },
+      );
+    } else {
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        Routes.successItemScreen,
+        (route) => route.isFirst,
+        arguments: {
+          'model': createdItem,
+          'isEdit': false,
+        },
+      );
+    }
   }
 
   @override

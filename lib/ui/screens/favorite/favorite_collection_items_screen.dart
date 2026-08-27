@@ -3,13 +3,14 @@ import 'package:Ebozor/data/cubits/category/fetch_category_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/delete_message_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/load_chat_messages.dart';
 import 'package:Ebozor/data/cubits/favorite/favorite_cubit.dart';
+import 'package:Ebozor/data/cubits/favorite/favorite_listings_cubit.dart';
 import 'package:Ebozor/data/model/favorite_listing_model.dart';
 import 'package:Ebozor/data/model/item/item_model.dart';
+import 'package:Ebozor/data/repositories/favourites_repository.dart';
 import 'package:Ebozor/ui/screens/chat/chat_screen.dart';
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
 import 'package:Ebozor/ui/screens/widgets/dialogs/favorite_list_options_bottom_sheet.dart';
 import 'package:Ebozor/ui/screens/widgets/dialogs/inquire_ad_dialog.dart';
-import 'package:Ebozor/ui/screens/widgets/dialogs/save_to_favorite_bottom_sheet.dart';
 import 'package:Ebozor/ui/screens/widgets/dialogs/seller_contact_dialog.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/no_data_found.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
@@ -18,6 +19,7 @@ import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
+import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -52,6 +54,7 @@ class _FavoriteCollectionItemsScreenState
   FavoriteViewMode _viewMode = FavoriteViewMode.list;
   final TextEditingController _searchController = TextEditingController();
   int? _selectedCategoryId;
+  final Set<int> _removingFavoriteIds = <int>{};
   late final ScrollController _scrollController = ScrollController()
     ..addListener(_onScroll);
 
@@ -68,6 +71,58 @@ class _FavoriteCollectionItemsScreenState
     context.read<FavoriteCubit>().getFavorite(
           favouritelistingId: _currentListing.favouritelistingId,
         );
+  }
+
+  Future<void> _removeFavorite(ItemModel item) async {
+    final itemId = item.id;
+    if (itemId == null || _removingFavoriteIds.contains(itemId)) return;
+
+    setState(() => _removingFavoriteIds.add(itemId));
+    try {
+      final repository = FavoriteRepository();
+      final response = _currentListing.isDefault
+          ? await repository.removeFavoriteEverywhere(itemId)
+          : await repository.manageFavorites(
+              itemId,
+              favouritelistingId: _currentListing.favouritelistingId,
+            );
+      if (!mounted) return;
+
+      final favoriteCubit = context.read<FavoriteCubit>();
+      favoriteCubit.removeFavoriteItem(item);
+      if (_currentListing.isDefault) {
+        favoriteCubit.setFavoriteListingIds(itemId, const <int>[]);
+        await context.read<FavoriteListingsCubit>().fetchListings();
+      } else {
+        context.read<FavoriteListingsCubit>().updateListCount(
+              _currentListing.favouritelistingId,
+              -1,
+            );
+      }
+      if (!mounted) return;
+
+      final removedCount = int.tryParse(
+              response['removed_membership_count']?.toString() ?? '') ??
+          1;
+      setState(() {
+        _currentListing = _currentListing.copyWith(
+          count: (_currentListing.count - removedCount).clamp(0, 999999),
+        );
+      });
+      HelperUtils.showSnackBarMessage(
+        context,
+        response['message']?.toString() ??
+            'Removed from Favorites'.translate(context),
+      );
+    } catch (error) {
+      if (mounted) {
+        HelperUtils.showSnackBarMessage(context, error.toString());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _removingFavoriteIds.remove(itemId));
+      }
+    }
   }
 
   List<ItemModel> _getFilteredItems(List<ItemModel> allItems) {
@@ -208,7 +263,8 @@ class _FavoriteCollectionItemsScreenState
                         color: context.color.secondaryColor,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: context.color.borderColor.withValues(alpha: 0.8),
+                          color:
+                              context.color.borderColor.withValues(alpha: 0.8),
                         ),
                       ),
                       child: TextField(
@@ -219,7 +275,8 @@ class _FavoriteCollectionItemsScreenState
                           color: context.color.textDefaultColor,
                         ),
                         decoration: InputDecoration(
-                          hintText: "Search your saved listings".translate(context),
+                          hintText:
+                              "Search your saved listings".translate(context),
                           hintStyle: TextStyle(
                             fontSize: 13.5,
                             color: context.color.textLightColor,
@@ -238,7 +295,8 @@ class _FavoriteCollectionItemsScreenState
                                 )
                               : null,
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 10),
                         ),
                       ),
                     ),
@@ -396,7 +454,8 @@ class _FavoriteCollectionItemsScreenState
   Widget _buildCategoryFilterChips() {
     return BlocBuilder<FetchCategoryCubit, FetchCategoryState>(
       builder: (context, catState) {
-        if (catState is FetchCategorySuccess && catState.categories.isNotEmpty) {
+        if (catState is FetchCategorySuccess &&
+            catState.categories.isNotEmpty) {
           final categories = catState.categories;
           return SizedBox(
             height: 40,
@@ -415,8 +474,11 @@ class _FavoriteCollectionItemsScreenState
                       selectedColor: context.color.territoryColor,
                       backgroundColor: context.color.secondaryColor,
                       labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : context.color.textDefaultColor,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected
+                            ? Colors.white
+                            : context.color.textDefaultColor,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
                         fontSize: 13,
                       ),
                       onSelected: (_) {
@@ -436,8 +498,11 @@ class _FavoriteCollectionItemsScreenState
                     selectedColor: context.color.territoryColor,
                     backgroundColor: context.color.secondaryColor,
                     labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : context.color.textDefaultColor,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected
+                          ? Colors.white
+                          : context.color.textDefaultColor,
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.normal,
                       fontSize: 13,
                     ),
                     onSelected: (_) {
@@ -492,7 +557,8 @@ class _FavoriteCollectionItemsScreenState
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(16)),
                   child: SizedBox(
                     height: 200,
                     width: double.infinity,
@@ -510,7 +576,8 @@ class _FavoriteCollectionItemsScreenState
                           )
                         : Container(
                             color: Colors.grey.shade200,
-                            child: const Icon(Icons.image, size: 40, color: Colors.grey),
+                            child: const Icon(Icons.image,
+                                size: 40, color: Colors.grey),
                           ),
                   ),
                 ),
@@ -521,7 +588,8 @@ class _FavoriteCollectionItemsScreenState
                     bottom: 12,
                     left: 12,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.6),
                         borderRadius: BorderRadius.circular(6),
@@ -529,11 +597,13 @@ class _FavoriteCollectionItemsScreenState
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 14),
+                          const Icon(Icons.camera_alt_outlined,
+                              color: Colors.white, size: 14),
                           const SizedBox(width: 4),
                           Text(
                             "${allImages.length}",
-                            style: const TextStyle(color: Colors.white, fontSize: 12),
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 12),
                           ),
                         ],
                       ),
@@ -546,7 +616,8 @@ class _FavoriteCollectionItemsScreenState
                     top: 12,
                     left: 12,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.95),
                         borderRadius: BorderRadius.circular(6),
@@ -560,7 +631,8 @@ class _FavoriteCollectionItemsScreenState
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.verified, color: Color(0xFF2563EB), size: 14),
+                          Icon(Icons.verified,
+                              color: Color(0xFF2563EB), size: 14),
                           SizedBox(width: 4),
                           Text(
                             "VERIFIED USER",
@@ -583,9 +655,7 @@ class _FavoriteCollectionItemsScreenState
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       GestureDetector(
-                        onTap: () {
-                          SaveToFavoriteBottomSheet.show(context, item: item);
-                        },
+                        onTap: () => _removeFavorite(item),
                         child: Container(
                           width: 36,
                           height: 36,
@@ -650,7 +720,8 @@ class _FavoriteCollectionItemsScreenState
                   if (item.address != null && item.address!.isNotEmpty)
                     Row(
                       children: [
-                        Icon(Icons.location_on_outlined, size: 14, color: context.color.textLightColor),
+                        Icon(Icons.location_on_outlined,
+                            size: 14, color: context.color.textLightColor),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
@@ -674,7 +745,8 @@ class _FavoriteCollectionItemsScreenState
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFFDC2626),
-                            side: const BorderSide(color: Color(0xFFDC2626), width: 1),
+                            side: const BorderSide(
+                                color: Color(0xFFDC2626), width: 1),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -684,7 +756,8 @@ class _FavoriteCollectionItemsScreenState
                             SellerContactBottomSheet.show(context, model: item);
                           },
                           icon: const Icon(Icons.phone_outlined, size: 16),
-                          label: Text("Call".translate(context), style: const TextStyle(fontSize: 13)),
+                          label: Text("Call".translate(context),
+                              style: const TextStyle(fontSize: 13)),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -692,7 +765,8 @@ class _FavoriteCollectionItemsScreenState
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFF7C3AED),
-                            side: const BorderSide(color: Color(0xFF7C3AED), width: 1),
+                            side: const BorderSide(
+                                color: Color(0xFF7C3AED), width: 1),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -708,15 +782,18 @@ class _FavoriteCollectionItemsScreenState
                                       return MultiBlocProvider(
                                         providers: [
                                           BlocProvider(
-                                            create: (context) => LoadChatMessagesCubit(),
+                                            create: (context) =>
+                                                LoadChatMessagesCubit(),
                                           ),
                                           BlocProvider(
-                                            create: (context) => DeleteMessageCubit(),
+                                            create: (context) =>
+                                                DeleteMessageCubit(),
                                           ),
                                         ],
                                         child: Builder(builder: (context) {
                                           return ChatScreen(
-                                            profilePicture: item.user?.profile ?? "",
+                                            profilePicture:
+                                                item.user?.profile ?? "",
                                             itemTitle: item.name ?? "",
                                             userId: item.user?.id?.toString() ??
                                                 item.userId?.toString() ??
@@ -744,7 +821,8 @@ class _FavoriteCollectionItemsScreenState
                             );
                           },
                           icon: const Icon(Icons.forum_outlined, size: 16),
-                          label: Text("Chat".translate(context), style: const TextStyle(fontSize: 13)),
+                          label: Text("Chat".translate(context),
+                              style: const TextStyle(fontSize: 13)),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -752,7 +830,8 @@ class _FavoriteCollectionItemsScreenState
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFFEA580C),
-                            side: const BorderSide(color: Color(0xFFEA580C), width: 1),
+                            side: const BorderSide(
+                                color: Color(0xFFEA580C), width: 1),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -761,8 +840,10 @@ class _FavoriteCollectionItemsScreenState
                           onPressed: () {
                             InquireAdBottomSheet.show(context, model: item);
                           },
-                          icon: const Icon(Icons.mail_outline_rounded, size: 16),
-                          label: Text("Email".translate(context), style: const TextStyle(fontSize: 13)),
+                          icon:
+                              const Icon(Icons.mail_outline_rounded, size: 16),
+                          label: Text("Email".translate(context),
+                              style: const TextStyle(fontSize: 13)),
                         ),
                       ),
                     ],
@@ -810,7 +891,8 @@ class _FavoriteCollectionItemsScreenState
               child: Stack(
                 children: [
                   ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(12)),
                     child: SizedBox(
                       width: double.infinity,
                       height: double.infinity,
@@ -828,9 +910,7 @@ class _FavoriteCollectionItemsScreenState
                     top: 8,
                     right: 8,
                     child: GestureDetector(
-                      onTap: () {
-                        SaveToFavoriteBottomSheet.show(context, item: item);
-                      },
+                      onTap: () => _removeFavorite(item),
                       child: Container(
                         width: 28,
                         height: 28,

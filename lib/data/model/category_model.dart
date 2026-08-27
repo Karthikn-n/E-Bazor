@@ -309,17 +309,24 @@ class FilterItem {
       values.addAll(valuesObject.map((value) =>
           (value['label'] ?? value['name'] ?? value['value']).toString()));
     }
+    final rawType = json['type']?.toString().trim().toLowerCase() ?? '';
+    final type = switch (rawType) {
+      'textbox' || 'input' => 'text',
+      'numeric' => 'number',
+      'select' => 'dropdown',
+      'radio' || 'checkbox' => 'button',
+      _ => rawType,
+    };
     return FilterItem(
       name: json['name']?.toString(),
-      type: json['type']?.toString().toLowerCase(),
+      type: type,
       values: values,
       valuesObject: valuesObject,
       multiSelect: json['multiselect'] == true ||
           json['multiselect'] == 1 ||
           json['multiselect'] == '1',
       sortOrder: int.tryParse(json['sort_order']?.toString() ?? '') ?? 0,
-      isActive: json['is_active'] == null ||
-          json['is_active'] == true ||
+      isActive: json['is_active'] == true ||
           json['is_active'] == 1 ||
           json['is_active'] == '1',
       placeholder: json['placeholder'] as String?, // ✅ add this

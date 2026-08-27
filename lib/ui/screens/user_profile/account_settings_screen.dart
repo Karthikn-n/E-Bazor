@@ -92,49 +92,31 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         backgroundColor: context.color.backgroundColor,
         appBar: UiUtils.buildAppBar(
           context,
-          title: "Account",
+          title: "account".translate(context),
           showBackButton: true,
         ),
         body: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildItemTile(
                   icon: Icons.phone_android_rounded,
-                  title: "Primary Phone Number",
+                  title: "primaryPhoneNumber".translate(context),
                   onTap: () {
                     Navigator.pushNamed(context, Routes.phoneNumbersScreen);
                   },
                 ),
-                _buildItemTile(
-                  icon: Icons.location_on_outlined,
-                  title: "Addresses",
-                  onTap: () {
-                    Navigator.pushNamed(context, Routes.userAddressListScreen);
-                  },
-                ),
-                _buildItemTile(
-                  icon: Icons.receipt_long_outlined,
-                  title: "transactionHistory".translate(context).isNotEmpty
-                      ? "transactionHistory".translate(context)
-                      : "Transaction History",
-                  onTap: () {
-                    Navigator.pushNamed(context, Routes.transactionHistory);
-                  },
-                ),
-                _buildItemTile(
-                  icon: Icons.rate_review_outlined,
-                  title: "myReview".translate(context).isNotEmpty
-                      ? "myReview".translate(context)
-                      : "My Reviews",
-                  onTap: () {
-                    Navigator.pushNamed(context, Routes.myReviewsScreen);
-                  },
-                ),
-
+                // _buildItemTile(
+                //   icon: Icons.receipt_long_outlined,
+                //   title: "transactionHistory".translate(context),
+                //   onTap: () {
+                //     Navigator.pushNamed(context, Routes.transactionHistory);
+                //   },
+                // ),
                 Divider(
                   height: 32,
                   thickness: 0.8,
@@ -152,13 +134,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     if (Constant.isDemoModeOn) {
                       if (HiveUtils.getUserDetails().mobile != null &&
                           Constant.demoMobileNumber ==
-                              (HiveUtils.getUserDetails()
-                                  .mobile!
-                                  .replaceFirst(
-                                      "+${HiveUtils.getCountryCode()}",
-                                      ""))) {
-                        HelperUtils.showSnackBarMessage(
-                            context, "thisActionNotValidDemo".translate(context));
+                              (HiveUtils.getUserDetails().mobile!.replaceFirst(
+                                  "+${HiveUtils.getCountryCode()}", ""))) {
+                        HelperUtils.showSnackBarMessage(context,
+                            "thisActionNotValidDemo".translate(context));
                         return;
                       }
                     }
@@ -216,7 +195,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  "This action is permanent and cannot be undone. All your ads, messages, saved preferences, and account history will be permanently deleted.",
+                  "deleteAccountConfirmMsg".translate(context),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13.5,

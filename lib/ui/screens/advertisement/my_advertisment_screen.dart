@@ -785,7 +785,10 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
         await Navigator.pushNamed(
           context,
           Routes.carPackagePaymentScreen,
-          arguments: {'model': editResult},
+          arguments: {
+            'model': editResult,
+            'isEdit': true,
+          },
         );
         if (context.mounted) _loadData();
       }
@@ -1037,7 +1040,10 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                                     Navigator.pushNamed(
                                       context,
                                       Routes.carPackagePaymentScreen,
-                                      arguments: {'model': item},
+                                      arguments: {
+                                        'model': item,
+                                        'isEdit': true,
+                                      },
                                     );
                                   } else if (val == "renew") {
                                     _renewExpiredAd(context, item);
@@ -1187,7 +1193,10 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                           Navigator.pushNamed(
                             context,
                             Routes.carPackagePaymentScreen,
-                            arguments: {'model': item},
+                            arguments: {
+                              'model': item,
+                              'isEdit': true,
+                            },
                           );
                         },
                         borderRadius: BorderRadius.circular(6),

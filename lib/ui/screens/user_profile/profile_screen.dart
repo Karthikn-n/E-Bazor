@@ -4,6 +4,7 @@ import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/category/fetch_category_cubit.dart';
 import 'package:Ebozor/data/cubits/home/fetch_home_screen_cubit.dart';
 import 'package:Ebozor/data/cubits/item/fetch_my_promoted_items_cubit.dart';
+import 'package:Ebozor/data/cubits/slider_cubit.dart';
 import 'package:Ebozor/data/cubits/system/app_theme_cubit.dart';
 import 'package:Ebozor/data/cubits/system/fetch_language_cubit.dart';
 import 'package:Ebozor/data/cubits/system/fetch_system_settings_cubit.dart';
@@ -27,18 +28,22 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:Ebozor/data/cubits/report/update_report_items_list_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/get_buyer_chat_users_cubit.dart';
 import 'package:Ebozor/data/model/system_settings_model.dart';
+import 'package:Ebozor/data/repositories/job_repository.dart';
+import 'package:Ebozor/ui/screens/widgets/image_cropper.dart';
 
 import 'package:Ebozor/utils/app_icon.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/network/apiCallTrigger.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
-import 'package:Ebozor/ui/screens/widgets/phone_verification_dialog.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/ui/screens/widgets/blurred_dialoge_box.dart';
+
+enum _ProfilePhotoAction { view, camera, gallery, remove }
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -51,6 +56,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     with AutomaticKeepAliveClientMixin<ProfileScreen> {
   ValueNotifier isDarkTheme = ValueNotifier(false);
   final InAppReview _inAppReview = InAppReview.instance;
+  final JobRepository _jobRepository = JobRepository();
+  File? _profilePhotoPreview;
+  bool _isUploadingProfilePhoto = false;
   // final FirebaseAuth _auth = FirebaseAuth.instance;
   // final GoogleSignIn _googleSignIn = GoogleSignIn();
   String _appVersion = "3.35.2.0 (40445)";
@@ -63,6 +71,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       context
           .read<FetchVerificationRequestsCubit>()
           .fetchVerificationRequests();
+      _refreshUserVerificationStatus();
     }
     if (!const bool.fromEnvironment("force-disable-demo-mode",
         defaultValue: false)) {
@@ -85,6 +94,56 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
+  Future<void> _refreshUserVerificationStatus() async {
+    final userDetail = await _jobRepository.fetchUserDetail();
+    if (userDetail == null || !userDetail.containsKey('is_verified')) return;
+
+    final rawStatus = userDetail['is_verified'];
+    final isVerified = rawStatus == true ||
+            rawStatus == 1 ||
+            rawStatus?.toString().toLowerCase() == 'true' ||
+            rawStatus?.toString() == '1'
+        ? 1
+        : 0;
+    await HiveUtils.setUserData({'is_verified': isVerified});
+    if (mounted) {
+      context.read<UserDetailsCubit>().copy(HiveUtils.getUserDetails());
+    }
+  }
+
+  void _handleVerificationTap(FetchVerificationRequestState state) {
+    if (state is FetchVerificationRequestSuccess) {
+      final status =
+          state.data.status?.trim().toLowerCase().replaceAll('_', ' ');
+      if (status == 'pending' || status == 'under review') {
+        HelperUtils.showSnackBarMessage(
+          context,
+          "verificationUnderReview".translate(context),
+          type: MessageType.warning,
+        );
+        return;
+      }
+      if (status == 'rejected') {
+        Navigator.pushNamed(
+          context,
+          Routes.sellerVerificationScreen,
+          arguments: {'isResubmitted': true},
+        );
+        return;
+      }
+    }
+
+    Navigator.pushNamed(
+      context,
+      Routes.chooseOtpMethodScreen,
+      arguments: {
+        'phoneNumber': HiveUtils.getUserDetails().mobile ?? '',
+        'verificationPurpose': 'sellerVerification',
+        'isFromSellerVerification': true,
+      },
+    );
+  }
+
   @override
   void didChangeDependencies() {
     isDarkTheme.value = context.read<AppThemeCubit>().isDarkMode();
@@ -99,6 +158,252 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   @override
   bool get wantKeepAlive => true;
+
+  void _showProfilePhotoViewDialog({String? imageUrl, File? imageFile}) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            Container(
+              width: double.infinity,
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.7,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.92),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InteractiveViewer(
+                minScale: 0.8,
+                maxScale: 4.0,
+                child: Center(
+                  child: imageFile != null
+                      ? Image.file(
+                          imageFile,
+                          fit: BoxFit.contain,
+                        )
+                      : (imageUrl != null && imageUrl.isNotEmpty)
+                          ? UiUtils.getImage(
+                              imageUrl,
+                              fit: BoxFit.contain,
+                            )
+                          : const Icon(
+                              Icons.person,
+                              size: 100,
+                              color: Colors.white70,
+                            ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showProfilePhotoPicker() async {
+    final hasProfilePhoto = _profilePhotoPreview != null ||
+        (HiveUtils.getUserDetails().profile ?? '').isNotEmpty;
+    final action = await showModalBottomSheet<_ProfilePhotoAction>(
+      context: context,
+      backgroundColor: context.color.secondaryColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 12, 8, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 42,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: context.color.borderColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                if (hasProfilePhoto)
+                  ListTile(
+                    leading: const Icon(Icons.visibility_outlined),
+                    title: Text("viewCurrentPhoto".translate(sheetContext)),
+                    onTap: () => Navigator.pop(
+                      sheetContext,
+                      _ProfilePhotoAction.view,
+                    ),
+                  ),
+                ListTile(
+                  leading: const Icon(Icons.photo_camera_outlined),
+                  title: Text("takeNewPhoto".translate(sheetContext)),
+                  onTap: () => Navigator.pop(
+                    sheetContext,
+                    _ProfilePhotoAction.camera,
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined),
+                  title: Text("chooseFromLibrary".translate(sheetContext)),
+                  onTap: () => Navigator.pop(
+                    sheetContext,
+                    _ProfilePhotoAction.gallery,
+                  ),
+                ),
+                if (hasProfilePhoto)
+                  ListTile(
+                    leading: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Colors.red,
+                    ),
+                    title: Text(
+                      "removePhoto".translate(sheetContext),
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                    onTap: () => Navigator.pop(
+                      sheetContext,
+                      _ProfilePhotoAction.remove,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _ProfilePhotoAction.view:
+        final user = HiveUtils.getUserDetails();
+        _showProfilePhotoViewDialog(
+          imageUrl: user.profile,
+          imageFile: _profilePhotoPreview,
+        );
+        break;
+      case _ProfilePhotoAction.camera:
+        await _pickAndUploadProfilePhoto(ImageSource.camera);
+        break;
+      case _ProfilePhotoAction.gallery:
+        await _pickAndUploadProfilePhoto(ImageSource.gallery);
+        break;
+      case _ProfilePhotoAction.remove:
+        await _removeProfilePhoto();
+        break;
+    }
+  }
+
+  Future<void> _pickAndUploadProfilePhoto(ImageSource source) async {
+    CropImage.init(context);
+    final pickedPhoto = await ImagePicker().pickImage(source: source);
+    if (pickedPhoto == null || !mounted) return;
+
+    final croppedPhoto = await CropImage.crop(filePath: pickedPhoto.path);
+    if (croppedPhoto == null || !mounted) return;
+
+    final profileFile = File(croppedPhoto.path);
+    setState(() {
+      _profilePhotoPreview = profileFile;
+      _isUploadingProfilePhoto = true;
+    });
+
+    try {
+      final response = await _jobRepository.saveUserDetail(
+        const <String, dynamic>{},
+        profileFile: profileFile,
+      );
+      String? profileUrl = _extractProfileUrl(response);
+      if (profileUrl == null) {
+        profileUrl = _extractProfileUrl(await _jobRepository.fetchUserDetail());
+      }
+
+      if (profileUrl != null && profileUrl.isNotEmpty) {
+        await HiveUtils.setUserData({'profile': profileUrl});
+        if (mounted) {
+          context.read<UserDetailsCubit>().copy(HiveUtils.getUserDetails());
+        }
+      }
+
+      if (!mounted) return;
+      setState(() => _isUploadingProfilePhoto = false);
+      HelperUtils.showSnackBarMessage(
+        context,
+        response['message']?.toString() ??
+            "profilePhotoUpdated".translate(context),
+        type: MessageType.success,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _profilePhotoPreview = null;
+        _isUploadingProfilePhoto = false;
+      });
+      HelperUtils.showSnackBarMessage(
+        context,
+        error.toString(),
+        type: MessageType.error,
+      );
+    }
+  }
+
+  Future<void> _removeProfilePhoto() async {
+    setState(() => _isUploadingProfilePhoto = true);
+    try {
+      final response = await _jobRepository.removeProfilePhoto();
+      await HiveUtils.setUserData({'profile': ''});
+      if (!mounted) return;
+
+      context.read<UserDetailsCubit>().copy(HiveUtils.getUserDetails());
+      setState(() {
+        _profilePhotoPreview = null;
+        _isUploadingProfilePhoto = false;
+      });
+      HelperUtils.showSnackBarMessage(
+        context,
+        response['message']?.toString() ??
+            "profilePhotoRemoved".translate(context),
+        type: MessageType.success,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isUploadingProfilePhoto = false);
+      HelperUtils.showSnackBarMessage(
+        context,
+        error.toString(),
+        type: MessageType.error,
+      );
+    }
+  }
+
+  String? _extractProfileUrl(dynamic payload) {
+    if (payload is! Map) return null;
+    for (final key in const ['profile', 'profile_url']) {
+      final value = payload[key];
+      if (value is String && value.trim().isNotEmpty) return value.trim();
+    }
+    for (final key in const ['data', 'user', 'user_detail']) {
+      final nested = _extractProfileUrl(payload[key]);
+      if (nested != null) return nested;
+    }
+    return null;
+  }
 
   // ---------------------------------------------------------------------------
   // Top Profile Card
@@ -122,12 +427,12 @@ class _ProfileScreenState extends State<ProfileScreen>
             final parsed = DateTime.tryParse(user.createdAt!);
             if (parsed != null) {
               joinedDate =
-                  "Joined on ${DateFormat('MMMM yyyy').format(parsed)}";
+                  "${"joinedOn".translate(context)} ${DateFormat('MMMM yyyy').format(parsed)}";
             }
           }
           if (joinedDate.isEmpty && isAuthenticated) {
             joinedDate =
-                "Joined on ${DateFormat('MMMM yyyy').format(DateTime.now())}";
+                "${"joinedOn".translate(context)} ${DateFormat('MMMM yyyy').format(DateTime.now())}";
           }
 
           return Container(
@@ -166,39 +471,60 @@ class _ProfileScreenState extends State<ProfileScreen>
                         backgroundColor: context.color.territoryColor
                             .withValues(alpha: 0.08),
                         radius: 34,
-                        child: isAuthenticated
-                            ? ((user.profile ?? "").isEmpty
-                                ? UiUtils.getSvg(
+                        child: _profilePhotoPreview != null
+                            ? Image.file(
+                                _profilePhotoPreview!,
+                                width: 68,
+                                height: 68,
+                                fit: BoxFit.cover,
+                              )
+                            : isAuthenticated
+                                ? ((user.profile ?? "").isEmpty
+                                    ? UiUtils.getSvg(
+                                        AppIcons.defaultPersonLogo,
+                                        color: context.color.territoryColor,
+                                        fit: BoxFit.none,
+                                      )
+                                    : UiUtils.getImage(
+                                        height: 68,
+                                        width: 68,
+                                        user.profile!,
+                                        fit: BoxFit.cover,
+                                      ))
+                                : UiUtils.getSvg(
                                     AppIcons.defaultPersonLogo,
                                     color: context.color.territoryColor,
                                     fit: BoxFit.none,
-                                  )
-                                : UiUtils.getImage(
-                                    height: 68,
-                                    width: 68,
-                                    user.profile!,
-                                    fit: BoxFit.cover,
-                                  ))
-                            : UiUtils.getSvg(
-                                AppIcons.defaultPersonLogo,
-                                color: context.color.territoryColor,
-                                fit: BoxFit.none,
-                              ),
+                                  ),
                       ),
                     ),
+                    if (_isUploadingProfilePhoto)
+                      const Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Color(0x66000000),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     if (isAuthenticated)
                       Positioned(
                         right: 0,
                         bottom: 0,
                         child: InkWell(
-                          onTap: () {
-                            HelperUtils.goToNextPage(
-                              Routes.completeProfile,
-                              context,
-                              false,
-                              args: {"from": "profile"},
-                            );
-                          },
+                          onTap: _isUploadingProfilePhoto
+                              ? null
+                              : _showProfilePhotoPicker,
                           child: Container(
                             padding: const EdgeInsets.all(5),
                             decoration: BoxDecoration(
@@ -230,7 +556,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         isAuthenticated
                             ? (user.displayName.isNotEmpty
                                 ? user.displayName
-                                : 'User')
+                                : "user".translate(context))
                             : "anonymous".translate(context),
                         style: TextStyle(
                           fontSize: 18,
@@ -244,13 +570,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       if (isAuthenticated) ...[
                         if (isVerified)
                           GestureDetector(
-                            onTap: () {
-                              Navigator.pushNamed(
-                                context,
-                                Routes.sellerVerificationScreen,
-                                arguments: {"isResubmitted": false},
-                              );
-                            },
+                            onTap: () => _handleVerificationTap(state),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 10, vertical: 4),
@@ -282,17 +602,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           )
                         else
                           InkWell(
-                            onTap: () {
-                              PhoneVerificationDialog.show(
-                                context,
-                                onVerified: () {
-                                  setState(() {});
-                                  context
-                                      .read<FetchVerificationRequestsCubit>()
-                                      .fetchVerificationRequests();
-                                },
-                              );
-                            },
+                            onTap: () => _handleVerificationTap(state),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 10, vertical: 4),
@@ -308,7 +618,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    "Get Verified",
+                                    "getVerified".translate(context),
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
@@ -383,7 +693,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             Expanded(
               child: _buildQuickActionCard(
                 icon: Icons.list_alt_rounded,
-                title: "My Ads",
+                title: "myAds".translate(context),
                 onTap: () {
                   APICallTrigger.trigger();
                   UiUtils.checkUser(
@@ -403,7 +713,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             Expanded(
               child: _buildQuickActionCard(
                 icon: Icons.bookmark_border_rounded,
-                title: "My Searches",
+                title: "mySearches".translate(context),
                 onTap: () {
                   UiUtils.checkUser(
                     onNotGuest: () {
@@ -420,30 +730,30 @@ class _ProfileScreenState extends State<ProfileScreen>
           ],
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildQuickActionCard(
-                icon: Icons.calendar_today_outlined,
-                title: "My Bookings",
-                badgeText: "NEW",
-                onTap: () {
-                  UiUtils.checkUser(
-                    onNotGuest: () {
-                      Navigator.pushNamed(
-                        context,
-                        Routes.carInspectionHistoryScreen,
-                      );
-                    },
-                    context: context,
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(child: SizedBox.shrink()),
-          ],
-        ),
+        // Row(
+        //   children: [
+        //     Expanded(
+        //       child: _buildQuickActionCard(
+        //         icon: Icons.calendar_today_outlined,
+        //         title: "My Bookings",
+        //         badgeText: "NEW",
+        //         onTap: () {
+        //           UiUtils.checkUser(
+        //             onNotGuest: () {
+        //               Navigator.pushNamed(
+        //                 context,
+        //                 Routes.carInspectionHistoryScreen,
+        //               );
+        //             },
+        //             context: context,
+        //           );
+        //         },
+        //       ),
+        //     ),
+        //     const SizedBox(width: 12),
+        //     const Expanded(child: SizedBox.shrink()),
+        //   ],
+        // ),
       ],
     );
   }
@@ -574,206 +884,206 @@ class _ProfileScreenState extends State<ProfileScreen>
   // ---------------------------------------------------------------------------
   // Security Bottom Sheet (Shows Blocked Users)
   // ---------------------------------------------------------------------------
-  void _showSecurityBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: context.color.secondaryColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: context.color.borderColor,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  "Security",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: context.color.textDefaultColor,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _buildMenuTile(
-                  icon: Icons.person_off_outlined,
-                  title: "blockedUsers".translate(context),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    Navigator.pushNamed(context, Routes.blockedUserListScreen);
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
+  // void _showSecurityBottomSheet() {
+  //   showModalBottomSheet(
+  //     context: context,
+  //     backgroundColor: context.color.secondaryColor,
+  //     shape: const RoundedRectangleBorder(
+  //       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  //     ),
+  //     builder: (ctx) {
+  //       return SafeArea(
+  //         child: Padding(
+  //           padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+  //           child: Column(
+  //             mainAxisSize: MainAxisSize.min,
+  //             crossAxisAlignment: CrossAxisAlignment.start,
+  //             children: [
+  //               Center(
+  //                 child: Container(
+  //                   width: 40,
+  //                   height: 4,
+  //                   decoration: BoxDecoration(
+  //                     color: context.color.borderColor,
+  //                     borderRadius: BorderRadius.circular(2),
+  //                   ),
+  //                 ),
+  //               ),
+  //               const SizedBox(height: 16),
+  //               Text(
+  //                 "security".translate(context),
+  //                 style: TextStyle(
+  //                   fontSize: 18,
+  //                   fontWeight: FontWeight.bold,
+  //                   color: context.color.textDefaultColor,
+  //                 ),
+  //               ),
+  //               const SizedBox(height: 12),
+  //               _buildMenuTile(
+  //                 icon: Icons.person_off_outlined,
+  //                 title: "blockedUsers".translate(context),
+  //                 onTap: () {
+  //                   Navigator.pop(ctx);
+  //                   Navigator.pushNamed(context, Routes.blockedUserListScreen);
+  //                 },
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //       );
+  //     },
+  //   );
+  // }
 
   // ---------------------------------------------------------------------------
   // Language Bottom Sheet
   // ---------------------------------------------------------------------------
-  void _showLanguageBottomSheet() {
-    final languageSetting = context
-        .read<FetchSystemSettingsCubit>()
-        .getSetting(SystemSetting.language);
+  // void _showLanguageBottomSheet() {
+  //   final languageSetting = context
+  //       .read<FetchSystemSettingsCubit>()
+  //       .getSetting(SystemSetting.language);
 
-    if (languageSetting == null ||
-        languageSetting is! List ||
-        languageSetting.isEmpty) {
-      HelperUtils.showSnackBarMessage(
-        context,
-        "No languages available",
-      );
-      return;
-    }
+  //   if (languageSetting == null ||
+  //       languageSetting is! List ||
+  //       languageSetting.isEmpty) {
+  //     HelperUtils.showSnackBarMessage(
+  //       context,
+  //       "noLanguagesAvailable".translate(context),
+  //     );
+  //     return;
+  //   }
 
-    final List languages = languageSetting;
+  //   final List languages = languageSetting;
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: context.color.secondaryColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (bottomSheetCtx) {
-        final currentLanguageState = context.watch<LanguageCubit>().state;
-        final currentCode = (currentLanguageState is LanguageLoader)
-            ? currentLanguageState.language['code']
-            : HiveUtils.getLanguage()?['code'];
+  //   showModalBottomSheet(
+  //     context: context,
+  //     backgroundColor: context.color.secondaryColor,
+  //     shape: const RoundedRectangleBorder(
+  //       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  //     ),
+  //     builder: (bottomSheetCtx) {
+  //       final currentLanguageState = context.watch<LanguageCubit>().state;
+  //       final currentCode = (currentLanguageState is LanguageLoader)
+  //           ? currentLanguageState.language['code']
+  //           : HiveUtils.getLanguage()?['code'];
 
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: context.color.borderColor,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "chooseLanguage".translate(context),
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: context.color.textDefaultColor,
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        Icons.close_rounded,
-                        size: 22,
-                        color: context.color.textLightColor,
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () => Navigator.pop(bottomSheetCtx),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Flexible(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: languages.length,
-                    separatorBuilder: (_, __) => Divider(
-                      height: 1,
-                      color: context.color.borderColor.withValues(alpha: 0.35),
-                    ),
-                    itemBuilder: (ctx, index) {
-                      final item = languages[index];
-                      final isSelected = item['code'] == currentCode;
+  //       return SafeArea(
+  //         child: Padding(
+  //           padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+  //           child: Column(
+  //             mainAxisSize: MainAxisSize.min,
+  //             crossAxisAlignment: CrossAxisAlignment.start,
+  //             children: [
+  //               Center(
+  //                 child: Container(
+  //                   width: 40,
+  //                   height: 4,
+  //                   decoration: BoxDecoration(
+  //                     color: context.color.borderColor,
+  //                     borderRadius: BorderRadius.circular(2),
+  //                   ),
+  //                 ),
+  //               ),
+  //               const SizedBox(height: 16),
+  //               Row(
+  //                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //                 children: [
+  //                   Text(
+  //                     "chooseLanguage".translate(context),
+  //                     style: TextStyle(
+  //                       fontSize: 18,
+  //                       fontWeight: FontWeight.bold,
+  //                       color: context.color.textDefaultColor,
+  //                     ),
+  //                   ),
+  //                   IconButton(
+  //                     icon: Icon(
+  //                       Icons.close_rounded,
+  //                       size: 22,
+  //                       color: context.color.textLightColor,
+  //                     ),
+  //                     padding: EdgeInsets.zero,
+  //                     constraints: const BoxConstraints(),
+  //                     onPressed: () => Navigator.pop(bottomSheetCtx),
+  //                   ),
+  //                 ],
+  //               ),
+  //               const SizedBox(height: 14),
+  //               Flexible(
+  //                 child: ListView.separated(
+  //                   shrinkWrap: true,
+  //                   itemCount: languages.length,
+  //                   separatorBuilder: (_, __) => Divider(
+  //                     height: 1,
+  //                     color: context.color.borderColor.withValues(alpha: 0.35),
+  //                   ),
+  //                   itemBuilder: (ctx, index) {
+  //                     final item = languages[index];
+  //                     final isSelected = item['code'] == currentCode;
 
-                      return InkWell(
-                        onTap: () {
-                          Navigator.pop(bottomSheetCtx);
-                          context
-                              .read<FetchLanguageCubit>()
-                              .getLanguage(item['code']);
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 14, horizontal: 4),
-                          child: Row(
-                            children: [
-                              if (item['image'] != null &&
-                                  item['image'].toString().isNotEmpty)
-                                Container(
-                                  width: 32,
-                                  height: 32,
-                                  margin: const EdgeInsets.only(right: 14),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(16),
-                                    child: UiUtils.imageType(
-                                      item['image'],
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                ),
-                              Expanded(
-                                child: Text(
-                                  item['name'] ?? "",
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: isSelected
-                                        ? FontWeight.bold
-                                        : FontWeight.w500,
-                                    color: isSelected
-                                        ? context.color.territoryColor
-                                        : context.color.textDefaultColor,
-                                  ),
-                                ),
-                              ),
-                              if (isSelected)
-                                Icon(
-                                  Icons.check_circle_rounded,
-                                  color: context.color.territoryColor,
-                                  size: 20,
-                                ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
+  //                     return InkWell(
+  //                       onTap: () {
+  //                         Navigator.pop(bottomSheetCtx);
+  //                         context
+  //                             .read<FetchLanguageCubit>()
+  //                             .getLanguage(item['code']);
+  //                       },
+  //                       child: Padding(
+  //                         padding: const EdgeInsets.symmetric(
+  //                             vertical: 14, horizontal: 4),
+  //                         child: Row(
+  //                           children: [
+  //                             if (item['image'] != null &&
+  //                                 item['image'].toString().isNotEmpty)
+  //                               Container(
+  //                                 width: 32,
+  //                                 height: 32,
+  //                                 margin: const EdgeInsets.only(right: 14),
+  //                                 decoration: BoxDecoration(
+  //                                   borderRadius: BorderRadius.circular(16),
+  //                                 ),
+  //                                 child: ClipRRect(
+  //                                   borderRadius: BorderRadius.circular(16),
+  //                                   child: UiUtils.imageType(
+  //                                     item['image'],
+  //                                     fit: BoxFit.cover,
+  //                                   ),
+  //                                 ),
+  //                               ),
+  //                             Expanded(
+  //                               child: Text(
+  //                                 item['name'] ?? "",
+  //                                 style: TextStyle(
+  //                                   fontSize: 15,
+  //                                   fontWeight: isSelected
+  //                                       ? FontWeight.bold
+  //                                       : FontWeight.w500,
+  //                                   color: isSelected
+  //                                       ? context.color.territoryColor
+  //                                       : context.color.textDefaultColor,
+  //                                 ),
+  //                               ),
+  //                             ),
+  //                             if (isSelected)
+  //                               Icon(
+  //                                 Icons.check_circle_rounded,
+  //                                 color: context.color.territoryColor,
+  //                                 size: 20,
+  //                               ),
+  //                           ],
+  //                         ),
+  //                       ),
+  //                     );
+  //                   },
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //       );
+  //     },
+  //   );
+  // }
 
   // ---------------------------------------------------------------------------
   // Legal Hub Bottom Sheet
@@ -805,7 +1115,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  "Legal Hub",
+                  "legalHub".translate(ctx),
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -907,7 +1217,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
                     // Title
                     Text(
-                      "Call us to get in touch",
+                      "callUsToGetInTouch".translate(dialogCtx),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 20,
@@ -919,7 +1229,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
                     // Timings / Working Hours
                     Text(
-                      "9:00 AM to 6:00 PM, Monday to Friday",
+                      "callUsWorkingHours".translate(dialogCtx),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
@@ -981,9 +1291,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                             fontSize: 13.5,
                             color: dialogCtx.color.textDefaultColor,
                           ),
-                          children: const [
-                            TextSpan(text: "Or email us at "),
+                          children: [
                             TextSpan(
+                                text: "orEmailUsAt".translate(dialogCtx)),
+                            const TextSpan(
                               text: "customersupport@ebozor.com",
                               style: TextStyle(
                                 color: Color(0xFF1E88E5),
@@ -1020,10 +1331,6 @@ class _ProfileScreenState extends State<ProfileScreen>
         );
       },
     );
-  }
-
-  void _handleJobProfileTap() {
-    Navigator.pushNamed(context, Routes.myJobApplicationsScreen);
   }
 
   // ---------------------------------------------------------------------------
@@ -1064,6 +1371,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
             HiveUtils.storeLanguage(map);
             context.read<LanguageCubit>().changeLanguage(map);
+            context.read<SliderCubit>().fetchSlider(context);
             context.read<FetchCategoryCubit>().fetchCategories();
             context.read<FetchHomeScreenCubit>().fetch(
                   city: HiveUtils.getCityName(),
@@ -1076,14 +1384,14 @@ class _ProfileScreenState extends State<ProfileScreen>
         },
         child: Scaffold(
           backgroundColor: context.color.backgroundColor,
-          appBar: UiUtils.buildAppBar(
-            context,
-            title: "profileTab".translate(context).isNotEmpty &&
-                    "profileTab".translate(context) != "profileTab"
-                ? "profileTab".translate(context)
-                : "Profile",
-            showBackButton: false,
-          ),
+          // appBar: UiUtils.buildAppBar(
+          //   context,
+          //   title: "profileTab".translate(context).isNotEmpty &&
+          //           "profileTab".translate(context) != "profileTab"
+          //       ? "profileTab".translate(context)
+          //       : "Profile",
+          //   showBackButton: false,
+          // ),
           body: SingleChildScrollView(
             controller: profileScreenController,
             physics: const BouncingScrollPhysics(),
@@ -1093,6 +1401,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const SizedBox(height: kToolbarHeight - 8),
                   // 1. Profile Header Card
                   _buildProfileHeader(),
                   const SizedBox(height: 14),
@@ -1108,7 +1417,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   // GROUP 1: Account & Profile
                   _buildMenuTile(
                     icon: Icons.person_outline_rounded,
-                    title: "Profile",
+                    title: "profileTab".translate(context),
                     onTap: () {
                       UiUtils.checkUser(
                         onNotGuest: () {
@@ -1121,7 +1430,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                   _buildMenuTile(
                     icon: Icons.settings_outlined,
-                    title: "Account",
+                    title: "account".translate(context),
                     onTap: () {
                       UiUtils.checkUser(
                         onNotGuest: () {
@@ -1134,7 +1443,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                   _buildMenuTile(
                     icon: Icons.notifications_none_rounded,
-                    title: "Notification",
+                    title: "notification".translate(context),
                     onTap: () {
                       UiUtils.checkUser(
                         onNotGuest: () {
@@ -1146,7 +1455,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                   _buildMenuTile(
                     icon: Icons.lock_outline_rounded,
-                    title: "Security",
+                    title: "security".translate(context),
                     onTap: () {
                       UiUtils.checkUser(
                         onNotGuest: () {
@@ -1161,8 +1470,21 @@ class _ProfileScreenState extends State<ProfileScreen>
 
                   // GROUP 2: Appointments & Services
                   _buildMenuTile(
+                    icon: Icons.business_center_outlined,
+                    title: "myJobApplication".translate(context),
+                    onTap: () {
+                      UiUtils.checkUser(
+                        onNotGuest: () {
+                          Navigator.pushNamed(
+                              context, Routes.myJobApplicationsScreen);
+                        },
+                        context: context,
+                      );
+                    },
+                  ),
+                  _buildMenuTile(
                     icon: Icons.calendar_today_outlined,
-                    title: "Car Appointments",
+                    title: "carAppointments".translate(context),
                     onTap: () {
                       UiUtils.checkUser(
                         onNotGuest: () {
@@ -1177,7 +1499,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                   _buildMenuTile(
                     icon: Icons.directions_car_outlined,
-                    title: "Car Inspections",
+                    title: "carInspections".translate(context),
                     onTap: () {
                       UiUtils.checkUser(
                         onNotGuest: () {
@@ -1192,7 +1514,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                   _buildMenuTile(
                     icon: Icons.shopping_bag_outlined,
-                    title: "Help Me Buy",
+                    title: "helpMeBuy".translate(context),
                     onTap: () {
                       Navigator.pushNamed(context, Routes.helpMeBuyScreen);
                     },
@@ -1203,20 +1525,20 @@ class _ProfileScreenState extends State<ProfileScreen>
                   // GROUP 3: Preferences / Localization
                   _buildMenuTile(
                     icon: Icons.apartment_rounded,
-                    title: "City",
+                    title: "city".translate(context),
                     trailingText: cityName,
                     onTap: () {
                       Navigator.pushNamed(context, Routes.citiesScreen);
                     },
                   ),
-                  _buildMenuTile(
-                    icon: Icons.translate_rounded,
-                    title: "Language",
-                    trailingText: langName,
-                    onTap: () {
-                      _showLanguageBottomSheet();
-                    },
-                  ),
+                  // _buildMenuTile(
+                  //   icon: Icons.translate_rounded,
+                  //   title: "language".translate(context),
+                  //   trailingText: langName,
+                  //   onTap: () {
+                  //     _showLanguageBottomSheet();
+                  //   },
+                  // ),
                   ValueListenableBuilder(
                     valueListenable: isDarkTheme,
                     builder: (context, v, c) {
@@ -1225,7 +1547,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         icon: isDark
                             ? Icons.dark_mode_outlined
                             : Icons.light_mode_outlined,
-                        title: "Dark Theme",
+                        title: "darkTheme".translate(context),
                         isSwitch: true,
                         switchValue: v,
                         onSwitchChanged: (value) {
@@ -1252,7 +1574,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   // GROUP 4: Content & Support
                   _buildMenuTile(
                     icon: Icons.article_outlined,
-                    title: "Blogs",
+                    title: "blogs".translate(context),
                     onTap: () {
                       UiUtils.checkUser(
                         onNotGuest: () {
@@ -1264,21 +1586,21 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                   _buildMenuTile(
                     icon: Icons.headset_mic_outlined,
-                    title: "Support",
+                    title: "support".translate(context),
                     onTap: () {
                       Navigator.pushNamed(context, Routes.faqsScreen);
                     },
                   ),
                   _buildMenuTile(
                     icon: Icons.phone_outlined,
-                    title: "Call Us",
+                    title: "callUs".translate(context),
                     onTap: () {
                       _showCallUsDialog();
                     },
                   ),
                   _buildMenuTile(
                     icon: Icons.gavel_outlined,
-                    title: "Legal Hub",
+                    title: "legalHub".translate(context),
                     onTap: () {
                       _showLegalHubBottomSheet();
                     },
@@ -1286,7 +1608,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   if (isAuthenticated)
                     _buildMenuTile(
                       icon: Icons.logout_rounded,
-                      title: "Log out",
+                      title: "logout".translate(context),
                       textColor: Colors.red,
                       iconColor: Colors.red,
                       onTap: () {
@@ -1296,7 +1618,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   else
                     _buildMenuTile(
                       icon: Icons.login_rounded,
-                      title: "Log in",
+                      title: "loginLbl".translate(context),
                       textColor: context.color.territoryColor,
                       iconColor: context.color.territoryColor,
                       onTap: () {
@@ -1312,7 +1634,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   // 4. Build Version
                   Center(
                     child: Text(
-                      "Build Version - $_appVersion",
+                      "${"buildVersion".translate(context)} - $_appVersion",
                       style: TextStyle(
                         fontSize: 12,
                         color: context.color.textLightColor,
@@ -1405,101 +1727,79 @@ class _ProfileQuickActionCard extends StatefulWidget {
 }
 
 class _ProfileQuickActionCardState extends State<_ProfileQuickActionCard> {
-  bool _isPressed = false;
-
   @override
   Widget build(BuildContext context) {
     final accentColor = context.color.territoryColor;
     final radius = BorderRadius.circular(14);
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 130),
-      curve: Curves.easeOut,
-      transform: Matrix4.translationValues(0, _isPressed ? 2 : 0, 0),
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: _isPressed ? 0.06 : 0.14),
-            blurRadius: _isPressed ? 4 : 12,
-            offset: Offset(0, _isPressed ? 1 : 5),
+    return Material(
+      color: context.color.secondaryColor,
+      borderRadius: radius,
+      clipBehavior: Clip.antiAlias,
+      child: Ink(
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          border: Border.all(
+            color: context.color.borderColor.withValues(alpha: 0.5),
+            width: 1,
           ),
-        ],
-      ),
-      child: Material(
-        color: context.color.secondaryColor,
-        borderRadius: radius,
-        clipBehavior: Clip.antiAlias,
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: radius,
-            border: Border.all(
-              color: context.color.borderColor.withValues(alpha: 0.5),
-              width: 1,
+        ),
+        child: InkWell(
+          onTap: widget.onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              vertical: 18,
+              horizontal: 12,
             ),
-          ),
-          child: InkWell(
-            onTap: widget.onTap,
-            onHighlightChanged: (isHighlighted) {
-              if (_isPressed != isHighlighted) {
-                setState(() => _isPressed = isHighlighted);
-              }
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: 18,
-                horizontal: 12,
-              ),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  if (widget.badgeText != null)
-                    Positioned(
-                      top: -8,
-                      right: -4,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: accentColor,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          widget.badgeText!,
-                          style: const TextStyle(
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                            letterSpacing: 0.3,
-                          ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                if (widget.badgeText != null)
+                  Positioned(
+                    top: -8,
+                    right: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: accentColor,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        widget.badgeText!,
+                        style: const TextStyle(
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: 0.3,
                         ),
                       ),
                     ),
-                  Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          widget.icon,
-                          size: 26,
-                          color: accentColor,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          widget.title,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: context.color.textColorDark,
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
-                ],
-              ),
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        widget.icon,
+                        size: 26,
+                        color: accentColor,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.title,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: context.color.textColorDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ),

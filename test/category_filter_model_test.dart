@@ -60,5 +60,23 @@ void main() {
       'multiselect': false,
     });
     expect(objectChoices.values, ['Midnight Blue', 'Pearl White']);
+
+    expect(
+      FilterItem.fromJson({
+        'name': 'Model name',
+        'type': 'textbox',
+        'multiselect': false,
+      }).type,
+      'text',
+    );
+    expect(
+      FilterItem.fromJson({
+        'name': 'Condition',
+        'type': 'select',
+        'values': ['New', 'Used'],
+        'multiselect': false,
+      }).type,
+      'dropdown',
+    );
   });
 }

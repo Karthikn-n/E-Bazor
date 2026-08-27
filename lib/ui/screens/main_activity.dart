@@ -476,7 +476,7 @@ class MainActivityState extends State<MainActivity>
       elevation: 0,
       padding: EdgeInsets.zero,
       child: Container(
-        height: 58,
+        height: kToolbarHeight,
         decoration: BoxDecoration(
           color: context.color.secondaryColor,
           border: Border(
@@ -494,8 +494,7 @@ class MainActivityState extends State<MainActivity>
               title: "homeTab".translate(context).isNotEmpty
                   ? "homeTab".translate(context)
                   : "Home",
-              outlineAsset: AppIcons.homeNavPng,
-              filledAsset: AppIcons.homeNavFilledPng,
+              asset: AppIcons.homeNavPng,
             ),
 
             buildBottomNavigationbarItem(
@@ -503,37 +502,64 @@ class MainActivityState extends State<MainActivity>
               title: "favorites".translate(context).isNotEmpty
                   ? "favorites".translate(context)
                   : "Favorites",
-              outlineIcon: Icons.favorite_border_rounded,
-              filledIcon: Icons.favorite_rounded,
+              icon: Icons.favorite_border_rounded,
             ),
 
-            /// CENTER BUTTON
-            InkWell(
-              borderRadius: BorderRadius.circular(30),
-              onTap: () {
-                UiUtils.checkUser(
-                  context: context,
-                  onNotGuest: () {
-                    Navigator.pushNamed(
-                      context,
-                      Routes.selectCategoryScreen,
-                      arguments: <String, dynamic>{},
+            /// CENTER PLACE AD BUTTON
+            Expanded(
+              child: Material(
+                type: MaterialType.transparency,
+                child: InkWell(
+                  highlightColor: Colors.transparent,
+                  splashColor: Colors.transparent,
+                  onTap: () {
+                    UiUtils.checkUser(
+                      context: context,
+                      onNotGuest: () {
+                        Navigator.pushNamed(
+                          context,
+                          Routes.selectCategoryScreen,
+                          arguments: <String, dynamic>{},
+                        );
+                      },
                     );
                   },
-                );
-              },
-              child: Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: context.color.territoryColor,
-                ),
-                child: const Center(
-                  child: Icon(
-                    Icons.add_rounded,
-                    color: Colors.white,
-                    size: 24,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: context.color.territoryColor,
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.add_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          "placeAd".translate(context).isNotEmpty
+                              ? "placeAd".translate(context)
+                              : "Place Ad",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: context.color.territoryColor,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -544,8 +570,7 @@ class MainActivityState extends State<MainActivity>
               title: "message".translate(context).isNotEmpty
                   ? "message".translate(context)
                   : "Chats",
-              outlineAsset: AppIcons.chatNavPng,
-              filledAsset: AppIcons.chatNavFilledPng,
+              asset: AppIcons.chatNavPng,
             ),
 
             buildBottomNavigationbarItem(
@@ -553,8 +578,7 @@ class MainActivityState extends State<MainActivity>
               title: "profileTab".translate(context).isNotEmpty
                   ? "profileTab".translate(context)
                   : "Profile",
-              outlineAsset: AppIcons.profileNavPng,
-              filledAsset: AppIcons.profileNavFilledPng,
+              asset: AppIcons.profileNavPng,
             ),
           ],
         ),
@@ -565,10 +589,8 @@ class MainActivityState extends State<MainActivity>
   Widget buildBottomNavigationbarItem({
     required int index,
     required String title,
-    String? outlineAsset,
-    String? filledAsset,
-    IconData? outlineIcon,
-    IconData? filledIcon,
+    String? asset,
+    IconData? icon,
   }) {
     final isSelected = currtab == index;
 
@@ -589,16 +611,16 @@ class MainActivityState extends State<MainActivity>
                   width: 24,
                   height: 24,
                   child: Center(
-                    child: outlineIcon != null
+                    child: icon != null
                         ? Icon(
-                            isSelected ? (filledIcon ?? outlineIcon) : outlineIcon,
+                            icon,
                             color: isSelected
                                 ? context.color.territoryColor
                                 : context.color.textColorDark.withValues(alpha: 0.55),
                             size: 22,
                           )
                         : Image.asset(
-                            isSelected ? filledAsset! : outlineAsset!,
+                            asset!,
                             color: isSelected
                                 ? context.color.territoryColor
                                 : context.color.textColorDark.withValues(alpha: 0.55),
@@ -612,6 +634,7 @@ class MainActivityState extends State<MainActivity>
                 Text(
                   title,
                   maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,

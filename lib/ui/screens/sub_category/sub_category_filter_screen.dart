@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:Ebozor/data/cubits/category/fetch_category_cubit.dart';
 import 'package:Ebozor/data/model/item_filter_model.dart';
+import 'package:Ebozor/data/model/property_filter_category_resolver.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
@@ -44,7 +45,7 @@ class FiltersPage extends StatefulWidget {
       final args = settings.arguments as Map;
       category = args['category'] as CategoryModel? ??
           CategoryModel(
-            id: int.tryParse(args['catID']?.toString() ?? '65') ?? 65,
+            id: int.tryParse(args['catID']?.toString() ?? ''),
             name: args['catName']?.toString() ?? 'Properties',
             slug:
                 args['categorySlug']?.toString() ?? args['catSlug']?.toString(),
@@ -54,7 +55,7 @@ class FiltersPage extends StatefulWidget {
       initialFilterConfiguration =
           args['filterConfiguration'] as FilterCategory?;
     } else {
-      category = CategoryModel(id: 65, name: "Properties");
+      category = CategoryModel(name: "Properties");
     }
 
     return MaterialPageRoute(
@@ -76,7 +77,7 @@ class FiltersPage extends StatefulWidget {
 
 class _FiltersPageState extends State<FiltersPage> {
   late FilterCubit cubit;
-  String selectedSlug = "residential";
+  String selectedSlug = '';
 
   // Tab: 0=Rent, 1=Buy, 2=Off-Plan
   int _selectedTab = 0;
@@ -94,20 +95,34 @@ class _FiltersPageState extends State<FiltersPage> {
       TextEditingController(text: '');
 
   // Dynamic filter state stored per filter name:
-  // Multi-select stores Set<String>
-  // Single-select stores String?
   final Map<String, dynamic> _selectedFilters = {};
+  final Set<String> _expandedMultiselectFilters = {};
+  final List<FilterCategory> _genericCategoryHistory = [];
 
   // Text / single numeric input dynamic filters stored per filter name
   final Map<String, TextEditingController> _filterTextControllers = {};
 
-  // Range Min / Max controllers for numeric range filters (e.g. Size, Km, etc.)
+  // Range Min / Max controllers for numeric range filters
   final Map<String, TextEditingController> _rangeMinControllers = {};
   final Map<String, TextEditingController> _rangeMaxControllers = {};
   final Map<String, RangeValues> _rangeSliderValues = {};
+  final List<TextEditingController> _retiredFilterControllers = [];
 
-  // Location controller
+  // Location fields
   final TextEditingController _locationController = TextEditingController();
+  String _selectedCountry = "";
+  String _selectedState = "";
+  String _selectedCity = "";
+  String _selectedArea = "";
+  int? _selectedAreaId;
+  int? _selectedRadius;
+  double? _selectedLat;
+  double? _selectedLong;
+
+  // More Filters section
+  bool _adsInEnglish = false;
+  bool _adsWithVideo = false;
+  bool _adsWith360Tour = false;
 
   // Live count state
   int _resultCount = 0;
@@ -116,21 +131,76 @@ class _FiltersPageState extends State<FiltersPage> {
   int _countRequestId = 0;
 
   bool get _isPropertyCategory {
-    const propertyIds = {65, 68, 139, 143};
-    final id = widget.category.id;
-    final value = '${widget.category.name ?? ''} '
-            '${widget.category.slug ?? ''} '
-            '${widget.initialFilterConfiguration?.slug ?? ''}'
-        .toLowerCase();
-    return propertyIds.contains(id) ||
-        value.contains('property') ||
-        value.contains('residential') ||
-        value.contains('off-plan');
+    return PropertyFilterCategoryResolver.isPropertyCategory(
+      CategoryModel(
+        name: widget.category.name,
+        slug: widget.initialFilterConfiguration?.slug ??
+            widget.initialFilter?.categorySlug ??
+            widget.category.slug,
+      ),
+    );
+  }
+
+  String get _defaultLocationLabel {
+    final values = [
+      HiveUtils.getCityName(),
+      HiveUtils.getStateName(),
+      HiveUtils.getCountryName(),
+    ];
+    return values
+            .whereType<String>()
+            .where((value) => value.trim().isNotEmpty)
+            .firstOrNull ??
+        '';
+  }
+
+  bool get _hasSelectedSubcategory {
+    if (!_isPropertyCategory) {
+      return _genericCategoryHistory.isNotEmpty && selectedSlug.isNotEmpty;
+    }
+
+    final state = cubit.state;
+    if (state is! FilterLoaded ||
+        _selectedCategory < 0 ||
+        _selectedCategory >= state.data.children.length) {
+      return false;
+    }
+    final category = state.data.children[_selectedCategory];
+    final name = category.name?.trim().toLowerCase() ?? '';
+    final slug = category.slug?.trim().toLowerCase() ?? '';
+    return !name.startsWith('all') && !slug.endsWith('-all');
+  }
+
+  List<CategoryModel> get _categoryTrees {
+    final state = context.read<FetchCategoryCubit>().state;
+    return state is FetchCategorySuccess
+        ? state.categories
+        : const <CategoryModel>[];
+  }
+
+  CategoryModel? _getRootCategoryForTab(int tabIndex) {
+    return PropertyFilterCategoryResolver.rootFor(
+      tab: PropertyFilterTab.values[tabIndex],
+      categoryTrees: _categoryTrees,
+      currentCategory: widget.category,
+    );
+  }
+
+  List<CategoryModel> _getPropertyTypesForTab(int tabIndex) {
+    return PropertyFilterCategoryResolver.propertyTypesFor(
+      tab: PropertyFilterTab.values[tabIndex],
+      categoryTrees: _categoryTrees,
+      currentCategory: widget.category,
+    );
   }
 
   List<FilterItem> _sortedActiveFilters(FilterCategory category) {
-    final filters =
-        category.filters.where((filter) => filter.isActive).toList();
+    final filters = category.filters
+        .where((filter) =>
+            filter.isActive &&
+            filter.name != null &&
+            filter.name!.trim().isNotEmpty)
+        .toList();
     filters.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     return filters;
   }
@@ -140,61 +210,77 @@ class _FiltersPageState extends State<FiltersPage> {
     super.initState();
     cubit = context.read<FilterCubit>();
 
-    // Determine default tab based on category id, name, or slug:
-    final catId = widget.category.id;
-    final slugLower = (widget.category.slug ?? "").toLowerCase();
-    final nameLower = (widget.category.name ?? "").toLowerCase();
-
-    if (catId == 143 ||
-        slugLower.contains("off-plan") ||
-        nameLower.contains("off-plan")) {
-      _selectedTab = 2; // Off-Plan
-    } else if (catId == 139 ||
-        slugLower.contains("sale") ||
-        nameLower.contains("sale") ||
-        nameLower.contains("buy")) {
-      _selectedTab = 1; // Buy
-    } else if (catId == 65 ||
-        catId == 68 ||
-        slugLower.contains("rent") ||
-        nameLower.contains("rent")) {
-      _selectedTab = 0; // Rent
-    } else {
-      _selectedTab = 0; // Default Rent
-    }
-
-    final selectedCategorySlug = widget.initialFilter?.categorySlug;
-    final initialSlug =
-        widget.initialFilterConfiguration?.slug?.isNotEmpty == true
-            ? widget.initialFilterConfiguration!.slug!
-            : (selectedCategorySlug != null && selectedCategorySlug.isNotEmpty)
-                ? selectedCategorySlug
-                : ((widget.category.children != null &&
-                        widget.category.children!.isNotEmpty)
-                    ? (widget.category.children!.first.slug ??
-                        widget.category.slug ??
-                        '')
-                    : (widget.category.slug ?? ''));
-
-    if (widget.category.children != null) {
-      final propertyTypeIndex = widget.category.children!.indexWhere(
-        (category) => category.slug == initialSlug,
+    final selectedCategorySlug =
+        widget.initialFilter?.categorySlug ?? widget.category.slug;
+    if (_isPropertyCategory) {
+      final requestedCategory = CategoryModel(
+        name: widget.category.name,
+        slug: widget.initialFilterConfiguration?.slug ??
+            selectedCategorySlug ??
+            widget.category.slug,
       );
-      if (propertyTypeIndex >= 0) _selectedPropertyType = propertyTypeIndex;
+      _selectedTab =
+          PropertyFilterCategoryResolver.tabFor(requestedCategory).index;
+
+      final tabPropertyTypes = _getPropertyTypesForTab(_selectedTab);
+      final initialSlug =
+          widget.initialFilterConfiguration?.slug?.isNotEmpty == true
+              ? widget.initialFilterConfiguration!.slug!
+              : (selectedCategorySlug?.isNotEmpty == true)
+                  ? selectedCategorySlug!
+                  : (tabPropertyTypes.isNotEmpty
+                      ? (tabPropertyTypes.first.slug ?? '')
+                      : (_getRootCategoryForTab(_selectedTab)?.slug ?? ''));
+
+      final propertyTypeIndex = tabPropertyTypes.indexWhere(
+        (category) =>
+            category.slug == initialSlug || category.id == widget.category.id,
+      );
+      if (propertyTypeIndex >= 0) {
+        _selectedPropertyType = propertyTypeIndex;
+        selectedSlug = tabPropertyTypes[propertyTypeIndex].slug ?? initialSlug;
+      } else {
+        _selectedPropertyType = 0;
+        selectedSlug = tabPropertyTypes.isNotEmpty
+            ? (tabPropertyTypes.first.slug ?? initialSlug)
+            : initialSlug;
+      }
+    } else {
+      selectedSlug =
+          widget.initialFilterConfiguration?.slug?.trim().isNotEmpty == true
+              ? widget.initialFilterConfiguration!.slug!.trim()
+              : (selectedCategorySlug ?? '').trim();
     }
+
+    final appliedCategorySlug = widget.initialFilter?.categorySlug;
     if (widget.initialFilterConfiguration != null &&
-        selectedCategorySlug != null) {
-      final categoryIndex = widget.initialFilterConfiguration!.children
-          .indexWhere((category) => category.slug == selectedCategorySlug);
-      if (categoryIndex >= 0) _selectedCategory = categoryIndex;
+        appliedCategorySlug != null) {
+      _selectedCategory = widget.initialFilterConfiguration!.children
+          .indexWhere((category) => category.slug == appliedCategorySlug);
+      if (!_isPropertyCategory &&
+          appliedCategorySlug != widget.initialFilterConfiguration!.slug) {
+        _genericCategoryHistory.add(widget.initialFilterConfiguration!);
+      }
     }
 
-    selectedSlug = initialSlug;
-    if (initialSlug.isNotEmpty) cubit.fetchFilters(initialSlug);
+    if (selectedSlug.isNotEmpty) cubit.fetchFilters(selectedSlug);
 
-    _locationController.text = widget.initialFilter?.city?.isNotEmpty == true
-        ? widget.initialFilter!.city!
-        : (HiveUtils.getCityName() ?? "");
+    _selectedCity = widget.initialFilter?.city ?? HiveUtils.getCityName() ?? "";
+    _selectedState =
+        widget.initialFilter?.state ?? HiveUtils.getStateName() ?? "";
+    _selectedCountry =
+        widget.initialFilter?.country ?? HiveUtils.getCountryName() ?? "";
+    _selectedArea = widget.initialFilter?.area ?? "";
+    _selectedAreaId = widget.initialFilter?.areaId;
+    _selectedRadius = widget.initialFilter?.radius;
+    _selectedLat = widget.initialFilter?.latitude;
+    _selectedLong = widget.initialFilter?.longitude;
+
+    _locationController.text = _selectedArea.isNotEmpty
+        ? _selectedArea
+        : _selectedCity.isNotEmpty
+            ? _selectedCity
+            : _selectedCountry;
 
     if (widget.initialFilter?.minPrice != null &&
         widget.initialFilter!.minPrice!.isNotEmpty) {
@@ -212,7 +298,15 @@ class _FiltersPageState extends State<FiltersPage> {
         if (k.startsWith('filters[') && k.endsWith(']')) {
           cleanKey = k.substring(8, k.length - 1);
         }
-        if (v is List) {
+        if (k == 'ads_in_english' || k == 'language') {
+          _adsInEnglish = true;
+        } else if (k == 'has_video' || k == 'video_link' || k == 'with_video') {
+          _adsWithVideo = true;
+        } else if (k == 'has_360_tour' ||
+            k == 'threeD_image' ||
+            k == 'virtual_tour') {
+          _adsWith360Tour = true;
+        } else if (v is List) {
           _selectedFilters[cleanKey] = List<String>.from(
             v.map((e) => e.toString()),
           );
@@ -223,23 +317,6 @@ class _FiltersPageState extends State<FiltersPage> {
           _selectedFilters[cleanKey] = v.toString();
         }
       });
-    }
-    for (final filterDefinition
-        in widget.initialFilterConfiguration?.filters ?? const <FilterItem>[]) {
-      final name = filterDefinition.name;
-      if (name == null || filterDefinition.values.isEmpty) continue;
-      final value = _selectedFilters[name];
-      if (filterDefinition.multiSelect) {
-        if (value is Iterable) {
-          _selectedFilters[name] =
-              Set<String>.from(value.map((item) => item.toString()));
-        } else if (value != null && value.toString().isNotEmpty) {
-          _selectedFilters[name] = <String>{value.toString()};
-        }
-      } else if (value is Iterable) {
-        final values = value.map((item) => item.toString()).toList();
-        _selectedFilters[name] = values.isEmpty ? '' : values.first;
-      }
     }
 
     _priceMinController.addListener(_onFilterChanged);
@@ -264,6 +341,9 @@ class _FiltersPageState extends State<FiltersPage> {
     for (var controller in _rangeMaxControllers.values) {
       controller.dispose();
     }
+    for (var controller in _retiredFilterControllers) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -271,12 +351,115 @@ class _FiltersPageState extends State<FiltersPage> {
     _updateItemCount();
   }
 
+  void _clearDynamicFilterSelections() {
+    final controllersToDispose = <TextEditingController>[
+      ..._filterTextControllers.values,
+      ..._rangeMinControllers.values,
+      ..._rangeMaxControllers.values,
+    ];
+    _selectedFilters.clear();
+    _expandedMultiselectFilters.clear();
+    _filterTextControllers.clear();
+    _rangeMinControllers.clear();
+    _rangeMaxControllers.clear();
+    _rangeSliderValues.clear();
+    _retiredFilterControllers.addAll(controllersToDispose);
+  }
+
+  void _openGenericCategory(FilterSubCategory category) {
+    final slug = category.slug?.trim() ?? '';
+    final state = cubit.state;
+    if (_isPropertyCategory || slug.isEmpty || state is FilterLoading) return;
+
+    final FilterCategory? visibleParent = state is FilterLoaded
+        ? (state.data.children.isNotEmpty
+            ? state.data
+            : (_genericCategoryHistory.isNotEmpty
+                ? _genericCategoryHistory.last
+                : state.data))
+        : (_genericCategoryHistory.isNotEmpty
+            ? _genericCategoryHistory.last
+            : null);
+    if (visibleParent == null) return;
+    final currentParentSlug = visibleParent.slug?.trim() ?? '';
+    final lastHistorySlug = _genericCategoryHistory.isNotEmpty
+        ? (_genericCategoryHistory.last.slug?.trim() ?? '')
+        : '';
+    if (_genericCategoryHistory.isEmpty ||
+        currentParentSlug != lastHistorySlug) {
+      _genericCategoryHistory.add(visibleParent);
+    }
+    _clearDynamicFilterSelections();
+    setState(() {
+      selectedSlug = slug;
+      _selectedCategory = -1;
+    });
+    cubit.fetchFilters(slug);
+    _onFilterChanged();
+  }
+
+  void _returnToPreviousGenericCategory() {
+    if (_genericCategoryHistory.isEmpty) return;
+    final previous = _genericCategoryHistory.removeLast();
+    final slug = previous.slug?.trim() ?? '';
+    if (slug.isEmpty) return;
+
+    _clearDynamicFilterSelections();
+    setState(() {
+      selectedSlug = slug;
+      _selectedCategory = -1;
+    });
+    cubit.fetchFilters(slug);
+    _onFilterChanged();
+  }
+
+  List<FilterSubCategory> _visibleGenericCategories(FilterState state) {
+    if (state is FilterLoaded && state.data.children.isNotEmpty) {
+      return state.data.children;
+    }
+    if (_genericCategoryHistory.isNotEmpty) {
+      return _genericCategoryHistory.last.children;
+    }
+    return state is FilterLoaded
+        ? state.data.children
+        : const <FilterSubCategory>[];
+  }
+
+  String _visibleGenericCategoryTitle(FilterState state) {
+    if (state is FilterLoaded && state.data.children.isNotEmpty) {
+      return state.data.name ?? 'Categories';
+    }
+    if (_genericCategoryHistory.isNotEmpty) {
+      return _genericCategoryHistory.last.name ?? 'Categories';
+    }
+    return state is FilterLoaded
+        ? (state.data.name ?? 'Categories')
+        : 'Categories';
+  }
+
+  Widget _buildGenericBackButton() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: _returnToPreviousGenericCategory,
+        icon: const Icon(Icons.arrow_back_rounded),
+        label: Text(
+          'Back to ${_genericCategoryHistory.last.name ?? 'Categories'}',
+        ),
+      ),
+    );
+  }
+
   int get _appliedFiltersCount {
     int count = 0;
+    if (_hasSelectedSubcategory) count++;
     if (_priceMinController.text.isNotEmpty ||
         _priceMaxController.text.isNotEmpty) count++;
-    if (_locationController.text.isNotEmpty &&
-        _locationController.text != (HiveUtils.getCityName() ?? "")) count++;
+    if (_selectedArea.isNotEmpty ||
+        (_locationController.text.isNotEmpty &&
+            _locationController.text != _defaultLocationLabel)) {
+      count++;
+    }
     _selectedFilters.forEach((_, val) {
       if (val is Set && val.isNotEmpty) count++;
       if (val is List && val.isNotEmpty) count++;
@@ -291,6 +474,9 @@ class _FiltersPageState extends State<FiltersPage> {
         count++;
       }
     });
+    if (_adsInEnglish) count++;
+    if (_adsWithVideo) count++;
+    if (_adsWith360Tour) count++;
     return count;
   }
 
@@ -326,17 +512,33 @@ class _FiltersPageState extends State<FiltersPage> {
             "min_price": _priceMinController.text.trim(),
           if (_priceMaxController.text.trim().isNotEmpty)
             "max_price": _priceMaxController.text.trim(),
-          if (_locationController.text.trim().isNotEmpty)
+          if (_selectedCity.isNotEmpty)
+            "city": _selectedCity
+          else if (_selectedCountry.isEmpty &&
+              _selectedState.isEmpty &&
+              _locationController.text.trim().isNotEmpty &&
+              _locationController.text.trim() != _defaultLocationLabel)
             "city": _locationController.text.trim()
-          else if (HiveUtils.getCityName() != null &&
+          else if (_selectedCountry.isEmpty &&
+              _selectedState.isEmpty &&
+              HiveUtils.getCityName() != null &&
               HiveUtils.getCityName()!.isNotEmpty)
             "city": HiveUtils.getCityName(),
-          if (HiveUtils.getStateName() != null &&
+          if (_selectedState.isNotEmpty)
+            "state": _selectedState
+          else if (_selectedCountry.isEmpty &&
+              HiveUtils.getStateName() != null &&
               HiveUtils.getStateName()!.isNotEmpty)
             "state": HiveUtils.getStateName(),
-          if (HiveUtils.getCountryName() != null &&
+          if (_selectedCountry.isNotEmpty)
+            "country": _selectedCountry
+          else if (HiveUtils.getCountryName() != null &&
               HiveUtils.getCountryName()!.isNotEmpty)
             "country": HiveUtils.getCountryName(),
+          if (_selectedAreaId != null) "area_id": _selectedAreaId,
+          if (_selectedRadius != null) "radius": _selectedRadius,
+          if (_selectedLat != null) "latitude": _selectedLat,
+          if (_selectedLong != null) "longitude": _selectedLong,
           "category_slug": activeCategorySlug,
         };
 
@@ -372,6 +574,20 @@ class _FiltersPageState extends State<FiltersPage> {
           }
         });
 
+        // Add More Filters parameters
+        if (_adsInEnglish) {
+          queryParams["language"] = "English";
+          queryParams["ads_in_english"] = "1";
+        }
+        if (_adsWithVideo) {
+          queryParams["video_link"] = "1";
+          queryParams["has_video"] = "1";
+        }
+        if (_adsWith360Tour) {
+          queryParams["threeD_image"] = "1";
+          queryParams["has_360_tour"] = "1";
+        }
+
         final dio = Dio(
           BaseOptions(
             baseUrl: Constant.baseUrl,
@@ -405,6 +621,46 @@ class _FiltersPageState extends State<FiltersPage> {
             _isLoadingCount = false;
           });
         }
+      }
+    });
+  }
+
+  void _onTapChooseLocation() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    Navigator.pushNamed(context, Routes.countriesScreen,
+        arguments: {"from": "filter"}).then((value) {
+      if (value != null) {
+        Map<String, dynamic> location = value as Map<String, dynamic>;
+
+        setState(() {
+          _selectedArea = location["area"] ?? "";
+          _selectedCity = location["city"] ?? "";
+          _selectedAreaId = location["area_id"] != null
+              ? int.tryParse(location["area_id"].toString())
+              : null;
+          _selectedRadius = location["radius"] != null
+              ? int.tryParse(location["radius"].toString())
+              : null;
+          _selectedCountry = location["country"] ?? "";
+          _selectedState = location["state"] ?? "";
+          _selectedLat = location["latitude"] != null
+              ? double.tryParse(location["latitude"].toString())
+              : null;
+          _selectedLong = location["longitude"] != null
+              ? double.tryParse(location["longitude"].toString())
+              : null;
+
+          final displayLoc = _selectedArea.isNotEmpty
+              ? _selectedArea
+              : _selectedCity.isNotEmpty
+                  ? _selectedCity
+                  : _selectedState.isNotEmpty
+                      ? _selectedState
+                      : _selectedCountry;
+
+          _locationController.text = displayLoc;
+        });
+        _onFilterChanged();
       }
     });
   }
@@ -446,6 +702,9 @@ class _FiltersPageState extends State<FiltersPage> {
 
         setState(() {
           _locationController.text = locName;
+          _selectedCity = locName;
+          _selectedLat = position.latitude;
+          _selectedLong = position.longitude;
         });
         _onFilterChanged();
       }
@@ -459,49 +718,71 @@ class _FiltersPageState extends State<FiltersPage> {
   }
 
   void _resetAllFilters() {
+    final genericRoot =
+        !_isPropertyCategory && _genericCategoryHistory.isNotEmpty
+            ? _genericCategoryHistory.first
+            : null;
+    _clearDynamicFilterSelections();
     setState(() {
-      _selectedTab = 0;
-      _selectedPropertyType = 0;
       _selectedCategory = -1;
+      if (genericRoot != null) {
+        _genericCategoryHistory.clear();
+        selectedSlug = genericRoot.slug?.trim() ?? selectedSlug;
+      }
       _priceMinController.clear();
       _priceMaxController.clear();
-      _locationController.text = HiveUtils.getCityName() ?? "";
-      _selectedFilters.clear();
-      _rangeSliderValues.clear();
-      for (var controller in _filterTextControllers.values) {
-        controller.clear();
-      }
-      for (var controller in _rangeMinControllers.values) {
-        controller.clear();
-      }
-      for (var controller in _rangeMaxControllers.values) {
-        controller.clear();
-      }
+      _selectedCity = HiveUtils.getCityName() ?? "";
+      _selectedState = HiveUtils.getStateName() ?? "";
+      _selectedCountry = HiveUtils.getCountryName() ?? "";
+      _selectedArea = "";
+      _selectedAreaId = null;
+      _selectedLat = null;
+      _selectedLong = null;
+      _selectedRadius = null;
+      _locationController.text = _defaultLocationLabel;
+      _adsInEnglish = false;
+      _adsWithVideo = false;
+      _adsWith360Tour = false;
     });
-    final initialSlug = (widget.category.children != null &&
-            widget.category.children!.isNotEmpty)
-        ? (widget.category.children!.first.slug ??
-            widget.category.slug ??
-            selectedSlug)
-        : (widget.category.slug ?? selectedSlug);
-    selectedSlug = initialSlug;
-    if (initialSlug.isNotEmpty) cubit.fetchFilters(initialSlug);
+    if (genericRoot != null && selectedSlug.isNotEmpty) {
+      cubit.fetchFilters(selectedSlug);
+    }
     _onFilterChanged();
   }
 
   void _applyFiltersAndNavigate() {
-    String activeCategoryId = widget.category.id.toString();
-    String activeCategoryName = widget.category.name ?? "Properties";
-    String activeCategorySlug = selectedSlug;
+    final propertyTypes = _isPropertyCategory
+        ? _getPropertyTypesForTab(_selectedTab)
+        : const <CategoryModel>[];
+    final selectedBaseCategory = _isPropertyCategory
+        ? (_selectedPropertyType >= 0 &&
+                _selectedPropertyType < propertyTypes.length
+            ? propertyTypes[_selectedPropertyType]
+            : _getRootCategoryForTab(_selectedTab) ?? widget.category)
+        : CategoryModel(
+            id: widget.initialFilterConfiguration?.id ?? widget.category.id,
+            name:
+                widget.initialFilterConfiguration?.name ?? widget.category.name,
+            slug: widget.initialFilterConfiguration?.slug ??
+                (selectedSlug.isNotEmpty
+                    ? selectedSlug
+                    : widget.category.slug ?? ''),
+          );
+    String activeCategoryId = selectedBaseCategory.id?.toString() ?? '';
+    String activeCategoryName = selectedBaseCategory.name ?? "Category";
+    String activeCategorySlug = selectedBaseCategory.slug ?? selectedSlug;
     final filterState = cubit.state;
-    if (filterState is FilterLoaded) {
+    if (filterState is FilterLoaded && filterState.data.slug == selectedSlug) {
+      activeCategoryId = filterState.data.id?.toString() ?? activeCategoryId;
+      activeCategoryName = filterState.data.name ?? activeCategoryName;
+      activeCategorySlug = filterState.data.slug ?? activeCategorySlug;
       if (_selectedCategory >= 0 &&
           _selectedCategory < filterState.data.children.length) {
         final child = filterState.data.children[_selectedCategory];
         if (child.slug != null &&
             child.slug!.isNotEmpty &&
             !child.slug!.endsWith('-all')) {
-          activeCategoryId = child.id.toString();
+          activeCategoryId = child.id?.toString() ?? activeCategoryId;
           activeCategoryName = child.name ?? activeCategoryName;
           activeCategorySlug = child.slug!;
         }
@@ -537,6 +818,19 @@ class _FiltersPageState extends State<FiltersPage> {
       }
     });
 
+    if (_adsInEnglish) {
+      customFieldFilterMap["ads_in_english"] = "1";
+      customFieldFilterMap["language"] = "English";
+    }
+    if (_adsWithVideo) {
+      customFieldFilterMap["has_video"] = "1";
+      customFieldFilterMap["video_link"] = "1";
+    }
+    if (_adsWith360Tour) {
+      customFieldFilterMap["has_360_tour"] = "1";
+      customFieldFilterMap["threeD_image"] = "1";
+    }
+
     ItemFilterModel appliedFilter = ItemFilterModel(
       categoryId: activeCategoryId,
       categorySlug: activeCategorySlug,
@@ -547,30 +841,68 @@ class _FiltersPageState extends State<FiltersPage> {
       maxPrice: _priceMaxController.text.trim().isNotEmpty
           ? _priceMaxController.text.trim()
           : null,
-      city: _locationController.text.trim().isNotEmpty
-          ? _locationController.text.trim()
-          : (HiveUtils.getCityName() ?? ""),
-      state: HiveUtils.getStateName() ?? "",
-      country: HiveUtils.getCountryName() ?? "",
+      city: _selectedCity.isNotEmpty
+          ? _selectedCity
+          : (_selectedCountry.isEmpty &&
+                  _selectedState.isEmpty &&
+                  _locationController.text.trim().isNotEmpty &&
+                  _locationController.text.trim() != _defaultLocationLabel)
+              ? _locationController.text.trim()
+              : (_selectedCountry.isEmpty && _selectedState.isEmpty
+                  ? (HiveUtils.getCityName() ?? "")
+                  : ""),
+      state: _selectedState.isNotEmpty
+          ? _selectedState
+          : (_selectedCountry.isEmpty ? (HiveUtils.getStateName() ?? "") : ""),
+      country: _selectedCountry.isNotEmpty
+          ? _selectedCountry
+          : (HiveUtils.getCountryName() ?? ""),
+      area: _selectedArea,
+      areaId: _selectedAreaId,
+      radius: _selectedRadius,
+      latitude: _selectedLat,
+      longitude: _selectedLong,
       customFields:
           customFieldFilterMap.isNotEmpty ? customFieldFilterMap : null,
     );
 
     Constant.itemFilter = appliedFilter;
 
-    List<CategoryModel> categoryChain = [widget.category];
-    List<String> categoryIds = [widget.category.id.toString()];
-
-    if (activeCategoryId != widget.category.id.toString()) {
-      categoryChain.add(CategoryModel(
-        id: int.tryParse(activeCategoryId) ?? 0,
-        name: activeCategoryName,
-        slug: activeCategorySlug,
-        children: [],
-        subcategoriesCount: 0,
-      ));
-      categoryIds.add(activeCategoryId);
+    final categoryChain = <CategoryModel>[];
+    final categoryIds = <String>[];
+    void addToChain(CategoryModel category) {
+      final id = category.id?.toString();
+      final slug = category.slug;
+      if (categoryChain.any((existing) =>
+          (id != null && existing.id?.toString() == id) ||
+          (slug != null && slug.isNotEmpty && existing.slug == slug))) {
+        return;
+      }
+      categoryChain.add(category);
+      if (id != null && id.isNotEmpty) categoryIds.add(id);
     }
+
+    if (_isPropertyCategory) {
+      final tabRoot = _getRootCategoryForTab(_selectedTab);
+      if (tabRoot != null) addToChain(tabRoot);
+    } else {
+      addToChain(widget.category);
+      for (final category in _genericCategoryHistory) {
+        addToChain(CategoryModel(
+          id: category.id,
+          name: category.name,
+          slug: category.slug,
+        ));
+      }
+    }
+    addToChain(selectedBaseCategory);
+    addToChain(CategoryModel(
+      id: int.tryParse(activeCategoryId),
+      name: activeCategoryName,
+      slug: activeCategorySlug,
+      children: const [],
+      subcategoriesCount: 0,
+    ));
 
     if (widget.isFromItemsList && Navigator.canPop(context)) {
       Navigator.pop(context, {
@@ -688,22 +1020,22 @@ class _FiltersPageState extends State<FiltersPage> {
             child: GestureDetector(
               onTap: () {
                 if (_selectedTab != i) {
+                  final tabPropertyTypes = _getPropertyTypesForTab(i);
+                  final rootCategory = _getRootCategoryForTab(i);
+                  final targetCategory = tabPropertyTypes.isNotEmpty
+                      ? tabPropertyTypes.first
+                      : rootCategory;
+                  final targetSlug = targetCategory?.slug ?? '';
+                  if (targetSlug.isEmpty) return;
+
+                  _clearDynamicFilterSelections();
                   setState(() {
                     _selectedTab = i;
-                    _selectedCategory = -1;
                     _selectedPropertyType = 0;
-                    _selectedFilters.clear();
-                    _filterTextControllers.clear();
-                    _rangeMinControllers.clear();
-                    _rangeMaxControllers.clear();
+                    _selectedCategory = -1;
+                    selectedSlug = targetSlug;
                   });
-
-                  String tabSlug = "property-for-rent";
-                  if (i == 1) tabSlug = "property-for-sale";
-                  if (i == 2) tabSlug = "property-for-sale-off-plan";
-
-                  selectedSlug = tabSlug;
-                  cubit.fetchFilters(tabSlug);
+                  cubit.fetchFilters(targetSlug);
                   _onFilterChanged();
                 }
               },
@@ -761,45 +1093,52 @@ class _FiltersPageState extends State<FiltersPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitle('Location'.translate(context)),
-        Container(
-          decoration: BoxDecoration(
-            color: context.color.secondaryColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: context.color.borderColor.withValues(alpha: 0.6),
-            ),
-          ),
-          child: TextField(
-            controller: _locationController,
-            style: TextStyle(
-              color: context.color.textDefaultColor,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-            decoration: InputDecoration(
-              hintText: 'e.g. Dubai Marina, Deira...'.translate(context),
-              hintStyle: TextStyle(
-                color: context.color.textLightColor,
-                fontSize: 13,
+        InkWell(
+          onTap: _onTapChooseLocation,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            decoration: BoxDecoration(
+              color: context.color.secondaryColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: context.color.borderColor.withValues(alpha: 0.6),
               ),
-              prefixIcon: Icon(
-                Icons.location_on_rounded,
-                color: context.color.territoryColor,
-                size: 20,
-              ),
-              suffixIcon: IconButton(
-                icon: Icon(
-                  Icons.my_location_rounded,
-                  color: context.color.territoryColor,
-                  size: 20,
+            ),
+            child: IgnorePointer(
+              ignoring: true,
+              child: TextField(
+                controller: _locationController,
+                style: TextStyle(
+                  color: context.color.textDefaultColor,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
                 ),
-                tooltip: 'Use current location'.translate(context),
-                onPressed: _fetchCurrentLocation,
-              ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 12,
+                decoration: InputDecoration(
+                  hintText: 'e.g. Dubai Marina, Deira...'.translate(context),
+                  hintStyle: TextStyle(
+                    color: context.color.textLightColor,
+                    fontSize: 13,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.location_on_rounded,
+                    color: context.color.territoryColor,
+                    size: 20,
+                  ),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      Icons.my_location_rounded,
+                      color: context.color.territoryColor,
+                      size: 20,
+                    ),
+                    tooltip: 'Use current location'.translate(context),
+                    onPressed: _fetchCurrentLocation,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 14,
+                  ),
+                ),
               ),
             ),
           ),
@@ -808,7 +1147,7 @@ class _FiltersPageState extends State<FiltersPage> {
     );
   }
 
-  Widget _buildPropertyTypeSection(List<dynamic> propertyTypes) {
+  Widget _buildPropertyTypeSection(List<CategoryModel> propertyTypes) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -826,13 +1165,16 @@ class _FiltersPageState extends State<FiltersPage> {
               return GestureDetector(
                 onTap: () {
                   if (_selectedPropertyType != i) {
+                    final slug = item.slug ?? '';
+                    if (slug.isEmpty) return;
+                    _clearDynamicFilterSelections();
                     setState(() {
                       _selectedPropertyType = i;
                       _selectedCategory = -1;
+                      selectedSlug = slug;
                     });
-                    final slug = item.slug ?? "residential";
-                    selectedSlug = slug;
                     cubit.fetchFilters(slug);
+                    _onFilterChanged();
                   }
                 },
                 child: AnimatedContainer(
@@ -894,6 +1236,14 @@ class _FiltersPageState extends State<FiltersPage> {
         return Icons.calendar_month_rounded;
       case 'daily short term':
         return Icons.today_rounded;
+      case 'new projects':
+        return Icons.apartment_rounded;
+      case 'off-plan':
+        return Icons.architecture_rounded;
+      case 'land':
+        return Icons.landscape_rounded;
+      case 'multiple units':
+        return Icons.holiday_village_rounded;
       default:
         return Icons.category_rounded;
     }
@@ -935,12 +1285,23 @@ class _FiltersPageState extends State<FiltersPage> {
             separatorBuilder: (_, __) => const SizedBox(width: 8),
             itemBuilder: (context, i) {
               final item = categories[i];
-              final isSelected = _selectedCategory == i;
+              final isSelected = _isPropertyCategory
+                  ? _selectedCategory == i
+                  : item.slug?.trim() == selectedSlug.trim();
 
               return GestureDetector(
                 onTap: () {
+                  if (!_isPropertyCategory) {
+                    _openGenericCategory(item);
+                    return;
+                  }
+                  final name = item.name?.trim().toLowerCase() ?? '';
+                  final slug = item.slug?.trim().toLowerCase() ?? '';
+                  final selectsAll =
+                      name.startsWith('all') || slug.endsWith('-all');
                   setState(() {
-                    _selectedCategory = i;
+                    _selectedCategory =
+                        selectsAll || _selectedCategory == i ? -1 : i;
                   });
                   _onFilterChanged();
                 },
@@ -1063,7 +1424,6 @@ class _FiltersPageState extends State<FiltersPage> {
           ],
         ),
         const SizedBox(height: 6),
-        // Range Slider
         RangeSlider(
           values: RangeValues(
             sliderRange.start.clamp(0, maxLimit),
@@ -1100,124 +1460,85 @@ class _FiltersPageState extends State<FiltersPage> {
           color: context.color.borderColor.withValues(alpha: 0.6),
         ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              onChanged: onChanged,
-              decoration: InputDecoration(
-                hintText: hint,
-                hintStyle: TextStyle(
-                  color: context.color.textLightColor,
-                  fontSize: 13,
-                ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: context.color.textDefaultColor,
-              ),
-            ),
+      child: TextField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        style: TextStyle(
+          color: context.color.textDefaultColor,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+        onChanged: onChanged,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(
+            color: context.color.textLightColor,
+            fontSize: 13,
           ),
-          Text(
-            suffix,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: context.color.textLightColor,
-            ),
+          suffixText: suffix,
+          suffixStyle: TextStyle(
+            color: context.color.textLightColor,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
           ),
-        ],
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 10,
+          ),
+        ),
       ),
     );
   }
 
-  bool _isRangeField(String name) {
-    final lower = name.toLowerCase();
-    return lower.contains('size') ||
-        lower.contains('area') ||
-        lower.contains('sqft') ||
-        lower.contains('kilometer') ||
-        lower.contains('km') ||
-        lower.contains('year') ||
-        lower.contains('capacity') ||
-        lower.contains('horsepower') ||
-        lower.contains('price');
-  }
-
-  String _getFieldUnit(String name) {
-    final lower = name.toLowerCase();
-    if (lower.contains('sqft') || lower.contains('size')) return 'Sqft';
-    if (lower.contains('km') || lower.contains('kilometer')) return 'Km';
-    if (lower.contains('year')) return 'Yr';
-    if (lower.contains('cc')) return 'cc';
-    if (lower.contains('hp') || lower.contains('horsepower')) return 'HP';
-    return '';
-  }
-
-  double _getFieldMaxLimit(String name) {
-    final lower = name.toLowerCase();
-    if (lower.contains('sqft') || lower.contains('size')) return 20000;
-    if (lower.contains('km') || lower.contains('kilometer')) return 300000;
-    if (lower.contains('price')) return 1000000;
-    if (lower.contains('cc')) return 6000;
-    if (lower.contains('hp') || lower.contains('horsepower')) return 1000;
-    return 10000;
-  }
-
   Widget _buildDynamicFilterSection(FilterItem filter) {
-    final filterName = filter.name ?? '';
-    if (filterName.isEmpty) return const SizedBox();
+    final filterName = filter.name;
+    if (filterName == null || filterName.isEmpty) return const SizedBox();
 
-    // Check if numeric field qualifies for Range Picker Slider
-    if (filter.type == 'number' && _isRangeField(filterName)) {
-      _rangeMinControllers.putIfAbsent(
-          filterName, () => TextEditingController());
-      _rangeMaxControllers.putIfAbsent(
-          filterName, () => TextEditingController());
+    final filterType = filter.type?.toLowerCase() ?? '';
 
-      final minC = _rangeMinControllers[filterName]!;
-      final maxC = _rangeMaxControllers[filterName]!;
+    if (filterType == 'range' ||
+        filterType == 'number_range' ||
+        filterType == 'numeric_range') {
       final initialValue = _selectedFilters.remove(filterName);
-      if (initialValue is Iterable) {
-        final values = initialValue.map((e) => e.toString()).toList();
-        if (minC.text.isEmpty && values.isNotEmpty) minC.text = values.first;
-        if (maxC.text.isEmpty && values.length > 1) maxC.text = values[1];
-      } else if (initialValue != null && minC.text.isEmpty) {
-        minC.text = initialValue.toString();
-      }
-
+      final initialValues = initialValue is Iterable
+          ? initialValue.map((value) => value.toString()).toList()
+          : const <String>[];
+      _rangeMinControllers.putIfAbsent(
+        filterName,
+        () => TextEditingController(
+          text: initialValues.isNotEmpty ? initialValues.first : '',
+        ),
+      );
+      _rangeMaxControllers.putIfAbsent(
+        filterName,
+        () => TextEditingController(
+          text: initialValues.length > 1 ? initialValues[1] : '',
+        ),
+      );
       return _buildRangeInputs(
         fieldKey: filterName,
         title: filterName,
-        minController: minC,
-        maxController: maxC,
-        unit: _getFieldUnit(filterName),
-        maxLimit: _getFieldMaxLimit(filterName),
+        minController: _rangeMinControllers[filterName]!,
+        maxController: _rangeMaxControllers[filterName]!,
+        unit: filterName.toLowerCase().contains('sqft')
+            ? 'Sqft'
+            : filterName.toLowerCase().contains('km')
+                ? 'Km'
+                : '',
+        maxLimit: filterName.toLowerCase().contains('sqft') ? 50000 : 500000,
       );
     }
 
-    // Text or generic Number input filter
-    if (filter.type == 'text' || filter.type == 'number') {
-      _filterTextControllers.putIfAbsent(
-          filterName, () => TextEditingController());
-      final controller = _filterTextControllers[filterName]!;
+    if (filterType == 'text' || filterType == 'number') {
       final initialValue = _selectedFilters.remove(filterName);
-      if (controller.text.isEmpty && initialValue != null) {
-        if (initialValue is Iterable) {
-          final values = initialValue.map((e) => e.toString()).toList();
-          if (values.isNotEmpty) controller.text = values.first;
-        } else {
-          controller.text = initialValue.toString();
-        }
-      }
-
+      final initialText = initialValue is Iterable
+          ? (initialValue.isEmpty ? '' : initialValue.first.toString())
+          : initialValue?.toString() ?? '';
+      _filterTextControllers.putIfAbsent(
+        filterName,
+        () => TextEditingController(text: initialText),
+      );
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1231,21 +1552,22 @@ class _FiltersPageState extends State<FiltersPage> {
               ),
             ),
             child: TextField(
-              controller: controller,
-              keyboardType: filter.type == 'number'
-                  ? TextInputType.number
+              controller: _filterTextControllers[filterName],
+              keyboardType: filterType == 'number'
+                  ? const TextInputType.numberWithOptions(decimal: true)
                   : TextInputType.text,
-              inputFormatters: filter.type == 'number'
-                  ? [FilteringTextInputFormatter.digitsOnly]
-                  : null,
-              onChanged: (_) => _onFilterChanged(),
               style: TextStyle(
                 color: context.color.textDefaultColor,
                 fontSize: 14,
-                fontWeight: FontWeight.w500,
               ),
+              onChanged: (_) {
+                setState(() {});
+                _onFilterChanged();
+              },
               decoration: InputDecoration(
-                hintText: filter.placeholder ?? 'Enter $filterName',
+                hintText: filter.placeholder?.trim().isNotEmpty == true
+                    ? filter.placeholder
+                    : "Enter $filterName",
                 hintStyle: TextStyle(
                   color: context.color.textLightColor,
                   fontSize: 13,
@@ -1264,20 +1586,24 @@ class _FiltersPageState extends State<FiltersPage> {
 
     if (filter.values.isEmpty) return const SizedBox();
 
-    // Multi-select filter (e.g. Amenities, Listed By, Regional Specs, etc.)
     if (filter.multiSelect) {
-      final initialValue = _selectedFilters[filterName];
-      if (initialValue is! Set<String>) {
-        if (initialValue is Iterable) {
-          _selectedFilters[filterName] =
-              Set<String>.from(initialValue.map((e) => e.toString()));
-        } else if (initialValue != null && initialValue.toString().isNotEmpty) {
-          _selectedFilters[filterName] = <String>{initialValue.toString()};
-        } else {
-          _selectedFilters[filterName] = <String>{};
-        }
+      final initialVal = _selectedFilters[filterName];
+      final Set<String> selectedSet;
+      if (initialVal is Set<String>) {
+        selectedSet = initialVal;
+      } else if (initialVal is Iterable) {
+        selectedSet = Set<String>.from(initialVal.map((e) => e.toString()));
+      } else if (initialVal != null && initialVal.toString().isNotEmpty) {
+        selectedSet = {initialVal.toString()};
+      } else {
+        selectedSet = <String>{};
       }
-      final selectedSet = _selectedFilters[filterName] as Set<String>;
+      _selectedFilters[filterName] = selectedSet;
+      final canExpand = filterType == 'button' && filter.values.length > 5;
+      final isExpanded = _expandedMultiselectFilters.contains(filterName);
+      final visibleValues = canExpand && !isExpanded
+          ? filter.values.take(5).toList()
+          : filter.values;
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1286,7 +1612,7 @@ class _FiltersPageState extends State<FiltersPage> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: filter.values.map((val) {
+            children: visibleValues.map((val) {
               final isSelected = selectedSet.contains(val);
               return _buildFilterPill(
                 label: val,
@@ -1305,11 +1631,40 @@ class _FiltersPageState extends State<FiltersPage> {
               );
             }).toList(),
           ),
+          if (canExpand) ...[
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  if (isExpanded) {
+                    _expandedMultiselectFilters.remove(filterName);
+                  } else {
+                    _expandedMultiselectFilters.add(filterName);
+                  }
+                });
+              },
+              icon: Icon(
+                isExpanded
+                    ? Icons.keyboard_arrow_up_rounded
+                    : Icons.keyboard_arrow_down_rounded,
+                size: 19,
+              ),
+              label: Text(
+                isExpanded
+                    ? 'Show less'
+                    : 'Show more (${filter.values.length - 5})',
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: context.color.territoryColor,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
         ],
       );
     }
 
-    // Single-select filter (e.g. Bedrooms, Bathrooms, Furnishing, Rent is paid)
     final initialValue = _selectedFilters[filterName];
     final String? selectedVal;
     if (initialValue is Iterable) {
@@ -1319,6 +1674,50 @@ class _FiltersPageState extends State<FiltersPage> {
       selectedVal = initialValue?.toString();
     }
     _selectedFilters[filterName] = selectedVal ?? '';
+
+    if (filterType == 'dropdown') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitle(filterName),
+          DropdownButtonFormField<String>(
+            key: ValueKey('$filterName-$selectedVal'),
+            initialValue:
+                filter.values.contains(selectedVal) ? selectedVal : null,
+            isExpanded: true,
+            decoration: InputDecoration(
+              hintText: filter.placeholder?.trim().isNotEmpty == true
+                  ? filter.placeholder
+                  : 'Select $filterName',
+              filled: true,
+              fillColor: context.color.secondaryColor,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: context.color.borderColor.withValues(alpha: 0.6),
+                ),
+              ),
+            ),
+            items: filter.values
+                .map((value) => DropdownMenuItem(
+                      value: value,
+                      child: Text(value),
+                    ))
+                .toList(),
+            onChanged: (value) {
+              setState(() {
+                if (value == null || value.isEmpty) {
+                  _selectedFilters.remove(filterName);
+                } else {
+                  _selectedFilters[filterName] = value;
+                }
+              });
+              _onFilterChanged();
+            },
+          ),
+        ],
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1401,6 +1800,130 @@ class _FiltersPageState extends State<FiltersPage> {
     );
   }
 
+  Widget _buildMoreFiltersSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle('More Filters'.translate(context)),
+        Row(
+          children: [
+            // Expanded(
+            //   child: _buildMoreFilterCard(
+            //     iconWidget: const Text(
+            //       "ABC",
+            //       style: TextStyle(
+            //         fontSize: 14,
+            //         fontWeight: FontWeight.w900,
+            //         letterSpacing: 1.1,
+            //       ),
+            //     ),
+            //     label: "Ads in\nEnglish".translate(context),
+            //     isSelected: _adsInEnglish,
+            //     onTap: () {
+            //       setState(() => _adsInEnglish = !_adsInEnglish);
+            //       _onFilterChanged();
+            //     },
+            //   ),
+            // ),
+            // const SizedBox(width: 10),
+            Expanded(
+              child: _buildMoreFilterCard(
+                iconWidget: const Icon(
+                  Icons.play_circle_outline_rounded,
+                  size: 26,
+                ),
+                label: "Ads with\nVideo".translate(context),
+                isSelected: _adsWithVideo,
+                onTap: () {
+                  setState(() => _adsWithVideo = !_adsWithVideo);
+                  _onFilterChanged();
+                },
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _buildMoreFilterCard(
+                iconWidget: const Icon(
+                  Icons.rotate_right_rounded,
+                  size: 28,
+                ),
+                label: "Ads with\n360 Tour".translate(context),
+                isSelected: _adsWith360Tour,
+                onTap: () {
+                  setState(() => _adsWith360Tour = !_adsWith360Tour);
+                  _onFilterChanged();
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMoreFilterCard({
+    required Widget iconWidget,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? context.color.territoryColor.withValues(alpha: 0.12)
+              : context.color.secondaryColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? context.color.territoryColor
+                : context.color.borderColor.withValues(alpha: 0.6),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            DefaultTextStyle(
+              style: TextStyle(
+                color: isSelected
+                    ? context.color.territoryColor
+                    : context.color.textDefaultColor,
+              ),
+              child: IconTheme(
+                data: IconThemeData(
+                  color: isSelected
+                      ? context.color.territoryColor
+                      : context.color.textDefaultColor,
+                ),
+                child: iconWidget,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected
+                    ? context.color.territoryColor
+                    : context.color.textDefaultColor,
+                height: 1.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildShowResultsButton() {
     final countFormatted = _resultCount.toString().replaceAllMapped(
         RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},');
@@ -1457,10 +1980,7 @@ class _FiltersPageState extends State<FiltersPage> {
 
   @override
   Widget build(BuildContext context) {
-    final propertyTypes = (widget.category.children != null &&
-            widget.category.children!.isNotEmpty)
-        ? widget.category.children!
-        : [widget.category];
+    final propertyTypes = _getPropertyTypesForTab(_selectedTab);
 
     return Scaffold(
       backgroundColor: context.color.backgroundColor,
@@ -1476,6 +1996,12 @@ class _FiltersPageState extends State<FiltersPage> {
                 }
               },
               builder: (context, state) {
+                final genericCategories = _isPropertyCategory
+                    ? const <FilterSubCategory>[]
+                    : _visibleGenericCategories(state);
+                final genericCategoryTitle = _isPropertyCategory
+                    ? 'Categories'
+                    : _visibleGenericCategoryTitle(state);
                 return SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   physics: const BouncingScrollPhysics(),
@@ -1490,6 +2016,21 @@ class _FiltersPageState extends State<FiltersPage> {
 
                       if (_isPropertyCategory) ...[
                         _buildPropertyTypeSection(propertyTypes),
+                        const SizedBox(height: 20),
+                      ],
+
+                      if (!_isPropertyCategory &&
+                          (genericCategories.isNotEmpty ||
+                              _genericCategoryHistory.isNotEmpty)) ...[
+                        if (genericCategories.isNotEmpty)
+                          _buildSubCategoriesSection(
+                            genericCategories,
+                            genericCategoryTitle,
+                          ),
+                        if (_genericCategoryHistory.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          _buildGenericBackButton(),
+                        ],
                         const SizedBox(height: 20),
                       ],
 
@@ -1514,7 +2055,8 @@ class _FiltersPageState extends State<FiltersPage> {
                         )
                       else if (state is FilterLoaded) ...[
                         // Sub-categories Chips
-                        if (state.data.children.isNotEmpty) ...[
+                        if (_isPropertyCategory &&
+                            state.data.children.isNotEmpty) ...[
                           _buildSubCategoriesSection(
                             state.data.children,
                             state.data.name ?? 'Categories',
@@ -1534,6 +2076,10 @@ class _FiltersPageState extends State<FiltersPage> {
                           );
                         }),
                       ],
+
+                      // More Filters Section (Ads in English, Ads with Video, Ads with 360 Tour)
+                      const SizedBox(height: 10),
+                      _buildMoreFiltersSection(),
 
                       const SizedBox(height: 30),
                     ],

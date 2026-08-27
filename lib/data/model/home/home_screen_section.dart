@@ -16,8 +16,8 @@ class HomeScreenSection {
 
   HomeScreenSection.fromJson(Map<String, dynamic> json) {
     sectionId = json['id'];
-    //title = json['title'];
-    title= json['translated_name'];
+    final trans = json['translated_name']?.toString().trim();
+    title = (trans != null && trans.isNotEmpty) ? trans : json['title']?.toString();
     style = json['style'];
     totalData = json['total_data'];
     if (json['section_data'] != null) {

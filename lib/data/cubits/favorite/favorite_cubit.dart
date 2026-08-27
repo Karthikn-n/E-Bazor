@@ -1,5 +1,3 @@
-
-
 import 'package:Ebozor/data/model/item/item_model.dart';
 import 'package:Ebozor/data/repositories/favourites_repository.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -51,7 +49,7 @@ class FavoriteFetchFailure extends FavoriteState {
   FavoriteFetchFailure(this.errorMessage);
 }
 
-class FavoriteCubit extends Cubit<FavoriteState>{
+class FavoriteCubit extends Cubit<FavoriteState> {
   final FavoriteRepository favoriteRepository;
   int? currentListingId;
   String? currentSearch;
@@ -61,7 +59,8 @@ class FavoriteCubit extends Cubit<FavoriteState>{
 
   FavoriteCubit(this.favoriteRepository) : super(FavoriteInitial());
 
-  void getFavorite({int? favouritelistingId, String? search, int? categoryId}) async {
+  void getFavorite(
+      {int? favouritelistingId, String? search, int? categoryId}) async {
     currentListingId = favouritelistingId;
     currentSearch = search;
     currentCategoryId = categoryId;
@@ -171,7 +170,8 @@ class FavoriteCubit extends Cubit<FavoriteState>{
       final favorite = (state as FavoriteFetchSuccess).favorite;
 
       // Find the index of the item to be removed
-      int indexToRemove = favorite.indexWhere((element) => element.id == model.id);
+      int indexToRemove =
+          favorite.indexWhere((element) => element.id == model.id);
       if (indexToRemove != -1) {
         // Decrement totalLikes of the item being removed
         ItemModel removedItem = favorite[indexToRemove];
@@ -183,16 +183,15 @@ class FavoriteCubit extends Cubit<FavoriteState>{
           favorite: List.from(favorite),
           hasMoreFetchError: true,
           page: (state as FavoriteFetchSuccess).page,
-          totalFavoriteCount: (state as FavoriteFetchSuccess).totalFavoriteCount,
+          totalFavoriteCount:
+              (state as FavoriteFetchSuccess).totalFavoriteCount > 0
+                  ? (state as FavoriteFetchSuccess).totalFavoriteCount - 1
+                  : 0,
           hasMore: (state as FavoriteFetchSuccess).hasMore,
         ));
-
       }
     }
   }
-
-
-
 
   bool isItemFavorite(int itemId) {
     if (state is FavoriteFetchSuccess) {
@@ -230,8 +229,4 @@ class FavoriteCubit extends Cubit<FavoriteState>{
     _itemsWithLoadedListings.clear();
     emit(FavoriteFetchInProgress());
   }
-
-
-
-
 }

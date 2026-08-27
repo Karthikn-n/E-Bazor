@@ -36,9 +36,8 @@ class ChatMessageHandler {
     /*  ///don't change this line
     List<Widget> msgs = (messages);*/
     messages = [..._chat, ...messages];
-    _chatMessageStream.sink.add(messages);
+    _emitMessages();
   }
-
 
   /* static void add(Widget chat) {
     print("Adding chat message: $chat");
@@ -84,7 +83,7 @@ class ChatMessageHandler {
     // Update the messages list and sink the new messages to the stream
     messages = messagesWithDate;
     // messages = chats; //uncomment and comment above code if problem in chat
-    _chatMessageStream.sink.add(messages);
+    _emitMessages();
     //getChatStream();
   }
 
@@ -107,10 +106,19 @@ class ChatMessageHandler {
   static void flushMessages() {
     messages.clear();
     _chat.clear();
+    _emitMessages();
   }
 
-  static Stream<List<Widget>> getChatStream() {
-    return _chatMessageStream.stream;
+  static Stream<List<Widget>> getChatStream() async* {
+    // A broadcast stream does not replay its latest event. Yielding the current
+    // snapshot first ensures history loaded before StreamBuilder subscribes is
+    // still rendered immediately.
+    yield List<Widget>.unmodifiable(messages);
+    yield* _chatMessageStream.stream;
+  }
+
+  static void _emitMessages() {
+    _chatMessageStream.sink.add(List<Widget>.unmodifiable(messages));
   }
 
   static void attachListener(void Function(dynamic)? onData) {
@@ -126,15 +134,15 @@ class ChatMessageHandler {
       return false;
     });
 
-    _chatMessageStream.sink.add(msgs);
+    messages = msgs;
+    _emitMessages();
   }
 
   ///This will replace message's key with server key so we will be able to delete message if we want
   static void updateMessageId(String identifier, int id) {
     try {
       List<Widget> msgs = _chat;
-      for
-   (var i = 0; i < _chat.length; i++) {
+      for (var i = 0; i < _chat.length; i++) {
         //We will only need to change its key when it is bloc provider because we added it locally and its key was also locally so we have to
         // replace it with server key when message send complete
         if (msgs[i] is BlocProvider) {
@@ -164,7 +172,8 @@ class ChatMessageHandler {
             _chatMessageStream.sink.add(msgs);
           }
         }
-      }  } catch (e) {}
+      }
+    } catch (e) {}
   }
 }
 

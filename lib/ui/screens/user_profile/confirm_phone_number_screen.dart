@@ -1,46 +1,57 @@
 import 'dart:async';
 import 'package:Ebozor/app/routes.dart';
-import 'package:Ebozor/utils/app_icon.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:Ebozor/data/cubits/auth/auth_cubit.dart';
 import 'package:Ebozor/data/cubits/seller/fetch_verification_request_cubit.dart';
 import 'package:Ebozor/data/repositories/job_repository.dart';
+import 'package:Ebozor/data/repositories/seller/seller_verification_field_repository.dart';
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
-import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
+import 'package:Ebozor/utils/app_icon.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sms_autofill/sms_autofill.dart';
 
 class ConfirmPhoneNumberScreen extends StatefulWidget {
   final String phoneNumber;
-  final String sid;
+  final String verificationId;
+  final int? resendToken;
   final String channel;
   final String verificationPurpose;
+  final bool isFromSellerVerification;
   final VoidCallback? onVerified;
 
   const ConfirmPhoneNumberScreen({
     super.key,
     required this.phoneNumber,
-    required this.sid,
-    this.channel = "WhatsApp",
+    required this.verificationId,
+    this.resendToken,
+    this.channel = "SMS",
     this.verificationPurpose = 'updatePhone',
+    this.isFromSellerVerification = false,
     this.onVerified,
   });
 
   static Route route(RouteSettings routeSettings) {
     final args = routeSettings.arguments as Map?;
+    final purpose =
+        (args?['verificationPurpose'] as String?) ?? 'updatePhone';
+    final isSeller = (args?['isFromSellerVerification'] as bool?) ??
+        (purpose == 'sellerVerification');
+
     return BlurredRouter(
       builder: (_) => ConfirmPhoneNumberScreen(
         phoneNumber: (args?['phoneNumber'] as String?) ?? "",
-        sid: (args?['sid'] as String?) ?? "",
-        channel: (args?['channel'] as String?) ?? "WhatsApp",
-        verificationPurpose:
-            (args?['verificationPurpose'] as String?) ?? 'updatePhone',
+        verificationId:
+            (args?['verificationId'] ?? args?['sid'] ?? "") as String,
+        resendToken: args?['resendToken'] as int?,
+        channel: (args?['channel'] as String?) ?? "SMS",
+        verificationPurpose: purpose,
+        isFromSellerVerification: isSeller,
         onVerified: args?['onVerified'] as VoidCallback?,
       ),
     );
@@ -51,34 +62,44 @@ class ConfirmPhoneNumberScreen extends StatefulWidget {
       _ConfirmPhoneNumberScreenState();
 }
 
-class _ConfirmPhoneNumberScreenState extends State<ConfirmPhoneNumberScreen> {
-  final List<TextEditingController> _otpControllers =
-      List.generate(6, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
-
-  late String _currentSid;
+class _ConfirmPhoneNumberScreenState extends State<ConfirmPhoneNumberScreen>
+    with CodeAutoFill {
+  String _otpCode = "";
+  late String _currentVerificationId;
+  int? _resendToken;
   Timer? _timer;
   int _countdownSeconds = 56;
   bool _isVerifying = false;
   bool _isResending = false;
   final JobRepository _jobRepository = JobRepository();
+  final SellerVerificationFieldRepository _verificationRepo =
+      SellerVerificationFieldRepository();
+
+  @override
+  void codeUpdated() {
+    if (code != null && code!.isNotEmpty) {
+      setState(() {
+        _otpCode = code!;
+      });
+      if (_otpCode.length == 6 && !_isVerifying) {
+        _verifyOtp();
+      }
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _currentSid = widget.sid;
+    _currentVerificationId = widget.verificationId;
+    _resendToken = widget.resendToken;
+    listenForCode();
     _startCountdown();
   }
 
   @override
   void dispose() {
+    cancel();
     _timer?.cancel();
-    for (var c in _otpControllers) {
-      c.dispose();
-    }
-    for (var f in _focusNodes) {
-      f.dispose();
-    }
     super.dispose();
   }
 
@@ -98,65 +119,64 @@ class _ConfirmPhoneNumberScreenState extends State<ConfirmPhoneNumberScreen> {
     });
   }
 
-  String get _otpCode => _otpControllers.map((c) => c.text.trim()).join();
-
   Future<void> _resendOtp() async {
     if (_countdownSeconds > 0 || _isResending) return;
 
     setState(() => _isResending = true);
     try {
-      final response = await Api.post(
-        url: Api.sendOtpApi,
-        parameter: {
-          "number": widget.phoneNumber,
-          "channel": "whatsapp",
-          "method": "whatsapp",
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: widget.phoneNumber,
+        timeout: const Duration(seconds: 60),
+        forceResendingToken: _resendToken,
+        verificationCompleted: (PhoneAuthCredential credential) async {},
+        verificationFailed: (FirebaseAuthException e) {
+          if (mounted) {
+            setState(() => _isResending = false);
+            HelperUtils.showSnackBarMessage(
+              context,
+              e.message ?? "Could not resend SMS OTP",
+              type: MessageType.error,
+            );
+          }
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          if (mounted) {
+            setState(() {
+              _currentVerificationId = verificationId;
+              _resendToken = resendToken;
+              _isResending = false;
+              _otpCode = "";
+            });
+            listenForCode();
+            _startCountdown();
+            HelperUtils.showSnackBarMessage(
+              context,
+              "SMS code resent successfully",
+              type: MessageType.success,
+            );
+          }
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          if (mounted) {
+            _currentVerificationId = verificationId;
+          }
         },
       );
-
-      String sid = "";
-      if (response['data'] != null && response['data'] is Map) {
-        sid = response['data']['sid']?.toString() ??
-            response['data']['id']?.toString() ??
-            "";
-      }
-      if (sid.isEmpty) {
-        sid = response['sid']?.toString() ?? "";
-      }
-      if (sid.isEmpty && response['data'] is String) {
-        sid = response['data'].toString();
-      }
-
-      if (response['error'] == true) {
-        final msg = response['message']?.toString() ?? "Failed to resend OTP";
-        HelperUtils.showSnackBarMessage(context, msg, type: MessageType.error);
-        return;
-      }
-
-      _currentSid = sid;
-      for (var c in _otpControllers) {
-        c.clear();
-      }
-      _focusNodes[0].requestFocus();
-      _startCountdown();
-      HelperUtils.showSnackBarMessage(
-        context,
-        "OTP resent successfully via WhatsApp",
-        type: MessageType.success,
-      );
     } catch (e) {
-      HelperUtils.showSnackBarMessage(
-        context,
-        "Error resending OTP: $e",
-        type: MessageType.error,
-      );
-    } finally {
-      if (mounted) setState(() => _isResending = false);
+      if (mounted) {
+        setState(() => _isResending = false);
+        HelperUtils.showSnackBarMessage(
+          context,
+          "Error resending OTP: $e",
+          type: MessageType.error,
+        );
+      }
     }
   }
 
   Future<void> _verifyOtp() async {
-    final code = _otpCode;
+    if (_isVerifying) return;
+    final code = _otpCode.trim();
     if (code.length < 6) {
       HelperUtils.showSnackBarMessage(
         context,
@@ -167,71 +187,71 @@ class _ConfirmPhoneNumberScreenState extends State<ConfirmPhoneNumberScreen> {
     }
 
     setState(() => _isVerifying = true);
+
     try {
-      final response = await Api.post(
-        url: Api.verifyOtpApi,
-        parameter: {
-          if (_currentSid.isNotEmpty) "sid": _currentSid,
-          "code": code,
-          "number": widget.phoneNumber,
-        },
+      // 1. Firebase Phone Auth Verification
+      final credential = PhoneAuthProvider.credential(
+        verificationId: _currentVerificationId,
+        smsCode: code,
       );
+      await FirebaseAuth.instance.signInWithCredential(credential);
 
-      if (response['error'] == true) {
-        final msg = response['message']?.toString() ?? "Invalid OTP code";
-        HelperUtils.showSnackBarMessage(context, msg, type: MessageType.error);
-        return;
+      // 2. Sync phone number with backend API
+      try {
+        await _verificationRepo.setUserPhoneNumber(
+            phoneNumber: widget.phoneNumber);
+      } catch (err) {
+        debugPrint("Notice: setUserPhoneNumber API: $err");
       }
 
-      if (widget.verificationPurpose == 'updatePhone') {
-        try {
-          final existingUser = HiveUtils.getUserDetails();
-          await context.read<AuthCubit>().updateuserdata(
-                context,
-                name: existingUser.name,
-                email: existingUser.email,
-                address: existingUser.address?.toString(),
-                fcmToken: existingUser.fcmId,
-                notification: existingUser.notification?.toString(),
-                mobile: widget.phoneNumber,
-                countryCode: HiveUtils.getCountryCode(),
-                personalDetail: existingUser.isPersonalDetailShow,
-              );
-          await _jobRepository.saveUserDetail({
-            'mobile': widget.phoneNumber,
-          });
-        } catch (err) {
-          debugPrint("Notice: profile sync after phone verification: $err");
-        }
-      }
+      // 3. Update local storage & AuthCubit profile
+      await HiveUtils.setUserData({'mobile': widget.phoneNumber});
 
-      final user = HiveUtils.getUserDetails();
-      user.mobile = widget.phoneNumber;
-      user.isVerified = 1;
-      await HiveUtils.setUserData(user.toJson());
+      try {
+        final existingUser = HiveUtils.getUserDetails();
+        await context.read<AuthCubit>().updateuserdata(
+              context,
+              name: existingUser.name,
+              email: existingUser.email,
+              address: existingUser.address?.toString(),
+              fcmToken: existingUser.fcmId,
+              notification: existingUser.notification?.toString(),
+              mobile: widget.phoneNumber,
+              countryCode: HiveUtils.getCountryCode(),
+              personalDetail: existingUser.isPersonalDetailShow,
+            );
+        await _jobRepository.saveUserDetail({
+          'mobile': widget.phoneNumber,
+        });
+      } catch (err) {
+        debugPrint("Notice: profile sync after phone verification: $err");
+      }
 
       try {
         context
             .read<FetchVerificationRequestsCubit>()
             .fetchVerificationRequests();
       } catch (_) {}
+
       widget.onVerified?.call();
 
+      if (!mounted) return;
+
+      HelperUtils.showSnackBarMessage(
+        context,
+        "Phone number verified successfully!",
+        type: MessageType.success,
+      );
+
+      Navigator.pop(context, true);
+    } catch (e) {
       if (mounted) {
         HelperUtils.showSnackBarMessage(
           context,
-          "Phone number verified and updated successfully!",
-          type: MessageType.success,
+          "Invalid or expired verification code",
+          type: MessageType.error,
         );
-
-        Navigator.pop(context, true);
       }
-    } catch (e) {
-      HelperUtils.showSnackBarMessage(
-        context,
-        "Verification error: $e",
-        type: MessageType.error,
-      );
     } finally {
       if (mounted) setState(() => _isVerifying = false);
     }
@@ -254,9 +274,9 @@ class _ConfirmPhoneNumberScreenState extends State<ConfirmPhoneNumberScreen> {
           elevation: 0,
           leading: IconButton(
             icon: Icon(
-              Icons.close_rounded,
+              Icons.arrow_back_ios_new_rounded,
               color: context.color.textDefaultColor,
-              size: 24,
+              size: 20,
             ),
             onPressed: () => Navigator.pop(context),
           ),
@@ -272,20 +292,15 @@ class _ConfirmPhoneNumberScreenState extends State<ConfirmPhoneNumberScreen> {
         ),
         body: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 10),
-
-              // Shield Badge Graphic from Screenshot 2
               Center(
-                child: UiUtils.getSvg(AppIcons.safety),
+                child: UiUtils.getSvg(AppIcons.safety, width: 110, height: 110),
               ),
-
-              const SizedBox(height: 24),
-
-              // Title matching Screenshot 2
+              const SizedBox(height: 20),
               Text(
                 "You're almost verified",
                 style: TextStyle(
@@ -294,251 +309,98 @@ class _ConfirmPhoneNumberScreenState extends State<ConfirmPhoneNumberScreen> {
                   color: context.color.textDefaultColor,
                 ),
               ),
-              const SizedBox(height: 12),
-
-              // Subtitle
+              const SizedBox(height: 8),
               RichText(
                 textAlign: TextAlign.center,
                 text: TextSpan(
                   style: TextStyle(
-                    fontSize: 14.5,
+                    fontSize: 13.5,
                     color: context.color.textLightColor,
-                    height: 1.45,
+                    height: 1.4,
                   ),
                   children: [
-                    const TextSpan(text: "We sent a verification code to "),
+                    const TextSpan(text: "Enter the 6-digit code sent to\n"),
                     TextSpan(
                       text: widget.phoneNumber,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFFDC2626), // Red accent
-                      ),
-                    ),
-                    TextSpan(
-                      text:
-                          " via ${widget.channel}. Please enter the OTP below:",
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 30),
-
-              // 6-box OTP Input Fields
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: List.generate(6, (index) {
-                  return SizedBox(
-                    width: 46,
-                    height: 54,
-                    child: TextFormField(
-                      controller: _otpControllers[index],
-                      focusNode: _focusNodes[index],
-                      keyboardType: TextInputType.number,
-                      textAlign: TextAlign.center,
-                      maxLength: 1,
                       style: TextStyle(
-                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: context.color.textDefaultColor,
                       ),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      decoration: InputDecoration(
-                        counterText: "",
-                        filled: true,
-                        fillColor: context.color.secondaryColor,
-                        contentPadding: EdgeInsets.zero,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: context.color.borderColor,
-                            width: 1.5,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: context.color.borderColor,
-                            width: 1.5,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: context.color.territoryColor,
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                      onChanged: (value) {
-                        if (value.isNotEmpty) {
-                          if (index < 5) {
-                            _focusNodes[index + 1].requestFocus();
-                          } else {
-                            _focusNodes[index].unfocus();
-                            _verifyOtp();
-                          }
-                        } else if (value.isEmpty && index > 0) {
-                          _focusNodes[index - 1].requestFocus();
-                        }
-                      },
                     ),
-                  );
-                }),
+                    const TextSpan(text: " via SMS"),
+                  ],
+                ),
               ),
+              const SizedBox(height: 28),
 
-              const SizedBox(height: 20),
-
-              // Countdown Timer
-              Text(
-                timerText,
-                style: TextStyle(
-                  fontSize: 13.5,
-                  color: context.color.textLightColor,
-                  fontWeight: FontWeight.w500,
+              // PinFieldAutoFill: Supports multi-digit typing, pasting full OTP, and SMS auto-retrieval
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: PinFieldAutoFill(
+                  currentCode: _otpCode,
+                  codeLength: 6,
+                  decoration: BoxLooseDecoration(
+                    radius: const Radius.circular(10),
+                    strokeWidth: 1.5,
+                    strokeColorBuilder: PinListenColorBuilder(
+                      context.color.territoryColor,
+                      context.color.borderColor.withValues(alpha: 0.8),
+                    ),
+                    bgColorBuilder:
+                        FixedColorBuilder(context.color.secondaryColor),
+                    textStyle: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: context.color.textDefaultColor,
+                    ),
+                    gapSpace: 8,
+                  ),
+                  onCodeChanged: (val) {
+                    _otpCode = val ?? "";
+                    if (_otpCode.length == 6 && !_isVerifying) {
+                      _verifyOtp();
+                    }
+                  },
+                  onCodeSubmitted: (val) {
+                    _otpCode = val;
+                    if (_otpCode.length == 6 && !_isVerifying) {
+                      _verifyOtp();
+                    }
+                  },
                 ),
               ),
 
-              const SizedBox(height: 18),
+              const SizedBox(height: 24),
 
-              // Resend Code Header
-              Text(
-                "Resend code via",
-                style: TextStyle(
-                  fontSize: 13.5,
-                  color: context.color.textDefaultColor,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // Resend Buttons (WhatsApp enabled, SMS hidden/disabled)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 10),
-                      side: BorderSide(
-                        color: _countdownSeconds == 0
-                            ? const Color(0xFF22C55E)
-                            : context.color.borderColor,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      backgroundColor: context.color.secondaryColor,
-                    ),
-                    onPressed: _countdownSeconds == 0 && !_isResending
-                        ? _resendOtp
-                        : null,
-                    icon: _isResending
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : FaIcon(
-                            FontAwesomeIcons.whatsapp,
-                            color: _countdownSeconds == 0
-                                ? const Color(0xFF22C55E)
-                                : Colors.grey,
-                            size: 16,
-                          ),
-                    label: Text(
-                      "WhatsApp",
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.bold,
-                        color: _countdownSeconds == 0
-                            ? context.color.textDefaultColor
-                            : Colors.grey,
-                      ),
-                    ),
-                  ),
-
-                  /*
-                  const SizedBox(width: 12),
-                  // SMS button hidden as requested
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 10),
-                      side: BorderSide(color: context.color.borderColor),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    onPressed: null,
-                    icon: const Icon(Icons.message_outlined, size: 16, color: Colors.grey),
-                    label: const Text("SMS", style: TextStyle(color: Colors.grey)),
-                  ),
-                  */
-                ],
-              ),
-
-              const SizedBox(height: 18),
-
-              // Need help? Customer Support
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "Need help? Please contact our ",
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      color: context.color.textLightColor,
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () {
-                      Navigator.pushNamed(context, Routes.faqsScreen);
-                    },
-                    child: const Text(
-                      "Customer Support",
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: Color(0xFF2563EB),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 32),
-
-              // Verify Button
+              // Verify button
               SizedBox(
                 width: double.infinity,
-                height: 50,
+                height: 48,
                 child: ElevatedButton(
+                  onPressed: _isVerifying ? null : _verifyOtp,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: context.color.territoryColor,
                     foregroundColor: Colors.white,
-                    elevation: 0,
+                    disabledBackgroundColor:
+                        context.color.textLightColor.withValues(alpha: 0.2),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
+                    elevation: 0,
                   ),
-                  onPressed: _isVerifying ? null : _verifyOtp,
                   child: _isVerifying
                       ? const SizedBox(
-                          width: 22,
-                          height: 22,
+                          width: 20,
+                          height: 20,
                           child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
+                            strokeWidth: 2,
                             color: Colors.white,
                           ),
                         )
                       : const Text(
-                          "Verify",
+                          "Verify & Continue",
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -546,6 +408,62 @@ class _ConfirmPhoneNumberScreenState extends State<ConfirmPhoneNumberScreen> {
               ),
 
               const SizedBox(height: 20),
+
+              // Resend Timer / Button
+              if (_countdownSeconds > 0)
+                Text(
+                  "Resend code in $timerText",
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: context.color.textLightColor,
+                  ),
+                )
+              else
+                TextButton(
+                  onPressed: _isResending ? null : _resendOtp,
+                  child: _isResending
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Text(
+                          "Resend SMS Code",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: context.color.territoryColor,
+                          ),
+                        ),
+                ),
+
+              const SizedBox(height: 28),
+              Wrap(
+                alignment: WrapAlignment.center,
+                children: [
+                  Text(
+                    "Didn't receive the code? Contact ",
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: context.color.textLightColor,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () =>
+                        Navigator.pushNamed(context, Routes.contactUs),
+                    child: const Text(
+                      "Support",
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: Color(0xFF2563EB),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),

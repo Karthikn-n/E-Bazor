@@ -68,6 +68,9 @@ class AreasScreenState extends State<AreasScreen> {
   String previousSearchQuery = "";
   AreaModel? selectedArea;
 
+  bool get _returnsLocationSelection =>
+      widget.from == "addItem" || widget.from == "filter";
+
   @override
   void initState() {
     super.initState();
@@ -437,7 +440,7 @@ class AreasScreenState extends State<AreasScreen> {
                   ),
                 ),
               ).then((value) {
-                if (value != null && widget.from == "addItem") {
+                if (value != null && _returnsLocationSelection) {
                   Navigator.pop(context, value);
                 }
               });

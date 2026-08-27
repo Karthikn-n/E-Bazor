@@ -3,9 +3,9 @@ import 'package:Ebozor/data/cubits/favorite/favorite_cubit.dart';
 import 'package:Ebozor/data/cubits/favorite/favorite_listings_cubit.dart';
 import 'package:Ebozor/data/model/favorite_listing_model.dart';
 import 'package:Ebozor/data/model/item/item_model.dart';
+import 'package:Ebozor/data/repositories/favourites_repository.dart';
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
 import 'package:Ebozor/ui/screens/widgets/dialogs/favorite_list_options_bottom_sheet.dart';
-import 'package:Ebozor/ui/screens/widgets/dialogs/save_to_favorite_bottom_sheet.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
 import 'package:Ebozor/ui/screens/widgets/intertitial_ads_screen.dart';
 import 'package:Ebozor/ui/screens/widgets/shimmerLoadingContainer.dart';
@@ -34,6 +34,7 @@ class FavoriteScreen extends StatefulWidget {
 }
 
 class FavoriteScreenState extends State<FavoriteScreen> {
+  final Set<int> _removingFavoriteIds = <int>{};
   @override
   void initState() {
     super.initState();
@@ -44,6 +45,38 @@ class FavoriteScreenState extends State<FavoriteScreen> {
   void _fetchData() {
     context.read<FavoriteListingsCubit>().fetchListings();
     context.read<FavoriteCubit>().getFavorite();
+  }
+
+  Future<void> _removeFavorite(ItemModel item) async {
+    final itemId = item.id;
+    if (itemId == null || _removingFavoriteIds.contains(itemId)) return;
+
+    setState(() => _removingFavoriteIds.add(itemId));
+    try {
+      final response =
+          await FavoriteRepository().removeFavoriteEverywhere(itemId);
+      if (!mounted) return;
+
+      final favoriteCubit = context.read<FavoriteCubit>();
+      favoriteCubit.removeFavoriteItem(item);
+      favoriteCubit.setFavoriteListingIds(itemId, const <int>[]);
+      await context.read<FavoriteListingsCubit>().fetchListings();
+      if (!mounted) return;
+
+      HelperUtils.showSnackBarMessage(
+        context,
+        response['message']?.toString() ??
+            'Removed from Favorites'.translate(context),
+      );
+    } catch (error) {
+      if (mounted) {
+        HelperUtils.showSnackBarMessage(context, error.toString());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _removingFavoriteIds.remove(itemId));
+      }
+    }
   }
 
   void _showCreateListDialog() {
@@ -78,14 +111,16 @@ class FavoriteScreenState extends State<FavoriteScreen> {
                   decoration: InputDecoration(
                     hintText: "Enter list title...".translate(context),
                     hintStyle: TextStyle(color: context.color.textLightColor),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide(color: context.color.borderColor),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: context.color.territoryColor),
+                      borderSide:
+                          BorderSide(color: context.color.territoryColor),
                     ),
                   ),
                   validator: (val) {
@@ -134,11 +169,13 @@ class FavoriteScreenState extends State<FavoriteScreen> {
                       ? const SizedBox(
                           width: 16,
                           height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
                         )
                       : Text(
                           "Create".translate(context),
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                 ),
               ],
@@ -166,7 +203,8 @@ class FavoriteScreenState extends State<FavoriteScreen> {
       backgroundColor: context.color.backgroundColor,
       appBar: UiUtils.buildAppBar(
         context,
-        showBackButton: true,
+        showBackButton: false,
+        centerTitle: true,
         title: "Favorites".translate(context),
       ),
       body: RefreshIndicator(
@@ -187,7 +225,8 @@ class FavoriteScreenState extends State<FavoriteScreen> {
 
               return ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 children: [
                   // SECTION 1: All Favorites
                   _buildAllFavoritesSection(defaultListing),
@@ -435,7 +474,8 @@ class FavoriteScreenState extends State<FavoriteScreen> {
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(12)),
                   child: SizedBox(
                     width: 155,
                     height: 110,
@@ -453,9 +493,7 @@ class FavoriteScreenState extends State<FavoriteScreen> {
                   top: 6,
                   right: 6,
                   child: GestureDetector(
-                    onTap: () {
-                      SaveToFavoriteBottomSheet.show(context, item: item);
-                    },
+                    onTap: () => _removeFavorite(item),
                     child: Container(
                       width: 26,
                       height: 26,
@@ -463,11 +501,19 @@ class FavoriteScreenState extends State<FavoriteScreen> {
                         shape: BoxShape.circle,
                         color: Colors.white,
                       ),
-                      child: const Icon(
-                        Icons.favorite,
-                        color: Color(0xFFEF4444),
-                        size: 15,
-                      ),
+                      child: _removingFavoriteIds.contains(item.id)
+                          ? const Padding(
+                              padding: EdgeInsets.all(6),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFFEF4444),
+                              ),
+                            )
+                          : const Icon(
+                              Icons.favorite,
+                              color: Color(0xFFEF4444),
+                              size: 15,
+                            ),
                     ),
                   ),
                 ),
@@ -476,7 +522,8 @@ class FavoriteScreenState extends State<FavoriteScreen> {
                     bottom: 6,
                     left: 6,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 2),
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.6),
                         borderRadius: BorderRadius.circular(4),
@@ -484,11 +531,13 @@ class FavoriteScreenState extends State<FavoriteScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 11),
+                          const Icon(Icons.camera_alt_outlined,
+                              color: Colors.white, size: 11),
                           const SizedBox(width: 3),
                           Text(
                             "${(item.galleryImages?.length ?? 0) + 1}",
-                            style: const TextStyle(color: Colors.white, fontSize: 10),
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 10),
                           ),
                         ],
                       ),
@@ -541,7 +590,8 @@ class FavoriteScreenState extends State<FavoriteScreen> {
     );
   }
 
-  Widget _buildPersonalizedListsSection(List<FavoriteListingModel> customListings) {
+  Widget _buildPersonalizedListsSection(
+      List<FavoriteListingModel> customListings) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -561,7 +611,8 @@ class FavoriteScreenState extends State<FavoriteScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.black87,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(6),
                 ),
@@ -571,7 +622,8 @@ class FavoriteScreenState extends State<FavoriteScreen> {
               icon: const Icon(Icons.add, size: 15),
               label: Text(
                 "New List".translate(context),
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -648,10 +700,12 @@ class FavoriteScreenState extends State<FavoriteScreen> {
                               ? CachedNetworkImage(
                                   imageUrl: listing.latestItem!.image!,
                                   fit: BoxFit.cover,
-                                  errorWidget: (_, __, ___) =>
-                                      const Icon(Icons.image, color: Colors.grey),
+                                  errorWidget: (_, __, ___) => const Icon(
+                                      Icons.image,
+                                      color: Colors.grey),
                                 )
-                              : const Icon(Icons.bookmark_border_rounded, color: Colors.grey),
+                              : const Icon(Icons.bookmark_border_rounded,
+                                  color: Colors.grey),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -669,7 +723,8 @@ class FavoriteScreenState extends State<FavoriteScreen> {
                             ),
                             const SizedBox(height: 3),
                             Text(
-                              "${listing.count} saved ad${listing.count == 1 ? '' : 's'}".translate(context),
+                              "${listing.count} saved ad${listing.count == 1 ? '' : 's'}"
+                                  .translate(context),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: context.color.textLightColor,

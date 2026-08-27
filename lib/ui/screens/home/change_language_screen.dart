@@ -1,4 +1,5 @@
 import 'package:Ebozor/data/cubits/home/fetch_home_screen_cubit.dart';
+import 'package:Ebozor/data/cubits/slider_cubit.dart';
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
 import 'package:Ebozor/data/cubits/system/fetch_language_cubit.dart';
 import 'package:Ebozor/data/cubits/system/fetch_system_settings_cubit.dart';
@@ -62,6 +63,7 @@ class LanguagesListScreen extends StatelessWidget {
 
             HiveUtils.storeLanguage(map);
             context.read<LanguageCubit>().changeLanguage(map);
+            context.read<SliderCubit>().fetchSlider(context);
             context.read<FetchCategoryCubit>().fetchCategories();
             context.read<FetchHomeScreenCubit>().fetch(
                 city: HiveUtils.getCityName(),

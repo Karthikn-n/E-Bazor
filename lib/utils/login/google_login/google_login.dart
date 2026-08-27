@@ -49,6 +49,5 @@ class GoogleLogin extends LoginSystem {
 
   @override
   void onEvent(MLoginState state) {
-    // TODO: implement onEvent
   }
 }

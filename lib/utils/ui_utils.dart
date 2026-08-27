@@ -316,6 +316,7 @@ class UiUtils {
       List<Widget>? actions,
       List<Widget>? bottom,
       double? bottomHeight,
+      bool centerTitle = false,
       bool? hideTopBorder,
       VoidCallback? onBackPress,
       Color? backgroundColor}) {
@@ -386,7 +387,7 @@ class UiUtils {
                             title ?? "",
                             overflow: TextOverflow.ellipsis,
                             softWrap: true,
-                            //textAlign: TextAlign.center,
+                            textAlign: centerTitle ? TextAlign.center : TextAlign.start,
                           )
                               .color(context.color.textDefaultColor)
                               .bold(weight: FontWeight.w600)

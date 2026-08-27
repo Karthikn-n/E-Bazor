@@ -1,3 +1,4 @@
+import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/ui/screens/home/home_screen.dart';
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
@@ -15,7 +16,6 @@ class SellerVerificationCompleteScreen extends StatefulWidget {
   });
 
   static Route route(RouteSettings settings) {
-    Map? arguments = settings.arguments as Map?;
     return BlurredRouter(
       builder: (context) {
         return SellerVerificationCompleteScreen();
@@ -33,7 +33,6 @@ class _SellerVerificationCompleteScreenState
     with SingleTickerProviderStateMixin {
   late AnimationController _slideController;
   late Animation<Offset> _slideAnimation;
-  bool isBack = false;
 
   @override
   void initState() {
@@ -68,38 +67,27 @@ class _SellerVerificationCompleteScreenState
     super.dispose();
   }
 
-  void _handleBackButtonPressed() {
-    if (_slideController.isAnimating) {
-      setState(() {
-        isBack = false;
-      });
-      // Don't allow popping while the animation is playing
-      return;
-    } else {
-      // Navigate back to the home screen
-      _navigateBackToProfile();
-      return;
-    }
-  }
 
   void _navigateBackToProfile() {
-    if (mounted)
-      Future.delayed(Duration(milliseconds: 500), () {
-        if (mounted) {
-          Navigator.pop(context);
-          Navigator.pop(context);
-          Navigator.pop(context,'refresh');
-        }
-      });
+    if (!mounted) return;
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context, 'refresh');
+    } else {
+      Navigator.pushReplacementNamed(
+        context,
+        Routes.main,
+        arguments: {'from': 'profile'},
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: isBack,
-      onPopInvokedWithResult: (didPop, result)  async {
-        // Handle back button press
-        _handleBackButtonPressed();
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _navigateBackToProfile();
       },
       child: Scaffold(
         appBar: UiUtils.buildAppBar(context, onBackPress: () {

@@ -7,6 +7,7 @@ import 'package:Ebozor/utils/sliver_grid_delegate_with_fixed_cross_axis_count_an
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/category/fetch_category_cubit.dart';
 import 'package:Ebozor/data/model/category_model.dart';
+import 'package:Ebozor/data/model/property_filter_category_resolver.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/category.dart';
@@ -96,15 +97,8 @@ class _CategoryListState extends State<CategoryList> {
                           if (widget.from == Routes.filterScreen) {
                             Navigator.pop(context, category);
                           } else {
-                            const filterCategoryIds = [65, 68, 139, 143];
-                            if (filterCategoryIds.contains(category.id) ||
-                                (category.name != null &&
-                                    (category.name!
-                                            .toLowerCase()
-                                            .contains("property") ||
-                                        category.name!
-                                            .toLowerCase()
-                                            .contains("properties")))) {
+                            if (PropertyFilterCategoryResolver
+                                .isPropertyCategory(category)) {
                               Navigator.pushNamed(
                                 context,
                                 Routes.filterpage,

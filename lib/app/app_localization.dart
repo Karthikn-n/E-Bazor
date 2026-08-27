@@ -21,25 +21,34 @@ class AppLocalization {
 
   //to load json(language) from assets
   Future loadJson() async {
-
     String jsonStringValues =
         await rootBundle.loadString('assets/languages/template.json');
-    // value from root-bundle will be encoded string
+    // Start with template fallback values
     Map<String, dynamic> mappedJson = {};
+    try {
+      mappedJson = json.decode(jsonStringValues) as Map<String, dynamic>;
+    } catch (_) {}
 
-    if (HiveUtils.getLanguage() == null ||
-        HiveUtils.getLanguage()['data'] == null) {
-      mappedJson = json.decode(jsonStringValues);
-    } else {
-      mappedJson = Map<String, dynamic>.from(HiveUtils.getLanguage()['data']);
+    final dynamic storedLang = HiveUtils.getLanguage();
+    if (storedLang is Map) {
+      final dynamic data = storedLang['data'] ?? storedLang['file_name'];
+      if (data is Map) {
+        data.forEach((key, value) {
+          if (value != null && value.toString().trim().isNotEmpty) {
+            mappedJson[key.toString()] = value.toString();
+          }
+        });
+      }
     }
+
     _localizedValues =
         mappedJson.map((key, value) => MapEntry(key, value.toString()));
   }
 
   //to get translated value of given title/key
   String? getTranslatedValues(String? key) {
-    return _localizedValues[key!];
+    if (key == null) return null;
+    return _localizedValues[key];
   }
 
   //need to declare custom delegate

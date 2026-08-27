@@ -67,6 +67,9 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
   CityModel? selectedCity;
   String? manualCityName;
 
+  bool get _returnsLocationSelection =>
+      widget.from == "addItem" || widget.from == "filter";
+
   @override
   void initState() {
     super.initState();
@@ -118,15 +121,15 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
     setState(() {});
   }
 
-  String get effectiveCityName {
-    if (selectedCity != null) return selectedCity!.name ?? "";
+  String? get selectedCityName {
+    if (selectedCity != null) return selectedCity!.name;
     if (manualCityName != null && manualCityName!.trim().isNotEmpty) {
       return manualCityName!.trim();
     }
     if (searchController.text.trim().isNotEmpty) {
       return searchController.text.trim();
     }
-    return widget.stateName;
+    return null;
   }
 
   double? get effectiveLatitude {
@@ -144,11 +147,11 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
   }
 
   Future<void> _applyLocationDirectly() async {
-    final cityName = effectiveCityName;
+    final cityName = selectedCityName;
     final lat = effectiveLatitude;
     final lng = effectiveLongitude;
 
-    if (widget.from == "addItem") {
+    if (_returnsLocationSelection) {
       Navigator.pop(context, {
         "area_id": null,
         "area": null,
@@ -164,6 +167,7 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
         state: widget.stateName,
         country: widget.countryName,
         area: null,
+        areaId: null,
         latitude: lat,
         longitude: lng,
       );
@@ -183,7 +187,7 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
   }
 
   void _openMapForLocation() {
-    final cityName = effectiveCityName;
+    final cityName = selectedCityName;
     final lat = effectiveLatitude;
     final lng = effectiveLongitude;
 
@@ -205,7 +209,7 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
         ),
       ),
     ).then((value) {
-      if (value != null && widget.from == "addItem") {
+      if (value != null && _returnsLocationSelection) {
         Navigator.pop(context, value);
       }
     });
@@ -644,7 +648,7 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
   }
 
   Widget _buildBottomBar() {
-    final cityName = effectiveCityName;
+    final cityName = selectedCityName;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -699,7 +703,9 @@ class CitiesScreenState extends CloudState<CitiesScreen> {
               child: UiUtils.buildButton(
                 context,
                 onPressed: _applyLocationDirectly,
-                buttonTitle: "Apply $cityName",
+                buttonTitle: cityName != null
+                    ? "Apply $cityName"
+                    : "Apply ${widget.stateName}",
                 textColor: Colors.white,
                 buttonColor: context.color.territoryColor,
                 radius: 10,

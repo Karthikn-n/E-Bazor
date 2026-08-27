@@ -141,10 +141,12 @@ class MotorsServiceReview {
 class CarAppointmentModel {
   final int? id;
   final int? userId;
+  final int? inspectionId;
   final String appointmentNumber;
   final String serviceType;
   final String status;
   final String carTitle;
+  final String? carImage;
   final String? carMake;
   final String? carModel;
   final String? carYear;
@@ -155,20 +157,25 @@ class CarAppointmentModel {
   final String? address;
   final String? userName;
   final String? userPhone;
+  final String? phoneNo;
   final String? userEmail;
   final String? notes;
   final double? amount;
   final String? paymentStatus;
+  final String? inspectionStatus;
+  final String? inspectionPrice;
   final String? createdAt;
   final String? updatedAt;
 
   const CarAppointmentModel({
     this.id,
     this.userId,
+    this.inspectionId,
     this.appointmentNumber = '',
     required this.serviceType,
     required this.status,
     required this.carTitle,
+    this.carImage,
     this.carMake,
     this.carModel,
     this.carYear,
@@ -179,10 +186,13 @@ class CarAppointmentModel {
     this.address,
     this.userName,
     this.userPhone,
+    this.phoneNo,
     this.userEmail,
     this.notes,
     this.amount,
     this.paymentStatus,
+    this.inspectionStatus,
+    this.inspectionPrice,
     this.createdAt,
     this.updatedAt,
   });
@@ -206,6 +216,12 @@ class CarAppointmentModel {
   }
 
   factory CarAppointmentModel.fromJson(Map<String, dynamic> json) {
+    final user =
+        json['user'] is Map ? json['user'] as Map<String, dynamic> : null;
+    final inspection = json['inspection'] is Map
+        ? json['inspection'] as Map<String, dynamic>
+        : null;
+
     final make = json['car_make'] ?? json['make'] ?? json['car_make_name'];
     final model = json['car_model'] ?? json['model'] ?? json['car_model_name'];
     final year = json['car_year'] ?? json['year'];
@@ -217,9 +233,23 @@ class CarAppointmentModel {
             .join(' ')
             .trim();
 
+    final phone = (json['phone_no'] ??
+            json['phone'] ??
+            json['user_phone'] ??
+            json['user_number'] ??
+            user?['mobile'] ??
+            json['contact'])
+        ?.toString();
+
+    final inspPrice =
+        inspection?['price']?.toString() ?? json['price']?.toString();
+    final rawAmount = json['amount'] ?? inspPrice;
+
     return CarAppointmentModel(
       id: int.tryParse(json['id']?.toString() ?? ''),
       userId: int.tryParse(json['user_id']?.toString() ?? ''),
+      inspectionId: int.tryParse(
+          (json['inspection_id'] ?? inspection?['id'])?.toString() ?? ''),
       appointmentNumber: (json['appointment_number'] ??
               json['reference_number'] ??
               (json['id'] != null ? '#APT-${json['id']}' : ''))
@@ -231,6 +261,7 @@ class CarAppointmentModel {
           .toString(),
       status: (json['status'] ?? 'pending').toString(),
       carTitle: title.isNotEmpty ? title : 'Car Appointment',
+      carImage: (json['car_image'] ?? json['image'])?.toString(),
       carMake: make?.toString(),
       carModel: model?.toString(),
       carYear: year?.toString(),
@@ -248,18 +279,17 @@ class CarAppointmentModel {
               json['city'])
           ?.toString(),
       address: json['address']?.toString(),
-      userName: (json['user_name'] ?? json['name'])?.toString(),
-      userPhone: (json['user_phone'] ??
-              json['user_number'] ??
-              json['phone_number'] ??
-              json['contact'])
-          ?.toString(),
-      userEmail: (json['user_email'] ?? json['email'])?.toString(),
+      userName: (json['user_name'] ?? user?['name'] ?? json['name'])?.toString(),
+      userPhone: phone,
+      phoneNo: phone,
+      userEmail: (json['user_email'] ?? user?['email'] ?? json['email'])?.toString(),
       notes: json['notes']?.toString(),
-      amount: double.tryParse(json['amount']?.toString() ??
-          json['price']?.toString() ??
-          ''),
-      paymentStatus: json['payment_status']?.toString(),
+      amount: double.tryParse(rawAmount?.toString() ?? ''),
+      paymentStatus: (inspection?['payment_status'] ?? json['payment_status'])
+          ?.toString(),
+      inspectionStatus:
+          (inspection?['status'] ?? json['inspection_status'])?.toString(),
+      inspectionPrice: inspPrice,
       createdAt: json['created_at']?.toString(),
       updatedAt: json['updated_at']?.toString(),
     );

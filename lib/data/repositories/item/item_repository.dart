@@ -12,7 +12,7 @@ import 'package:path/path.dart' as path;
 class ItemRepository {
   Future<ItemModel> createItem(
     Map<String, dynamic> itemDetails,
-    File mainImage,
+    File? mainImage,
     List<File>? otherImages,
   ) async {
     try {
@@ -20,13 +20,14 @@ class ItemRepository {
       parameters.addAll(itemDetails);
 
       // Main image
-      //MultipartFile image = await MultipartFile.fromFile(mainImage.path);
-      MultipartFile image = await MultipartFile.fromFile(mainImage.path,
-          filename: path.basename(mainImage.path));
+      if (mainImage != null) {
+        MultipartFile image = await MultipartFile.fromFile(mainImage.path,
+            filename: path.basename(mainImage.path));
+        parameters["image"] = image;
+      }
 
       if (otherImages != null && otherImages.isNotEmpty) {
         List<Future<MultipartFile>> futures = otherImages.map((imageFile) {
-          //return MultipartFile.fromFile(imageFile.path);
           return MultipartFile.fromFile(imageFile.path,
               filename: path.basename(imageFile.path));
         }).toList();
@@ -38,10 +39,7 @@ class ItemRepository {
         }
       }
 
-      parameters.addAll({
-        "image": image,
-        "show_only_to_premium": 1,
-      });
+      parameters["show_only_to_premium"] = 1;
 
       Map<String, dynamic> response = await Api.post(
         url: Api.addItemApi,
@@ -147,12 +145,15 @@ class ItemRepository {
   }
 
   Future<DataOutput<ItemModel>> fetchItemFromItemId(int id,
-      {int? categoryId}) async {
+      {int? categoryId, String? status}) async {
     Map<String, dynamic> parameters = {
       Api.id: id,
     };
     if (categoryId != null) {
       parameters[Api.categoryId] = categoryId;
+    }
+    if (status != null && status.isNotEmpty) {
+      parameters['status'] = status;
     }
 
     Map<String, dynamic> response = await Api.get(

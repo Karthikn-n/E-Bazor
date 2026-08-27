@@ -121,15 +121,8 @@ class NotificationsState extends State<Notifications> {
       itemCount: 8,
       physics: const NeverScrollableScrollPhysics(),
       itemBuilder: (context, index) {
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: context.color.secondaryColor,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: context.color.borderColor.withValues(alpha: 0.5),
-            ),
-          ),
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
           child: Row(
             children: <Widget>[
               const CustomShimmer(
@@ -193,116 +186,96 @@ class NotificationsState extends State<Notifications> {
         Expanded(
           child: ListView.separated(
             controller: _pageScrollController,
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            separatorBuilder: (context, index) => const SizedBox(height: 10),
+            // physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+            separatorBuilder: (context, index) => Divider(
+              height: 1,
+              indent: 78,
+              color: context.color.borderColor.withValues(alpha: 0.55),
+            ),
             itemCount: state.notificationdata.length,
             itemBuilder: (context, index) {
               NotificationData notificationData = state.notificationdata[index];
               final hasImage = notificationData.image != null &&
                   notificationData.image!.isNotEmpty;
 
-              return Container(
-                decoration: BoxDecoration(
-                  color: context.color.secondaryColor,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: context.color.borderColor.withValues(alpha: 0.6),
-                    width: 1,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.02),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(14),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: () {
-                      selectedNotification = notificationData;
-                      HelperUtils.goToNextPage(
-                          Routes.notificationDetailPage, context, false);
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          if (hasImage)
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: UiUtils.getImage(
-                                notificationData.image!,
-                                height: 48,
-                                width: 48,
-                                fit: BoxFit.cover,
-                              ),
-                            )
-                          else
-                            _buildFallbackIcon(),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                Text(
-                                  (notificationData.title ?? "").firstUpperCase(),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: context.color.textDefaultColor,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  (notificationData.message ?? "").firstUpperCase(),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12.5,
-                                    color: context.color.textLightColor,
-                                    height: 1.35,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                if (notificationData.createdAt != null &&
-                                    notificationData.createdAt!.isNotEmpty)
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.access_time_rounded,
-                                        size: 12,
-                                        color: context.color.textLightColor,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        notificationData.createdAt!.formatDate(),
-                                        style: TextStyle(
-                                          fontSize: 11.5,
-                                          color: context.color.textLightColor,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                              ],
+              return Material(
+                color: context.color.secondaryColor,
+                child: InkWell(
+                  onTap: () {
+                    selectedNotification = notificationData;
+                    HelperUtils.goToNextPage(
+                        Routes.notificationDetailPage, context, false);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        if (hasImage)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: UiUtils.getImage(
+                              notificationData.image!,
+                              height: 48,
+                              width: 48,
+                              fit: BoxFit.cover,
                             ),
+                          )
+                        else
+                          _buildFallbackIcon(),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                (notificationData.title ?? "").firstUpperCase(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.color.textDefaultColor,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                (notificationData.message ?? "")
+                                    .firstUpperCase(),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: context.color.textLightColor,
+                                  height: 1.35,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              if (notificationData.createdAt != null &&
+                                  notificationData.createdAt!.isNotEmpty)
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.access_time_rounded,
+                                      size: 12,
+                                      color: context.color.textLightColor,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      notificationData.createdAt!.formatDate(),
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: context.color.textLightColor,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          Icon(
-                            Icons.arrow_forward_ios_rounded,
-                            size: 13,
-                            color: context.color.textLightColor,
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

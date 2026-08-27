@@ -13,6 +13,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/svg.dart';
 
+import 'package:shimmer/shimmer.dart';
+
 class ChatTile extends StatelessWidget {
   final String profilePicture;
   final String userName;
@@ -143,8 +145,12 @@ class ChatTile extends StatelessWidget {
                             ? CachedNetworkImage(
                                 imageUrl: profilePicture,
                                 fit: BoxFit.cover,
-                                placeholder: (_, __) => Container(
-                                  color: context.color.borderColor.withValues(alpha: 0.2),
+                                placeholder: (_, __) => Shimmer.fromColors(
+                                  baseColor: context.color.borderColor.withValues(alpha: 0.4),
+                                  highlightColor: context.color.borderColor.withValues(alpha: 0.15),
+                                  child: Container(
+                                    color: Colors.white,
+                                  ),
                                 ),
                                 errorWidget: (_, __, ___) => Icon(
                                   Icons.person_rounded,
@@ -189,6 +195,13 @@ class ChatTile extends StatelessWidget {
                             child: CachedNetworkImage(
                               imageUrl: itemPicture,
                               fit: BoxFit.cover,
+                              placeholder: (_, __) => Shimmer.fromColors(
+                                baseColor: context.color.borderColor.withValues(alpha: 0.4),
+                                highlightColor: context.color.borderColor.withValues(alpha: 0.15),
+                                child: Container(
+                                  color: Colors.white,
+                                ),
+                              ),
                               errorWidget: (_, __, ___) => Icon(
                                 Icons.shopping_bag_outlined,
                                 size: 12,

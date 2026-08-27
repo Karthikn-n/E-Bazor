@@ -20,7 +20,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:Ebozor/utils/app_icon.dart';
-import 'package:Ebozor/utils/sliver_grid_delegate_with_fixed_cross_axis_count_and_fixed_height.dart';
 import 'package:Ebozor/data/model/item/item_model.dart';
 import 'package:Ebozor/data/model/item_filter_model.dart';
 
@@ -29,7 +28,6 @@ import 'package:Ebozor/utils/ApiService/api.dart';
 
 import 'package:Ebozor/utils/responsiveSize.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
-import 'package:Ebozor/ui/screens/home/widgets/home_sections_adapter.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/no_data_found.dart';
 import 'package:Ebozor/ui/screens/main_activity.dart';
 import 'package:Ebozor/data/cubits/saved_search/fetch_saved_searches_cubit.dart';
@@ -108,7 +106,6 @@ class ItemsListState extends State<ItemsList> {
   String _selectedRoomsLabel = "Bedrooms";
   String _selectedBathroomsLabel = "Bathrooms";
   String _selectedPriceRangeLabel = "Price Range";
-  String _selectedRoomTypeLabel = "Room type";
   String _selectedJobTypeLabel = "Job Type";
   String _selectedJobGenderLabel = "Gender";
 
@@ -339,6 +336,9 @@ class ItemsListState extends State<ItemsList> {
     } else if (existing != null && existing.toString().trim().isNotEmpty) {
       selected.add(existing.toString());
     }
+    var showAllOptions = false;
+    final canCollapseOptions =
+        item.multiSelect && type == 'button' && item.values.length > 5;
 
     final optionCount = item.values.length;
     final initialSize =
@@ -351,6 +351,9 @@ class ItemsListState extends State<ItemsList> {
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
+            final visibleOptions = canCollapseOptions && !showAllOptions
+                ? item.values.take(5).toList()
+                : item.values;
             return DraggableScrollableSheet(
               initialChildSize: initialSize.toDouble(),
               minChildSize: 0.36,
@@ -445,41 +448,67 @@ class ItemsListState extends State<ItemsList> {
                                   ),
                                 ),
                               )
-                            : Wrap(
-                                spacing: 10,
-                                runSpacing: 10,
-                                children: item.values.map((option) {
-                                  final isSelected = selected.contains(option);
-                                  return FilterChip(
-                                    label: Text(option),
-                                    selected: isSelected,
-                                    showCheckmark: true,
-                                    selectedColor: sheetContext
-                                        .color.territoryColor
-                                        .withValues(alpha: 0.12),
-                                    side: BorderSide(
-                                      color: isSelected
-                                          ? sheetContext.color.territoryColor
-                                          : sheetContext.color.borderColor,
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Wrap(
+                                    spacing: 10,
+                                    runSpacing: 10,
+                                    children: visibleOptions.map((option) {
+                                      final isSelected =
+                                          selected.contains(option);
+                                      return FilterChip(
+                                        label: Text(option),
+                                        selected: isSelected,
+                                        showCheckmark: true,
+                                        selectedColor: sheetContext
+                                            .color.territoryColor
+                                            .withValues(alpha: 0.12),
+                                        side: BorderSide(
+                                          color: isSelected
+                                              ? sheetContext
+                                                  .color.territoryColor
+                                              : sheetContext.color.borderColor,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        onSelected: (_) {
+                                          setSheetState(() {
+                                            if (item.multiSelect) {
+                                              isSelected
+                                                  ? selected.remove(option)
+                                                  : selected.add(option);
+                                            } else {
+                                              selected
+                                                ..clear()
+                                                ..add(option);
+                                            }
+                                          });
+                                        },
+                                      );
+                                    }).toList(),
+                                  ),
+                                  if (canCollapseOptions) ...[
+                                    const SizedBox(height: 8),
+                                    TextButton.icon(
+                                      onPressed: () => setSheetState(
+                                        () => showAllOptions = !showAllOptions,
+                                      ),
+                                      icon: Icon(
+                                        showAllOptions
+                                            ? Icons.keyboard_arrow_up_rounded
+                                            : Icons.keyboard_arrow_down_rounded,
+                                      ),
+                                      label: Text(
+                                        showAllOptions
+                                            ? 'Show less'
+                                            : 'Show more (${item.values.length - 5})',
+                                      ),
                                     ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    onSelected: (_) {
-                                      setSheetState(() {
-                                        if (item.multiSelect) {
-                                          isSelected
-                                              ? selected.remove(option)
-                                              : selected.add(option);
-                                        } else {
-                                          selected
-                                            ..clear()
-                                            ..add(option);
-                                        }
-                                      });
-                                    },
-                                  );
-                                }).toList(),
+                                  ],
+                                ],
                               ),
                       ),
                     ),
@@ -1075,92 +1104,92 @@ class ItemsListState extends State<ItemsList> {
     return [];
   }
 
-  Widget _buildDynamicSegmentTabs(List<ItemModel> items) {
-    final segmentOptions = _extractDynamicSegments(items);
-    if (segmentOptions.isEmpty) {
-      return const SizedBox.shrink();
-    }
+  // Widget _buildDynamicSegmentTabs(List<ItemModel> items) {
+  //   final segmentOptions = _extractDynamicSegments(items);
+  //   if (segmentOptions.isEmpty) {
+  //     return const SizedBox.shrink();
+  //   }
 
-    List<String> allTabs = ["All", ...segmentOptions];
+  //   List<String> allTabs = ["All", ...segmentOptions];
 
-    return Container(
-      color: context.color.backgroundColor,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: allTabs.map((tabTitle) {
-            final isSelected =
-                (tabTitle == "All" && _selectedSegmentValue == null) ||
-                    (_selectedSegmentValue != null &&
-                        _selectedSegmentValue!.toLowerCase() ==
-                            tabTitle.toLowerCase());
+  //   return Container(
+  //     color: context.color.backgroundColor,
+  //     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+  //     child: SingleChildScrollView(
+  //       scrollDirection: Axis.horizontal,
+  //       child: Row(
+  //         children: allTabs.map((tabTitle) {
+  //           final isSelected =
+  //               (tabTitle == "All" && _selectedSegmentValue == null) ||
+  //                   (_selectedSegmentValue != null &&
+  //                       _selectedSegmentValue!.toLowerCase() ==
+  //                           tabTitle.toLowerCase());
 
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: () {
-                  setState(() {
-                    if (tabTitle == "All") {
-                      _selectedSegmentValue = null;
-                      if (_isPropertyVertical()) {
-                        _setCustomFilterValue(
-                          _detectedFilterFieldName ?? 'Is it furnished?',
-                          null,
-                        );
-                      }
-                    } else {
-                      _selectedSegmentValue = tabTitle;
-                      if (_isPropertyVertical()) {
-                        _setCustomFilterValue(
-                          _detectedFilterFieldName ?? 'Is it furnished?',
-                          tabTitle.toLowerCase(),
-                        );
-                      }
-                    }
-                  });
+  //           return Padding(
+  //             padding: const EdgeInsets.only(right: 8),
+  //             child: InkWell(
+  //               borderRadius: BorderRadius.circular(8),
+  //               onTap: () {
+  //                 setState(() {
+  //                   if (tabTitle == "All") {
+  //                     _selectedSegmentValue = null;
+  //                     if (_isPropertyVertical()) {
+  //                       _setCustomFilterValue(
+  //                         _detectedFilterFieldName ?? 'Is it furnished?',
+  //                         null,
+  //                       );
+  //                     }
+  //                   } else {
+  //                     _selectedSegmentValue = tabTitle;
+  //                     if (_isPropertyVertical()) {
+  //                       _setCustomFilterValue(
+  //                         _detectedFilterFieldName ?? 'Is it furnished?',
+  //                         tabTitle.toLowerCase(),
+  //                       );
+  //                     }
+  //                   }
+  //                 });
 
-                  if (_isPropertyVertical()) {
-                    _fetchFilteredItems();
-                  }
-                },
-                child: Container(
-                  height: 36,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? const Color(0xFFE8F1FD)
-                        : context.color.secondaryColor,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isSelected
-                          ? const Color(0xFF2979FF).withValues(alpha: 0.6)
-                          : context.color.borderColor.withValues(alpha: 0.6),
-                      width: 1,
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      tabTitle,
-                      style: TextStyle(
-                        color: isSelected
-                            ? const Color(0xFF1565C0)
-                            : context.color.textDefaultColor,
-                        fontSize: 13,
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
+  //                 if (_isPropertyVertical()) {
+  //                   _fetchFilteredItems();
+  //                 }
+  //               },
+  //               child: Container(
+  //                 height: 36,
+  //                 padding: const EdgeInsets.symmetric(horizontal: 16),
+  //                 decoration: BoxDecoration(
+  //                   color: isSelected
+  //                       ? const Color(0xFFE8F1FD)
+  //                       : context.color.secondaryColor,
+  //                   borderRadius: BorderRadius.circular(8),
+  //                   border: Border.all(
+  //                     color: isSelected
+  //                         ? const Color(0xFF2979FF).withValues(alpha: 0.6)
+  //                         : context.color.borderColor.withValues(alpha: 0.6),
+  //                     width: 1,
+  //                   ),
+  //                 ),
+  //                 child: Center(
+  //                   child: Text(
+  //                     tabTitle,
+  //                     style: TextStyle(
+  //                       color: isSelected
+  //                           ? const Color(0xFF1565C0)
+  //                           : context.color.textDefaultColor,
+  //                       fontSize: 13,
+  //                       fontWeight:
+  //                           isSelected ? FontWeight.bold : FontWeight.w500,
+  //                     ),
+  //                   ),
+  //                 ),
+  //               ),
+  //             ),
+  //           );
+  //         }).toList(),
+  //       ),
+  //     ),
+  //   );
+  // }
 
   void _syncQuickFilterLabelsFromFilter() {
     if (filter == null) return;
@@ -1333,893 +1362,6 @@ class ItemsListState extends State<ItemsList> {
     }
   }
 
-  void _showJobTypeQuickFilter() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Material(
-          color: Colors.transparent,
-          child: Container(
-            decoration: BoxDecoration(
-              color: context.color.secondaryColor,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
-            ),
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  "Select Job Type",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: context.color.textDefaultColor,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    "All Types",
-                    "Full Time",
-                    "Part Time",
-                    "Contract",
-                    "Remote",
-                    "Internship",
-                    "Temporary",
-                  ].map((type) {
-                    final isSelected = _selectedJobTypeLabel == type ||
-                        (type == "All Types" &&
-                            (_selectedJobTypeLabel == "Job Type" ||
-                                _selectedJobTypeLabel == "All Types"));
-                    return ChoiceChip(
-                      label: Text(type),
-                      selected: isSelected,
-                      selectedColor:
-                          context.color.territoryColor.withValues(alpha: 0.15),
-                      backgroundColor: context.color.secondaryColor,
-                      labelStyle: TextStyle(
-                        color: isSelected
-                            ? context.color.territoryColor
-                            : context.color.textDefaultColor,
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                      onSelected: (selected) {
-                        Navigator.pop(context);
-                        setState(() {
-                          _selectedJobTypeLabel =
-                              type == "All Types" ? "Job Type" : type;
-                          if (type != "All Types") {
-                            _selectedSegmentValue = type;
-                          } else {
-                            _selectedSegmentValue = null;
-                          }
-                        });
-                        final catIdInt = int.tryParse(widget.categoryId) ?? 0;
-                        if (catIdInt != 0) {
-                          context
-                              .read<FetchItemFromCategoryCubit>()
-                              .fetchItemFromCategory(
-                                categoryId: catIdInt,
-                                search: searchController.text,
-                                filter: filter,
-                              );
-                        }
-                      },
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showJobGenderQuickFilter() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          decoration: BoxDecoration(
-            color: context.color.secondaryColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                "Select Gender Preference",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: context.color.textDefaultColor,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  "All",
-                  "Male",
-                  "Female",
-                  "Any",
-                ].map((g) {
-                  final isSelected = _selectedJobGenderLabel == g ||
-                      (g == "All" &&
-                          (_selectedJobGenderLabel == "Gender" ||
-                              _selectedJobGenderLabel == "All"));
-                  return ChoiceChip(
-                    label: Text(g),
-                    selected: isSelected,
-                    selectedColor:
-                        context.color.territoryColor.withValues(alpha: 0.15),
-                    backgroundColor: context.color.secondaryColor,
-                    labelStyle: TextStyle(
-                      color: isSelected
-                          ? context.color.territoryColor
-                          : context.color.textDefaultColor,
-                      fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
-                    onSelected: (selected) {
-                      Navigator.pop(context);
-                      setState(() {
-                        _selectedJobGenderLabel = g == "All" ? "Gender" : g;
-                      });
-                      final catIdInt = int.tryParse(widget.categoryId) ?? 0;
-                      if (catIdInt != 0) {
-                        context
-                            .read<FetchItemFromCategoryCubit>()
-                            .fetchItemFromCategory(
-                              categoryId: catIdInt,
-                              search: searchController.text,
-                              filter: filter,
-                            );
-                      }
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showPropertyPurposeQuickFilter() {
-    final purposes = [
-      {
-        "label": "Property for Rent",
-        "short": "Rent",
-        "id": 65,
-        "slug": "residential"
-      },
-      {
-        "label": "Property for Sale",
-        "short": "Buy",
-        "id": 139,
-        "slug": "property-for-sale-new-projects"
-      },
-      {
-        "label": "Off-Plan / Projects",
-        "short": "Off-Plan",
-        "id": 143,
-        "slug": "property-for-sale-off-plan"
-      },
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Material(
-          color: Colors.transparent,
-          child: Container(
-            decoration: BoxDecoration(
-              color: context.color.secondaryColor,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
-            ),
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  "Select Purpose",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: context.color.textDefaultColor,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ...purposes.map((p) {
-                  final shortName = p['short'] as String;
-                  final fullName = p['label'] as String;
-                  final catId = p['id'] as int;
-                  final slug = p['slug'] as String;
-
-                  final isSelected = _selectedRentSaleLabel == shortName ||
-                      _selectedRentSaleLabel == fullName ||
-                      (shortName == "Rent" && _selectedRentSaleLabel == "Rent");
-
-                  return ListTile(
-                    title: Text(
-                      fullName,
-                      style: TextStyle(
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
-                        color: isSelected
-                            ? context.color.territoryColor
-                            : context.color.textDefaultColor,
-                      ),
-                    ),
-                    trailing: isSelected
-                        ? Icon(Icons.check_circle,
-                            color: context.color.territoryColor)
-                        : null,
-                    onTap: () {
-                      Navigator.pop(context);
-                      setState(() {
-                        _selectedRentSaleLabel = shortName;
-                        _currentCategoryIds = [catId.toString()];
-                        _selectedPropertyTypeLabel = "Property Type";
-                        _selectedRoomsLabel = "Bedrooms";
-                        _selectedBathroomsLabel = "Bathrooms";
-                        _selectedSegmentValue = null;
-                        _currentChain = [
-                          CategoryModel(
-                            id: catId,
-                            name: fullName,
-                            slug: slug,
-                            children: [],
-                            subcategoriesCount: 0,
-                          )
-                        ];
-                        if (filter != null) {
-                          filter = filter!.copyWith(
-                            categoryId: catId.toString(),
-                            categorySlug: slug,
-                            customFields: const {},
-                          );
-                        } else {
-                          filter = ItemFilterModel(
-                            categoryId: catId.toString(),
-                            categorySlug: slug,
-                          );
-                        }
-                        Constant.itemFilter = filter;
-                      });
-                      _loadPropertyFilterConfiguration(slug);
-                      _fetchFilteredItems();
-                    },
-                  );
-                }),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showPropertyTypeQuickFilter() {
-    final configuration = _propertyFilterConfiguration;
-    if (configuration == null) {
-      _openFullFilterScreen();
-      return;
-    }
-    final configuredCategories = configuration.children.where((category) {
-      final name = category.name?.trim() ?? '';
-      return name.isNotEmpty && !name.toLowerCase().startsWith('all');
-    }).toList();
-    final chainCategories = _currentChain.isEmpty
-        ? const <FilterSubCategory>[]
-        : (_currentChain.first.children ?? const <CategoryModel>[])
-            .where((category) {
-            final name = category.name?.trim() ?? '';
-            return name.isNotEmpty && !name.toLowerCase().startsWith('all');
-          }).map((category) {
-            return FilterSubCategory(
-              id: category.id,
-              name: category.name,
-              slug: category.slug,
-            );
-          }).toList();
-    final usesConfiguredCategories = configuredCategories.isNotEmpty;
-    final categories =
-        usesConfiguredCategories ? configuredCategories : chainCategories;
-    final parentId = usesConfiguredCategories
-        ? configuration.id
-        : (_currentChain.isNotEmpty ? _currentChain.first.id : null);
-    final parentSlug = usesConfiguredCategories
-        ? configuration.slug
-        : (_currentChain.isNotEmpty ? _currentChain.first.slug : null);
-    final propertyTypes = [
-      "All Types",
-      ...categories.map((category) => category.name!),
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * 0.75,
-          ),
-          decoration: BoxDecoration(
-            color: context.color.secondaryColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  "Property Type",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: context.color.textDefaultColor,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: propertyTypes.map((type) {
-                    final isSelected = _selectedPropertyTypeLabel == type ||
-                        (type == "All Types" &&
-                            (_selectedPropertyTypeLabel == "Property Type" ||
-                                _selectedPropertyTypeLabel == "All Types"));
-                    return ChoiceChip(
-                      label: Text(type),
-                      selected: isSelected,
-                      selectedColor:
-                          context.color.territoryColor.withValues(alpha: 0.15),
-                      backgroundColor: context.color.secondaryColor,
-                      labelStyle: TextStyle(
-                        color: isSelected
-                            ? context.color.territoryColor
-                            : context.color.textDefaultColor,
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                      onSelected: (selected) {
-                        Navigator.pop(context);
-                        _setCustomFilterValue('Property Type', null);
-                        FilterSubCategory? selectedCategory;
-                        if (type != "All Types") {
-                          for (final category in categories) {
-                            if (category.name == type) {
-                              selectedCategory = category;
-                              break;
-                            }
-                          }
-                        }
-                        setState(() {
-                          _selectedPropertyTypeLabel =
-                              type == "All Types" ? "Property Type" : type;
-                          final targetId = selectedCategory?.id ??
-                              parentId ??
-                              _activeCategoryId;
-                          final targetSlug = selectedCategory?.slug ??
-                              parentSlug ??
-                              filter?.categorySlug;
-                          filter = (filter ??
-                                  ItemFilterModel(
-                                      categoryId: targetId.toString()))
-                              .copyWith(
-                            categoryId: targetId.toString(),
-                            categorySlug: targetSlug,
-                          );
-                          _currentCategoryIds = [targetId.toString()];
-                          Constant.itemFilter = filter;
-                        });
-                        _fetchFilteredItems();
-                      },
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showRoomsQuickFilter() {
-    final bedroomsFilter =
-        _propertyFilterByNames(const ['Bedrooms', 'Bedroom']);
-    if (bedroomsFilter == null || bedroomsFilter.values.isEmpty) {
-      _openFullFilterScreen();
-      return;
-    }
-    final fieldName = bedroomsFilter.name ?? 'Bedrooms';
-    final roomOptions = [
-      "All Bedrooms",
-      ...bedroomsFilter.values.map(
-        (value) => value.toLowerCase() == 'studio'
-            ? value
-            : '$value ${value == '1' ? 'Bedroom' : 'Bedrooms'}',
-      ),
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          decoration: BoxDecoration(
-            color: context.color.secondaryColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                "Bedrooms",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: context.color.textDefaultColor,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: roomOptions.map((room) {
-                  final isSelected = _selectedRoomsLabel == room ||
-                      (_selectedRoomsLabel == "Bedrooms" &&
-                          room == "All Bedrooms") ||
-                      (_selectedRoomsLabel.contains(room.split(" ").first) &&
-                          room != "All Bedrooms");
-
-                  return ChoiceChip(
-                    label: Text(room),
-                    selected: isSelected,
-                    selectedColor:
-                        context.color.territoryColor.withValues(alpha: 0.15),
-                    backgroundColor: context.color.secondaryColor,
-                    labelStyle: TextStyle(
-                      color: isSelected
-                          ? context.color.territoryColor
-                          : context.color.textDefaultColor,
-                      fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
-                    onSelected: (selected) {
-                      Navigator.pop(context);
-                      final rawVal = room == "All Bedrooms"
-                          ? ""
-                          : (room == "Studio"
-                              ? "Studio"
-                              : room.split(" ").first);
-
-                      setState(() {
-                        _selectedRoomsLabel =
-                            room == "All Bedrooms" ? "Bedrooms" : room;
-
-                        _setCustomFilterValue(
-                          fieldName,
-                          rawVal.isEmpty ? null : rawVal,
-                        );
-                      });
-                      _fetchFilteredItems();
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showBathroomsQuickFilter() {
-    final bathroomsFilter =
-        _propertyFilterByNames(const ['Bathrooms', 'Bathroom']);
-    if (bathroomsFilter == null || bathroomsFilter.values.isEmpty) {
-      _openFullFilterScreen();
-      return;
-    }
-    final fieldName = bathroomsFilter.name ?? 'Bathrooms';
-    final bathOptions = [
-      "All Bathrooms",
-      ...bathroomsFilter.values.map(
-        (value) => '$value ${value == '1' ? 'Bathroom' : 'Bathrooms'}',
-      ),
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          decoration: BoxDecoration(
-            color: context.color.secondaryColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                "Bathrooms",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: context.color.textDefaultColor,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: bathOptions.map((bath) {
-                  final isSelected = _selectedBathroomsLabel == bath ||
-                      (_selectedBathroomsLabel == "Bathrooms" &&
-                          bath == "All Bathrooms") ||
-                      (_selectedBathroomsLabel
-                              .contains(bath.split(" ").first) &&
-                          bath != "All Bathrooms");
-
-                  return ChoiceChip(
-                    label: Text(bath),
-                    selected: isSelected,
-                    selectedColor:
-                        context.color.territoryColor.withValues(alpha: 0.15),
-                    backgroundColor: context.color.secondaryColor,
-                    labelStyle: TextStyle(
-                      color: isSelected
-                          ? context.color.territoryColor
-                          : context.color.textDefaultColor,
-                      fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
-                    onSelected: (selected) {
-                      Navigator.pop(context);
-                      final rawVal =
-                          bath == "All Bathrooms" ? "" : bath.split(" ").first;
-
-                      setState(() {
-                        _selectedBathroomsLabel =
-                            bath == "All Bathrooms" ? "Bathrooms" : bath;
-
-                        _setCustomFilterValue(
-                          fieldName,
-                          rawVal.isEmpty ? null : rawVal,
-                        );
-                      });
-                      _fetchFilteredItems();
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showPriceRangeQuickFilter() {
-    final currentMin = double.tryParse(filter?.minPrice ?? '') ?? 0.0;
-    final currentMax = double.tryParse(filter?.maxPrice ?? '') ?? 10000000.0;
-
-    final minCtrl = TextEditingController(
-      text: filter?.minPrice != null && filter!.minPrice!.isNotEmpty
-          ? filter!.minPrice!
-          : "",
-    );
-    final maxCtrl = TextEditingController(
-      text: filter?.maxPrice != null && filter!.maxPrice!.isNotEmpty
-          ? filter!.maxPrice!
-          : "",
-    );
-
-    double sliderMin = currentMin.clamp(0.0, 10000000.0);
-    double sliderMax = currentMax.clamp(0.0, 10000000.0);
-    if (sliderMin > sliderMax) sliderMin = 0.0;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: context.color.secondaryColor,
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(16)),
-                ),
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "Price Range (${Constant.currencySymbol})",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: context.color.textDefaultColor,
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            setModalState(() {
-                              minCtrl.clear();
-                              maxCtrl.clear();
-                              sliderMin = 0.0;
-                              sliderMax = 10000000.0;
-                            });
-                          },
-                          child: Text(
-                            "Reset",
-                            style: TextStyle(
-                              color: context.color.territoryColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: minCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: "Minimum",
-                              prefixText: "${Constant.currencySymbol} ",
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 10),
-                            ),
-                            onChanged: (val) {
-                              final num = double.tryParse(val) ?? 0.0;
-                              setModalState(() {
-                                sliderMin = num.clamp(0.0, sliderMax);
-                              });
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text("to",
-                            style:
-                                TextStyle(color: context.color.textLightColor)),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextField(
-                            controller: maxCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: "Maximum",
-                              prefixText: "${Constant.currencySymbol} ",
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 10),
-                            ),
-                            onChanged: (val) {
-                              final num = double.tryParse(val) ?? 10000000.0;
-                              setModalState(() {
-                                sliderMax = num.clamp(sliderMin, 10000000.0);
-                              });
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    RangeSlider(
-                      values: RangeValues(sliderMin, sliderMax),
-                      min: 0.0,
-                      max: 10000000.0,
-                      divisions: 100,
-                      activeColor: context.color.territoryColor,
-                      inactiveColor: context.color.borderColor,
-                      labels: RangeLabels(
-                        "${sliderMin.toInt()} ${Constant.currencySymbol}",
-                        "${sliderMax.toInt()} ${Constant.currencySymbol}",
-                      ),
-                      onChanged: (RangeValues values) {
-                        setModalState(() {
-                          sliderMin = values.start;
-                          sliderMax = values.end;
-                          minCtrl.text =
-                              sliderMin > 0 ? sliderMin.toInt().toString() : "";
-                          maxCtrl.text = sliderMax < 10000000
-                              ? sliderMax.toInt().toString()
-                              : "";
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 46,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: context.color.territoryColor,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          final minP = minCtrl.text.trim();
-                          final maxP = maxCtrl.text.trim();
-                          setState(() {
-                            if (minP.isEmpty && maxP.isEmpty) {
-                              _selectedPriceRangeLabel = "Price Range";
-                            } else if (minP.isNotEmpty && maxP.isNotEmpty) {
-                              _selectedPriceRangeLabel = "$minP - $maxP";
-                            } else if (minP.isNotEmpty) {
-                              _selectedPriceRangeLabel = "> $minP";
-                            } else {
-                              _selectedPriceRangeLabel = "< $maxP";
-                            }
-
-                            if (filter != null) {
-                              filter = filter!.copyWith(
-                                minPrice: minP.isNotEmpty ? minP : null,
-                                maxPrice: maxP.isNotEmpty ? maxP : null,
-                                clearMinPrice: minP.isEmpty,
-                                clearMaxPrice: maxP.isEmpty,
-                              );
-                            } else {
-                              filter = ItemFilterModel(
-                                minPrice: minP.isNotEmpty ? minP : null,
-                                maxPrice: maxP.isNotEmpty ? maxP : null,
-                                categoryId: widget.categoryId,
-                              );
-                            }
-                          });
-
-                          Constant.itemFilter = filter;
-                          _fetchFilteredItems();
-                        },
-                        child: const Text(
-                          "Apply Price Filter",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   Widget _buildFilterChips() {
     final activeFiltersCount = _activeFiltersCount;
 
@@ -2323,22 +1465,6 @@ class ItemsListState extends State<ItemsList> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildDynamicChip(int chainIndex) {
-    CategoryModel currentModel = _currentChain[chainIndex];
-    return _buildChip(
-      label: currentModel.name ?? "",
-      isActive: !_isAllFieldsSelected, // Inactive if All Fields is selected
-      showDropdown: true,
-      onTap: () {
-        if (_isAllFieldsSelected) {
-          _restoreSelection(chainIndex);
-        } else {
-          _showDynamicFilterBottomSheet(chainIndex);
-        }
-      },
     );
   }
 
@@ -3143,6 +2269,335 @@ class ItemsListState extends State<ItemsList> {
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(children: features),
+      ),
+    );
+  }
+
+  bool _isJobItem(ItemModel item) {
+    if (item.isJobsCategory) return true;
+    if (_isJobsVertical()) return true;
+    final allCategoryIds = item.allCategoryIds ?? "${item.categoryId ?? ''}";
+    final catIdList = allCategoryIds.split(',').map((e) => e.trim()).toList();
+    final catSlug = (item.category?.slug ?? '').toLowerCase();
+    final catName = (item.category?.name ?? '').toLowerCase();
+    return catIdList.contains('4') ||
+        catSlug.contains('job') ||
+        catName.contains('job');
+  }
+
+  String? _getJobCustomField(ItemModel item, List<String> aliases) {
+    if (item.customFields == null || item.customFields!.isEmpty) return null;
+    for (final alias in aliases) {
+      final normalizedAlias =
+          alias.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+      for (final field in item.customFields!) {
+        final fieldName = (field.name ?? field.label ?? '')
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9]'), '');
+        if (fieldName == normalizedAlias ||
+            fieldName.contains(normalizedAlias)) {
+          if (field.value != null && field.value!.isNotEmpty) {
+            final val = field.value!
+                .map((e) => e.toString().trim())
+                .where((e) => e.isNotEmpty)
+                .join(', ');
+            if (val.isNotEmpty) return val;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  String _formatJobDate(String? rawDate) {
+    if (rawDate == null || rawDate.trim().isEmpty) return '';
+    try {
+      final dt = DateTime.tryParse(rawDate)?.toLocal();
+      if (dt == null) return rawDate;
+      final now = DateTime.now();
+      final diff = now.difference(dt);
+      if (diff.inMinutes < 60) {
+        final mins = diff.inMinutes <= 1 ? 1 : diff.inMinutes;
+        return '$mins min${mins > 1 ? "s" : ""} ago';
+      } else if (diff.inHours < 24 && now.day == dt.day) {
+        final hrs = diff.inHours <= 1 ? 1 : diff.inHours;
+        return '$hrs hour${hrs > 1 ? "s" : ""} ago';
+      } else if (diff.inDays == 1 ||
+          (diff.inHours < 48 && now.day - dt.day == 1)) {
+        return 'Yesterday';
+      } else {
+        return dt.toIso8601String().formatDate(format: 'd MMM, yyyy');
+      }
+    } catch (_) {
+      return rawDate;
+    }
+  }
+
+  Widget _buildJobCard(BuildContext context, ItemModel item) {
+    final hideCompany = _getJobCustomField(
+            item, ['hide company name', 'hide company'])
+        ?.toLowerCase() ==
+        'yes';
+    String companyName = 'Confidential';
+    if (!hideCompany) {
+      final customCompany =
+          _getJobCustomField(item, ['company name', 'company', 'employer']);
+      if (customCompany != null && customCompany.isNotEmpty) {
+        companyName = customCompany;
+      } else if (item.user?.name != null &&
+          item.user!.name!.trim().isNotEmpty) {
+        companyName = item.user!.name!.trim();
+      }
+    }
+
+    // Salary formatting
+    final rawSalary = _getJobCustomField(
+        item, ['monthly salary', 'salary', 'compensation', 'package']);
+    String salaryText;
+    if (rawSalary != null && rawSalary.trim().isNotEmpty) {
+      if (rawSalary.toLowerCase().contains('negotiable')) {
+        salaryText = 'Negotiable Salary';
+      } else if (rawSalary.toLowerCase().contains('aed') ||
+          rawSalary.toLowerCase().contains('per month')) {
+        salaryText = rawSalary;
+      } else {
+        salaryText = '${Constant.currencySymbol} $rawSalary per month';
+      }
+    } else if (item.price != null && item.price! > 0) {
+      salaryText =
+          '${Constant.currencySymbol} ${item.price! % 1 == 0 ? item.price!.toInt() : item.price} per month';
+    } else {
+      salaryText = 'Negotiable Salary';
+    }
+
+    // Experience formatting
+    final rawExp = _getJobCustomField(item,
+        ['minimum work experience', 'work experience', 'experience']);
+    String expText = '0-1 Years Exp';
+    if (rawExp != null && rawExp.trim().isNotEmpty) {
+      expText =
+          rawExp.toLowerCase().contains('exp') ? rawExp : '$rawExp Exp';
+    }
+
+    // Education formatting
+    final rawEdu = _getJobCustomField(item, [
+      'education qualifications',
+      'minimum education level',
+      'education level',
+      'qualification'
+    ]);
+    final eduText =
+        (rawEdu != null && rawEdu.trim().isNotEmpty) ? rawEdu : 'N/A';
+
+    // Location formatting
+    final locParts = <String>[];
+    if (item.area != null && item.area!.trim().isNotEmpty) {
+      locParts.add(item.area!.trim());
+    }
+    if (item.city != null &&
+        item.city!.trim().isNotEmpty &&
+        !locParts.contains(item.city!.trim())) {
+      locParts.add(item.city!.trim());
+    }
+    if (locParts.isEmpty) {
+      if (item.state != null && item.state!.trim().isNotEmpty) {
+        locParts.add(item.state!.trim());
+      }
+      if (item.country != null &&
+          item.country!.trim().isNotEmpty &&
+          !locParts.contains(item.country!.trim())) {
+        locParts.add(item.country!.trim());
+      }
+    }
+    final locationText = locParts.isNotEmpty
+        ? locParts.join(', ')
+        : (item.address?.trim() ?? 'Dubai');
+
+    // Date formatting
+    final dateText = _formatJobDate(item.created);
+
+    // Badges based on condition
+    final isFeatured = item.isFeature == true;
+
+    return Container(
+      // margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: context.color.secondaryColor,
+        // borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.color.borderColor.withValues(alpha: 0.5),
+        ),
+        boxShadow: [
+         
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          // borderRadius: BorderRadius.circular(14),
+          onTap: () => _navigateToDetails(context, item),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Badge (if applicable)
+                if (isFeatured) ...[
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2563EB),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      "FEATURED",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+
+                // Job Title
+                Text(
+                  item.name?.trim() ?? "Job Opportunity",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: context.color.textDefaultColor,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+
+                // Company Name
+                Text(
+                  companyName,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: context.color.textLightColor.withValues(alpha: 0.9),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 10),
+
+                // Salary Row
+                Row(
+                  children: [
+                    Icon(
+                      Icons.payments_outlined,
+                      size: 16,
+                      color:
+                          context.color.textDefaultColor.withValues(alpha: 0.8),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        salaryText,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: context.color.textDefaultColor
+                              .withValues(alpha: 0.85),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 7),
+
+                // Experience & Education Row
+                Row(
+                  children: [
+                    // Experience
+                    Icon(
+                      Icons.business_center_outlined,
+                      size: 16,
+                      color:
+                          context.color.textDefaultColor.withValues(alpha: 0.8),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      expText,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: context.color.textDefaultColor
+                            .withValues(alpha: 0.85),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+
+                    // Education
+                    Icon(
+                      Icons.school_outlined,
+                      size: 16,
+                      color:
+                          context.color.textDefaultColor.withValues(alpha: 0.8),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        eduText,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: context.color.textDefaultColor
+                              .withValues(alpha: 0.85),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 7),
+
+                // Location & Date Row
+                Row(
+                  children: [
+                    Icon(
+                      Icons.location_on_outlined,
+                      size: 16,
+                      color:
+                          context.color.textDefaultColor.withValues(alpha: 0.8),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        locationText,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: context.color.textDefaultColor
+                              .withValues(alpha: 0.85),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      dateText,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.color.textLightColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -4114,33 +3569,14 @@ class ItemsListState extends State<ItemsList> {
       itemCount: filteredItems.length,
       itemBuilder: (context, index) {
         ItemModel item = filteredItems[index];
+        if (_isJobItem(item)) {
+          return _buildJobCard(context, item);
+        }
         return _buildPropertyCard(context, item);
       },
     );
   }
-
-  Widget _buildGridViewSection(BuildContext context, int startIndex,
-      int itemCount, List<ItemModel> items) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCountAndFixedHeight(
-          crossAxisCount: 2,
-          height: MediaQuery.of(context).size.height / 3.5.rh(context),
-          mainAxisSpacing: 7,
-          crossAxisSpacing: 10),
-      itemCount: itemCount,
-      itemBuilder: (context, index) {
-        ItemModel item = items[startIndex + index];
-        return GestureDetector(
-          onTap: () => _navigateToDetails(context, item),
-          child: ItemCard(item: item),
-        );
-      },
-    );
-  }
-
+  
   Widget buildItemsShimmer(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(8.0),

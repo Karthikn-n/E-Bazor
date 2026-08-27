@@ -249,15 +249,22 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   }
 
   void combineImages() {
-    images.add(model.image);
+    final mainImage = model.image?.trim();
+    if (mainImage != null && mainImage.isNotEmpty) {
+      images.add(mainImage);
+    }
     if (model.galleryImages != null && model.galleryImages!.isNotEmpty) {
       for (var element in model.galleryImages!) {
-        images.add(element.image);
+        final galleryImage = element.image?.trim();
+        if (galleryImage != null && galleryImage.isNotEmpty) {
+          images.add(galleryImage);
+        }
       }
     }
 
-    if (model.videoLink != null && model.videoLink!.isNotEmpty) {
-      images.add(model.videoLink);
+    final videoLink = model.videoLink?.trim();
+    if (videoLink != null && videoLink.isNotEmpty) {
+      images.add(videoLink);
     }
 
     if (model.videoLink != "" &&
@@ -316,6 +323,10 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isJobAd()) {
+      return _buildJobDetailsScreen();
+    }
+
     return AnnotatedRegion(
         value: const SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
@@ -344,7 +355,6 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (isAddedByMe) setLikesAndViewsCount(),
                         // Price and status widget
                         setPriceAndStatus(),
                         Padding(
@@ -423,6 +433,380 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
             ),
           ),
         ));
+  }
+
+  Widget _buildJobDetailsScreen() {
+    final companyName = _jobCustomFieldValue(
+          const ['company name', 'company'],
+        ) ??
+        model.user?.name?.trim();
+    final salary = _jobCustomFieldValue(
+          const ['monthly salary', 'salary', 'compensation'],
+        ) ??
+        ((model.price ?? 0) > 0
+            ? '${Constant.currencySymbol} ${model.price}'
+            : null);
+    final employmentType = _jobCustomFieldValue(
+      const ['employment type', 'job type'],
+    );
+    final experience = _jobCustomFieldValue(
+      const ['work experience', 'experience'],
+    );
+    final location = _jobLocationLabel();
+
+    final facts = <Widget>[
+      if (salary != null) _buildJobFact(Icons.payments_outlined, salary),
+      if (location.isNotEmpty)
+        _buildJobFact(Icons.location_on_outlined, location),
+      if (employmentType != null)
+        _buildJobFact(Icons.schedule_outlined, employmentType),
+      if (experience != null)
+        _buildJobFact(Icons.work_history_outlined, experience),
+    ];
+
+    return AnnotatedRegion(
+      value: SystemUiOverlayStyle(
+        statusBarColor: context.color.secondaryColor,
+        statusBarIconBrightness:
+            Theme.of(context).brightness == Brightness.dark
+                ? Brightness.light
+                : Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: context.color.secondaryDetailsColor,
+        appBar: AppBar(
+          backgroundColor: context.color.secondaryColor,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0.5,
+          leading: IconButton(
+            icon: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: context.color.textDefaultColor,
+              size: 20,
+            ),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: Text(
+            'Job Details',
+            style: TextStyle(
+              color: context.color.textDefaultColor,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          actions: [
+            if (isAddedByMe)
+              IconButton(
+                tooltip: 'Edit job',
+                onPressed: () => _navigateToEditAd(context, model),
+                icon: Icon(
+                  Icons.edit_outlined,
+                  color: context.color.textDefaultColor,
+                ),
+              ),
+            IconButton(
+              tooltip: 'Share job',
+              onPressed: () => HelperUtils.share(context, model.slug ?? ''),
+              icon: Icon(
+                Icons.share_outlined,
+                color: context.color.textDefaultColor,
+              ),
+            ),
+          ],
+        ),
+        bottomNavigationBar: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 5, 10, 8),
+          child: SafeArea(top: false, child: bottomButtonWidget()),
+        ),
+        body: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          model.name?.trim().isNotEmpty == true
+                              ? model.name!.trim()
+                              : 'Job opportunity',
+                          style: TextStyle(
+                            color: context.color.textDefaultColor,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            height: 1.2,
+                          ),
+                        ),
+                        if (companyName != null &&
+                            companyName.isNotEmpty) ...[
+                          const SizedBox(height: 5),
+                          Text(
+                            companyName,
+                            style: TextStyle(
+                              color: context.color.textLightColor,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                        if (model.category?.name?.trim().isNotEmpty ==
+                            true) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            model.category!.name!.trim(),
+                            style: TextStyle(
+                              color: context.color.textLightColor,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Container(
+                    width: 58,
+                    height: 58,
+                    decoration: BoxDecoration(
+                      color:
+                          context.color.territoryColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: context.color.territoryColor
+                            .withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: model.user?.profile?.trim().isNotEmpty == true
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(11),
+                            child: UiUtils.getImage(
+                              model.user!.profile!.trim(),
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Icon(
+                            Icons.business_center_outlined,
+                            color: context.color.territoryColor,
+                            size: 30,
+                          ),
+                  ),
+                ],
+              ),
+              if (facts.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                Wrap(
+                  spacing: 14,
+                  runSpacing: 10,
+                  children: facts,
+                ),
+              ],
+              if (model.description?.trim().isNotEmpty == true) ...[
+                const SizedBox(height: 24),
+                _buildJobSectionTitle('Job Details'),
+                const SizedBox(height: 10),
+                Text(
+                  model.description!.trim(),
+                  style: TextStyle(
+                    color: context.color.textDefaultColor
+                        .withValues(alpha: 0.82),
+                    fontSize: 14,
+                    height: 1.55,
+                  ),
+                ),
+              ],
+              _buildJobDynamicDetails(),
+              if (model.created?.trim().isNotEmpty == true) ...[
+                const SizedBox(height: 18),
+                Text(
+                  'Posted on ${model.created!.formatDate(format: "d MMMM, yyyy")}',
+                  style: TextStyle(
+                    color: context.color.textLightColor,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+              if (!isAddedByMe) ...[
+                const SizedBox(height: 20),
+                _buildReportAdRow(),
+              ],
+              const SizedBox(height: 14),
+              relatedAds(),
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildJobSectionTitle(String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        color: context.color.textDefaultColor,
+        fontSize: 18,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+  }
+
+  Widget _buildJobFact(IconData icon, String value) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 17, color: context.color.textLightColor),
+        const SizedBox(width: 6),
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.sizeOf(context).width * 0.68,
+          ),
+          child: Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: context.color.textDefaultColor.withValues(alpha: 0.78),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _jobLocationLabel() {
+    final values = <String>[
+      model.area ?? '',
+      model.city ?? '',
+      model.state ?? '',
+      model.country ?? '',
+    ];
+    final unique = <String>[];
+    for (final value in values) {
+      final trimmed = value.trim();
+      if (trimmed.isNotEmpty &&
+          !unique.any((entry) => entry.toLowerCase() == trimmed.toLowerCase())) {
+        unique.add(trimmed);
+      }
+    }
+    if (unique.isNotEmpty) return unique.join(', ');
+    return model.address?.trim() ?? '';
+  }
+
+  String _normalizeJobFieldName(String value) {
+    return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '');
+  }
+
+  String? _jobFieldValue(CustomFieldModel field) {
+    final values = field.value
+            ?.map((value) => value.toString().trim())
+            .where((value) => value.isNotEmpty)
+            .toList() ??
+        const <String>[];
+    if (values.isEmpty) return null;
+    return values.join(', ');
+  }
+
+  String? _jobCustomFieldValue(List<String> aliases) {
+    final normalizedAliases =
+        aliases.map(_normalizeJobFieldName).where((value) => value.isNotEmpty);
+    for (final field in model.customFields ?? const <CustomFieldModel>[]) {
+      final value = _jobFieldValue(field);
+      if (value == null) continue;
+      final fieldName =
+          _normalizeJobFieldName('${field.name ?? ''} ${field.label ?? ''}');
+      if (normalizedAliases.any(
+        (alias) => fieldName == alias || fieldName.contains(alias),
+      )) {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  Widget _buildJobDynamicDetails() {
+    final fields = (model.customFields ?? const <CustomFieldModel>[])
+        .where((field) => _jobFieldValue(field) != null)
+        .where((field) => field.type?.toLowerCase() != 'fileinput')
+        .toList();
+    if (fields.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 24),
+        _buildJobSectionTitle('Job Information'),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: context.color.secondaryColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: context.color.borderColor.withValues(alpha: 0.55),
+            ),
+          ),
+          child: Column(
+            children: List.generate(fields.length, (index) {
+              final field = fields[index];
+              final label = (field.label ?? field.name ?? 'Information').trim();
+              final value = _jobFieldValue(field)!;
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 4,
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              color: context.color.textLightColor,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 5,
+                          child: Text(
+                            value,
+                            textAlign: TextAlign.end,
+                            style: TextStyle(
+                              color: context.color.textDefaultColor,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (index != fields.length - 1)
+                    Divider(
+                      height: 1,
+                      color:
+                          context.color.borderColor.withValues(alpha: 0.45),
+                    ),
+                ],
+              );
+            }),
+          ),
+        ),
+      ],
+    );
   }
 
   bool _isCarListing() {
@@ -1666,7 +2050,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Similar Ads")
+          Text(_isJobAd() ? "Similar Jobs" : "Similar Ads")
               .size(context.font.large)
               .bold(weight: FontWeight.w600)
               .setMaxLines(lines: 1),
@@ -2433,8 +2817,6 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                         buttonColor: context.color.territoryColor,
                         textColor: context.color.secondaryColor,
                         buttonTitle: "renewItem".translate(context),
-
-                        //TODO: change title to Your Current Plan according to condition
                         outerPadding: const EdgeInsets.all(20)),
                   );
                 })
@@ -2546,11 +2928,19 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     if (editResult is ItemModel) {
       editResult.status = editStatus;
       if (_isPaymentPendingStatus(editStatus)) {
-        await Navigator.pushNamed(
+        final paidItem = await Navigator.pushNamed(
           context,
           Routes.carPackagePaymentScreen,
-          arguments: {'model': editResult},
+          arguments: {
+            'model': editResult,
+            'isEdit': true,
+          },
         );
+        if (paidItem is ItemModel) {
+          editResult.status = "approved";
+          editResult.active = true;
+        }
+        if (context.mounted) Navigator.pop(context, "refresh");
         return;
       }
     }
@@ -2572,7 +2962,10 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
             Navigator.pushNamed(
               context,
               Routes.carPackagePaymentScreen,
-              arguments: {'model': item},
+              arguments: {
+                'model': item,
+                'isEdit': true,
+              },
             );
           }, null, null),
         ),
@@ -3317,6 +3710,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                       'itemId': model.id ?? widget.model.id,
                       'itemTitle': model.name ?? widget.model.name ?? '',
                       'categoryName': model.category?.name ?? '',
+                      'customFields':
+                          model.customFields ?? widget.model.customFields,
                     },
                   );
                 },
@@ -3855,7 +4250,10 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                             Navigator.pushNamed(
                               context,
                               Routes.carPackagePaymentScreen,
-                              arguments: {'model': model},
+                              arguments: {
+                                'model': model,
+                                'isEdit': true,
+                              },
                             );
                           } else if (val == "renew") {
                             try {
@@ -4236,7 +4634,6 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                 borderRadius: BorderRadius.circular(cornerRadius),
                 color: backgroundColor),
             child: childWidget)
-        //TODO: swap icons according to liked and non-liked -- favorite_border_rounded and favorite_rounded
         );
   }
 
@@ -4252,69 +4649,6 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   }
 
 //ImageView
-
-  Widget setLikesAndViewsCount() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-              child: Container(
-                  decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          width: 1,
-                          color: context.color.textDefaultColor
-                              .withValues(alpha: 0.1))),
-                  padding: const EdgeInsets.symmetric(horizontal: 5),
-                  height: 46.rh(context),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      UiUtils.getSvg(AppIcons.eye,
-                          color: context.color.textDefaultColor),
-                      const SizedBox(
-                        width: 8,
-                      ),
-                      Text(model.views != null ? model.views!.toString() : "0")
-                          .color(context.color.textDefaultColor
-                              .withValues(alpha: 0.8))
-                          .size(context.font.large)
-                    ],
-                  ))),
-          SizedBox(width: 20.rw(context)),
-          Expanded(
-              child: Container(
-                  decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          width: 1,
-                          color: context.color.textDefaultColor
-                              .withValues(alpha: 0.1))),
-                  padding: const EdgeInsets.symmetric(horizontal: 5),
-                  height: 46.rh(context),
-                  //alignment: AlignmentDirectional.center,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      UiUtils.getSvg(AppIcons.like,
-                          color: context.color.textDefaultColor),
-                      const SizedBox(
-                        width: 8,
-                      ),
-                      Text(model.totalLikes == null
-                              ? "0"
-                              : model.totalLikes.toString())
-                          .color(context.color.textDefaultColor
-                              .withValues(alpha: 0.8))
-                          .size(context.font.large)
-                    ],
-                  ))),
-        ],
-      ),
-    );
-  }
 
   Widget setRejectedReason() {
     if (model.status == "rejected" &&
@@ -4379,8 +4713,6 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   _getStatusTextColor(model.status),
                 ),
           )
-
-        //TODO: change color according to status - confirm,pending,etc..
       ],
     );
   }
@@ -4472,7 +4804,6 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                       .color(context.color.textDefaultColor
                           .withValues(alpha: 0.5)))
               : const SizedBox.shrink()
-          //TODO: add DATE from model
         ],
       ),
     );
@@ -4483,7 +4814,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text("aboutThisItemLbl".translate(context)).bold().size(context
-            .font.large), //TODO: replace label with your own - aboutThisPropLbl
+            .font.large),
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 5.0),
           child: Text(model.description ?? "")

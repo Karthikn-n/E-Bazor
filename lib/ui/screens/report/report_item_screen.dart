@@ -104,7 +104,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                         child: Padding(
                           padding: const EdgeInsets.all(14.0),
                           child: Text(
-                            reasons![index].reason.firstUpperCase() ?? "",
+                            reasons![index].reason.firstUpperCase(),
                           ).color(
                             selectedId == reasons![index].id
                                 ? context.color.territoryColor

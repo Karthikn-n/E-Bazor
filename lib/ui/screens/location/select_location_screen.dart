@@ -32,6 +32,8 @@ class SelectLocationScreen extends StatefulWidget {
 }
 
 class _SelectLocationScreenState extends State<SelectLocationScreen> {
+  bool get _returnsLocationSelection =>
+      widget.from == "addItem" || widget.from == "filter";
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   Timer? _searchDebounce;
@@ -383,7 +385,7 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
         }),
       ),
     ).then((value) {
-      if (value != null && widget.from == "addItem") {
+      if (value != null && _returnsLocationSelection) {
         Navigator.pop(context, value);
       }
     });
@@ -395,7 +397,7 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
       Routes.nearbyLocationScreen,
       arguments: {"from": widget.from},
     ).then((value) {
-      if (value != null && widget.from == "addItem") {
+      if (value != null && _returnsLocationSelection) {
         Navigator.pop(context, value);
       }
       setState(() {});
@@ -408,7 +410,7 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
       Routes.countriesScreen,
       arguments: {"from": widget.from},
     ).then((value) {
-      if (value != null && widget.from == "addItem") {
+      if (value != null && _returnsLocationSelection) {
         Navigator.pop(context, value);
       }
     });

@@ -106,7 +106,7 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
         backgroundColor: context.color.backgroundColor,
         appBar: UiUtils.buildAppBar(
           context,
-          title: "Profile",
+          title: "profileTab".translate(context),
           showBackButton: true,
         ),
         body: SingleChildScrollView(
@@ -119,7 +119,7 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
               children: [
                 _buildItemTile(
                   icon: Icons.person_outline_rounded,
-                  title: "My profile",
+                  title: "myProfile".translate(context),
                   onTap: () {
                     UiUtils.checkUser(
                       onNotGuest: () {
@@ -134,35 +134,10 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
                     );
                   },
                 ),
-                _buildItemTile(
-                  icon: Icons.badge_outlined,
-                  title: "My Job Profile",
-                  onTap: () {
-                    UiUtils.checkUser(
-                      onNotGuest: () {
-                        Navigator.pushNamed(
-                            context, Routes.myJobProfileScreen);
-                      },
-                      context: context,
-                    );
-                  },
-                ),
-                _buildItemTile(
-                  icon: Icons.business_center_outlined,
-                  title: "My Job Application",
-                  onTap: () {
-                    UiUtils.checkUser(
-                      onNotGuest: () {
-                        Navigator.pushNamed(
-                            context, Routes.myJobApplicationsScreen);
-                      },
-                      context: context,
-                    );
-                  },
-                ),
+                
                 _buildItemTile(
                   icon: Icons.location_on_outlined,
-                  title: "My addresses",
+                  title: "myAddresses".translate(context),
                   onTap: () {
                     UiUtils.checkUser(
                       onNotGuest: () {
@@ -175,8 +150,18 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
                 ),
                 _buildItemTile(
                   icon: Icons.public_outlined,
-                  title: "My public Profile",
+                  title: "myPublicProfile".translate(context),
                   onTap: _openPublicProfile,
+                ),
+                _buildItemTile(
+                  icon: Icons.work_outline,
+                  title: "myJobProfile".translate(context),
+                  onTap: () {
+                    UiUtils.checkUser(
+                        onNotGuest: () => Navigator.pushNamed(
+                            context, Routes.myJobProfileScreen),
+                        context: context);
+                  },
                 ),
               ],
             ),

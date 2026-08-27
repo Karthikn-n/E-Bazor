@@ -12,7 +12,6 @@ import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 class SavedSearchesScreen extends StatefulWidget {
   const SavedSearchesScreen({super.key});
@@ -32,6 +31,9 @@ class SavedSearchesScreen extends StatefulWidget {
 
 class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  bool _isSearching = false;
+  String _localSearchQuery = "";
   String _selectedSort = "newest"; // newest, oldest, name_asc
 
   @override
@@ -43,6 +45,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -77,7 +80,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
               ),
               const SizedBox(height: 14),
               Text(
-                "Sort Saved Searches",
+                "sortSavedSearches".translate(context),
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -86,7 +89,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
               ),
               const SizedBox(height: 8),
               ListTile(
-                title: const Text("Newest First"),
+                title: Text("newestFirst".translate(context)),
                 trailing: _selectedSort == "newest"
                     ? Icon(Icons.check, color: context.color.territoryColor)
                     : null,
@@ -96,7 +99,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
                 },
               ),
               ListTile(
-                title: const Text("Oldest First"),
+                title: Text("oldestFirst".translate(context)),
                 trailing: _selectedSort == "oldest"
                     ? Icon(Icons.check, color: context.color.territoryColor)
                     : null,
@@ -106,7 +109,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
                 },
               ),
               ListTile(
-                title: const Text("Name (A to Z)"),
+                title: Text("nameAtoZ".translate(context)),
                 trailing: _selectedSort == "name_asc"
                     ? Icon(Icons.check, color: context.color.territoryColor)
                     : null,
@@ -130,7 +133,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
         backgroundColor: context.color.secondaryColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
-          "Rename Saved Search",
+          "renameSavedSearch".translate(context),
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
@@ -145,7 +148,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
             fontSize: 14,
           ),
           decoration: InputDecoration(
-            hintText: "Enter search name",
+            hintText: "enterSearchName".translate(context),
             hintStyle: TextStyle(color: context.color.textLightColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
@@ -186,9 +189,9 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
                 }
               }
             },
-            child: const Text(
-              "Save",
-              style: TextStyle(
+            child: Text(
+              "saveBtnLbl".translate(context),
+              style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
               ),
@@ -206,7 +209,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
         backgroundColor: context.color.secondaryColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
-          "Delete Saved Search",
+          "deleteSavedSearch".translate(context),
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
@@ -236,9 +239,9 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
               ),
             ),
             onPressed: () => Navigator.pop(dialogCtx, true),
-            child: const Text(
-              "Delete",
-              style: TextStyle(
+            child: Text(
+              "deleteBtnLbl".translate(context),
+              style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
               ),
@@ -380,7 +383,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      "Select Category",
+                      "categories".translate(context),
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -406,15 +409,15 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
                 color: context.color.borderColor.withValues(alpha: 0.5),
               ),
               ListTile(
-                leading: Icon(
-                  Icons.grid_view_rounded,
-                  color: selectedId == null
-                      ? context.color.territoryColor
-                      : context.color.textLightColor,
-                  size: 22,
-                ),
+                // leading: Icon(
+                //   Icons.grid_view_rounded,
+                //   color: selectedId == null
+                //       ? context.color.territoryColor
+                //       : context.color.textLightColor,
+                //   size: 22,
+                // ),
                 title: Text(
-                  "All Categories",
+                  "allCategories".translate(context),
                   style: TextStyle(
                     fontWeight: selectedId == null
                         ? FontWeight.bold
@@ -453,46 +456,46 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
               ),
               ...categories.map((cat) {
                 final isSelected = selectedId == cat.id;
-                Widget leadingIcon;
-                if (cat.image != null && cat.image!.isNotEmpty) {
-                  if (cat.image!.endsWith('.svg')) {
-                    leadingIcon = SvgPicture.network(
-                      cat.image!,
-                      width: 22,
-                      height: 22,
-                      colorFilter: ColorFilter.mode(
-                        isSelected
-                            ? context.color.territoryColor
-                            : context.color.textLightColor,
-                        BlendMode.srcIn,
-                      ),
-                    );
-                  } else {
-                    leadingIcon = CachedNetworkImage(
-                      imageUrl: cat.image!,
-                      width: 22,
-                      height: 22,
-                      errorWidget: (_, __, ___) => Icon(
-                        Icons.category_outlined,
-                        color: isSelected
-                            ? context.color.territoryColor
-                            : context.color.textLightColor,
-                        size: 22,
-                      ),
-                    );
-                  }
-                } else {
-                  leadingIcon = Icon(
-                    Icons.category_outlined,
-                    color: isSelected
-                        ? context.color.territoryColor
-                        : context.color.textLightColor,
-                    size: 22,
-                  );
-                }
+                // Widget leadingIcon;
+                // if (cat.image != null && cat.image!.isNotEmpty) {
+                //   if (cat.image!.endsWith('.svg')) {
+                //     leadingIcon = SvgPicture.network(
+                //       cat.image!,
+                //       width: 22,
+                //       height: 22,
+                //       colorFilter: ColorFilter.mode(
+                //         isSelected
+                //             ? context.color.territoryColor
+                //             : context.color.textLightColor,
+                //         BlendMode.srcIn,
+                //       ),
+                //     );
+                //   } else {
+                //     leadingIcon = CachedNetworkImage(
+                //       imageUrl: cat.image!,
+                //       width: 22,
+                //       height: 22,
+                //       errorWidget: (_, __, ___) => Icon(
+                //         Icons.category_outlined,
+                //         color: isSelected
+                //             ? context.color.territoryColor
+                //             : context.color.textLightColor,
+                //         size: 22,
+                //       ),
+                //     );
+                //   }
+                // } else {
+                //   leadingIcon = Icon(
+                //     Icons.category_outlined,
+                //     color: isSelected
+                //         ? context.color.territoryColor
+                //         : context.color.textLightColor,
+                //     size: 22,
+                //   );
+                // }
 
                 return ListTile(
-                  leading: leadingIcon,
+                  // leading: leadingIcon,
                   title: Text(
                     cat.name ?? "",
                     style: TextStyle(
@@ -579,7 +582,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
               child: Row(
                 children: [
                   _buildTabItem(
-                    label: "All",
+                    label: "all".translate(context),
                     count: totalAllCount,
                     isSelected: selectedId == null,
                     onTap: () {
@@ -666,8 +669,25 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
     );
   }
 
-  List<SavedSearchModel> _applySort(List<SavedSearchModel> list) {
-    final sorted = List<SavedSearchModel>.from(list);
+  List<SavedSearchModel> _filterAndSort(List<SavedSearchModel> list) {
+    var result = list;
+    if (_localSearchQuery.trim().isNotEmpty) {
+      final query = _localSearchQuery.trim().toLowerCase();
+      result = result.where((search) {
+        final title = (search.title ?? "").toLowerCase();
+        final categorySlug = (search.categorySlug ?? "").toLowerCase();
+        final hierarchy = search.categoryHierarchy.join(" ").toLowerCase();
+        final location = (search.location ?? "").toLowerCase();
+        final url = (search.searchUrl ?? "").toLowerCase();
+        return title.contains(query) ||
+            categorySlug.contains(query) ||
+            hierarchy.contains(query) ||
+            location.contains(query) ||
+            url.contains(query);
+      }).toList();
+    }
+
+    final sorted = List<SavedSearchModel>.from(result);
     if (_selectedSort == "newest") {
       sorted.sort((a, b) => (b.createdAt ?? "").compareTo(a.createdAt ?? ""));
     } else if (_selectedSort == "oldest") {
@@ -687,38 +707,92 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
       appBar: AppBar(
         backgroundColor: context.color.secondaryColor,
         elevation: 0,
-        centerTitle: true,
+        centerTitle: !_isSearching,
         leading: IconButton(
           icon: Icon(
             Icons.arrow_back_ios_new_rounded,
             size: 18,
             color: context.color.textDefaultColor,
           ),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (_isSearching) {
+              setState(() {
+                _isSearching = false;
+                _localSearchQuery = "";
+                _searchController.clear();
+              });
+            } else {
+              Navigator.pop(context);
+            }
+          },
         ),
-        title: Text(
-          "My Saved Searches",
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.bold,
-            color: context.color.textDefaultColor,
-          ),
-        ),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                style: TextStyle(
+                  color: context.color.textDefaultColor,
+                  fontSize: 15,
+                ),
+                decoration: InputDecoration(
+                  hintText: "searchSavedSearches".translate(context),
+                  hintStyle: TextStyle(
+                    color: context.color.textLightColor.withValues(alpha: 0.6),
+                    fontSize: 14,
+                  ),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                onChanged: (val) {
+                  setState(() {
+                    _localSearchQuery = val;
+                  });
+                },
+              )
+            : Text(
+                "mySearches".translate(context),
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: context.color.textDefaultColor,
+                ),
+              ),
         actions: [
-          IconButton(
-            icon: Icon(
-              Icons.search_rounded,
-              color: context.color.textDefaultColor,
-              size: 22,
+          if (_isSearching)
+            IconButton(
+              icon: Icon(
+                Icons.close_rounded,
+                color: context.color.textDefaultColor,
+                size: 20,
+              ),
+              onPressed: () {
+                if (_searchController.text.isNotEmpty) {
+                  _searchController.clear();
+                  setState(() {
+                    _localSearchQuery = "";
+                  });
+                } else {
+                  setState(() {
+                    _isSearching = false;
+                  });
+                }
+              },
+            )
+          else
+            IconButton(
+              icon: Icon(
+                Icons.search_rounded,
+                color: context.color.textDefaultColor,
+                size: 22,
+              ),
+              onPressed: () {
+                setState(() {
+                  _isSearching = true;
+                });
+              },
             ),
-            onPressed: () {
-              Navigator.pushNamed(
-                context,
-                Routes.searchScreenRoute,
-                arguments: {'autoFocus': true},
-              );
-            },
-          ),
         ],
       ),
       floatingActionButton: Container(
@@ -753,7 +827,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    "Sort",
+                    "sort".translate(context),
                     style: TextStyle(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w600,
@@ -795,7 +869,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
             }
 
             if (state is FetchSavedSearchesSuccess) {
-              final displayedSearches = _applySort(state.filteredSearches);
+              final displayedSearches = _filterAndSort(state.filteredSearches);
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -810,13 +884,41 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
                   Expanded(
                     child: displayedSearches.isEmpty
                         ? Center(
-                            child: NoDataFound(
-                              onTap: () {
-                                context
-                                    .read<FetchSavedSearchesCubit>()
-                                    .fetchSavedSearches();
-                              },
-                            ),
+                            child: _localSearchQuery.isNotEmpty
+                                ? Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 24, vertical: 32),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.search_off_rounded,
+                                          size: 48,
+                                          color: context.color.textLightColor
+                                              .withValues(alpha: 0.5),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          "No saved searches match \"$_localSearchQuery\"",
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: context
+                                                .color.textDefaultColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : NoDataFound(
+                                    onTap: () {
+                                      context
+                                          .read<FetchSavedSearchesCubit>()
+                                          .fetchSavedSearches();
+                                    },
+                                  ),
                           )
                         : ListView.builder(
                             controller: _scrollController,
@@ -1154,14 +1256,14 @@ class _SwipeableSavedSearchTileState extends State<_SwipeableSavedSearchTile>
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              search.notification == true
-                                  ? Icons.notifications_active_outlined
-                                  : Icons.notifications_off_outlined,
-                              size: 21,
-                              color: context.color.textDefaultColor,
-                            ),
-                            const SizedBox(width: 8),
+                            // Icon(
+                            //   search.notification == true
+                            //       ? Icons.notifications_active_outlined
+                            //       : Icons.notifications_off_outlined,
+                            //   size: 21,
+                            //   color: context.color.textDefaultColor,
+                            // ),
+                            // const SizedBox(width: 8),
                             PopupMenuButton<String>(
                               icon: Icon(
                                 Icons.more_vert_rounded,

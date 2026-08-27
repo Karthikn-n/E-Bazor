@@ -87,16 +87,12 @@ class SaveSearchBottomSheet extends StatefulWidget {
 
 class _SaveSearchBottomSheetState extends State<SaveSearchBottomSheet> {
   late final TextEditingController _titleController;
-  late bool _notification;
-  late bool _subscribeEmail;
   bool _isActionInProgress = false;
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.initialTitle ?? "");
-    _notification = widget.initialNotification;
-    _subscribeEmail = widget.initialSubscribeEmail;
   }
 
   @override
@@ -124,8 +120,6 @@ class _SaveSearchBottomSheetState extends State<SaveSearchBottomSheet> {
           searchUrl: widget.searchUrl,
           apiSearchUrl: widget.apiSearchUrl,
           location: widget.location,
-          subscribeEmail: _subscribeEmail,
-          notification: _notification,
         );
   }
 
@@ -195,13 +189,16 @@ class _SaveSearchBottomSheetState extends State<SaveSearchBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final isAlreadySaved = widget.isAlreadySaved || widget.savedSearchId != null;
+    final isAlreadySaved =
+        widget.isAlreadySaved || widget.savedSearchId != null;
 
     return BlocConsumer<SaveSearchCubit, SaveSearchState>(
       listener: (context, state) {
         if (state is SaveSearchSuccess) {
           // Add newly saved search to FetchSavedSearchesCubit state
-          context.read<FetchSavedSearchesCubit>().addSavedSearch(state.savedSearch);
+          context
+              .read<FetchSavedSearchesCubit>()
+              .addSavedSearch(state.savedSearch);
           Navigator.pop(context);
           HelperUtils.showSnackBarMessage(
             context,
@@ -295,8 +292,8 @@ class _SaveSearchBottomSheetState extends State<SaveSearchBottomSheet> {
                 const SizedBox(height: 6),
                 Text(
                   isAlreadySaved
-                      ? "You have already saved this search. You can rename it, manage notifications, or delete it."
-                      : "Get notified when new listings match your search criteria.",
+                      ? "You have already saved this search. You can rename or delete it."
+                      : "Save this search to find it again quickly.",
                   style: TextStyle(
                     fontSize: 13,
                     color: context.color.textLightColor,
@@ -350,91 +347,6 @@ class _SaveSearchBottomSheetState extends State<SaveSearchBottomSheet> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 18),
-
-                // Notification & Email Alert Options
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: context.color.backgroundColor,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: context.color.borderColor.withValues(alpha: 0.6),
-                      width: 1,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      // Push Notification Toggle
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.notifications_active_outlined,
-                                size: 20,
-                                color: context.color.territoryColor,
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                "Push Notifications",
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: context.color.textDefaultColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Switch(
-                            value: _notification,
-                            onChanged: (val) =>
-                                setState(() => _notification = val),
-                            activeThumbColor: Colors.white,
-                            activeTrackColor: context.color.territoryColor,
-                          ),
-                        ],
-                      ),
-                      Divider(
-                        height: 1,
-                        color: context.color.borderColor.withValues(alpha: 0.4),
-                      ),
-                      // Email Alert Toggle
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.email_outlined,
-                                size: 20,
-                                color: context.color.territoryColor,
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                "Email Alerts",
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: context.color.textDefaultColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Switch(
-                            value: _subscribeEmail,
-                            onChanged: (val) =>
-                                setState(() => _subscribeEmail = val),
-                            activeThumbColor: Colors.white,
-                            activeTrackColor: context.color.territoryColor,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
                 const SizedBox(height: 24),
 
                 // Save or Update Button
@@ -483,7 +395,8 @@ class _SaveSearchBottomSheetState extends State<SaveSearchBottomSheet> {
                       onPressed: isLoading ? null : _onDeleteExisting,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.redAccent,
-                        side: const BorderSide(color: Colors.redAccent, width: 1.2),
+                        side: const BorderSide(
+                            color: Colors.redAccent, width: 1.2),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),

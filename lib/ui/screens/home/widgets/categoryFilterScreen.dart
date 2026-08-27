@@ -7,6 +7,7 @@ import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
 
 import 'package:Ebozor/data/model/category_model.dart';
+import 'package:Ebozor/data/model/property_filter_category_resolver.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class CategoryFilterScreen extends StatefulWidget {
@@ -116,17 +117,10 @@ class _CategoryFilterScreenState extends State<CategoryFilterScreen>
                                   widget.categoryList
                                       .add(state.categories[index]);
 
-                                  const filterCategoryIds = [65, 68, 139, 143];
                                   final cat = state.categories[index];
 
-                                  if (filterCategoryIds.contains(cat.id) ||
-                                      (cat.name != null &&
-                                          (cat.name!
-                                                  .toLowerCase()
-                                                  .contains("property") ||
-                                              cat.name!
-                                                  .toLowerCase()
-                                                  .contains("properties")))) {
+                                  if (PropertyFilterCategoryResolver
+                                      .isPropertyCategory(cat)) {
                                     Navigator.pushNamed(
                                       context,
                                       Routes.filterpage,

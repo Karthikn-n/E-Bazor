@@ -41,7 +41,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
     if (email.isEmpty) {
       HelperUtils.showSnackBarMessage(
         context,
-        "No email associated with your account. Please update your profile first.",
+        "noEmailAssociated".translate(context),
         type: MessageType.error,
       );
       return;
@@ -112,7 +112,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                     ),
                     const SizedBox(width: 10),
                     Text(
-                      "Secure your account",
+                      "secureYourAccount".translate(context),
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -130,7 +130,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
 
                 // Description
                 Text(
-                  "If you don't recognise your device, protect your account by resetting your password. This will log you out of all other devices for added security.",
+                  "secureAccountDesc".translate(context),
                   style: TextStyle(
                     fontSize: 14.5,
                     height: 1.45,
@@ -156,7 +156,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                         ),
                         onPressed: () => Navigator.pop(bottomSheetCtx),
                         child: Text(
-                          "Close",
+                          "close".translate(context),
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -181,19 +181,19 @@ class _SecurityScreenState extends State<SecurityScreen> {
                           Navigator.pop(bottomSheetCtx);
                           _handlePasswordReset();
                         },
-                        child: const Row(
+                        child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              "Update Password",
-                              style: TextStyle(
+                              "updatePassword".translate(context),
+                              style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                               ),
                             ),
-                            SizedBox(width: 6),
-                            Icon(
+                            const SizedBox(width: 6),
+                            const Icon(
                               Icons.chevron_right_rounded,
                               color: Colors.white,
                               size: 18,
@@ -226,7 +226,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
         backgroundColor: context.color.backgroundColor,
         appBar: UiUtils.buildAppBar(
           context,
-          title: "Security",
+          title: "security".translate(context),
           showBackButton: true,
         ),
         body: SingleChildScrollView(
@@ -238,7 +238,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
               children: [
                 // 1. Email Section
                 Text(
-                  "Email",
+                  "emailLbl".translate(context),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -265,7 +265,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      "Password",
+                      "password".translate(context),
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -336,7 +336,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
 
                 // 3. Your Devices Section
                 Text(
-                  "Your Devices",
+                  "yourDevices".translate(context),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -345,7 +345,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  "If you don't recognise any devices below",
+                  "yourDevicesDesc".translate(context),
                   style: TextStyle(
                     fontSize: 13.5,
                     color: context.color.textLightColor,
@@ -368,7 +368,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                     ),
                     onPressed: _showSecureAccountBottomSheet,
                     child: Text(
-                      "Secure your account",
+                      "secureYourAccount".translate(context),
                       style: TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.bold,
@@ -413,13 +413,13 @@ class _SecurityScreenState extends State<SecurityScreen> {
                         final isCurrent = device.isCurrent == true;
                         final deviceName = device.deviceName ??
                             "${Constant.appName} app from ${Platform.isAndroid ? 'Android' : 'iOS'}";
-                        final location = device.location ?? "Active Session";
-                        String addedDate = "Added on 27 Jul, 2026";
+                        final location = device.location ?? "activeSession".translate(context);
+                        String addedDate = "${"addedOn".translate(context)} 27 Jul, 2026";
                         if (device.lastUsedAt != null) {
                           final parsed = DateTime.tryParse(device.lastUsedAt!);
                           if (parsed != null) {
                             addedDate =
-                                "Added on ${DateFormat('d MMM, yyyy').format(parsed)}";
+                                "${"addedOn".translate(context)} ${DateFormat('d MMM, yyyy').format(parsed)}";
                           }
                         }
 
@@ -439,7 +439,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      isCurrent ? "$deviceName (This Device)" : deviceName,
+                                      isCurrent ? "$deviceName (${"thisDevice".translate(context)})" : deviceName,
                                       style: TextStyle(
                                         fontSize: 14.5,
                                         fontWeight: FontWeight.w600,

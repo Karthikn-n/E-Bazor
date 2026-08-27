@@ -82,6 +82,8 @@ class _ClassifiedsPostingFormScreenState
   GoogleMapController? _mapController;
   bool _isLocating = false;
 
+  List<CustomFieldModel> _phoneCustomFields = [];
+
   bool get _isClassifiedsAd {
     final categories = <CategoryModel>[
       ...?widget.breadcrumbs,
@@ -94,6 +96,43 @@ class _ClassifiedsPostingFormScreenState
           slug.contains('classif') ||
           name.contains('classified');
     });
+  }
+
+  bool get _isJobAd {
+    final categories = <CategoryModel>[
+      ...?widget.breadcrumbs,
+      if (widget.category != null) widget.category!,
+    ];
+    final allCategoryIds = widget.item?.allCategoryIds?.split(',') ?? [];
+    return categories.any((category) {
+      final slug = category.slug?.trim().toLowerCase() ?? '';
+      final name = category.name?.trim().toLowerCase() ?? '';
+      final id = category.id?.toString() ?? '';
+      return id == '4' ||
+          id == '356' ||
+          id == '357' ||
+          slug.contains('job') ||
+          name.contains('job') ||
+          name.contains('hiring') ||
+          name.contains('recruit') ||
+          name.contains('talent');
+    }) ||
+        allCategoryIds.contains('4') ||
+        allCategoryIds.contains('356') ||
+        allCategoryIds.contains('357');
+  }
+
+  bool _isPhoneCustomField(CustomFieldModel field) {
+    final name = (field.name ?? '').trim().toLowerCase();
+    final label = (field.label ?? '').trim().toLowerCase();
+    return name.contains('phone') ||
+        name.contains('mobile') ||
+        name.contains('contact') ||
+        name.contains('whatsapp') ||
+        label.contains('phone') ||
+        label.contains('mobile') ||
+        label.contains('contact') ||
+        label.contains('whatsapp');
   }
 
   @override
@@ -185,7 +224,10 @@ class _ClassifiedsPostingFormScreenState
   }
 
   void _populateDynamicCustomFields(List<CustomFieldModel> fieldsList) {
-    _adminFieldsController.replaceFields(fieldsList);
+    _phoneCustomFields = fieldsList.where(_isPhoneCustomField).toList();
+    final nonPhoneFields =
+        fieldsList.where((f) => !_isPhoneCustomField(f)).toList();
+    _adminFieldsController.replaceFields(nonPhoneFields);
     _isLoadingDynamicFields = false;
   }
 
@@ -325,7 +367,8 @@ class _ClassifiedsPostingFormScreenState
 
     final isEditMode = widget.isEdit || widget.item != null;
 
-    if (!isEditMode &&
+    if (!_isJobAd &&
+        !isEditMode &&
         _selectedImages.isEmpty &&
         _existingNetworkImages.isEmpty) {
       HelperUtils.showSnackBarMessage(
@@ -346,14 +389,18 @@ class _ClassifiedsPostingFormScreenState
       return;
     }
 
-    final price = double.tryParse(_priceController.text.trim());
-    if (price == null || price <= 0) {
-      HelperUtils.showSnackBarMessage(
-        context,
-        "Please enter a valid price",
-        type: MessageType.warning,
-      );
-      return;
+    double price = 0;
+    if (!_isJobAd) {
+      final parsedPrice = double.tryParse(_priceController.text.trim());
+      if (parsedPrice == null || parsedPrice <= 0) {
+        HelperUtils.showSnackBarMessage(
+          context,
+          "Please enter a valid price",
+          type: MessageType.warning,
+        );
+        return;
+      }
+      price = parsedPrice;
     }
 
     final categoryId = widget.category?.id ??
@@ -373,6 +420,11 @@ class _ClassifiedsPostingFormScreenState
                 : (widget.item?.allCategoryIds ?? "$categoryId");
 
     final mergedCustomFields = _adminFieldsController.toSubmissionMap();
+    for (final pf in _phoneCustomFields) {
+      if (pf.id != null && _phoneController.text.trim().isNotEmpty) {
+        mergedCustomFields[pf.id.toString()] = [_phoneController.text.trim()];
+      }
+    }
 
     final itemDetails = <String, dynamic>{
       if (isEditMode && widget.item?.id != null) 'id': widget.item!.id,
@@ -445,7 +497,8 @@ class _ClassifiedsPostingFormScreenState
       itemDetails.addAll(
         await _adminFieldsController.toFileSubmissionMap(),
       );
-      final mainImg = _selectedImages.first;
+      final mainImg =
+          _selectedImages.isNotEmpty ? _selectedImages.first : null;
       final otherImgs =
           _selectedImages.length > 1 ? _selectedImages.sublist(1) : <File>[];
       createdItemModel =
@@ -588,35 +641,42 @@ class _ClassifiedsPostingFormScreenState
                   ),
                   const SizedBox(height: 18),
 
-                  // 3. Pictures
-                  PostingPicturesSection(
-                    images: _selectedImages,
-                    existingImages: _existingNetworkImages,
-                    onAdd: _pickImages,
-                    onRemove: (index) =>
-                        setState(() => _selectedImages.removeAt(index)),
-                    onRemoveExisting: (index) =>
-                        setState(() => _existingNetworkImages.removeAt(index)),
-                  ),
-                  const SizedBox(height: 18),
+                  // 3. Pictures (Hidden for Job ads)
+                  if (!_isJobAd) ...[
+                    PostingPicturesSection(
+                      images: _selectedImages,
+                      existingImages: _existingNetworkImages,
+                      onAdd: _pickImages,
+                      onRemove: (index) =>
+                          setState(() => _selectedImages.removeAt(index)),
+                      onRemoveExisting: (index) =>
+                          setState(() => _existingNetworkImages.removeAt(index)),
+                    ),
+                    const SizedBox(height: 18),
+                  ],
                   if (_isClassifiedsAd) ...[
                     PostingMediaLinksSection(
                       youtubeController: _youtubeUrlController,
                     ),
                     const SizedBox(height: 18),
                   ],
-                  // 4. Price
-                  const PostingFieldLabel("Price *"),
-                  _buildTextField(
-                    controller: _priceController,
-                    hint: "e.g. 150",
-                    keyboardType: TextInputType.number,
-                    suffixText: "AED",
-                    validator: (val) => val == null || val.trim().isEmpty
-                        ? "Price is required"
-                        : null,
-                  ),
-                  const SizedBox(height: 18),
+                  // 4. Price (Hidden for Job ads)
+                  if (!_isJobAd) ...[
+                    const PostingFieldLabel("Price *"),
+                    _buildTextField(
+                      controller: _priceController,
+                      hint: "e.g. 150",
+                      keyboardType: TextInputType.number,
+                      suffixText: "AED",
+                      validator: (val) {
+                        if (_isJobAd) return null;
+                        return val == null || val.trim().isEmpty
+                            ? "Price is required"
+                            : null;
+                      },
+                    ),
+                    const SizedBox(height: 18),
+                  ],
 
                   // 5. Phone Number
                   const PostingFieldLabel("Phone number *"),

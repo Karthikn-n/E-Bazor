@@ -1,4 +1,3 @@
-import 'package:device_preview/device_preview.dart';
 import 'package:Ebozor/app/app.dart';
 import 'package:Ebozor/app/app_localization.dart';
 import 'package:Ebozor/app/app_theme.dart';
@@ -93,52 +92,22 @@ class _AppState extends State<App> {
           onGenerateRoute: Routes.onGenerateRouted,
           theme: appThemeData[currentTheme],
           builder: (context, child) {
-            TextDirection? direction;
+            TextDirection direction = TextDirection.ltr;
 
             if (languageState is LanguageLoader) {
               if (languageState.language['rtl'] == true) {
                 direction = TextDirection.rtl;
-              } else {
-                direction = TextDirection.ltr;
               }
-            } else {
-              direction = TextDirection.ltr;
             }
             return MediaQuery(
               data: MediaQuery.of(context).copyWith(
-                textScaler: const TextScaler.linear(
-                    1.0), //set text scale factor to 1 so that this will not resize app's text while user change their system settings text scale
+                textScaler: const TextScaler.linear(1.0),
               ),
               child: Directionality(
                 textDirection: direction,
-                //This will convert app direction according to language
-                child: DevicePreview(
-                  enabled: false,
-
-                  /// Turn on this if you want to test the app in different screen sizes
-                  builder: (context) {
-                    return child ?? const SizedBox.shrink();
-                  },
-                ),
+                child: child ?? const SizedBox.shrink(),
               ),
-            ); /*MediaQuery(
-              data: MediaQuery.of(context).copyWith(
-                textScaler: const TextScaler.linear(
-                    1.0), //set text scale factor to 1 so that this will not resize app's text while user change their system settings text scale
-              ),
-              child: Directionality(
-                textDirection: direction,
-                //This will convert app direction according to language
-                child: DevicePreview(
-                  enabled: false,
-
-                  /// Turn on this if you want to test the app in different screen sizes
-                  builder: (context) {
-                    return child!;
-                  },
-                ),
-              ),
-            );*/
+            );
           },
           localizationsDelegates: const [
             AppLocalization.delegate,

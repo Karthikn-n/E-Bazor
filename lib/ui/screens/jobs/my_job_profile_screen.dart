@@ -1,19 +1,36 @@
 import 'dart:io';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:Ebozor/data/repositories/job_repository.dart';
 import 'package:Ebozor/ui/screens/jobs/introduction_recording_screen.dart';
+import 'package:Ebozor/ui/screens/widgets/image_cropper.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
-import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/utils/validator.dart';
+
+enum _JobProfilePhotoAction { view, camera, gallery, remove }
+
+
+
+String _firstNonEmptyProfileValue(
+  Map<dynamic, dynamic> entry,
+  List<String> keys,
+) {
+  for (final key in keys) {
+    final value = entry[key]?.toString().trim();
+    if (value != null && value.isNotEmpty) return value;
+  }
+  return '';
+}
 
 class MyJobProfileScreen extends StatefulWidget {
   const MyJobProfileScreen({super.key});
@@ -34,6 +51,11 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
 
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isUpdatingProfilePhoto = false;
+  File? _profilePhotoPreview;
+
+  AudioPlayer? _audioPlayer;
+  bool _isPlayingAudio = false;
 
   // Basic Info Controllers
   final TextEditingController _nameController = TextEditingController();
@@ -42,6 +64,7 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
   final TextEditingController _nationalityController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _languagesController = TextEditingController();
+  final List<String> _languagesList = [];
   String? _gender;
   String? _visaStatus;
 
@@ -53,8 +76,7 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
   String? _educationLevel;
   final TextEditingController _specializationController =
       TextEditingController();
-  final TextEditingController _universityController =
-      TextEditingController();
+  final TextEditingController _universityController = TextEditingController();
   String? _qualificationCountry;
   String? _graduationStartYear;
   String? _graduationEndYear;
@@ -72,8 +94,7 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
   String? _experienceStartDate;
   String? _experienceEndDate;
   bool _currentlyWorking = false;
-  String? _totalExperience;
-  String? _noticePeriod;
+
 
   // Skills fields
   final List<String> _skillsList = [];
@@ -92,8 +113,60 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
   final List<Map<String, String>> _licencesList = [];
   final List<Map<String, String>> _portfoliosList = [];
   final List<Map<String, String>> _referencesList = [];
+  String _profileSummary = '';
+  String? _jobAvailability;
+
+  static const List<String> _availabilityOptions = [
+    'Immediate',
+    'Actively Looking',
+  ];
+
+  bool get _hasAddableMoreSections =>
+      _licencesList.isEmpty ||
+      _portfoliosList.isEmpty ||
+      _referencesList.isEmpty;
+
+  String _truncateSummaryWords(String text, int maxWords) {
+    final words = text.trim().split(RegExp(r'\s+'));
+    if (words.length <= maxWords) return text;
+    return "${words.take(maxWords).join(' ')}...";
+  }
 
   // Static options
+  static const List<String> _allLanguages = [
+    "Arabic",
+    "Bengali",
+    "Chinese (Mandarin)",
+    "Dutch",
+    "English",
+    "French",
+    "German",
+    "Gujarati",
+    "Hindi",
+    "Indonesian",
+    "Italian",
+    "Japanese",
+    "Kannada",
+    "Korean",
+    "Malay",
+    "Malayalam",
+    "Marathi",
+    "Persian (Farsi)",
+    "Polish",
+    "Portuguese",
+    "Punjabi",
+    "Russian",
+    "Spanish",
+    "Swahili",
+    "Tagalog (Filipino)",
+    "Tamil",
+    "Telugu",
+    "Thai",
+    "Turkish",
+    "Ukrainian",
+    "Urdu",
+    "Vietnamese",
+  ];
   final List<String> _genders = ["Male", "Female", "Other"];
   final List<String> _visaStatuses = [
     "Employment",
@@ -135,7 +208,6 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
     "Human Resources",
   ];
 
-
   @override
   void initState() {
     super.initState();
@@ -144,6 +216,7 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
 
   @override
   void dispose() {
+    _audioPlayer?.dispose();
     _scrollController.dispose();
     _nameController.dispose();
     _emailController.dispose();
@@ -157,6 +230,247 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
     _positionController.dispose();
     _jobDescriptionController.dispose();
     super.dispose();
+  }
+
+  void _showProfilePhotoViewDialog({String? imageUrl, File? imageFile}) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            Container(
+              width: double.infinity,
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.7,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.92),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InteractiveViewer(
+                minScale: 0.8,
+                maxScale: 4.0,
+                child: Center(
+                  child: imageFile != null
+                      ? Image.file(
+                          imageFile,
+                          fit: BoxFit.contain,
+                        )
+                      : (imageUrl != null && imageUrl.isNotEmpty)
+                          ? UiUtils.getImage(
+                              imageUrl,
+                              fit: BoxFit.contain,
+                            )
+                          : const Icon(
+                              Icons.person,
+                              size: 100,
+                              color: Colors.white70,
+                            ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showProfilePhotoPicker() async {
+    final hasProfilePhoto = _profilePhotoPreview != null ||
+        (HiveUtils.getUserDetails().profile ?? '').isNotEmpty;
+    final action = await showModalBottomSheet<_JobProfilePhotoAction>(
+      context: context,
+      backgroundColor: context.color.secondaryColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 12, 8, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 42,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: context.color.borderColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                if (hasProfilePhoto)
+                  ListTile(
+                    leading: const Icon(Icons.visibility_outlined),
+                    title: const Text('View current photo'),
+                    onTap: () => Navigator.pop(
+                      sheetContext,
+                      _JobProfilePhotoAction.view,
+                    ),
+                  ),
+                ListTile(
+                  leading: const Icon(Icons.photo_camera_outlined),
+                  title: const Text('Take a new photo'),
+                  onTap: () => Navigator.pop(
+                    sheetContext,
+                    _JobProfilePhotoAction.camera,
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined),
+                  title: const Text('Choose from your library'),
+                  onTap: () => Navigator.pop(
+                    sheetContext,
+                    _JobProfilePhotoAction.gallery,
+                  ),
+                ),
+                if (hasProfilePhoto)
+                  ListTile(
+                    leading: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Colors.red,
+                    ),
+                    title: const Text(
+                      'Remove photo',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                    onTap: () => Navigator.pop(
+                      sheetContext,
+                      _JobProfilePhotoAction.remove,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _JobProfilePhotoAction.view:
+        final user = HiveUtils.getUserDetails();
+        _showProfilePhotoViewDialog(
+          imageUrl: user.profile,
+          imageFile: _profilePhotoPreview,
+        );
+        break;
+      case _JobProfilePhotoAction.camera:
+        await _pickAndUploadProfilePhoto(ImageSource.camera);
+        break;
+      case _JobProfilePhotoAction.gallery:
+        await _pickAndUploadProfilePhoto(ImageSource.gallery);
+        break;
+      case _JobProfilePhotoAction.remove:
+        await _removeProfilePhoto();
+        break;
+    }
+  }
+
+  Future<void> _pickAndUploadProfilePhoto(ImageSource source) async {
+    CropImage.init(context);
+    final pickedPhoto = await ImagePicker().pickImage(source: source);
+    if (pickedPhoto == null || !mounted) return;
+
+    final croppedPhoto = await CropImage.crop(filePath: pickedPhoto.path);
+    if (croppedPhoto == null || !mounted) return;
+
+    final profileFile = File(croppedPhoto.path);
+    setState(() {
+      _profilePhotoPreview = profileFile;
+      _isUpdatingProfilePhoto = true;
+    });
+
+    try {
+      final response = await _jobRepository.saveUserDetail(
+        const <String, dynamic>{},
+        profileFile: profileFile,
+      );
+      String? profileUrl = _extractProfileUrl(response);
+      if (profileUrl == null) {
+        profileUrl = _extractProfileUrl(await _jobRepository.fetchUserDetail());
+      }
+      if (profileUrl == null || profileUrl.isEmpty) {
+        throw StateError(
+            'The server did not return the uploaded profile photo.');
+      }
+
+      await HiveUtils.setUserData({'profile': profileUrl});
+      if (!mounted) return;
+      setState(() => _isUpdatingProfilePhoto = false);
+      HelperUtils.showSnackBarMessage(
+        context,
+        response['message']?.toString() ?? 'Profile photo updated',
+        type: MessageType.success,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _profilePhotoPreview = null;
+        _isUpdatingProfilePhoto = false;
+      });
+      HelperUtils.showSnackBarMessage(
+        context,
+        error.toString(),
+        type: MessageType.error,
+      );
+    }
+  }
+
+  Future<void> _removeProfilePhoto() async {
+    setState(() => _isUpdatingProfilePhoto = true);
+    try {
+      final response = await _jobRepository.removeProfilePhoto();
+      await HiveUtils.setUserData({'profile': ''});
+      if (!mounted) return;
+
+      setState(() {
+        _profilePhotoPreview = null;
+        _isUpdatingProfilePhoto = false;
+      });
+      HelperUtils.showSnackBarMessage(
+        context,
+        response['message']?.toString() ?? 'Profile photo removed',
+        type: MessageType.success,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isUpdatingProfilePhoto = false);
+      HelperUtils.showSnackBarMessage(
+        context,
+        error.toString(),
+        type: MessageType.error,
+      );
+    }
+  }
+
+  String? _extractProfileUrl(dynamic payload) {
+    if (payload is! Map) return null;
+    for (final key in const ['profile', 'profile_url']) {
+      final value = payload[key];
+      if (value is String && value.trim().isNotEmpty) return value.trim();
+    }
+    for (final key in const ['data', 'user', 'user_detail']) {
+      final nested = _extractProfileUrl(payload[key]);
+      if (nested != null) return nested;
+    }
+    return null;
   }
 
   Future<void> _loadJobProfile() async {
@@ -176,6 +490,9 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
     try {
       final userDetail = await _jobRepository.fetchUserDetail();
       if (userDetail != null && mounted) {
+        final profileUrl = userDetail['profile']?.toString().trim() ?? '';
+        await HiveUtils.setUserData({'profile': profileUrl});
+        _profilePhotoPreview = null;
         if (userDetail['name'] != null &&
             userDetail['name'].toString().isNotEmpty) {
           _nameController.text = userDetail['name'].toString();
@@ -192,11 +509,18 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
           _nationalityController.text = userDetail['nationality'].toString();
         }
         if (userDetail['current_location'] != null) {
-          _locationController.text =
-              userDetail['current_location'].toString();
+          _locationController.text = userDetail['current_location'].toString();
         }
         if (userDetail['language'] != null) {
-          _languagesController.text = userDetail['language'].toString();
+          final rawLang = userDetail['language'].toString();
+          _languagesController.text = rawLang;
+          _languagesList.clear();
+          for (var l in rawLang.split(',')) {
+            final trimmed = l.trim();
+            if (trimmed.isNotEmpty && !_languagesList.contains(trimmed)) {
+              _languagesList.add(trimmed);
+            }
+          }
         }
         if (userDetail['gender'] != null &&
             _genders.contains(userDetail['gender'])) {
@@ -206,8 +530,14 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
             _visaStatuses.contains(userDetail['visa_status'])) {
           _visaStatus = userDetail['visa_status'].toString();
         }
-        // Qualifications parsing (List and scalar fallback)
+        _profileSummary =
+            userDetail['profile_summary']?.toString().trim() ?? '';
+        final jobStatus = userDetail['job_status']?.toString().trim();
+        _jobAvailability =
+            jobStatus == null || jobStatus.isEmpty ? null : jobStatus;
+        // Qualifications parsing (List and scalar fallback with deduplication)
         _qualificationsList.clear();
+        final Set<String> seenQuals = {};
         if (userDetail['user_qualification'] is List) {
           for (var q in userDetail['user_qualification']) {
             if (q is Map) {
@@ -216,7 +546,11 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
               final uni = (map['university_name'] ?? '').toString().trim();
               final spec = (map['specialization'] ?? '').toString().trim();
               if (degree.isNotEmpty || uni.isNotEmpty || spec.isNotEmpty) {
-                _qualificationsList.add(map);
+                final key = "$degree|$uni|$spec".toLowerCase();
+                if (!seenQuals.contains(key)) {
+                  seenQuals.add(key);
+                  _qualificationsList.add(map);
+                }
               }
             }
           }
@@ -236,8 +570,9 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
           });
         }
 
-        // Experiences parsing (List and scalar fallback)
+        // Experiences parsing (List and scalar fallback with deduplication & cleaning)
         _experiencesList.clear();
+        final Set<String> seenExps = {};
         if (userDetail['user_experience'] is List) {
           for (var exp in userDetail['user_experience']) {
             if (exp is Map) {
@@ -255,7 +590,13 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                   title.isNotEmpty ||
                   company.isNotEmpty ||
                   category.isNotEmpty) {
-                _experiencesList.add(map);
+                final key = isFresher
+                    ? "fresher"
+                    : "$title|$company|$category".toLowerCase();
+                if (!seenExps.contains(key)) {
+                  seenExps.add(key);
+                  _experiencesList.add(map);
+                }
               }
             }
           }
@@ -274,7 +615,9 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
               'experience_company': company,
               'experience_job_titel': title,
               'experience_job_description':
-                  (userDetail['experience_job_description'] ?? '').toString().trim(),
+                  (userDetail['experience_job_description'] ?? '')
+                      .toString()
+                      .trim(),
               'experience_job_category': userDetail['experience_job_category'],
               'experience_industry': userDetail['experience_industry'],
               'experience_country': userDetail['experience_country'],
@@ -298,6 +641,107 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
         if (userDetail['resume'] != null) {
           _existingResumeUrl = userDetail['resume'].toString();
         }
+        if (userDetail['audio_introduction'] != null &&
+            userDetail['audio_introduction'].toString().trim().isNotEmpty) {
+          _audioIntroPath = userDetail['audio_introduction'].toString().trim();
+          HiveUtils.setAudioIntroPath(_audioIntroPath);
+        } else if (userDetail['audio'] != null &&
+            userDetail['audio'].toString().trim().isNotEmpty) {
+          _audioIntroPath = userDetail['audio'].toString().trim();
+          HiveUtils.setAudioIntroPath(_audioIntroPath);
+        } else {
+          final localAudio = HiveUtils.getAudioIntroPath();
+          if (localAudio != null &&
+              (localAudio.startsWith('http') || File(localAudio).existsSync())) {
+            _audioIntroPath = localAudio;
+          }
+        }
+        if (userDetail['video_introduction'] != null &&
+            userDetail['video_introduction'].toString().trim().isNotEmpty) {
+          _videoIntroPath = userDetail['video_introduction'].toString().trim();
+          HiveUtils.setVideoIntroPath(_videoIntroPath);
+        } else if (userDetail['video'] != null &&
+            userDetail['video'].toString().trim().isNotEmpty) {
+          _videoIntroPath = userDetail['video'].toString().trim();
+          HiveUtils.setVideoIntroPath(_videoIntroPath);
+        } else {
+          final localVideo = HiveUtils.getVideoIntroPath();
+          if (localVideo != null &&
+              (localVideo.startsWith('http') || File(localVideo).existsSync())) {
+            _videoIntroPath = localVideo;
+          }
+        }
+
+        _licencesList
+          ..clear()
+          ..addAll(
+            (userDetail['licenses_certificates'] is List
+                    ? userDetail['licenses_certificates'] as List
+                    : const <dynamic>[])
+                .whereType<Map>()
+                .map(
+                  (entry) => <String, String>{
+                    'id': entry['id']?.toString() ?? '',
+                    'name': _firstNonEmptyProfileValue(
+                      entry,
+                      const ['course_name', 'name'],
+                    ),
+                    'org': _firstNonEmptyProfileValue(
+                      entry,
+                      const ['issuing_organization', 'organization'],
+                    ),
+                  },
+                )
+                .where((entry) => entry['name']!.trim().isNotEmpty),
+          );
+        _portfoliosList
+          ..clear()
+          ..addAll(
+            (userDetail['user_portfolio'] is List
+                    ? userDetail['user_portfolio'] as List
+                    : const <dynamic>[])
+                .whereType<Map>()
+                .map(
+                  (entry) => <String, String>{
+                    'id': entry['id']?.toString() ?? '',
+                    'name': _firstNonEmptyProfileValue(
+                      entry,
+                      const ['portfolio_name', 'name'],
+                    ),
+                    'link': _firstNonEmptyProfileValue(
+                      entry,
+                      const ['portfolio_link', 'link'],
+                    ),
+                  },
+                )
+                .where((entry) => entry['name']!.trim().isNotEmpty),
+          );
+        _referencesList
+          ..clear()
+          ..addAll(
+            (userDetail['user_reference'] is List
+                    ? userDetail['user_reference'] as List
+                    : const <dynamic>[])
+                .whereType<Map>()
+                .map(
+                  (entry) => <String, String>{
+                    'id': entry['id']?.toString() ?? '',
+                    'name': _firstNonEmptyProfileValue(
+                      entry,
+                      const ['reference_name', 'name'],
+                    ),
+                    'company': _firstNonEmptyProfileValue(
+                      entry,
+                      const ['reference_company_name', 'company_name'],
+                    ),
+                    'email': _firstNonEmptyProfileValue(
+                      entry,
+                      const ['reference_email', 'email'],
+                    ),
+                  },
+                )
+                .where((entry) => entry['name']!.trim().isNotEmpty),
+          );
       }
     } catch (e) {
       debugPrint("Error loading job profile: $e");
@@ -311,22 +755,36 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
   int _calculateRemainingSections() {
     int totalSections = 6;
     int filled = 0;
+    // 1. Basic Info
     if (_nameController.text.trim().isNotEmpty &&
         _emailController.text.trim().isNotEmpty) {
       filled++;
     }
-    if (_educationLevel != null && _educationLevel!.isNotEmpty) filled++;
-    if (_experienceType == "Fresher" ||
+    // 2. Qualifications
+    if (_qualificationsList.isNotEmpty ||
+        (_educationLevel != null && _educationLevel!.isNotEmpty)) {
+      filled++;
+    }
+    // 3. Experience
+    if (_experiencesList.isNotEmpty ||
+        _experienceType == "Fresher" ||
         _companyController.text.trim().isNotEmpty ||
         _positionController.text.trim().isNotEmpty) {
       filled++;
     }
-    if (_skillsList.isNotEmpty || _jobCategory != null) filled++;
+    // 4. Skills
+    if (_skillsList.isNotEmpty || _jobCategory != null) {
+      filled++;
+    }
+    // 5. Resume
     if (_resumeFile != null ||
         (_existingResumeUrl != null && _existingResumeUrl!.isNotEmpty)) {
       filled++;
     }
-    if (_audioIntroPath != null || _videoIntroPath != null) filled++;
+    // 6. Digital Profile (Audio or Video introduction)
+    if (_audioIntroPath != null || _videoIntroPath != null) {
+      filled++;
+    }
     return (totalSections - filled).clamp(0, totalSections);
   }
 
@@ -357,109 +815,42 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
           ? phoneDigits
           : "+$_phoneCountryCode$phoneDigits";
 
-      // Filter and sanitize qualifications
-      final validQualifications = _qualificationsList.where((q) {
-        final degree = (q['degree'] ?? '').toString().trim();
-        final uni = (q['university_name'] ?? '').toString().trim();
-        final spec = (q['specialization'] ?? '').toString().trim();
-        return degree.isNotEmpty || uni.isNotEmpty || spec.isNotEmpty;
-      }).map((q) {
-        final map = <String, dynamic>{};
-        if (q['id'] != null) map['id'] = q['id'];
-        if (q['degree'] != null) map['degree'] = q['degree'].toString().trim();
-        if (q['specialization'] != null) {
-          map['specialization'] = q['specialization'].toString().trim();
-        }
-        if (q['university_name'] != null) {
-          map['university_name'] = q['university_name'].toString().trim();
-        }
-        if (q['country'] != null) map['country'] = q['country'].toString().trim();
-        if (q['graduation_from'] != null) {
-          map['graduation_from'] = q['graduation_from'].toString().trim();
-        }
-        if (q['graduation_to'] != null) {
-          map['graduation_to'] = q['graduation_to'].toString().trim();
-        }
-        return map;
-      }).toList();
-
-      // Filter and sanitize experiences
-      final validExperiences = _experiencesList.where((exp) {
-        final isFresher = exp['fresher'] == 1 ||
-            exp['fresher'] == "1" ||
-            exp['fresher'] == true;
-        final title = (exp['experience_job_titel'] ?? '').toString().trim();
-        final comp = (exp['experience_company'] ?? '').toString().trim();
-        final cat = (exp['experience_job_category'] ?? '').toString().trim();
-        return isFresher || title.isNotEmpty || comp.isNotEmpty || cat.isNotEmpty;
-      }).map((exp) {
-        final map = <String, dynamic>{};
-        if (exp['id'] != null) map['id'] = exp['id'];
-        map['fresher'] = (exp['fresher'] == 1 ||
-                exp['fresher'] == "1" ||
-                exp['fresher'] == true)
-            ? 1
-            : 0;
-        if (exp['experience_company'] != null) {
-          map['experience_company'] = exp['experience_company'].toString().trim();
-        }
-        if (exp['experience_job_titel'] != null) {
-          map['experience_job_titel'] =
-              exp['experience_job_titel'].toString().trim();
-        }
-        if (exp['experience_job_description'] != null) {
-          map['experience_job_description'] =
-              exp['experience_job_description'].toString().trim();
-        }
-        if (exp['experience_job_category'] != null) {
-          map['experience_job_category'] =
-              exp['experience_job_category'].toString().trim();
-        }
-        if (exp['experience_industry'] != null) {
-          map['experience_industry'] =
-              exp['experience_industry'].toString().trim();
-        }
-        if (exp['experience_country'] != null) {
-          map['experience_country'] =
-              exp['experience_country'].toString().trim();
-        }
-        if (exp['experience_start_date'] != null) {
-          map['experience_start_date'] =
-              exp['experience_start_date'].toString().trim();
-        }
-        if (exp['experience_end_date'] != null) {
-          map['experience_end_date'] =
-              exp['experience_end_date'].toString().trim();
-        }
-        map['currently_working'] = (exp['currently_working'] == 1 ||
-                exp['currently_working'] == "1" ||
-                exp['currently_working'] == true)
-            ? 1
-            : 0;
-        return map;
-      }).toList();
+      final langValue = _languagesList.isNotEmpty
+          ? _languagesList.join(', ')
+          : _languagesController.text.trim();
 
       final Map<String, dynamic> userDetailData = {
         'name': _nameController.text.trim(),
         'email': _emailController.text.trim(),
+        'email_id': _emailController.text.trim(),
         'mobile': fullPhone,
         if (_nationalityController.text.trim().isNotEmpty)
           'nationality': _nationalityController.text.trim(),
         if (_locationController.text.trim().isNotEmpty)
           'current_location': _locationController.text.trim(),
-        if (_languagesController.text.trim().isNotEmpty)
-          'language': _languagesController.text.trim(),
+        if (langValue.isNotEmpty)
+          'language': langValue,
         if (_gender != null) 'gender': _gender,
         if (_visaStatus != null) 'visa_status': _visaStatus,
         if (_skillsList.isNotEmpty) 'skills': _skillsList.join(', '),
         if (_jobCategory != null) 'experience_industry': _jobCategory,
-        'user_qualification': validQualifications,
-        'user_experience': validExperiences,
+        'profile_summary': _profileSummary,
+        if (_jobAvailability != null) 'job_status': _jobAvailability,
       };
 
       await _jobRepository.saveUserDetail(
         userDetailData,
         resumeFile: _resumeFile,
+        audioFile: _audioIntroPath != null &&
+                !_audioIntroPath!.startsWith('http') &&
+                File(_audioIntroPath!).existsSync()
+            ? File(_audioIntroPath!)
+            : null,
+        videoFile: _videoIntroPath != null &&
+                !_videoIntroPath!.startsWith('http') &&
+                File(_videoIntroPath!).existsSync()
+            ? File(_videoIntroPath!)
+            : null,
       );
 
       if (mounted) {
@@ -468,7 +859,6 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
           "Profile updated successfully",
           type: MessageType.success,
         );
-        _loadJobProfile();
       }
     } catch (e) {
       if (mounted) {
@@ -482,6 +872,182 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
       if (mounted) {
         setState(() => _isSaving = false);
       }
+    }
+  }
+
+  Future<void> _saveLicence({
+    String? id,
+    required String courseName,
+    required String issuingOrg,
+  }) async {
+    setState(() => _isSaving = true);
+    try {
+      final response = await _jobRepository.saveUserDetail({
+        'type': 'licenses_certificates',
+        if (id != null && id.isNotEmpty) 'licenses_certificates_id': id,
+        'course_name': courseName,
+        'issuing_organization': issuingOrg,
+      });
+      await _loadJobProfile();
+      if (mounted) {
+        HelperUtils.showSnackBarMessage(
+          context,
+          response['message']?.toString() ?? 'Licence saved successfully',
+          type: MessageType.success,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        HelperUtils.showSnackBarMessage(context, e.toString(), type: MessageType.error);
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _savePortfolio({
+    String? id,
+    required String portfolioName,
+    required String portfolioLink,
+  }) async {
+    setState(() => _isSaving = true);
+    try {
+      final response = await _jobRepository.saveUserDetail({
+        'type': 'user_portfolio',
+        if (id != null && id.isNotEmpty) 'user_portfolio_id': id,
+        'portfolio_name': portfolioName,
+        'portfolio_link': portfolioLink,
+      });
+      await _loadJobProfile();
+      if (mounted) {
+        HelperUtils.showSnackBarMessage(
+          context,
+          response['message']?.toString() ?? 'Portfolio saved successfully',
+          type: MessageType.success,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        HelperUtils.showSnackBarMessage(context, e.toString(), type: MessageType.error);
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _saveReference({
+    String? id,
+    required String refName,
+    required String refCompany,
+    required String refEmail,
+  }) async {
+    setState(() => _isSaving = true);
+    try {
+      final response = await _jobRepository.saveUserDetail({
+        'type': 'user_reference',
+        if (id != null && id.isNotEmpty) 'user_reference_id': id,
+        'reference_name': refName,
+        'reference_company_name': refCompany,
+        'reference_email': refEmail,
+      });
+      await _loadJobProfile();
+      if (mounted) {
+        HelperUtils.showSnackBarMessage(
+          context,
+          response['message']?.toString() ?? 'Reference saved successfully',
+          type: MessageType.success,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        HelperUtils.showSnackBarMessage(context, e.toString(), type: MessageType.error);
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _saveQualification({
+    String? id,
+    required String degree,
+    required String specialization,
+    required String universityName,
+    required String country,
+    required String graduationFrom,
+    required String graduationTo,
+  }) async {
+    setState(() => _isSaving = true);
+    try {
+      final response = await _jobRepository.saveUserDetail({
+        'type': 'user_qualification',
+        if (id != null && id.isNotEmpty) 'qualification_id': id,
+        'degree': degree,
+        'specialization': specialization,
+        'university_name': universityName,
+        'country': country,
+        'graduation_from': graduationFrom,
+        'graduation_to': graduationTo,
+      });
+      await _loadJobProfile();
+      if (mounted) {
+        HelperUtils.showSnackBarMessage(
+          context,
+          response['message']?.toString() ?? 'Qualification saved successfully',
+          type: MessageType.success,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        HelperUtils.showSnackBarMessage(context, e.toString(), type: MessageType.error);
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _saveExperience({
+    String? id,
+    required String company,
+    required String title,
+    required String description,
+    required String category,
+    required String industry,
+    required String country,
+    required String startDate,
+    required String endDate,
+    required bool currentlyWorking,
+    required bool isFresher,
+  }) async {
+    setState(() => _isSaving = true);
+    try {
+      final response = await _jobRepository.saveUserDetail({
+        'type': 'user_experience',
+        if (id != null && id.isNotEmpty) 'experience_id': id,
+        'experience_company': company,
+        'experience_job_titel': title,
+        'experience_job_description': description,
+        'experience_job_category': category,
+        'experience_industry': industry,
+        'experience_country': country,
+        'experience_start_date': startDate,
+        'experience_end_date': endDate,
+        'currently_working': currentlyWorking ? 1 : 0,
+        'fresher': isFresher ? 1 : 0,
+      });
+      await _loadJobProfile();
+      if (mounted) {
+        HelperUtils.showSnackBarMessage(
+          context,
+          response['message']?.toString() ?? 'Experience saved successfully',
+          type: MessageType.success,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        HelperUtils.showSnackBarMessage(context, e.toString(), type: MessageType.error);
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -501,8 +1067,18 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
     }
 
     final months = [
-      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec"
     ];
 
     return showModalBottomSheet<String>(
@@ -515,8 +1091,7 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
         return StatefulBuilder(
           builder: (ctx, setPickerState) {
             return Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -798,9 +1373,185 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                                 _nationalityController.text = textCtrl.text;
                               } else if (fieldKey == "language") {
                                 _languagesController.text = textCtrl.text;
+                                _languagesList.clear();
+                                for (var l in textCtrl.text.split(',')) {
+                                  final t = l.trim();
+                                  if (t.isNotEmpty && !_languagesList.contains(t)) {
+                                    _languagesList.add(t);
+                                  }
+                                }
                               } else if (fieldKey == "location") {
                                 _locationController.text = textCtrl.text;
                               }
+                            });
+                            Navigator.pop(ctx);
+                            _saveJobProfileData();
+                          },
+                          child: const Text("Save"),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showLanguagesBottomSheet() {
+    final List<String> tempLanguages = List<String>.from(_languagesList);
+    if (tempLanguages.isEmpty && _languagesController.text.isNotEmpty) {
+      for (var l in _languagesController.text.split(',')) {
+        final t = l.trim();
+        if (t.isNotEmpty && !tempLanguages.contains(t)) {
+          tempLanguages.add(t);
+        }
+      }
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.color.secondaryColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Languages",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: context.color.textDefaultColor,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  _buildFieldLabel("Select Language"),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey("lang_dd_sheet_${tempLanguages.length}_${tempLanguages.hashCode}"),
+                    isExpanded: true,
+                    initialValue: null,
+                    hint: Text(
+                      "Choose a language to add",
+                      style: TextStyle(color: context.color.textLightColor),
+                    ),
+                    items: _allLanguages
+                        .where((lang) => !tempLanguages.contains(lang))
+                        .map((lang) => DropdownMenuItem(
+                              value: lang,
+                              child: Text(
+                                lang,
+                                style: TextStyle(
+                                    color: context.color.textDefaultColor),
+                              ),
+                            ))
+                        .toList(),
+                    onChanged: (selectedLang) {
+                      if (selectedLang != null &&
+                          !tempLanguages.contains(selectedLang)) {
+                        setSheetState(() {
+                          tempLanguages.add(selectedLang);
+                        });
+                      }
+                    },
+                    decoration: _inputDecoration(""),
+                  ),
+                  if (tempLanguages.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    _buildFieldLabel("Selected Languages"),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: tempLanguages.map((lang) {
+                        return Chip(
+                          label: Text(
+                            lang,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: context.color.textDefaultColor,
+                            ),
+                          ),
+                          deleteIcon: const Icon(
+                            Icons.cancel_rounded,
+                            size: 18,
+                            color: Color(0xFFEF4444),
+                          ),
+                          onDeleted: () {
+                            setSheetState(() {
+                              tempLanguages.remove(lang);
+                            });
+                          },
+                          backgroundColor: context.color.backgroundColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide(
+                              color: context.color.borderColor,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                  const SizedBox(height: 22),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: context.color.borderColor),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            foregroundColor: context.color.textDefaultColor,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text("Cancel"),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: context.color.territoryColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              // _languagesList = List.from(tempLanguages);
+                              _languagesController.text =
+                                  _languagesList.join(', ');
                             });
                             Navigator.pop(ctx);
                             _saveJobProfileData();
@@ -829,10 +1580,16 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
     final tempPhoneCtrl = TextEditingController(text: _phoneController.text);
     final tempNatCtrl =
         TextEditingController(text: _nationalityController.text);
-    final tempLocCtrl =
-        TextEditingController(text: _locationController.text);
-    final tempLangCtrl =
-        TextEditingController(text: _languagesController.text);
+    final tempLocCtrl = TextEditingController(text: _locationController.text);
+    final List<String> tempLanguages = List<String>.from(_languagesList);
+    if (tempLanguages.isEmpty && _languagesController.text.isNotEmpty) {
+      for (var l in _languagesController.text.split(',')) {
+        final t = l.trim();
+        if (t.isNotEmpty && !tempLanguages.contains(t)) {
+          tempLanguages.add(t);
+        }
+      }
+    }
     String? tempGender = _gender;
     String? tempVisa = _visaStatus;
 
@@ -907,10 +1664,10 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                       _buildFieldLabel("Visa Status"),
                       DropdownButtonFormField<String>(
                         isExpanded: true,
-                        value: tempVisa != null &&
-                                _visaStatuses.contains(tempVisa)
-                            ? tempVisa
-                            : null,
+                        initialValue:
+                            tempVisa != null && _visaStatuses.contains(tempVisa)
+                                ? tempVisa
+                                : null,
                         hint: Text("Select Visa Status",
                             style:
                                 TextStyle(color: context.color.textLightColor)),
@@ -925,10 +1682,10 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                       _buildFieldLabel("Gender"),
                       DropdownButtonFormField<String>(
                         isExpanded: true,
-                        value: tempGender != null &&
-                                _genders.contains(tempGender)
-                            ? tempGender
-                            : null,
+                        initialValue:
+                            tempGender != null && _genders.contains(tempGender)
+                                ? tempGender
+                                : null,
                         hint: Text("Select Gender",
                             style:
                                 TextStyle(color: context.color.textLightColor)),
@@ -950,24 +1707,83 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                       _buildFieldLabel("Current Location / City"),
                       TextFormField(
                         controller: tempLocCtrl,
-                        decoration:
-                            _inputDecoration("e.g. Dubai, Abu Dhabi"),
+                        decoration: _inputDecoration("e.g. Dubai, Abu Dhabi"),
                       ),
                       const SizedBox(height: 12),
                       _buildFieldLabel("Languages"),
-                      TextFormField(
-                        controller: tempLangCtrl,
-                        decoration:
-                            _inputDecoration("e.g. English, Arabic, Hindi"),
+                      DropdownButtonFormField<String>(
+                        key: ValueKey("lang_dd_basic_${tempLanguages.length}_${tempLanguages.hashCode}"),
+                        isExpanded: true,
+                        initialValue: null,
+                        hint: Text(
+                          "Select languages from list",
+                          style: TextStyle(color: context.color.textLightColor),
+                        ),
+                        items: _allLanguages
+                            .where((lang) => !tempLanguages.contains(lang))
+                            .map((lang) => DropdownMenuItem(
+                                  value: lang,
+                                  child: Text(
+                                    lang,
+                                    style: TextStyle(
+                                        color: context.color.textDefaultColor),
+                                  ),
+                                ))
+                            .toList(),
+                        onChanged: (selectedLang) {
+                          if (selectedLang != null &&
+                              !tempLanguages.contains(selectedLang)) {
+                            setModalState(() {
+                              tempLanguages.add(selectedLang);
+                            });
+                          }
+                        },
+                        decoration: _inputDecoration(""),
                       ),
+                      if (tempLanguages.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: tempLanguages.map((lang) {
+                            return Chip(
+                              label: Text(
+                                lang,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: context.color.textDefaultColor,
+                                ),
+                              ),
+                              deleteIcon: const Icon(
+                                Icons.cancel_rounded,
+                                size: 18,
+                                color: Color(0xFFEF4444),
+                              ),
+                              onDeleted: () {
+                                setModalState(() {
+                                  tempLanguages.remove(lang);
+                                });
+                              },
+                              backgroundColor: context.color.backgroundColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                side: BorderSide(
+                                  color: context.color.borderColor,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
                       const SizedBox(height: 24),
                       Row(
                         children: [
                           Expanded(
                             child: OutlinedButton(
                               style: OutlinedButton.styleFrom(
-                                side:
-                                    BorderSide(color: context.color.borderColor),
+                                side: BorderSide(
+                                    color: context.color.borderColor),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -1000,8 +1816,10 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                                     _nationalityController.text =
                                         tempNatCtrl.text;
                                     _locationController.text = tempLocCtrl.text;
+                                    _languagesList.clear();
+                                    _languagesList.addAll(tempLanguages);
                                     _languagesController.text =
-                                        tempLangCtrl.text;
+                                        tempLanguages.join(', ');
                                     _gender = tempGender;
                                     _visaStatus = tempVisa;
                                   });
@@ -1087,7 +1905,7 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                     _buildFieldLabel("Highest Education Level *"),
                     DropdownButtonFormField<String>(
                       isExpanded: true,
-                      value: tempEducation != null &&
+                      initialValue: tempEducation != null &&
                               _educationLevels.contains(tempEducation)
                           ? tempEducation
                           : null,
@@ -1095,8 +1913,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                           style:
                               TextStyle(color: context.color.textLightColor)),
                       items: _educationLevels
-                          .map((e) =>
-                              DropdownMenuItem(value: e, child: Text(e)))
+                          .map(
+                              (e) => DropdownMenuItem(value: e, child: Text(e)))
                           .toList(),
                       onChanged: (v) => setModalState(() => tempEducation = v),
                       decoration: _inputDecoration(""),
@@ -1112,8 +1930,7 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                     _buildFieldLabel("University / Institute Name"),
                     TextFormField(
                       controller: tempUniCtrl,
-                      decoration:
-                          _inputDecoration("e.g. University of Dubai"),
+                      decoration: _inputDecoration("e.g. University of Dubai"),
                     ),
                     const SizedBox(height: 12),
                     _buildFieldLabel("Country"),
@@ -1254,7 +2071,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                         Expanded(
                           child: OutlinedButton(
                             style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: context.color.borderColor),
+                              side:
+                                  BorderSide(color: context.color.borderColor),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -1276,8 +2094,14 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
-                            onPressed: () {
+                            onPressed: () async {
+                              final qualId = initialData?['id'] ??
+                                  (editIndex != null &&
+                                          editIndex < _qualificationsList.length
+                                      ? _qualificationsList[editIndex]['id']
+                                      : null);
                               final newQual = {
+                                if (qualId != null) 'id': qualId,
                                 'degree': tempEducation ?? '',
                                 'specialization': tempSpecCtrl.text.trim(),
                                 'university_name': tempUniCtrl.text.trim(),
@@ -1297,7 +2121,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                                 _specializationController.text =
                                     newQual['specialization']?.toString() ?? '';
                                 _universityController.text =
-                                    newQual['university_name']?.toString() ?? '';
+                                    newQual['university_name']?.toString() ??
+                                        '';
                                 _qualificationCountry =
                                     newQual['country']?.toString();
                                 _graduationStartYear =
@@ -1306,7 +2131,15 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                                     newQual['graduation_to']?.toString();
                               });
                               Navigator.pop(ctx);
-                              _saveJobProfileData();
+                              await _saveQualification(
+                                id: qualId?.toString(),
+                                degree: tempEducation ?? '',
+                                specialization: tempSpecCtrl.text.trim(),
+                                universityName: tempUniCtrl.text.trim(),
+                                country: tempCountry ?? '',
+                                graduationFrom: tempStartYear ?? '',
+                                graduationTo: tempEndYear ?? '',
+                              );
                             },
                             child: const Text("Save"),
                           ),
@@ -1453,8 +2286,7 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                         Expanded(
                           child: InkWell(
                             onTap: () {
-                              setModalState(
-                                  () => tempExpType = "Experienced");
+                              setModalState(() => tempExpType = "Experienced");
                             },
                             borderRadius: BorderRadius.circular(10),
                             child: Container(
@@ -1511,13 +2343,14 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                       _buildFieldLabel("Company Name *"),
                       TextFormField(
                         controller: tempCompanyCtrl,
-                        decoration: _inputDecoration("e.g. Acme Tech Solutions"),
+                        decoration:
+                            _inputDecoration("e.g. Acme Tech Solutions"),
                       ),
                       const SizedBox(height: 12),
                       _buildFieldLabel("Job Category"),
                       DropdownButtonFormField<String>(
                         isExpanded: true,
-                        value: tempCat != null && _categories.contains(tempCat)
+                        initialValue: tempCat != null && _categories.contains(tempCat)
                             ? tempCat
                             : null,
                         hint: Text("Select Category",
@@ -1534,7 +2367,7 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                       _buildFieldLabel("Industry"),
                       DropdownButtonFormField<String>(
                         isExpanded: true,
-                        value: tempInd != null && _categories.contains(tempInd)
+                        initialValue: tempInd != null && _categories.contains(tempInd)
                             ? tempInd
                             : null,
                         hint: Text("Select Industry",
@@ -1743,7 +2576,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                         Expanded(
                           child: OutlinedButton(
                             style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: context.color.borderColor),
+                              side:
+                                  BorderSide(color: context.color.borderColor),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -1765,8 +2599,14 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
-                            onPressed: () {
+                            onPressed: () async {
+                              final expId = initialData?['id'] ??
+                                  (editIndex != null &&
+                                          editIndex < _experiencesList.length
+                                      ? _experiencesList[editIndex]['id']
+                                      : null);
                               final newExp = {
+                                if (expId != null) 'id': expId,
                                 'fresher': tempExpType == "Fresher" ? 1 : 0,
                                 'experience_company':
                                     tempCompanyCtrl.text.trim(),
@@ -1814,7 +2654,19 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                                 _currentlyWorking = tempCurrent;
                               });
                               Navigator.pop(ctx);
-                              _saveJobProfileData();
+                              await _saveExperience(
+                                id: expId?.toString(),
+                                company: tempCompanyCtrl.text.trim(),
+                                title: tempPosCtrl.text.trim(),
+                                description: tempDescCtrl.text.trim(),
+                                category: tempCat ?? '',
+                                industry: tempInd ?? '',
+                                country: tempCountry ?? '',
+                                startDate: tempStartDate ?? '',
+                                endDate: tempEndDate ?? '',
+                                currentlyWorking: tempCurrent,
+                                isFresher: tempExpType == "Fresher",
+                              );
                             },
                             child: const Text("Save"),
                           ),
@@ -1892,15 +2744,16 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                     _buildFieldLabel("Job Industry / Category"),
                     DropdownButtonFormField<String>(
                       isExpanded: true,
-                      initialValue: tempCat != null && _categories.contains(tempCat)
-                          ? tempCat
-                          : null,
+                      initialValue:
+                          tempCat != null && _categories.contains(tempCat)
+                              ? tempCat
+                              : null,
                       hint: Text("Select Industry",
                           style:
                               TextStyle(color: context.color.textLightColor)),
                       items: _categories
-                          .map((e) =>
-                              DropdownMenuItem(value: e, child: Text(e)))
+                          .map(
+                              (e) => DropdownMenuItem(value: e, child: Text(e)))
                           .toList(),
                       onChanged: (v) => setModalState(() => tempCat = v),
                       decoration: _inputDecoration(""),
@@ -2060,14 +2913,12 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                     IntroductionRecordingScreen.route(RecordingType.audio),
                   );
                   if (result != null && result is Map) {
+                    final path = result['filePath']?.toString();
                     setState(() {
-                      _audioIntroPath = result['filePath']?.toString();
+                      _audioIntroPath = path;
                     });
-                    HelperUtils.showSnackBarMessage(
-                      context,
-                      "Audio introduction saved successfully!",
-                      type: MessageType.success,
-                    );
+                    HiveUtils.setAudioIntroPath(path);
+                    await _saveJobProfileData();
                   }
                 },
                 borderRadius: BorderRadius.circular(12),
@@ -2138,14 +2989,12 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                     IntroductionRecordingScreen.route(RecordingType.video),
                   );
                   if (result != null && result is Map) {
+                    final path = result['filePath']?.toString();
                     setState(() {
-                      _videoIntroPath = result['filePath']?.toString();
+                      _videoIntroPath = path;
                     });
-                    HelperUtils.showSnackBarMessage(
-                      context,
-                      "Video introduction saved successfully!",
-                      type: MessageType.success,
-                    );
+                    HiveUtils.setVideoIntroPath(path);
+                    await _saveJobProfileData();
                   }
                 },
                 borderRadius: BorderRadius.circular(12),
@@ -2214,9 +3063,557 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
   }
 
   // ---------------------------------------------------------------------------
+  Future<void> _showEditJobProfileSheet() async {
+    final nameController =
+        TextEditingController(text: _nameController.text.trim());
+    final summaryController = TextEditingController(text: _profileSummary);
+    final availabilityOptions = <String>{
+      ..._availabilityOptions,
+      if (_jobAvailability != null && _jobAvailability!.isNotEmpty)
+        _jobAvailability!,
+    }.toList();
+    String? selectedAvailability = _jobAvailability;
+    File? selectedProfilePhoto;
+    bool isSaving = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.color.secondaryColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            final user = HiveUtils.getUserDetails();
+            return SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  18,
+                  20,
+                  MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Edit profile',
+                            style: TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.bold,
+                              color: context.color.textDefaultColor,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: isSaving
+                              ? null
+                              : () => Navigator.pop(sheetContext),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    _buildFieldLabel('Profile name *'),
+                    TextFormField(
+                      controller: nameController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: _inputDecoration('Enter your profile name'),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildFieldLabel('Profile picture'),
+                    InkWell(
+                      onTap: isSaving
+                          ? null
+                          : () async {
+                              final hasPhoto = selectedProfilePhoto != null ||
+                                  (user.profile ?? '').isNotEmpty;
+                              final action =
+                                  await showModalBottomSheet<_JobProfilePhotoAction>(
+                                context: context,
+                                backgroundColor: context.color.secondaryColor,
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.vertical(
+                                      top: Radius.circular(20)),
+                                ),
+                                builder: (ctx) => SafeArea(
+                                  top: false,
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        8, 12, 8, 16),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 42,
+                                          height: 4,
+                                          margin:
+                                              const EdgeInsets.only(bottom: 12),
+                                          decoration: BoxDecoration(
+                                            color: context.color.borderColor,
+                                            borderRadius:
+                                                BorderRadius.circular(2),
+                                          ),
+                                        ),
+                                        if (hasPhoto)
+                                          ListTile(
+                                            leading: const Icon(
+                                                Icons.visibility_outlined),
+                                            title:
+                                                const Text('View current photo'),
+                                            onTap: () => Navigator.pop(
+                                              ctx,
+                                              _JobProfilePhotoAction.view,
+                                            ),
+                                          ),
+                                        ListTile(
+                                          leading: const Icon(
+                                              Icons.photo_camera_outlined),
+                                          title: const Text('Take a new photo'),
+                                          onTap: () => Navigator.pop(
+                                            ctx,
+                                            _JobProfilePhotoAction.camera,
+                                          ),
+                                        ),
+                                        ListTile(
+                                          leading: const Icon(
+                                              Icons.photo_library_outlined),
+                                          title: const Text(
+                                              'Choose from your library'),
+                                          onTap: () => Navigator.pop(
+                                            ctx,
+                                            _JobProfilePhotoAction.gallery,
+                                          ),
+                                        ),
+                                        if (hasPhoto)
+                                          ListTile(
+                                            leading: const Icon(
+                                              Icons.delete_outline_rounded,
+                                              color: Colors.red,
+                                            ),
+                                            title: const Text(
+                                              'Remove photo',
+                                              style:
+                                                  TextStyle(color: Colors.red),
+                                            ),
+                                            onTap: () => Navigator.pop(
+                                              ctx,
+                                              _JobProfilePhotoAction.remove,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+
+                              if (!mounted || action == null) return;
+                              if (action == _JobProfilePhotoAction.view) {
+                                _showProfilePhotoViewDialog(
+                                  imageUrl: user.profile,
+                                  imageFile: selectedProfilePhoto,
+                                );
+                              } else if (action ==
+                                  _JobProfilePhotoAction.remove) {
+                                await _removeProfilePhoto();
+                                setSheetState(
+                                    () => selectedProfilePhoto = null);
+                              } else {
+                                final source = action ==
+                                        _JobProfilePhotoAction.camera
+                                    ? ImageSource.camera
+                                    : ImageSource.gallery;
+                                CropImage.init(context);
+                                final pickedPhoto =
+                                    await ImagePicker().pickImage(
+                                  source: source,
+                                );
+                                if (pickedPhoto == null || !mounted) return;
+                                final croppedPhoto = await CropImage.crop(
+                                  filePath: pickedPhoto.path,
+                                );
+                                if (croppedPhoto == null ||
+                                    !sheetContext.mounted) {
+                                  return;
+                                }
+                                setSheetState(
+                                  () => selectedProfilePhoto =
+                                      File(croppedPhoto.path),
+                                );
+                              }
+                            },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: context.color.backgroundColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: context.color.borderColor,
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: SizedBox(
+                                width: 76,
+                                height: 76,
+                                child: selectedProfilePhoto != null
+                                    ? Image.file(
+                                        selectedProfilePhoto!,
+                                        fit: BoxFit.cover,
+                                      )
+                                    : (user.profile ?? '').isNotEmpty
+                                        ? UiUtils.getImage(
+                                            user.profile!,
+                                            fit: BoxFit.cover,
+                                          )
+                                        : Container(
+                                            color:
+                                                context.color.secondaryColor,
+                                            child: Icon(
+                                              Icons.person_outline_rounded,
+                                              size: 34,
+                                              color: context
+                                                  .color.territoryColor,
+                                            ),
+                                          ),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    selectedProfilePhoto == null
+                                        ? 'Upload profile picture'
+                                        : 'New picture selected',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: context.color.textDefaultColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Tap to choose an image from your library',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: context.color.textLightColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              Icons.upload_outlined,
+                              color: context.color.territoryColor,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildFieldLabel('Profile summary'),
+                    TextFormField(
+                      controller: summaryController,
+                      minLines: 4,
+                      maxLines: 6,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: _inputDecoration(
+                        'Tell employers about your experience and strengths',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildFieldLabel('Availability to join'),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: isSaving
+                                ? null
+                                : () => setSheetState(() =>
+                                    selectedAvailability = 'Immediate'),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: selectedAvailability == 'Immediate'
+                                    ? const Color(0xFF10B981)
+                                        .withValues(alpha: 0.1)
+                                    : context.color.backgroundColor,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: selectedAvailability == 'Immediate'
+                                      ? const Color(0xFF10B981)
+                                      : context.color.borderColor,
+                                  width: selectedAvailability == 'Immediate'
+                                      ? 1.8
+                                      : 1.0,
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  Icon(
+                                    Icons.bolt_rounded,
+                                    color: selectedAvailability == 'Immediate'
+                                        ? const Color(0xFF10B981)
+                                        : context.color.textLightColor,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Immediate',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: selectedAvailability ==
+                                              'Immediate'
+                                          ? FontWeight.bold
+                                          : FontWeight.w600,
+                                      color: selectedAvailability ==
+                                              'Immediate'
+                                          ? const Color(0xFF10B981)
+                                          : context.color.textDefaultColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Ready to join now',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: context.color.textLightColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: InkWell(
+                            onTap: isSaving
+                                ? null
+                                : () => setSheetState(() =>
+                                    selectedAvailability =
+                                        'Actively Looking'),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: selectedAvailability ==
+                                        'Actively Looking'
+                                    ? const Color(0xFF2563EB)
+                                        .withValues(alpha: 0.1)
+                                    : context.color.backgroundColor,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: selectedAvailability ==
+                                          'Actively Looking'
+                                      ? const Color(0xFF2563EB)
+                                      : context.color.borderColor,
+                                  width: selectedAvailability ==
+                                          'Actively Looking'
+                                      ? 1.8
+                                      : 1.0,
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  Icon(
+                                    Icons.travel_explore_rounded,
+                                    color: selectedAvailability ==
+                                            'Actively Looking'
+                                        ? const Color(0xFF2563EB)
+                                        : context.color.textLightColor,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Actively Looking',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: selectedAvailability ==
+                                              'Actively Looking'
+                                          ? FontWeight.bold
+                                          : FontWeight.w600,
+                                      color: selectedAvailability ==
+                                              'Actively Looking'
+                                          ? const Color(0xFF2563EB)
+                                          : context.color.textDefaultColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Open to offers',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: context.color.textLightColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 22),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: isSaving
+                                ? null
+                                : () => Navigator.pop(sheetContext),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor:
+                                  context.color.textDefaultColor,
+                              side: BorderSide(
+                                color: context.color.borderColor,
+                              ),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 13),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(9),
+                              ),
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isSaving
+                                ? null
+                                : () async {
+                                    final profileName =
+                                        nameController.text.trim();
+                                    if (profileName.isEmpty) {
+                                      HelperUtils.showSnackBarMessage(
+                                        context,
+                                        'Please enter your profile name',
+                                        type: MessageType.warning,
+                                      );
+                                      return;
+                                    }
+
+                                    setSheetState(() => isSaving = true);
+                                    try {
+                                      final response =
+                                          await _jobRepository.saveUserDetail(
+                                        {
+                                          'name': profileName,
+                                          'profile_summary':
+                                              summaryController.text.trim(),
+                                          'job_status':
+                                              selectedAvailability ?? '',
+                                        },
+                                        profileFile: selectedProfilePhoto,
+                                      );
+                                      final refreshedUser =
+                                          await _jobRepository.fetchUserDetail();
+                                      final profileUrl =
+                                          _extractProfileUrl(refreshedUser) ??
+                                              _extractProfileUrl(response) ??
+                                              user.profile ??
+                                              '';
+
+                                      await HiveUtils.setUserData({
+                                        'name': profileName,
+                                        'profile': profileUrl,
+                                      });
+                                      if (!mounted) return;
+                                      setState(() {
+                                        _nameController.text = profileName;
+                                        _profileSummary =
+                                            summaryController.text.trim();
+                                        _jobAvailability =
+                                            selectedAvailability;
+                                        _profilePhotoPreview = null;
+                                      });
+                                      if (sheetContext.mounted) {
+                                        Navigator.pop(sheetContext);
+                                      }
+                                      HelperUtils.showSnackBarMessage(
+                                        context,
+                                        response['message']?.toString() ??
+                                            'Profile updated successfully',
+                                        type: MessageType.success,
+                                      );
+                                    } catch (error) {
+                                      if (mounted) {
+                                        HelperUtils.showSnackBarMessage(
+                                          context,
+                                          error.toString(),
+                                          type: MessageType.error,
+                                        );
+                                      }
+                                      if (sheetContext.mounted) {
+                                        setSheetState(
+                                          () => isSaving = false,
+                                        );
+                                      }
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor:
+                                  context.color.territoryColor,
+                              foregroundColor: Colors.white,
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 13),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(9),
+                              ),
+                            ),
+                            child: isSaving
+                                ? const SizedBox(
+                                    width: 19,
+                                    height: 19,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text('Save'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    nameController.dispose();
+    summaryController.dispose();
+  }
+
   // 6. "Add More Sections" Bottom Sheet
   // ---------------------------------------------------------------------------
   void _showAddMoreSectionsBottomSheet() {
+    final showLicence = _licencesList.isEmpty;
+    final showPortfolio = _portfoliosList.isEmpty;
+    final showReference = _referencesList.isEmpty;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: context.color.secondaryColor,
@@ -2249,52 +3646,72 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Item 1: Licences or Certificates
-              _buildAddSectionOption(
-                icon: Icons.military_tech_outlined,
-                title: "Licences or Certificates",
-                subtitle:
-                    "Add your skill based certifications eg: Safety Licence.",
-                onAdd: () {
-                  Navigator.pop(ctx);
-                  _showLicenceFormSheet();
-                },
-              ),
+              if (showLicence) ...[
+                _buildAddSectionOption(
+                  icon: Icons.military_tech_outlined,
+                  title: "Licences or Certificates",
+                  subtitle:
+                      "Add your skill based certifications eg: Safety Licence.",
+                  onAdd: () {
+                    Navigator.pop(ctx);
+                    _showLicenceFormSheet();
+                  },
+                ),
+                if (showPortfolio || showReference) ...[
+                  const SizedBox(height: 12),
+                  Divider(
+                      height: 1,
+                      color: context.color.borderColor.withValues(alpha: 0.4)),
+                  const SizedBox(height: 12),
+                ],
+              ],
 
-              const SizedBox(height: 12),
-              Divider(
-                  height: 1,
-                  color: context.color.borderColor.withValues(alpha: 0.4)),
-              const SizedBox(height: 12),
+              if (showPortfolio) ...[
+                _buildAddSectionOption(
+                  icon: Icons.link_rounded,
+                  title: "Portfolio",
+                  subtitle: "Add links to your online work projects.",
+                  onAdd: () {
+                    Navigator.pop(ctx);
+                    _showPortfolioFormSheet();
+                  },
+                ),
+                if (showReference) ...[
+                  const SizedBox(height: 12),
+                  Divider(
+                      height: 1,
+                      color: context.color.borderColor.withValues(alpha: 0.4)),
+                  const SizedBox(height: 12),
+                ],
+              ],
 
-              // Item 2: Portfolio
-              _buildAddSectionOption(
-                icon: Icons.link_rounded,
-                title: "Portfolio",
-                subtitle: "Add links to your online work projects.",
-                onAdd: () {
-                  Navigator.pop(ctx);
-                  _showPortfolioFormSheet();
-                },
-              ),
+              if (showReference) ...[
+                _buildAddSectionOption(
+                  icon: Icons.person_outline_rounded,
+                  title: "Reference",
+                  subtitle:
+                      "Add details of your previous employer for background and experience check.",
+                  onAdd: () {
+                    Navigator.pop(ctx);
+                    _showReferenceFormSheet();
+                  },
+                ),
+              ],
 
-              const SizedBox(height: 12),
-              Divider(
-                  height: 1,
-                  color: context.color.borderColor.withValues(alpha: 0.4)),
-              const SizedBox(height: 12),
-
-              // Item 3: Reference
-              _buildAddSectionOption(
-                icon: Icons.person_outline_rounded,
-                title: "Reference",
-                subtitle:
-                    "Add details of your previous employer for background and experience check.",
-                onAdd: () {
-                  Navigator.pop(ctx);
-                  _showReferenceFormSheet();
-                },
-              ),
+              if (!showLicence && !showPortfolio && !showReference) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: Text(
+                      "All sections have been added to your profile.",
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: context.color.textLightColor,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 16),
             ],
@@ -2366,9 +3783,10 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
   // ---------------------------------------------------------------------------
   // Licences, Portfolio & Reference Forms
   // ---------------------------------------------------------------------------
-  void _showLicenceFormSheet() {
-    final nameCtrl = TextEditingController();
-    final orgCtrl = TextEditingController();
+  void _showLicenceFormSheet({int? editIndex, Map<String, String>? initialData}) {
+    final nameCtrl = TextEditingController(text: initialData?['name'] ?? '');
+    final orgCtrl = TextEditingController(text: initialData?['org'] ?? '');
+    final isEditing = editIndex != null;
 
     showModalBottomSheet(
       context: context,
@@ -2390,7 +3808,7 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "Add Licence or Certificate",
+                isEditing ? "Edit Licence or Certificate" : "Add Licence or Certificate",
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -2401,8 +3819,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
               _buildFieldLabel("Course / Certificate Name *"),
               TextFormField(
                 controller: nameCtrl,
-                decoration: _inputDecoration(
-                    "e.g. AWS Certified Solutions Architect"),
+                decoration:
+                    _inputDecoration("e.g. AWS Certified Solutions Architect"),
               ),
               const SizedBox(height: 12),
               _buildFieldLabel("Issuing Organization"),
@@ -2436,19 +3854,32 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                             borderRadius: BorderRadius.circular(8)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      onPressed: () {
-                        if (nameCtrl.text.trim().isNotEmpty) {
+                      onPressed: () async {
+                        final licName = nameCtrl.text.trim();
+                        final licOrg = orgCtrl.text.trim();
+                        if (licName.isNotEmpty) {
+                          final licId = initialData?['id'] ??
+                              (editIndex != null &&
+                                      editIndex < _licencesList.length
+                                  ? _licencesList[editIndex]['id']
+                                  : null);
+                          final entry = {
+                            if (licId != null) 'id': licId,
+                            'name': licName,
+                            'org': licOrg,
+                          };
                           setState(() {
-                            _licencesList.add({
-                              'name': nameCtrl.text.trim(),
-                              'org': orgCtrl.text.trim(),
-                            });
+                            if (isEditing) {
+                              _licencesList[editIndex] = entry;
+                            } else {
+                              _licencesList.add(entry);
+                            }
                           });
                           Navigator.pop(ctx);
-                          HelperUtils.showSnackBarMessage(
-                            context,
-                            "Certificate added",
-                            type: MessageType.success,
+                          await _saveLicence(
+                            id: licId,
+                            courseName: licName,
+                            issuingOrg: licOrg,
                           );
                         }
                       },
@@ -2464,9 +3895,10 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
     );
   }
 
-  void _showPortfolioFormSheet() {
-    final nameCtrl = TextEditingController();
-    final linkCtrl = TextEditingController();
+  void _showPortfolioFormSheet({int? editIndex, Map<String, String>? initialData}) {
+    final nameCtrl = TextEditingController(text: initialData?['name'] ?? '');
+    final linkCtrl = TextEditingController(text: initialData?['link'] ?? '');
+    final isEditing = editIndex != null;
 
     showModalBottomSheet(
       context: context,
@@ -2488,7 +3920,7 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "Add Portfolio Project",
+                isEditing ? "Edit Portfolio Project" : "Add Portfolio Project",
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -2534,19 +3966,32 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                             borderRadius: BorderRadius.circular(8)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      onPressed: () {
-                        if (nameCtrl.text.trim().isNotEmpty) {
+                      onPressed: () async {
+                        final portName = nameCtrl.text.trim();
+                        final portLink = linkCtrl.text.trim();
+                        if (portName.isNotEmpty) {
+                          final portId = initialData?['id'] ??
+                              (editIndex != null &&
+                                      editIndex < _portfoliosList.length
+                                  ? _portfoliosList[editIndex]['id']
+                                  : null);
+                          final entry = {
+                            if (portId != null) 'id': portId,
+                            'name': portName,
+                            'link': portLink,
+                          };
                           setState(() {
-                            _portfoliosList.add({
-                              'name': nameCtrl.text.trim(),
-                              'link': linkCtrl.text.trim(),
-                            });
+                            if (isEditing) {
+                              _portfoliosList[editIndex] = entry;
+                            } else {
+                              _portfoliosList.add(entry);
+                            }
                           });
                           Navigator.pop(ctx);
-                          HelperUtils.showSnackBarMessage(
-                            context,
-                            "Portfolio added",
-                            type: MessageType.success,
+                          await _savePortfolio(
+                            id: portId,
+                            portfolioName: portName,
+                            portfolioLink: portLink,
                           );
                         }
                       },
@@ -2562,10 +4007,11 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
     );
   }
 
-  void _showReferenceFormSheet() {
-    final nameCtrl = TextEditingController();
-    final compCtrl = TextEditingController();
-    final emailCtrl = TextEditingController();
+  void _showReferenceFormSheet({int? editIndex, Map<String, String>? initialData}) {
+    final nameCtrl = TextEditingController(text: initialData?['name'] ?? '');
+    final compCtrl = TextEditingController(text: initialData?['company'] ?? '');
+    final emailCtrl = TextEditingController(text: initialData?['email'] ?? '');
+    final isEditing = editIndex != null;
 
     showModalBottomSheet(
       context: context,
@@ -2587,7 +4033,7 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "Add Reference",
+                isEditing ? "Edit Reference" : "Add Reference",
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -2639,20 +4085,35 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                             borderRadius: BorderRadius.circular(8)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      onPressed: () {
-                        if (nameCtrl.text.trim().isNotEmpty) {
+                      onPressed: () async {
+                        final refName = nameCtrl.text.trim();
+                        final refComp = compCtrl.text.trim();
+                        final refEmail = emailCtrl.text.trim();
+                        if (refName.isNotEmpty) {
+                          final refId = initialData?['id'] ??
+                              (editIndex != null &&
+                                      editIndex < _referencesList.length
+                                  ? _referencesList[editIndex]['id']
+                                  : null);
+                          final entry = {
+                            if (refId != null) 'id': refId,
+                            'name': refName,
+                            'company': refComp,
+                            'email': refEmail,
+                          };
                           setState(() {
-                            _referencesList.add({
-                              'name': nameCtrl.text.trim(),
-                              'company': compCtrl.text.trim(),
-                              'email': emailCtrl.text.trim(),
-                            });
+                            if (isEditing) {
+                              _referencesList[editIndex] = entry;
+                            } else {
+                              _referencesList.add(entry);
+                            }
                           });
                           Navigator.pop(ctx);
-                          HelperUtils.showSnackBarMessage(
-                            context,
-                            "Reference added",
-                            type: MessageType.success,
+                          await _saveReference(
+                            id: refId,
+                            refName: refName,
+                            refCompany: refComp,
+                            refEmail: refEmail,
                           );
                         }
                       },
@@ -2721,24 +4182,27 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
 
                           // Section 3: Experience Tile
                           _buildExperienceTile(),
-                          _buildTileDivider(),
 
-                          // Section 4: Skills Tile
-                          _buildSkillsTile(),
-                          _buildTileDivider(),
-
-                          // Section 5: Resume Tile
-                          _buildResumeTile(),
-                          _buildTileDivider(),
-
-                          // Section 6: Digital Profile Tile
-                          _buildDigitalProfileTile(),
-
-                          // Section 7+: Dynamic added sections (Licences, Portfolio, Reference)
+                          // Section 4: Licenses or Certificates Tile
                           if (_licencesList.isNotEmpty) ...[
                             _buildTileDivider(),
                             _buildLicencesTile(),
                           ],
+
+                          _buildTileDivider(),
+
+                          // Section 5: Skills Tile
+                          _buildSkillsTile(),
+                          _buildTileDivider(),
+
+                          // Section 6: Resume Tile
+                          _buildResumeTile(),
+                          _buildTileDivider(),
+
+                          // Section 7: Digital Profile Tile
+                          _buildDigitalProfileTile(),
+
+                          // Section 8+: Dynamic added sections (Portfolio, Reference)
                           if (_portfoliosList.isNotEmpty) ...[
                             _buildTileDivider(),
                             _buildPortfolioTile(),
@@ -2753,7 +4217,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
 
                     const SizedBox(height: 20),
 
-                    // 3. "Add More Sections" Button (opens Image 2 Sheet)
+                    // 3. "Add More Sections" Button – hidden when all sections are filled
+                    if (_hasAddableMoreSections)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: InkWell(
@@ -2846,40 +4311,168 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Avatar
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF334155) : Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.blue.withValues(alpha: 0.12),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: user.profile != null && user.profile!.isNotEmpty
-                      ? UiUtils.getImage(user.profile!, fit: BoxFit.cover)
-                      : const Icon(
-                          Icons.camera_alt_outlined,
-                          color: Color(0xFF2563EB),
-                          size: 28,
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned.fill(
+                      child: GestureDetector(
+                        onTap: _isUpdatingProfilePhoto
+                            ? null
+                            : _showProfilePhotoPicker,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color:
+                                isDark ? const Color(0xFF334155) : Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.blue.withValues(alpha: 0.12),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: _profilePhotoPreview != null
+                                ? Image.file(
+                                    _profilePhotoPreview!,
+                                    fit: BoxFit.cover,
+                                  )
+                                : user.profile != null &&
+                                        user.profile!.isNotEmpty
+                                    ? UiUtils.getImage(
+                                        user.profile!,
+                                        fit: BoxFit.cover,
+                                      )
+                                    : const Icon(
+                                        Icons.person_outline_rounded,
+                                        color: Color(0xFF2563EB),
+                                        size: 30,
+                                      ),
+                          ),
                         ),
+                      ),
+                    ),
+                    Positioned(
+                      right: -4,
+                      bottom: -4,
+                      child: GestureDetector(
+                        onTap: _isUpdatingProfilePhoto
+                            ? null
+                            : _showProfilePhotoPicker,
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2563EB),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt_rounded,
+                            size: 13,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (_isUpdatingProfilePhoto)
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Colors.black38,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: Text(
-                  userName,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: context.color.textDefaultColor,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      userName,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: context.color.textDefaultColor,
+                      ),
+                    ),
+                    if (_jobAvailability != null &&
+                        _jobAvailability!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: (_jobAvailability == 'Immediate' ||
+                                  _jobAvailability == 'Immediate Joiner')
+                              ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                              : const Color(0xFF2563EB).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: (_jobAvailability == 'Immediate' ||
+                                        _jobAvailability == 'Immediate Joiner')
+                                    ? const Color(0xFF10B981)
+                                    : const Color(0xFF2563EB),
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              _jobAvailability!,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: (_jobAvailability == 'Immediate' ||
+                                        _jobAvailability == 'Immediate Joiner')
+                                    ? const Color(0xFF10B981)
+                                    : const Color(0xFF2563EB),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (_profileSummary.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        _truncateSummaryWords(_profileSummary, 100),
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: context.color.textLightColor,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               PopupMenuButton<String>(
@@ -2887,31 +4480,31 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
                 onSelected: (value) {
-                  if (value == "share") {
-                    Share.share(
-                        "Check out $userName's Job Profile on ${Constant.appName}");
-                  } else if (value == "refresh") {
-                    _loadJobProfile();
+                  if (value == "addMore") {
+                    _showAddMoreSectionsBottomSheet();
+                  } else if (value == "edit") {
+                    _showEditJobProfileSheet();
                   }
                 },
                 itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: "share",
-                    child: Row(
-                      children: [
-                        Icon(Icons.share_outlined, size: 18),
-                        SizedBox(width: 10),
-                        Text("Share Profile"),
-                      ],
+                  if (_hasAddableMoreSections)
+                    const PopupMenuItem(
+                      value: "addMore",
+                      child: Row(
+                        children: [
+                          Icon(Icons.add_circle_outline_rounded, size: 18),
+                          SizedBox(width: 10),
+                          Text("Add More Sections"),
+                        ],
+                      ),
                     ),
-                  ),
                   const PopupMenuItem(
-                    value: "refresh",
+                    value: "edit",
                     child: Row(
                       children: [
-                        Icon(Icons.refresh_rounded, size: 18),
+                        Icon(Icons.edit_outlined, size: 18),
                         SizedBox(width: 10),
-                        Text("Refresh Details"),
+                        Text("Edit Profile"),
                       ],
                     ),
                   ),
@@ -2975,9 +4568,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 6,
-              backgroundColor: isDark
-                  ? const Color(0xFF334155)
-                  : const Color(0xFFDBEAFE),
+              backgroundColor:
+                  isDark ? const Color(0xFF334155) : const Color(0xFFDBEAFE),
               valueColor:
                   const AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
             ),
@@ -3150,6 +4742,10 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
             const SizedBox(height: 8),
             _buildInfoRow("Languages", languages),
           ],
+          if (_jobAvailability != null && _jobAvailability!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _buildInfoRow("Availability", _jobAvailability!),
+          ],
 
           // Any unselected field shows as an "+ Add" action
           if (_visaStatus == null || _visaStatus!.isEmpty) ...[
@@ -3202,16 +4798,877 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
             const SizedBox(height: 8),
             _buildAddClickable(
               label: "+ Add Languages",
-              onTap: () => _showSingleFieldBottomSheet(
-                title: "Languages",
-                fieldKey: "language",
-                currentValue: languages,
-              ),
+              onTap: _showLanguagesBottomSheet,
             ),
           ],
         ],
       ),
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Reusable Section Header & List Item Helpers (Premium Tile UI)
+  // ---------------------------------------------------------------------------
+  Widget _buildSectionHeader({
+    required String title,
+    VoidCallback? onAdd,
+    VoidCallback? onEdit,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: context.color.textDefaultColor,
+          ),
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (onAdd != null)
+              IconButton(
+                icon: const Icon(Icons.add, size: 20),
+                color: context.color.textLightColor,
+                splashRadius: 18,
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
+                onPressed: onAdd,
+              ),
+            if (onAdd != null && onEdit != null) const SizedBox(width: 14),
+            if (onEdit != null)
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                color: context.color.textLightColor,
+                splashRadius: 18,
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
+                onPressed: onEdit,
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildItemTile({
+    required IconData icon,
+    required Widget content,
+    VoidCallback? onEdit,
+    VoidCallback? onDelete,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Center(
+              child: Icon(
+                icon,
+                size: 22,
+                color: const Color(0xFF3B82F6),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: content),
+          if (onEdit != null || onDelete != null) ...[
+            const SizedBox(width: 6),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (onEdit != null)
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 16),
+                    color: context.color.textLightColor,
+                    splashRadius: 16,
+                    padding: const EdgeInsets.all(4),
+                    constraints: const BoxConstraints(),
+                    onPressed: onEdit,
+                  ),
+                if (onDelete != null) ...[
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded,
+                        size: 16, color: Colors.red),
+                    splashRadius: 16,
+                    padding: const EdgeInsets.all(4),
+                    constraints: const BoxConstraints(),
+                    onPressed: onDelete,
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Generic Manage List Bottom Sheet (Edit/Delete items from header edit icon)
+  // ---------------------------------------------------------------------------
+  void _showManageListSheet({
+    required String title,
+    required String addLabel,
+    required VoidCallback onAddNew,
+    required List<Widget> Function(
+            BuildContext sheetCtx, StateSetter setSheetState)
+        itemsBuilder,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.color.secondaryColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (sheetCtx, setSheetState) {
+            final items = itemsBuilder(sheetCtx, setSheetState);
+            return SafeArea(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: context.color.textDefaultColor,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.pop(sheetCtx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (items.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        child: Center(
+                          child: Text(
+                            "No items found",
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: context.color.textLightColor,
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: MediaQuery.of(context).size.height * 0.55,
+                        ),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: items,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: Text(addLabel),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: BorderSide(color: context.color.territoryColor),
+                          foregroundColor: context.color.territoryColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(sheetCtx);
+                          onAddNew();
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showManageQualificationsSheet() {
+    if (_qualificationsList.isEmpty) {
+      _showQualificationsBottomSheet();
+      return;
+    }
+
+    _showManageListSheet(
+      title: "Manage Qualifications",
+      addLabel: "Add New Qualification",
+      onAddNew: () => _showQualificationsBottomSheet(),
+      itemsBuilder: (sheetCtx, setSheetState) {
+        return List.generate(_qualificationsList.length, (index) {
+          final q = _qualificationsList[index];
+          final degree = q['degree']?.toString() ?? '';
+          final spec = q['specialization']?.toString() ?? '';
+          final uni = q['university_name']?.toString() ?? '';
+          final fromYear = q['graduation_from']?.toString() ?? '';
+          final toYear = q['graduation_to']?.toString() ?? '';
+
+          final titleText = degree.isNotEmpty ? degree : spec;
+          final subtitleText = uni.isNotEmpty ? uni : spec;
+          final yearsText = (fromYear.isNotEmpty || toYear.isNotEmpty)
+              ? "$fromYear - $toYear"
+              : "";
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: context.color.backgroundColor,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: context.color.borderColor.withValues(alpha: 0.7),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.school_outlined,
+                        size: 20, color: Color(0xFF3B82F6)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        titleText.isNotEmpty ? titleText : "Qualification",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: context.color.textDefaultColor,
+                        ),
+                      ),
+                      if (subtitleText.isNotEmpty && subtitleText != titleText)
+                        Text(
+                          subtitleText,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.color.textLightColor,
+                          ),
+                        ),
+                      if (yearsText.isNotEmpty)
+                        Text(
+                          yearsText,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: context.color.textLightColor,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  color: context.color.textLightColor,
+                  onPressed: () {
+                    Navigator.pop(sheetCtx);
+                    _showQualificationsBottomSheet(
+                      initialData: q,
+                      editIndex: index,
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded,
+                      size: 18, color: Colors.red),
+                  onPressed: () {
+                    setState(() {
+                      _qualificationsList.removeAt(index);
+                    });
+                    setSheetState(() {});
+                    _saveJobProfileData();
+                    if (_qualificationsList.isEmpty) {
+                      Navigator.pop(sheetCtx);
+                    }
+                  },
+                ),
+              ],
+            ),
+          );
+        });
+      },
+    );
+  }
+
+  void _showManageExperienceSheet() {
+    if (_experiencesList.isEmpty) {
+      _showExperienceBottomSheet();
+      return;
+    }
+
+    _showManageListSheet(
+      title: "Manage Experience",
+      addLabel: "Add New Experience",
+      onAddNew: () => _showExperienceBottomSheet(),
+      itemsBuilder: (sheetCtx, setSheetState) {
+        return List.generate(_experiencesList.length, (index) {
+          final exp = _experiencesList[index];
+          final isFresher = exp['fresher'] == 1 ||
+              exp['fresher'] == "1" ||
+              exp['fresher'] == true;
+          final title = exp['experience_job_titel']?.toString() ?? '';
+          final company = exp['experience_company']?.toString() ?? '';
+          final start = exp['experience_start_date']?.toString() ?? '';
+          final end = exp['experience_end_date']?.toString() ?? '';
+          final currentlyWorking = exp['currently_working'] == 1 ||
+              exp['currently_working'] == "1" ||
+              exp['currently_working'] == true;
+
+          final dateText =
+              (start.isNotEmpty || end.isNotEmpty || currentlyWorking)
+                  ? "$start - ${currentlyWorking ? 'Present' : end}"
+                  : "";
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: context.color.backgroundColor,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: context.color.borderColor.withValues(alpha: 0.7),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      isFresher
+                          ? Icons.school_outlined
+                          : Icons.work_outline_rounded,
+                      size: 20,
+                      color: const Color(0xFF3B82F6),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isFresher
+                            ? "Fresher"
+                            : (title.isNotEmpty ? title : "Experience"),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: context.color.textDefaultColor,
+                        ),
+                      ),
+                      if (company.isNotEmpty)
+                        Text(
+                          company,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.color.textLightColor,
+                          ),
+                        ),
+                      if (dateText.isNotEmpty)
+                        Text(
+                          dateText,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: context.color.textLightColor,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  color: context.color.textLightColor,
+                  onPressed: () {
+                    Navigator.pop(sheetCtx);
+                    _showExperienceBottomSheet(
+                      initialData: exp,
+                      editIndex: index,
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded,
+                      size: 18, color: Colors.red),
+                  onPressed: () {
+                    setState(() {
+                      _experiencesList.removeAt(index);
+                    });
+                    setSheetState(() {});
+                    _saveJobProfileData();
+                    if (_experiencesList.isEmpty) {
+                      Navigator.pop(sheetCtx);
+                    }
+                  },
+                ),
+              ],
+            ),
+          );
+        });
+      },
+    );
+  }
+
+  void _showManageLicencesSheet() {
+    if (_licencesList.isEmpty) {
+      _showLicenceFormSheet();
+      return;
+    }
+
+    _showManageListSheet(
+      title: "Manage Licenses & Certificates",
+      addLabel: "Add New License / Certificate",
+      onAddNew: _showLicenceFormSheet,
+      itemsBuilder: (sheetCtx, setSheetState) {
+        return List.generate(_licencesList.length, (index) {
+          final lic = _licencesList[index];
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: context.color.backgroundColor,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: context.color.borderColor.withValues(alpha: 0.7),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.lightbulb_outline_rounded,
+                        size: 20, color: Color(0xFF3B82F6)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        lic['name'] ?? 'Certificate',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: context.color.textDefaultColor,
+                        ),
+                      ),
+                      if (lic['org'] != null && lic['org']!.isNotEmpty)
+                        Text(
+                          lic['org']!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.color.textLightColor,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  color: context.color.textLightColor,
+                  onPressed: () {
+                    Navigator.pop(sheetCtx);
+                    _showLicenceFormSheet(
+                      editIndex: index,
+                      initialData: lic,
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded,
+                      size: 18, color: Colors.red),
+                  onPressed: () {
+                    setState(() => _licencesList.removeAt(index));
+                    setSheetState(() {});
+                    _saveJobProfileData();
+                    if (_licencesList.isEmpty) {
+                      Navigator.pop(sheetCtx);
+                    }
+                  },
+                ),
+              ],
+            ),
+          );
+        });
+      },
+    );
+  }
+
+  void _showManagePortfolioSheet() {
+    if (_portfoliosList.isEmpty) {
+      _showPortfolioFormSheet();
+      return;
+    }
+
+    _showManageListSheet(
+      title: "Manage Portfolio Links",
+      addLabel: "Add New Portfolio Link",
+      onAddNew: _showPortfolioFormSheet,
+      itemsBuilder: (sheetCtx, setSheetState) {
+        return List.generate(_portfoliosList.length, (index) {
+          final p = _portfoliosList[index];
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: context.color.backgroundColor,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: context.color.borderColor.withValues(alpha: 0.7),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.link_rounded,
+                        size: 20, color: Color(0xFF3B82F6)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        p['name'] ?? 'Portfolio',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: context.color.textDefaultColor,
+                        ),
+                      ),
+                      if (p['link'] != null && p['link']!.isNotEmpty)
+                        Text(
+                          p['link']!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF2563EB),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  color: context.color.textLightColor,
+                  onPressed: () {
+                    Navigator.pop(sheetCtx);
+                    _showPortfolioFormSheet(
+                      editIndex: index,
+                      initialData: p,
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded,
+                      size: 18, color: Colors.red),
+                  onPressed: () {
+                    setState(() => _portfoliosList.removeAt(index));
+                    setSheetState(() {});
+                    _saveJobProfileData();
+                    if (_portfoliosList.isEmpty) {
+                      Navigator.pop(sheetCtx);
+                    }
+                  },
+                ),
+              ],
+            ),
+          );
+        });
+      },
+    );
+  }
+
+  void _showManageReferenceSheet() {
+    if (_referencesList.isEmpty) {
+      _showReferenceFormSheet();
+      return;
+    }
+
+    _showManageListSheet(
+      title: "Manage References",
+      addLabel: "Add New Reference",
+      onAddNew: _showReferenceFormSheet,
+      itemsBuilder: (sheetCtx, setSheetState) {
+        return List.generate(_referencesList.length, (index) {
+          final ref = _referencesList[index];
+          final company = ref['company'] ?? ref['org'] ?? '';
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: context.color.backgroundColor,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: context.color.borderColor.withValues(alpha: 0.7),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.person_outline_rounded,
+                        size: 20, color: Color(0xFF3B82F6)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        ref['name'] ?? 'Reference',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: context.color.textDefaultColor,
+                        ),
+                      ),
+                      if (company.isNotEmpty)
+                        Text(
+                          company,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.color.textLightColor,
+                          ),
+                        ),
+                      if (ref['contact'] != null && ref['contact']!.isNotEmpty)
+                        Text(
+                          ref['contact']!,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: context.color.textLightColor,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  color: context.color.textLightColor,
+                  onPressed: () {
+                    Navigator.pop(sheetCtx);
+                    _showReferenceFormSheet(
+                      editIndex: index,
+                      initialData: ref,
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded,
+                      size: 18, color: Colors.red),
+                  onPressed: () {
+                    setState(() => _referencesList.removeAt(index));
+                    setSheetState(() {});
+                    _saveJobProfileData();
+                    if (_referencesList.isEmpty) {
+                      Navigator.pop(sheetCtx);
+                    }
+                  },
+                ),
+              ],
+            ),
+          );
+        });
+      },
+    );
+  }
+
+  Widget _buildWaveformGraphic() {
+    final heights = [
+      12.0,
+      20.0,
+      32.0,
+      16.0,
+      28.0,
+      40.0,
+      22.0,
+      36.0,
+      48.0,
+      26.0,
+      38.0,
+      18.0,
+      30.0,
+      42.0,
+      20.0,
+      34.0,
+      16.0,
+      24.0,
+      14.0
+    ];
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: heights.map((h) {
+        return Container(
+          width: 3,
+          height: h,
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          decoration: BoxDecoration(
+            color: const Color(0xFF3B82F6),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildResumeDocumentGraphic() {
+    return Container(
+      width: 48,
+      height: 58,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.withValues(alpha: 0.08),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 14,
+            height: 14,
+            decoration: const BoxDecoration(
+              color: Color(0xFFDBEAFE),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(width: 28, height: 2.5, color: const Color(0xFFCBD5E1)),
+          const SizedBox(height: 4),
+          Container(width: 22, height: 2.5, color: const Color(0xFFE2E8F0)),
+          const SizedBox(height: 4),
+          Container(width: 26, height: 2.5, color: const Color(0xFFE2E8F0)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _toggleAudioPlayback() async {
+    if (_audioIntroPath == null || _audioIntroPath!.isEmpty) return;
+
+    if (_isPlayingAudio) {
+      await _audioPlayer?.pause();
+      if (mounted) setState(() => _isPlayingAudio = false);
+      return;
+    }
+
+    _audioPlayer ??= AudioPlayer();
+    _audioPlayer!.onPlayerComplete.listen((_) {
+      if (mounted) setState(() => _isPlayingAudio = false);
+    });
+
+    try {
+      if (_audioIntroPath!.startsWith('http')) {
+        await _audioPlayer!.play(UrlSource(_audioIntroPath!));
+      } else {
+        await _audioPlayer!.play(DeviceFileSource(_audioIntroPath!));
+      }
+      if (mounted) setState(() => _isPlayingAudio = true);
+    } catch (e) {
+      HelperUtils.showSnackBarMessage(
+        context,
+        "Could not play audio: $e",
+        type: MessageType.error,
+      );
+    }
+  }
+
+  Future<void> _viewResume() async {
+    if (_resumeFile != null && _resumeFile!.existsSync()) {
+      try {
+        await OpenFilex.open(_resumeFile!.path);
+      } catch (_) {
+        HelperUtils.showSnackBarMessage(
+          context,
+          "Resume: ${_resumeFile!.path.split(Platform.pathSeparator).last}",
+          type: MessageType.success,
+        );
+      }
+    } else if (_existingResumeUrl != null && _existingResumeUrl!.isNotEmpty) {
+      final uri = Uri.parse(_existingResumeUrl!);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } else {
+      _pickResumeFile();
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -3221,71 +5678,49 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
     final hasQuals = _qualificationsList.isNotEmpty;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Qualifications",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: context.color.textDefaultColor,
-                ),
-              ),
-              InkWell(
-                onTap: () => _showQualificationsBottomSheet(),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.add_rounded,
-                        size: 18,
-                        color: context.color.territoryColor,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        "Add",
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: context.color.territoryColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+          _buildSectionHeader(
+            title: "Qualifications",
+            onAdd: () => _showQualificationsBottomSheet(),
+            onEdit: hasQuals ? _showManageQualificationsSheet : null,
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           if (!hasQuals) ...[
             InkWell(
               onTap: () => _showQualificationsBottomSheet(),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.school_outlined,
-                    size: 24,
-                    color: context.color.textLightColor,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      "Add your academic qualification details such as School, Undergrad and Post graduation degree.",
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        color: context.color.textLightColor,
-                        height: 1.4,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.school_outlined,
+                            size: 22, color: Color(0xFF3B82F6)),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        "+ Add Qualifications (Degree, College, Years)",
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: const Color(0xFF2563EB),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ] else ...[
@@ -3295,100 +5730,50 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                 final degree = q['degree']?.toString() ?? '';
                 final spec = q['specialization']?.toString() ?? '';
                 final uni = q['university_name']?.toString() ?? '';
-                final country = q['country']?.toString() ?? '';
                 final fromYear = q['graduation_from']?.toString() ?? '';
                 final toYear = q['graduation_to']?.toString() ?? '';
 
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: context.color.backgroundColor,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: context.color.borderColor.withValues(alpha: 0.6),
-                    ),
-                  ),
-                  child: Row(
+                final titleText = degree.isNotEmpty ? degree : spec;
+                final subtitleText = uni.isNotEmpty ? uni : spec;
+                final yearsText = (fromYear.isNotEmpty || toYear.isNotEmpty)
+                    ? "$fromYear - $toYear"
+                    : "";
+
+                return _buildItemTile(
+                  icon: Icons.school_outlined,
+                  content: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.school_outlined,
-                        size: 22,
-                        color: context.color.territoryColor,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (degree.isNotEmpty)
-                              Text(
-                                degree,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: context.color.textDefaultColor,
-                                ),
-                              ),
-                            if (spec.isNotEmpty)
-                              Text(
-                                spec,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: context.color.textDefaultColor,
-                                ),
-                              ),
-                            if (uni.isNotEmpty || country.isNotEmpty)
-                              Text(
-                                "$uni${uni.isNotEmpty && country.isNotEmpty ? ', ' : ''}$country",
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  color: context.color.textLightColor,
-                                ),
-                              ),
-                            if (fromYear.isNotEmpty || toYear.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2.0),
-                                child: Text(
-                                  "Graduation: $fromYear - $toYear",
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: context.color.textLightColor,
-                                  ),
-                                ),
-                              ),
-                          ],
+                      Text(
+                        titleText.isNotEmpty ? titleText : "Qualification",
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w600,
+                          color: context.color.textDefaultColor,
                         ),
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 18),
-                            color: context.color.textLightColor,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            onPressed: () => _showQualificationsBottomSheet(
-                              initialData: q,
-                              editIndex: index,
+                      if (subtitleText.isNotEmpty && subtitleText != titleText)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2.0),
+                          child: Text(
+                            subtitleText,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: context.color.textLightColor,
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline_rounded,
-                                size: 18, color: Colors.red),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            onPressed: () {
-                              setState(() {
-                                _qualificationsList.removeAt(index);
-                              });
-                              _saveJobProfileData();
-                            },
+                        ),
+                      if (yearsText.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2.0),
+                          child: Text(
+                            yearsText,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.color.textLightColor,
+                            ),
                           ),
-                        ],
-                      ),
+                        ),
                     ],
                   ),
                 );
@@ -3407,71 +5792,49 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
     final hasExps = _experiencesList.isNotEmpty;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Experience",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: context.color.textDefaultColor,
-                ),
-              ),
-              InkWell(
-                onTap: () => _showExperienceBottomSheet(),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.add_rounded,
-                        size: 18,
-                        color: context.color.territoryColor,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        "Add",
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: context.color.territoryColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+          _buildSectionHeader(
+            title: "Experience",
+            onAdd: () => _showExperienceBottomSheet(),
+            onEdit: hasExps ? _showManageExperienceSheet : null,
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           if (!hasExps) ...[
             InkWell(
               onTap: () => _showExperienceBottomSheet(),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.work_outline_rounded,
-                    size: 24,
-                    color: context.color.textLightColor,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      "Add your current and past work experiences.",
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        color: context.color.textLightColor,
-                        height: 1.4,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.work_outline_rounded,
+                            size: 22, color: Color(0xFF3B82F6)),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        "+ Add Work Experience",
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: const Color(0xFF2563EB),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ] else ...[
@@ -3481,132 +5844,74 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                 final isFresher = exp['fresher'] == 1 ||
                     exp['fresher'] == "1" ||
                     exp['fresher'] == true;
-                final title =
-                    exp['experience_job_titel']?.toString() ?? '';
-                final company =
-                    exp['experience_company']?.toString() ?? '';
-                final category =
-                    exp['experience_job_category']?.toString() ?? '';
-                final start =
-                    exp['experience_start_date']?.toString() ?? '';
-                final end =
-                    exp['experience_end_date']?.toString() ?? '';
+                final title = exp['experience_job_titel']?.toString() ?? '';
+                final company = exp['experience_company']?.toString() ?? '';
+                final start = exp['experience_start_date']?.toString() ?? '';
+                final end = exp['experience_end_date']?.toString() ?? '';
                 final currentlyWorking = exp['currently_working'] == 1 ||
                     exp['currently_working'] == "1" ||
                     exp['currently_working'] == true;
 
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: context.color.backgroundColor,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: context.color.borderColor.withValues(alpha: 0.6),
-                    ),
-                  ),
-                  child: Row(
+                final dateText =
+                    (start.isNotEmpty || end.isNotEmpty || currentlyWorking)
+                        ? "$start - ${currentlyWorking ? 'Present' : end}"
+                        : "";
+
+                return _buildItemTile(
+                  icon: isFresher
+                      ? Icons.school_outlined
+                      : Icons.work_outline_rounded,
+                  content: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        isFresher
-                            ? Icons.school_outlined
-                            : Icons.work_outline_rounded,
-                        size: 22,
-                        color: context.color.territoryColor,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (isFresher) ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF10B981)
-                                      .withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  "Fresher",
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF10B981),
-                                  ),
-                                ),
-                              ),
-                            ] else ...[
-                              if (title.isNotEmpty)
-                                Text(
-                                  title,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: context.color.textDefaultColor,
-                                  ),
-                                ),
-                              if (company.isNotEmpty)
-                                Text(
-                                  company,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: context.color.textDefaultColor,
-                                  ),
-                                ),
-                              if (category.isNotEmpty)
-                                Text(
-                                  category,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: context.color.textLightColor,
-                                  ),
-                                ),
-                              if (start.isNotEmpty || end.isNotEmpty || currentlyWorking)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2.0),
-                                  child: Text(
-                                    "$start - ${currentlyWorking ? 'Present' : end}",
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: context.color.textLightColor,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ],
+                      if (isFresher) ...[
+                        Text(
+                          "Fresher",
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w600,
+                            color: context.color.textDefaultColor,
+                          ),
                         ),
-                      ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 18),
+                        Text(
+                          "Looking for first job opportunity",
+                          style: TextStyle(
+                            fontSize: 12.5,
                             color: context.color.textLightColor,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            onPressed: () => _showExperienceBottomSheet(
-                              initialData: exp,
-                              editIndex: index,
+                          ),
+                        ),
+                      ] else ...[
+                        Text(
+                          title.isNotEmpty ? title : "Experience",
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w600,
+                            color: context.color.textDefaultColor,
+                          ),
+                        ),
+                        if (company.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2.0),
+                            child: Text(
+                              company,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: context.color.textLightColor,
+                              ),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline_rounded,
-                                size: 18, color: Colors.red),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            onPressed: () {
-                              setState(() {
-                                _experiencesList.removeAt(index);
-                              });
-                              _saveJobProfileData();
-                            },
+                        if (dateText.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2.0),
+                            child: Text(
+                              dateText,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: context.color.textLightColor,
+                              ),
+                            ),
                           ),
-                        ],
-                      ),
+                      ],
                     ],
                   ),
                 );
@@ -3619,524 +5924,756 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // 4. Skills Tile
+  // 4. Licenses or Certificates Tile
   // ---------------------------------------------------------------------------
-  Widget _buildSkillsTile() {
-    final hasSkills = _skillsList.isNotEmpty || _jobCategory != null;
+  Widget _buildLicencesTile() {
+    final hasLics = _licencesList.isNotEmpty;
 
-    return InkWell(
-      onTap: _showSkillsBottomSheet,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Skills",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: context.color.textDefaultColor,
-                  ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(
+            title: "Licenses or Certificates",
+            onAdd: _showLicenceFormSheet,
+            onEdit: hasLics ? _showManageLicencesSheet : null,
+          ),
+          const SizedBox(height: 12),
+          if (!hasLics) ...[
+            InkWell(
+              onTap: _showLicenceFormSheet,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.lightbulb_outline_rounded,
+                            size: 22, color: Color(0xFF3B82F6)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        "+ Add Licenses or Certificates",
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: const Color(0xFF2563EB),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                Icon(
-                  hasSkills ? Icons.edit_outlined : Icons.add_rounded,
-                  size: 20,
-                  color: context.color.textLightColor,
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.auto_graph_rounded,
-                  size: 24,
-                  color: hasSkills
-                      ? context.color.territoryColor
-                      : context.color.textLightColor,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: hasSkills
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (_jobCategory != null) ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
-                                margin: const EdgeInsets.only(bottom: 6),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF2563EB)
-                                      .withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  _jobCategory!,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF2563EB),
-                                  ),
-                                ),
-                              ),
-                            ],
-                            if (_skillsList.isNotEmpty)
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 6,
-                                children: _skillsList.map((s) {
-                                  return Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: context.color.backgroundColor,
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                          color: context.color.borderColor),
-                                    ),
-                                    child: Text(
-                                      s,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: context.color.textDefaultColor,
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                          ],
-                        )
-                      : Text(
-                          "Add your technical or soft skills such as Salesforce, Communication skills etc.",
+          ] else ...[
+            ...List.generate(_licencesList.length, (index) {
+              final lic = _licencesList[index];
+              return _buildItemTile(
+                icon: Icons.lightbulb_outline_rounded,
+                content: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      lic['name'] ?? 'Certificate',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w600,
+                        color: context.color.textDefaultColor,
+                      ),
+                    ),
+                    if (lic['org'] != null && lic['org']!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2.0),
+                        child: Text(
+                          lic['org']!,
                           style: TextStyle(
-                            fontSize: 13.5,
+                            fontSize: 12.5,
                             color: context.color.textLightColor,
-                            height: 1.4,
                           ),
                         ),
+                      ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            }),
           ],
-        ),
+        ],
       ),
     );
   }
 
   // ---------------------------------------------------------------------------
-  // 5. Resume Tile
+  // 5. Skills Tile
+  // ---------------------------------------------------------------------------
+  Widget _buildSkillsTile() {
+    final hasSkills = _skillsList.isNotEmpty || _jobCategory != null;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(
+            title: "Skills",
+            onEdit: _showSkillsBottomSheet,
+          ),
+          const SizedBox(height: 12),
+          if (!hasSkills) ...[
+            InkWell(
+              onTap: _showSkillsBottomSheet,
+              child: Text(
+                "+ Add skills (e.g. Flutter, React, Communication)",
+                style: TextStyle(
+                  fontSize: 13,
+                  color: const Color(0xFF2563EB),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ] else ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (_jobCategory != null && _jobCategory!.isNotEmpty)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFF2563EB).withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Text(
+                      _jobCategory!,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF2563EB),
+                      ),
+                    ),
+                  ),
+                ..._skillsList.map((s) {
+                  return Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: context.color.secondaryColor,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: context.color.borderColor.withValues(alpha: 0.8),
+                      ),
+                    ),
+                    child: Text(
+                      s,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: context.color.textDefaultColor,
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 6. Resume Tile
   // ---------------------------------------------------------------------------
   Widget _buildResumeTile() {
     final hasResume = _resumeFile != null ||
         (_existingResumeUrl != null && _existingResumeUrl!.isNotEmpty);
 
-    return InkWell(
-      onTap: _pickResumeFile,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Resume",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: context.color.textDefaultColor,
-                  ),
-                ),
-                Icon(
-                  hasResume ? Icons.edit_outlined : Icons.add_rounded,
-                  size: 20,
-                  color: context.color.textLightColor,
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.description_outlined,
-                  size: 24,
-                  color:
-                      hasResume ? Colors.green : context.color.textLightColor,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: hasResume
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _resumeFile != null
-                                  ? _resumeFile!.path
-                                      .split(Platform.pathSeparator)
-                                      .last
-                                  : "Uploaded Resume",
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.bold,
-                                color: context.color.textDefaultColor,
-                              ),
-                            ),
-                            if (_existingResumeUrl != null &&
-                                _existingResumeUrl!.isNotEmpty &&
-                                _resumeFile == null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4.0),
-                                child: InkWell(
-                                  onTap: () async {
-                                    final uri =
-                                        Uri.parse(_existingResumeUrl!);
-                                    if (await canLaunchUrl(uri)) {
-                                      await launchUrl(uri,
-                                          mode:
-                                              LaunchMode.externalApplication);
-                                    }
-                                  },
-                                  child: Text(
-                                    "Preview Uploaded Resume",
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: context.color.territoryColor,
-                                      fontWeight: FontWeight.bold,
-                                      decoration: TextDecoration.underline,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        )
-                      : Text(
-                          "Upload your most recent resume.",
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            color: context.color.textLightColor,
-                            height: 1.4,
-                          ),
-                        ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+    final fileName = _resumeFile != null
+        ? _resumeFile!.path.split(Platform.pathSeparator).last
+        : (_existingResumeUrl != null
+            ? _existingResumeUrl!.split('/').last
+            : "Resume.pdf");
 
-  // ---------------------------------------------------------------------------
-  // 6. Digital Profile Tile
-  // ---------------------------------------------------------------------------
-  Widget _buildDigitalProfileTile() {
-    final hasDigital = _audioIntroPath != null || _videoIntroPath != null;
-
-    return InkWell(
-      onTap: _showDigitalProfileBottomSheet,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Digital Profile",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: context.color.textDefaultColor,
-                  ),
-                ),
-                Icon(
-                  hasDigital ? Icons.edit_outlined : Icons.add_rounded,
-                  size: 20,
-                  color: context.color.textLightColor,
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.mic_none_rounded,
-                  size: 24,
-                  color: hasDigital
-                      ? const Color(0xFFE50914)
-                      : context.color.textLightColor,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: hasDigital
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (_audioIntroPath != null)
-                              Row(
-                                children: [
-                                  const Icon(Icons.mic,
-                                      size: 16, color: Color(0xFF2563EB)),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    "Audio Introduction Recorded",
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: context.color.textDefaultColor,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            if (_videoIntroPath != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4.0),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.videocam,
-                                        size: 16, color: Color(0xFFE50914)),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      "Video Introduction Recorded",
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: context.color.textDefaultColor,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        )
-                      : Text(
-                          "Add your audio and video introduction to grab potential employers attention.",
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            color: context.color.textLightColor,
-                            height: 1.4,
-                          ),
-                        ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Additional Dynamic Tiles (Licences, Portfolio, Reference)
-  // ---------------------------------------------------------------------------
-  Widget _buildLicencesTile() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Licences or Certificates",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: context.color.textDefaultColor,
+          _buildSectionHeader(
+            title: "Resume",
+            onEdit: _pickResumeFile,
+          ),
+          const SizedBox(height: 12),
+          if (hasResume) ...[
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: context.color.secondaryColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: context.color.borderColor.withValues(alpha: 0.7),
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.add, size: 20),
-                color: context.color.textLightColor,
-                constraints: const BoxConstraints(),
-                padding: EdgeInsets.zero,
-                onPressed: _showLicenceFormSheet,
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ..._licencesList.map((lic) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: Row(
+              child: Column(
                 children: [
-                  const Icon(Icons.military_tech_outlined,
-                      size: 20, color: Color(0xFF2563EB)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  // Top Banner Graphic
+                  Container(
+                    width: double.infinity,
+                    height: 80,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEFF6FF),
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(12)),
+                    ),
+                    child: Center(
+                      child: _buildResumeDocumentGraphic(),
+                    ),
+                  ),
+                  // Bottom info row + View button
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    child: Row(
                       children: [
-                        Text(
-                          lic['name'] ?? '',
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.bold,
-                            color: context.color.textDefaultColor,
+                        const Icon(
+                          Icons.description_outlined,
+                          color: Color(0xFF2563EB),
+                          size: 24,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "Resume",
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                fileName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: context.color.textLightColor,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        if (lic['org'] != null && lic['org']!.isNotEmpty)
-                          Text(
-                            lic['org']!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.color.textLightColor,
+                        const SizedBox(width: 8),
+                        OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 6),
+                            minimumSize: const Size(0, 32),
+                            side: BorderSide(color: context.color.borderColor),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
                           ),
+                          onPressed: _viewResume,
+                          child: Text(
+                            "View",
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                              color: context.color.textDefaultColor,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
-            );
-          }),
+            ),
+          ] else ...[
+            InkWell(
+              onTap: _pickResumeFile,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                decoration: BoxDecoration(
+                  color: context.color.backgroundColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: context.color.borderColor.withValues(alpha: 0.8),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(Icons.cloud_upload_outlined,
+                        size: 28, color: Color(0xFF3B82F6)),
+                    const SizedBox(height: 6),
+                    Text(
+                      "+ Upload Resume (PDF, DOCX)",
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: context.color.textDefaultColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildPortfolioTile() {
+  // ---------------------------------------------------------------------------
+  // 7. Digital Profile Tile
+  // ---------------------------------------------------------------------------
+  Widget _buildDigitalProfileTile() {
+    final hasAudio = _audioIntroPath != null && _audioIntroPath!.isNotEmpty;
+    final hasVideo = _videoIntroPath != null && _videoIntroPath!.isNotEmpty;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Portfolio",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: context.color.textDefaultColor,
+          _buildSectionHeader(
+            title: "Digital Profile",
+            onEdit: _showDigitalProfileBottomSheet,
+          ),
+          const SizedBox(height: 12),
+
+          // Audio Profile Card
+          if (hasAudio) ...[
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: context.color.secondaryColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: context.color.borderColor.withValues(alpha: 0.7),
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.add, size: 20),
-                color: context.color.textLightColor,
-                constraints: const BoxConstraints(),
-                padding: EdgeInsets.zero,
-                onPressed: _showPortfolioFormSheet,
+              child: Column(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    height: 70,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEFF6FF),
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(12)),
+                    ),
+                    child: Center(
+                      child: _buildWaveformGraphic(),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.mic_none_rounded,
+                          color: Color(0xFF2563EB),
+                          size: 22,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "Audio Profile",
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                "Voice Introduction",
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: context.color.textLightColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        InkWell(
+                          onTap: _toggleAudioPlayback,
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF1E293B),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              _isPlayingAudio
+                                  ? Icons.pause_rounded
+                                  : Icons.play_arrow_rounded,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ..._portfoliosList.map((p) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          // Video Profile Tile / Add Video
+          if (hasVideo) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: context.color.secondaryColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: context.color.borderColor.withValues(alpha: 0.7),
+                ),
+              ),
               child: Row(
                 children: [
-                  const Icon(Icons.link_rounded,
-                      size: 20, color: Color(0xFF2563EB)),
-                  const SizedBox(width: 10),
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.videocam_rounded,
+                          size: 22, color: Color(0xFF3B82F6)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        const Text(
+                          "Video Profile",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         Text(
-                          p['name'] ?? '',
+                          "Video Introduction Recorded",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.color.textLightColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.refresh, size: 18),
+                    color: context.color.textLightColor,
+                    onPressed: _showDigitalProfileBottomSheet,
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            InkWell(
+              onTap: () async {
+                final result = await Navigator.push(
+                  context,
+                  IntroductionRecordingScreen.route(RecordingType.video),
+                );
+                if (result != null && result is Map) {
+                  final path = result['filePath']?.toString();
+                  setState(() {
+                    _videoIntroPath = path;
+                  });
+                  HiveUtils.setVideoIntroPath(path);
+                  await _saveJobProfileData();
+                }
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: context.color.secondaryColor,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: context.color.borderColor.withValues(alpha: 0.7),
+                  ),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add,
+                            size: 18, color: context.color.textDefaultColor),
+                        const SizedBox(width: 6),
+                        Text(
+                          "Add Video",
                           style: TextStyle(
                             fontSize: 13.5,
                             fontWeight: FontWeight.bold,
                             color: context.color.textDefaultColor,
                           ),
                         ),
-                        if (p['link'] != null && p['link']!.isNotEmpty)
-                          Text(
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Add video to grab potential employer attention",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.color.textLightColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 8. Portfolio Tile
+  // ---------------------------------------------------------------------------
+  Widget _buildPortfolioTile() {
+    final hasPorts = _portfoliosList.isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(
+            title: "Portfolio",
+            onAdd: _showPortfolioFormSheet,
+            onEdit: hasPorts ? _showManagePortfolioSheet : null,
+          ),
+          const SizedBox(height: 12),
+          if (!hasPorts) ...[
+            InkWell(
+              onTap: _showPortfolioFormSheet,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.link_rounded,
+                            size: 22, color: Color(0xFF3B82F6)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        "+ Add Portfolio Link (GitHub, Behance, Website)",
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: const Color(0xFF2563EB),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ] else ...[
+            ...List.generate(_portfoliosList.length, (index) {
+              final p = _portfoliosList[index];
+              return _buildItemTile(
+                icon: Icons.link_rounded,
+                content: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      p['name'] ?? 'Portfolio',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w600,
+                        color: context.color.textDefaultColor,
+                      ),
+                    ),
+                    if (p['link'] != null && p['link']!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2.0),
+                        child: InkWell(
+                          onTap: () async {
+                            final raw = p['link']!;
+                            final url = raw.startsWith('http')
+                                ? raw
+                                : 'https://$raw';
+                            final uri = Uri.parse(url);
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri,
+                                  mode: LaunchMode.externalApplication);
+                            }
+                          },
+                          child: Text(
                             p['link']!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.color.territoryColor,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: Color(0xFF2563EB),
                               decoration: TextDecoration.underline,
                             ),
                           ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }),
+          ],
         ],
       ),
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // 9. Reference Tile
+  // ---------------------------------------------------------------------------
   Widget _buildReferenceTile() {
+    final hasRefs = _referencesList.isNotEmpty;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Reference",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: context.color.textDefaultColor,
+          _buildSectionHeader(
+            title: "Reference",
+            onAdd: _showReferenceFormSheet,
+            onEdit: hasRefs ? _showManageReferenceSheet : null,
+          ),
+          const SizedBox(height: 12),
+          if (!hasRefs) ...[
+            InkWell(
+              onTap: _showReferenceFormSheet,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.person_outline_rounded,
+                            size: 22, color: Color(0xFF3B82F6)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        "+ Add Reference",
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: const Color(0xFF2563EB),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.add, size: 20),
-                color: context.color.textLightColor,
-                constraints: const BoxConstraints(),
-                padding: EdgeInsets.zero,
-                onPressed: _showReferenceFormSheet,
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ..._referencesList.map((ref) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: Row(
-                children: [
-                  const Icon(Icons.person_outline_rounded,
-                      size: 20, color: Color(0xFF2563EB)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          ref['name'] ?? '',
+            ),
+          ] else ...[
+            ...List.generate(_referencesList.length, (index) {
+              final ref = _referencesList[index];
+              return _buildItemTile(
+                icon: Icons.person_outline_rounded,
+                content: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      ref['name'] ?? 'Reference',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w600,
+                        color: context.color.textDefaultColor,
+                      ),
+                    ),
+                    if (ref['company'] != null && ref['company']!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2.0),
+                        child: Text(
+                          ref['company']!,
                           style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.bold,
-                            color: context.color.textDefaultColor,
+                            fontSize: 12.5,
+                            color: context.color.textLightColor,
                           ),
                         ),
-                        if (ref['company'] != null &&
-                            ref['company']!.isNotEmpty)
-                          Text(
-                            ref['company']!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.color.textLightColor,
-                            ),
+                      )
+                    else if (ref['org'] != null && ref['org']!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2.0),
+                        child: Text(
+                          ref['org']!,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: context.color.textLightColor,
                           ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
+                        ),
+                      ),
+                    if (ref['contact'] != null && ref['contact']!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2.0),
+                        child: Text(
+                          ref['contact']!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.color.textLightColor,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }),
+          ],
         ],
       ),
     );
@@ -4217,8 +6754,7 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
       ),
       filled: true,
       fillColor: context.color.backgroundColor,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: BorderSide(

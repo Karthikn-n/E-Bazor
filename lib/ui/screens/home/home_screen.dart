@@ -15,6 +15,7 @@ import 'package:Ebozor/data/cubits/home/fetch_home_screen_cubit.dart';
 import 'package:Ebozor/data/cubits/favorite/favorite_cubit.dart';
 
 import 'package:Ebozor/data/model/home/home_screen_section.dart';
+import 'package:Ebozor/data/repositories/job_repository.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_keys.dart';
 import 'package:Ebozor/utils/constant.dart';
@@ -50,7 +51,7 @@ import 'package:Ebozor/ui/screens/home/widgets/home_shimmers.dart';
 import 'package:Ebozor/ui/screens/home/slider_widget.dart';
 import 'package:Ebozor/ui/screens/home/widgets/verification_banner.dart';
 
-const double sidePadding =12;
+const double sidePadding = 12;
 
 class HomeScreen extends StatefulWidget {
   final String? from;
@@ -96,6 +97,21 @@ class HomeScreenState extends State<HomeScreen>
         state: HiveUtils.getStateName());
   }
 
+  Future<void> _refreshUserVerificationStatus() async {
+    final userDetail = await JobRepository().fetchUserDetail();
+    if (userDetail == null || !userDetail.containsKey('is_verified')) return;
+
+    final rawStatus = userDetail['is_verified'];
+    final isVerified = rawStatus == true ||
+            rawStatus == 1 ||
+            rawStatus?.toString().toLowerCase() == 'true' ||
+            rawStatus?.toString() == '1'
+        ? 1
+        : 0;
+    await HiveUtils.setUserData({'is_verified': isVerified});
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     initializeSettings();
@@ -110,6 +126,7 @@ class HomeScreenState extends State<HomeScreen>
     _refreshData();
 
     if (HiveUtils.isUserAuthenticated()) {
+      _refreshUserVerificationStatus();
       context.read<FavoriteCubit>().getFavorite();
       //fetchApiKeys();
       context.read<GetBuyerChatListCubit>().fetch();
@@ -135,7 +152,8 @@ class HomeScreenState extends State<HomeScreen>
       }
     });
 
-    _userBoxSubscription = Hive.box(HiveKeys.userDetailsBox).watch().listen((event) {
+    _userBoxSubscription =
+        Hive.box(HiveKeys.userDetailsBox).watch().listen((event) {
       if (event.key == HiveKeys.city ||
           event.key == HiveKeys.stateKey ||
           event.key == HiveKeys.countryKey ||
@@ -176,7 +194,7 @@ class HomeScreenState extends State<HomeScreen>
     context.read<GetApiKeysCubit>().fetch();
   }
 
- /*void pageScrollListener() {
+  /*void pageScrollListener() {
     ///This will load data on page end
     if (homeScreenController.isEndReached()) {
       if (mounted) {
@@ -196,7 +214,7 @@ class HomeScreenState extends State<HomeScreen>
 
     return SafeArea(
       child: Scaffold(
-     /*   appBar: AppBar(
+        /*   appBar: AppBar(
           elevation: 0,
           leadingWidth: double.maxFinite,
           leading: Padding(
@@ -222,7 +240,6 @@ class HomeScreenState extends State<HomeScreen>
               children: [
                 BlocBuilder<FetchHomeScreenCubit, FetchHomeScreenState>(
                   builder: (context, state) {
-
                     if (state is FetchHomeScreenInProgress) {
                       return shimmerEffect();
                     }
@@ -230,13 +247,12 @@ class HomeScreenState extends State<HomeScreen>
                       return Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-     // seach widget at home scree
+                          // seach widget at home scree
                           const HomeSearchField(),
-                          const SliderWidget(),
+                          // const SliderWidget(),
                           const CategoryWidgetHome(),
-                          if(HiveUtils.isUserAuthenticated() && HiveUtils.getUserDetails().isVerified != 1)...[
+                          if (HiveUtils.isUserAuthenticated())
                             const VerificationBanner(),
-                          ],
                           ...List.generate(state.sections.length, (index) {
                             HomeScreenSection section = state.sections[index];
                             if (state.sections.isNotEmpty) {
@@ -264,8 +280,7 @@ class HomeScreenState extends State<HomeScreen>
                       );
                     }
 
-                    if(state is FetchHomeScreenFail)
-                    {
+                    if (state is FetchHomeScreenFail) {
                       print('hey bro ${state.error}');
                     }
                     return SizedBox.shrink();
@@ -473,7 +488,6 @@ class HomeScreenState extends State<HomeScreen>
   Widget sliderWidget() {
     return BlocConsumer<SliderCubit, SliderState>(
       listener: (context, state) {
-
         if (state is SliderFetchSuccess) {
           setState(() {});
         }
@@ -487,7 +501,6 @@ class HomeScreenState extends State<HomeScreen>
           return Container();
         }
         if (state is SliderFetchSuccess) {
-        
           if (state.sliderlist.isNotEmpty) {
             return const SliderWidget();
           }
@@ -519,7 +532,9 @@ class AllItemsWidget extends StatelessWidget {
                     start: sidePadding,
                     end: sidePadding,
                   ),
-                  child: Text("recentAds".translate(context).isNotEmpty ? "recentAds".translate(context) : "Recent Ads")
+                  child: Text("recentAds".translate(context).isNotEmpty
+                          ? "recentAds".translate(context)
+                          : "Recent Ads")
                       .size(context.font.large)
                       .bold(weight: FontWeight.bold)
                       .color(context.color.textColorDark),
@@ -582,8 +597,6 @@ class AllItemsWidget extends StatelessWidget {
     );
   }
 }
-
-
 
 Future<void> notificationPermissionChecker() async {
   if (!(await Permission.notification.isGranted)) {

@@ -1,5 +1,6 @@
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/category/fetch_category_cubit.dart';
+import 'package:Ebozor/data/model/property_filter_category_resolver.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -30,16 +31,16 @@ class CategoryWidgetHome extends StatelessWidget {
           }
 
           return Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             child: GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: state.categories.length,
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-                childAspectRatio: 0.8,
+                // crossAxisSpacing: 6,
+                // mainAxisSpacing: 6,
+                childAspectRatio: 1,
               ),
               itemBuilder: (context, index) {
                 final category = state.categories[index];
@@ -48,17 +49,9 @@ class CategoryWidgetHome extends StatelessWidget {
                   title: category.name ?? "",
                   url: category.url ?? "",
                   onTap: () {
-                    const filterCategoryIds = [65, 68, 139, 143];
-
                     /// ✅ FILTER PAGE FOR PROPERTY
-                    if (filterCategoryIds.contains(category.id) ||
-                        (category.name != null &&
-                            (category.name!
-                                    .toLowerCase()
-                                    .contains("property") ||
-                                category.name!
-                                    .toLowerCase()
-                                    .contains("properties")))) {
+                    if (PropertyFilterCategoryResolver.isPropertyCategory(
+                        category)) {
                       Navigator.pushNamed(
                         context,
                         Routes.filterpage,
@@ -103,39 +96,38 @@ class CategoryWidgetHome extends StatelessWidget {
 
   Widget _buildShimmerGrid(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        itemCount: 9,
+        itemCount: 6,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 3,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          childAspectRatio: 0.8,
+          childAspectRatio: 1,
         ),
         itemBuilder: (context, index) {
           return Card(
             elevation: 0.5,
             color: context.color.secondaryColor,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   CustomShimmer(
-                    width: 52,
-                    height: 52,
-                    borderRadius: 26,
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 6),
                   CustomShimmer(
-                    width: 60,
-                    height: 12,
-                    borderRadius: 6,
+                    width: 48,
+                    height: 8,
+                    borderRadius: 4,
                   ),
                 ],
               ),

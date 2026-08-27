@@ -137,6 +137,8 @@ class VerificationFieldModel {
   String? status;
   dynamic values;
 
+  int? get isRequired => required;
+
   VerificationFieldModel({
     this.id,
     this.name,

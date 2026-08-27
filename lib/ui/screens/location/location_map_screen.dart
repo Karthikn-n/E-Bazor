@@ -57,6 +57,9 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
   bool _initialLocationSet = false;
   String? from;
 
+  bool get _returnsLocationSelection =>
+      from == "addItem" || from == "filter";
+
   @override
   void initState() {
     super.initState();
@@ -692,7 +695,7 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                             child: UiUtils.buildButton(
                               context,
                               onPressed: () async {
-                                if (from == "addItem") {
+                                if (_returnsLocationSelection) {
                                   if (formatedAddress != null) {
                                     Navigator.pop(context, {
                                       "area_id": formatedAddress!.areaId,

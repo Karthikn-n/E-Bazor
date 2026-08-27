@@ -128,12 +128,10 @@ class FetchSectionItemsCubit extends Cubit<FetchSectionItemsState>
   }
 
   FetchSectionItemsState? fromJson(Map<String, dynamic> json) {
-    // TODO: implement fromJson
     return null;
   }
 
   Map<String, dynamic>? toJson(FetchSectionItemsState state) {
-    // TODO: implement toJson
     return null;
   }
 }

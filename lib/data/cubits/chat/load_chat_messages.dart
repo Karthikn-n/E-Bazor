@@ -3,9 +3,8 @@
 import 'package:Ebozor/data/repositories/chat_repository.dart';
 import 'package:Ebozor/data/model/data_output.dart';
 import 'package:Ebozor/ui/screens/chat/chat_audio/widgets/chat_widget.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-
 
 class LoadChatMessagesState {}
 
@@ -59,25 +58,59 @@ class LoadChatMessagesFailed extends LoadChatMessagesState {
   });
 }
 
-class LoadChatMessagesCubit extends Cubit<LoadChatMessagesState>{
+class LoadChatMessagesCubit extends Cubit<LoadChatMessagesState> {
   LoadChatMessagesCubit() : super(LoadChatMessagesInitial());
   final ChatRepostiory _chatRepostiory = ChatRepostiory();
 
   Future<void> load({required int itemOfferId}) async {
     try {
       emit(LoadChatMessagesInProgress());
-      DataOutput<ChatMessage> result = await _chatRepostiory.getMessagesApi(
+      final result = await _chatRepostiory.getMessagesApi(
         itemOfferId: itemOfferId,
         page: 1,
       );
 
+      var messages = List<ChatMessage>.of(result.modelList);
+      var currentPage = 1;
       emit(LoadChatMessagesSuccess(
-        messages: result.modelList,
-        currentPage: 1,
+        messages: messages,
+        currentPage: currentPage,
         itemOfferId: itemOfferId,
-        isLoadingMore: false,
+        isLoadingMore: messages.length < result.total,
         totalPage: result.total,
       ));
+
+      // Render the newest page immediately, then hydrate the rest of the
+      // thread without requiring the user to scroll to trigger every page.
+      while (messages.length < result.total) {
+        try {
+          final nextPage = await _chatRepostiory.getMessagesApi(
+            itemOfferId: itemOfferId,
+            page: currentPage + 1,
+          );
+          if (nextPage.modelList.isEmpty) break;
+
+          final merged = _mergeMessages(messages, nextPage.modelList);
+          if (merged.length == messages.length) break;
+
+          messages = merged;
+          currentPage++;
+          emit(LoadChatMessagesSuccess(
+            messages: messages,
+            currentPage: currentPage,
+            itemOfferId: itemOfferId,
+            isLoadingMore: messages.length < result.total,
+            totalPage: result.total,
+          ));
+        } catch (_) {
+          break;
+        }
+      }
+
+      if (state is LoadChatMessagesSuccess &&
+          (state as LoadChatMessagesSuccess).isLoadingMore) {
+        emit((state as LoadChatMessagesSuccess).copyWith(isLoadingMore: false));
+      }
     } catch (e) {
       emit(LoadChatMessagesFailed(error: e.toString()));
     }
@@ -98,10 +131,11 @@ class LoadChatMessagesCubit extends Cubit<LoadChatMessagesState>{
         LoadChatMessagesSuccess messagesSuccessState =
             (state as LoadChatMessagesSuccess);
 
-        messagesSuccessState.messages.addAll(result.modelList);
+        final mergedMessages =
+            _mergeMessages(messagesSuccessState.messages, result.modelList);
 
         emit(LoadChatMessagesSuccess(
-          messages: messagesSuccessState.messages,
+          messages: mergedMessages,
           currentPage: (state as LoadChatMessagesSuccess).currentPage + 1,
           itemOfferId: (state as LoadChatMessagesSuccess).itemOfferId,
           isLoadingMore: false,
@@ -121,8 +155,26 @@ class LoadChatMessagesCubit extends Cubit<LoadChatMessagesState>{
     return false;
   }
 
+  List<ChatMessage> _mergeMessages(
+    List<ChatMessage> current,
+    List<ChatMessage> incoming,
+  ) {
+    final existingKeys = current
+        .map((message) => message.key)
+        .whereType<ValueKey>()
+        .map((key) => key.value)
+        .toSet();
+    return <ChatMessage>[
+      ...current,
+      ...incoming.where(
+        (message) =>
+            message.key is! ValueKey ||
+            !existingKeys.contains((message.key as ValueKey).value),
+      ),
+    ];
+  }
+
   LoadChatMessagesState? fromJson(Map<String, dynamic> json) {
-    // TODO: implement fromJson
     return null;
   }
 

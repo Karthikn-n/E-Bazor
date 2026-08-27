@@ -1,3 +1,4 @@
+import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/ui/screens/home/home_screen.dart';
@@ -23,7 +24,6 @@ import 'dart:ui' as ui;
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:Ebozor/utils/constant.dart';
-import 'package:Ebozor/ui/screens/widgets/errors/no_data_found.dart';
 import 'package:Ebozor/ui/screens/widgets/shimmerLoadingContainer.dart';
 
 class SellerProfileScreen extends StatefulWidget {
@@ -112,213 +112,235 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    print("_tabController.index***${_tabController.index}");
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        backgroundColor: context.color.backgroundColor,
-        body: NestedScrollView(
-          //controller: _tabController.index == 0 ? controller : reviewController,
-          headerSliverBuilder: (context, innerBoxIsScrolled) => [
-            SliverAppBar(
-              leading: Material(
-                clipBehavior: Clip.antiAlias,
-                color: Colors.transparent,
-                type: MaterialType.circle,
-                child: InkWell(
-                  onTap: () {
-                    Navigator.pop(context);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(18.0),
-                    child: Directionality(
-                      textDirection: Directionality.of(context),
-                      child: RotatedBox(
-                        quarterTurns:
-                            Directionality.of(context) == ui.TextDirection.rtl
-                                ? 2
-                                : -4,
-                        child: UiUtils.getSvg(AppIcons.arrowLeft,
-                            fit: BoxFit.none,
-                            color: context.color.textDefaultColor),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              //automaticallyImplyLeading: false,
-              pinned: true,
-              actions: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 14.0),
-                  child: Center(
-                    child: InkWell(
-                      onTap: () {
-                        Share.share(
-                            "Check out ${widget.model.name ?? 'Seller'}'s profile on ${Constant.appName}");
-                      },
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: context.color.borderColor
-                                .withValues(alpha: 0.8),
-                            width: 1.2,
-                          ),
-                        ),
-                        child: Icon(
-                          Icons.share_outlined,
-                          size: 20,
-                          color: context.color.textDefaultColor,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+  double? get _sellerRating {
+    final value = widget.rating ?? widget.model.averageRating;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
+  }
 
-              expandedHeight: (widget.model.createdAt != null &&
-                      widget.model.createdAt != '')
-                  ? context.screenHeight / 2.3
-                  : context.screenHeight / 2.9,
-              backgroundColor: context.color.secondaryColor,
-              flexibleSpace: FlexibleSpaceBar(
-                background: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        height: 100.rh(context),
-                      ),
-                      SizedBox(
-                          height: 95.rh(context),
-                          width: 95.rw(context),
-                          child: ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: widget.model.profile != null
-                                  ? UiUtils.getImage(widget.model.profile!,
-                                      fit: BoxFit.fill)
-                                  : UiUtils.getSvg(
-                                      AppIcons.defaultPersonLogo,
-                                      color: context.color.territoryColor,
-                                      fit: BoxFit.none,
-                                    ))),
-                      SizedBox(
-                        height: 7,
-                      ),
-                      Text(widget.model.name!)
-                          .bold()
-                          .color(context.color.textDefaultColor),
-                      if (widget.model.createdAt != null &&
-                          widget.model.createdAt != '') ...[
-                        SizedBox(
-                          height: 7,
-                        ),
-                        Text("${"memberSince".translate(context)}\t${UiUtils.monthYearDate(widget.model.createdAt!)}")
-                            .bold(weight: FontWeight.w400)
-                            .color(context.color.textDefaultColor),
-                      ],
-                      if (widget.rating != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: RichText(
-                            text: TextSpan(
-                              children: [
-                                WidgetSpan(
-                                  child: Icon(Icons.star_rounded,
-                                      size: 18,
-                                      color: context
-                                          .color.textDefaultColor), // Star icon
-                                ),
-                                TextSpan(
-                                  text:
-                                      '\t${widget.rating!.toStringAsFixed(2).toString()}',
-                                  // Rating value
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: context.color.textDefaultColor,
-                                  ),
-                                ),
-                                TextSpan(
-                                  text: '  |  ',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: context.color.textDefaultColor
-                                        .withValues(alpha: 0.5),
-                                  ),
-                                ),
-                                TextSpan(
-                                  text:
-                                      '${widget.total}\t${"ratings".translate(context)}',
-                                  // Rating count text
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: context.color.textDefaultColor
-                                        .withValues(alpha: 0.3),
-                                  ),
-                                ),
-                              ],
+  int get _sellerRatingsCount =>
+      widget.total ??
+      widget.model.reviewsCount ??
+      widget.model.overallCount ??
+      0;
+
+  bool get _sellerIsVerified => widget.model.isVerified == 1;
+
+  Widget _buildSellerAvatar(String profile) {
+    return ClipOval(
+      child: Container(
+        width: 68,
+        height: 68,
+        color: context.color.territoryColor.withValues(alpha: 0.08),
+        child: profile.isNotEmpty
+            ? UiUtils.getImage(profile, fit: BoxFit.cover)
+            : UiUtils.getSvg(
+                AppIcons.defaultPersonLogo,
+                color: context.color.territoryColor,
+                fit: BoxFit.none,
+              ),
+      ),
+    );
+  }
+
+  Widget _buildSellerHeader({Seller? seller, int? ratingsTotal}) {
+    final rating = seller?.averageRating ?? _sellerRating;
+    final joined = seller?.createdAt?.trim().isNotEmpty == true
+        ? seller!.createdAt!.trim()
+        : widget.model.createdAt?.trim() ?? '';
+    final sellerName = seller?.name?.trim().isNotEmpty == true
+        ? seller!.name!.trim()
+        : widget.model.name?.trim().isNotEmpty == true
+            ? widget.model.name!.trim()
+            : 'Seller';
+    final sellerProfile = seller?.profile?.trim().isNotEmpty == true
+        ? seller!.profile!.trim()
+        : widget.model.profile?.trim() ?? '';
+    final isVerified = seller?.isVerified == 1 || _sellerIsVerified;
+    final ratingCount = ratingsTotal ?? _sellerRatingsCount;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 72, 16, 56),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          _buildSellerAvatar(sellerProfile),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  sellerName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: context.color.textDefaultColor,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (joined.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    '${"memberSince".translate(context)} ${UiUtils.monthYearDate(joined)}',
+                    style: TextStyle(
+                      color: context.color.textLightColor,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (isVerified)
+                      const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.verified_rounded,
+                            color: Color(0xFF2563EB),
+                            size: 15,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'VERIFIED USER',
+                            style: TextStyle(
+                              color: Color(0xFF2563EB),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                        ),
-                    ]),
-              ),
-              bottom: PreferredSize(
-                preferredSize: Size.fromHeight(60.0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: context.color.secondaryColor,
-                    border: Border(
-                      top: BorderSide(
-                          color: context.color.backgroundColor, width: 2.5),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      TabBar(
-                        controller: _tabController,
-                        indicatorColor: context.color.territoryColor,
-                        labelColor: context.color.territoryColor,
-                        labelStyle: Theme.of(context)
-                            .textTheme
-                            .titleMedium!
-                            .copyWith(fontWeight: FontWeight.w500),
-                        unselectedLabelColor:
-                            context.color.textDefaultColor.withValues(alpha: 0.7),
-                        unselectedLabelStyle: Theme.of(context)
-                            .textTheme
-                            .titleMedium!
-                            .copyWith(fontWeight: FontWeight.w500),
-                        tabs: const [
-                          Tab(text: 'Ads'),
-                          Tab(text: 'Ratings'),
                         ],
                       ),
-                      Divider(
-                        height: 0,
-                        thickness: 2,
-                        color: context.color.textDefaultColor.withValues(alpha: 0.2),
+                    if (rating != null)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.star_rounded,
+                            size: 15,
+                            color: context.color.textDefaultColor,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            rating.toStringAsFixed(1),
+                            style: TextStyle(
+                              color: context.color.textDefaultColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '(${ratingCount.toString()} ${"ratings".translate(context)})',
+                            style: TextStyle(
+                              color: context.color.textLightColor,
+                              fontSize: 10.5,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                  ],
                 ),
-              ),
-            ),
-          ],
-          body: SafeArea(
-            bottom: true,
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                liveAdsWidget(),
-                ratingsListWidget(),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: context.color.backgroundColor,
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverAppBar(
+            pinned: true,
+            elevation: 0,
+            surfaceTintColor: Colors.transparent,
+            backgroundColor: context.color.secondaryColor,
+            expandedHeight: 205,
+            leading: IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 20,
+                color: context.color.textDefaultColor,
+              ),
+            ),
+            actions: [
+              IconButton(
+                tooltip: 'Share',
+                onPressed: () {
+                  Share.share(
+                    "Check out ${widget.model.name ?? 'Seller'}'s profile on ${Constant.appName}",
+                  );
+                },
+                icon: Icon(
+                  Icons.share_outlined,
+                  size: 21,
+                  color: context.color.textDefaultColor,
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            flexibleSpace: FlexibleSpaceBar(
+              background:
+                  BlocBuilder<FetchSellerRatingsCubit, FetchSellerRatingsState>(
+                builder: (context, state) {
+                  return _buildSellerHeader(
+                    seller: state is FetchSellerRatingsSuccess
+                        ? state.seller
+                        : null,
+                    ratingsTotal:
+                        state is FetchSellerRatingsSuccess ? state.total : null,
+                  );
+                },
+              ),
+            ),
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(50),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: context.color.secondaryColor,
+                  border: Border(
+                    bottom: BorderSide(
+                      color: context.color.borderColor.withValues(alpha: 0.55),
+                    ),
+                  ),
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  indicatorColor: context.color.territoryColor,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  labelColor: context.color.territoryColor,
+                  unselectedLabelColor: context.color.textDefaultColor,
+                  labelStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  tabs: const [
+                    Tab(text: 'Ads'),
+                    Tab(text: 'Ratings'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+        body: TabBarView(
+          controller: _tabController,
+          children: [
+            liveAdsWidget(),
+            ratingsListWidget(),
+          ],
         ),
       ),
     );
@@ -339,10 +361,13 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
       if (state is FetchSellerItemsSuccess) {
         print("state loading more${state.isLoadingMore}");
         if (state.items.isEmpty) {
+          final isSelf = HiveUtils.isUserAuthenticated() &&
+              HiveUtils.getUserDetails().id == widget.model.id;
           return Center(
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 30),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 30),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -350,7 +375,9 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
                   const CactusIllustration(),
                   const SizedBox(height: 24),
                   Text(
-                    "You don't have any ads that\nare live.",
+                    isSelf
+                        ? "You haven't posted any live ads yet."
+                        : 'No live ads from this seller.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 18,
@@ -359,32 +386,28 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
                       height: 1.3,
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: 200,
-                    height: 48,
-                    child: ElevatedButton(
+                  if (isSelf) ...[
+                    const SizedBox(height: 16),
+                    ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: context.color.territoryColor,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 12),
                       ),
                       onPressed: () {
                         Navigator.pushNamed(
-                            context, Routes.selectItemTypeScreen);
+                          context,
+                          Routes.selectCategoryScreen,
+                          arguments: <String, dynamic>{},
+                        );
                       },
-                      child: const Text(
-                        "Post ad now",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      child: const Text("Post an Ad"),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -547,12 +570,33 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
       if (state is FetchSellerRatingsSuccess) {
         if (state.ratings.isEmpty) {
           return Center(
-            child: NoDataFound(
-              onTap: () {
-                context
-                    .read<FetchSellerRatingsCubit>()
-                    .fetch(sellerId: widget.model.id!);
-              },
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 30),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 20),
+                  Image.asset(
+                    AppIcons.noRatingsPlaceholder,
+                    width: 140,
+                    height: 140,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    "youDontHaveAnyRatings".translate(context),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: context.color.textDefaultColor,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }
@@ -595,7 +639,6 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
       }
       return Container();
     });
-
   }
 
 // Rating summary widget (similar to the top section of your image)
@@ -764,8 +807,9 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
                       if (ratings.createdAt != null)
                         Text(
                           dateTime(ratings.createdAt!),
-                        ).size(context.font.small).color(
-                            context.color.textDefaultColor.withValues(alpha: 0.3)),
+                        ).size(context.font.small).color(context
+                            .color.textDefaultColor
+                            .withValues(alpha: 0.3)),
                     ],
                   ),
                   SizedBox(height: 5),
@@ -1390,13 +1434,13 @@ class CactusPainter extends CustomPainter {
     final leftPath = Path();
     leftPath.moveTo(size.width * 0.38, size.height * 0.45);
     leftPath.lineTo(size.width * 0.16, size.height * 0.45);
-    leftPath.quadraticBezierTo(
-        size.width * 0.08, size.height * 0.45, size.width * 0.08, size.height * 0.38);
+    leftPath.quadraticBezierTo(size.width * 0.08, size.height * 0.45,
+        size.width * 0.08, size.height * 0.38);
     leftPath.lineTo(size.width * 0.08, size.height * 0.20);
-    leftPath.quadraticBezierTo(
-        size.width * 0.08, size.height * 0.12, size.width * 0.16, size.height * 0.12);
-    leftPath.quadraticBezierTo(
-        size.width * 0.24, size.height * 0.12, size.width * 0.24, size.height * 0.20);
+    leftPath.quadraticBezierTo(size.width * 0.08, size.height * 0.12,
+        size.width * 0.16, size.height * 0.12);
+    leftPath.quadraticBezierTo(size.width * 0.24, size.height * 0.12,
+        size.width * 0.24, size.height * 0.20);
     leftPath.lineTo(size.width * 0.24, size.height * 0.34);
     leftPath.lineTo(size.width * 0.38, size.height * 0.34);
     leftPath.close();
@@ -1406,8 +1450,8 @@ class CactusPainter extends CustomPainter {
     final rightPath = Path();
     rightPath.moveTo(size.width * 0.62, size.height * 0.30);
     rightPath.lineTo(size.width * 0.82, size.height * 0.30);
-    rightPath.quadraticBezierTo(
-        size.width * 0.92, size.height * 0.30, size.width * 0.92, size.height * 0.22);
+    rightPath.quadraticBezierTo(size.width * 0.92, size.height * 0.30,
+        size.width * 0.92, size.height * 0.22);
     rightPath.lineTo(size.width * 0.92, size.height * 0.08);
     rightPath.quadraticBezierTo(size.width * 0.92, 0, size.width * 0.84, 0);
     rightPath.quadraticBezierTo(
@@ -1419,8 +1463,8 @@ class CactusPainter extends CustomPainter {
 
     // Base Stand
     final baseRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(
-          size.width * 0.28, size.height * 0.90, size.width * 0.44, size.height * 0.10),
+      Rect.fromLTWH(size.width * 0.28, size.height * 0.90, size.width * 0.44,
+          size.height * 0.10),
       const Radius.circular(3),
     );
     canvas.drawRRect(baseRect, paint);
@@ -1429,4 +1473,3 @@ class CactusPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-
