@@ -25,7 +25,6 @@ workflows:
           set -e
           flutter pub get
           flutter precache --ios
-          flutter build ios --config-only --release --no-codesign
           if [ ! -s ios/Flutter/Generated.xcconfig ]; then
             echo "Flutter did not generate ios/Flutter/Generated.xcconfig"
             exit 1
