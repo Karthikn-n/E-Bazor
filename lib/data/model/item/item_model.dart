@@ -78,14 +78,46 @@ class ItemModel {
       _categorySearchText.contains('residential') ||
       _categorySearchText.contains('commercial');
 
-  bool get isJobsCategory =>
-      categoryPathIds.contains(4) || _categorySearchText.contains('job');
+  bool get isJobsCategory {
+    if (categoryPathIds.contains(4) ||
+        categoryPathIds.contains(356) ||
+        categoryPathIds.contains(357) ||
+        _categorySearchText.contains('job') ||
+        _categorySearchText.contains('hiring')) {
+      return true;
+    }
+    if (customFields != null && customFields!.isNotEmpty) {
+      return customFields!.any((cf) {
+        final name = (cf.name ?? '').toLowerCase();
+        return name == 'job role' ||
+            name == 'monthly salary' ||
+            name == 'employment type' ||
+            name == 'cv required' ||
+            name == 'minimum work experience' ||
+            name == 'minimum education level';
+      });
+    }
+    return false;
+  }
 
   /// Employer-created job vacancy posts live under the "I'm hiring" branch
   /// (category 356). Candidate/"I want a job" posts use category 357 and must
   /// keep their separate CV actions.
-  bool get isHiringPost =>
-      categoryPathIds.contains(356) || _categorySearchText.contains('hiring');
+  bool get isHiringPost {
+    if (categoryPathIds.contains(356) ||
+        _categorySearchText.contains('hiring')) {
+      return true;
+    }
+    if (isJobsCategory) {
+      if (categoryPathIds.contains(357) ||
+          _categorySearchText.contains('want a job') ||
+          _categorySearchText.contains('candidate')) {
+        return false;
+      }
+      return true;
+    }
+    return false;
+  }
 
   bool get isClassifiedsCategory =>
       categoryPathIds.contains(2) ||

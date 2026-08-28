@@ -481,7 +481,39 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
     );
   }
 
-  String _formatPrice(dynamic rawPrice) {
+  String _formatPrice(dynamic rawPrice, [ItemModel? item]) {
+    if (item != null && (item.isHiringPost || item.isJobsCategory)) {
+      if (item.customFields != null) {
+        for (final cf in item.customFields!) {
+          final name = (cf.name ?? '').toLowerCase();
+          if (name.contains('salary')) {
+            if (cf.value != null && cf.value!.isNotEmpty) {
+              final val = cf.value!.first.toString().trim();
+              if (val.isNotEmpty && val.toLowerCase() != 'null') {
+                if (val.toLowerCase() == 'negotiable') return 'Negotiable';
+                if (val.toLowerCase().contains('aed') ||
+                    val.toLowerCase().contains('month') ||
+                    val.toLowerCase().contains('less than')) {
+                  return val;
+                }
+                return 'AED $val / month';
+              }
+            }
+          }
+        }
+      }
+      if (item.price == null || item.price == 0) {
+        return 'Negotiable';
+      }
+      final dPrice = double.tryParse(item.price.toString());
+      if (dPrice != null) {
+        final formatted = dPrice.toInt().toString().replaceAllMapped(
+            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
+        return 'AED $formatted / month';
+      }
+      return 'AED ${item.price} / month';
+    }
+
     if (rawPrice == null) return "AED 0";
     final dPrice = double.tryParse(rawPrice.toString());
     if (dPrice == null) return "AED $rawPrice";
@@ -827,7 +859,7 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
 
   Widget _buildAdTile(BuildContext context, ItemModel item) {
     final statusStr = (item.status ?? "").toLowerCase();
-    final isHiringPost = item.isHiringPost;
+    final isHiringPost = item.isHiringPost || item.isJobsCategory;
     final isLive = statusStr == "approved" ||
         statusStr == "live" ||
         statusStr == "1" ||
@@ -954,22 +986,86 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                     ),
                   ],
 
-                  // Thumbnail Image Tile
+                  // Thumbnail Image Tile / Job Placeholder
                   ClipRRect(
                     borderRadius: BorderRadius.circular(13),
                     child: Container(
                       width: 86,
                       height: 86,
-                      color: context.color.backgroundColor,
+                      decoration: BoxDecoration(
+                        color: context.color.backgroundColor,
+                        borderRadius: BorderRadius.circular(13),
+                        border: Border.all(
+                          color: context.color.borderColor.withValues(alpha: 0.5),
+                          width: 1,
+                        ),
+                      ),
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          UiUtils.getImage(
-                            item.image ?? "",
-                            fit: BoxFit.cover,
-                            width: 86,
-                            height: 86,
-                          ),
+                          if (item.image != null && item.image!.trim().isNotEmpty)
+                            UiUtils.getImage(
+                              item.image!.trim(),
+                              fit: BoxFit.cover,
+                              width: 86,
+                              height: 86,
+                            )
+                          else if (isHiringPost)
+                            Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    context.color.territoryColor
+                                        .withValues(alpha: 0.12),
+                                    context.color.territoryColor
+                                        .withValues(alpha: 0.04),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(7),
+                                    decoration: BoxDecoration(
+                                      color: context.color.territoryColor
+                                          .withValues(alpha: 0.15),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.business_center_rounded,
+                                      size: 22,
+                                      color: context.color.territoryColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "Hiring",
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: context.color.territoryColor,
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            Container(
+                              color: context.color.territoryColor
+                                  .withValues(alpha: 0.06),
+                              child: Center(
+                                child: Icon(
+                                  Icons.image_outlined,
+                                  size: 30,
+                                  color: context.color.textLightColor
+                                      .withValues(alpha: 0.6),
+                                ),
+                              ),
+                            ),
                           if (item.isFeature == true)
                             Positioned(
                               top: 3,
@@ -1091,10 +1187,40 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                                     ? [
                                         _buildMenuItem(
                                           context,
-                                          "deactivate",
-                                          Icons.pause_circle_outline_rounded,
-                                          "Deactivate Ad",
-                                          Colors.amber.shade800,
+                                          "view",
+                                          Icons.visibility_outlined,
+                                          "View Details",
+                                          context.color.textDefaultColor,
+                                        ),
+                                        _buildMenuItem(
+                                          context,
+                                          "edit",
+                                          Icons.edit_outlined,
+                                          "Edit Ad",
+                                          context.color.textDefaultColor,
+                                        ),
+                                        if (isLive)
+                                          _buildMenuItem(
+                                            context,
+                                            "deactivate",
+                                            Icons.pause_circle_outline_rounded,
+                                            "Deactivate Ad",
+                                            Colors.amber.shade800,
+                                          ),
+                                        if (isInactive)
+                                          _buildMenuItem(
+                                            context,
+                                            "activate",
+                                            Icons.play_circle_outline_rounded,
+                                            "Activate Ad",
+                                            Colors.green,
+                                          ),
+                                        _buildMenuItem(
+                                          context,
+                                          "delete",
+                                          Icons.delete_outline_rounded,
+                                          "Delete Ad",
+                                          Colors.red,
                                         ),
                                       ]
                                     : [
@@ -1189,15 +1315,20 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              _formatPrice(item.price),
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: context.color.territoryColor,
+                            Expanded(
+                              child: Text(
+                                _formatPrice(item.price, item),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: context.color.territoryColor,
+                                ),
                               ),
                             ),
-                            if (item.created != null)
+                            if (item.created != null) ...[
+                              const SizedBox(width: 8),
                               Text(
                                 item.created.toString().formatDate(),
                                 style: TextStyle(
@@ -1205,6 +1336,7 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                                   color: context.color.textLightColor,
                                 ),
                               ),
+                            ],
                           ],
                         ),
                       ],
@@ -1350,7 +1482,25 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
 
   String _extractSpecsSnippet(ItemModel item) {
     List<String> parts = [];
-    if (item.customFields != null) {
+    if (item.isHiringPost || item.isJobsCategory) {
+      if (item.customFields != null) {
+        for (final cf in item.customFields!) {
+          final name = (cf.name ?? '').toLowerCase();
+          if ((name.contains('job role') ||
+                  name.contains('employment type') ||
+                  name.contains('experience') ||
+                  name.contains('education') ||
+                  name.contains('work location')) &&
+              cf.value != null &&
+              cf.value!.isNotEmpty) {
+            final val = cf.value!.first.toString().trim();
+            if (val.isNotEmpty && !parts.contains(val)) {
+              parts.add(val);
+            }
+          }
+        }
+      }
+    } else if (item.customFields != null) {
       for (final cf in item.customFields!) {
         final name = (cf.name ?? '').toLowerCase();
         if ((name.contains('year') ||

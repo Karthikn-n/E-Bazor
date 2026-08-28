@@ -28,6 +28,7 @@ ios/Flutter/ephemeral/
 **/xcuserdata/
 android/.gradle/
 android/app/build/
+log/
 coverage/
 
 # IntelliJ IDE files

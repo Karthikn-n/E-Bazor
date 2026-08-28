@@ -317,7 +317,7 @@ class _ChatScreenState extends State<ChatScreen>
       description: '',
       price: widget.itemPrice,
       image: widget.itemImage,
-      status: widget.status ?? 'sold out',
+      status: widget.status ?? 'active',
       active: !isSoldOut,
       created: DateTime.tryParse(widget.date) != null
           ? widget.date
@@ -1996,7 +1996,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   Widget _buildAdBannerStatusWidget() {
-    if (_isSoldOut && !_isCurrentUserSeller) {
+    if (_isSoldOut) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
         decoration: BoxDecoration(
@@ -2025,61 +2025,6 @@ class _ChatScreenState extends State<ChatScreen>
               ),
             ),
           ],
-        ),
-      );
-    }
-
-    if (_isCurrentUserSeller) {
-      final sold = _isSoldOut;
-      return GestureDetector(
-        onTap: _isMarkingSold ? null : _markSoldToChatBuyer,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
-          decoration: BoxDecoration(
-            color: sold
-                ? Colors.red.withValues(alpha: 0.12)
-                : context.color.territoryColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: sold
-                  ? Colors.red.withValues(alpha: 0.45)
-                  : context.color.territoryColor.withValues(alpha: 0.5),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_isMarkingSold)
-                SizedBox(
-                  width: 13,
-                  height: 13,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 1.7,
-                    color: sold
-                        ? Colors.red.shade700
-                        : context.color.territoryColor,
-                  ),
-                )
-              else
-                Icon(
-                  sold ? Icons.add_shopping_cart_rounded : Icons.sell_outlined,
-                  size: 13,
-                  color:
-                      sold ? Colors.red.shade700 : context.color.territoryColor,
-                ),
-              const SizedBox(width: 3.5),
-              Text(
-                sold ? 'Sell again' : 'soldOut'.translate(context),
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color:
-                      sold ? Colors.red.shade700 : context.color.territoryColor,
-                ),
-              ),
-            ],
-          ),
         ),
       );
     }

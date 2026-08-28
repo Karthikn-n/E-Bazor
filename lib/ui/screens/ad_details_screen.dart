@@ -3001,19 +3001,41 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     if (isAddedByMe) {
       final model = this.model;
       final contextColor = context.color;
-      if (_isHiringPost()) {
+      if (_isHiringPost() || _isJobAd()) {
         final status = (model.status ?? '').trim().toLowerCase();
         final isLive = status == 'active' ||
             status == 'approved' ||
             status == 'live' ||
             status == '1';
-        if (!isLive) return const SizedBox.shrink();
-        return _buildButton(
-          _isDeactivatingHiringPost ? 'Deactivating...' : 'Deactivate Ad',
-          () => _deactivateOwnedHiringPost(model),
-          null,
-          null,
-        );
+        if (isLive) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _buildButton("editBtnLbl".translate(context), () {
+                  _navigateToEditAd(context, model);
+                }, contextColor.secondaryColor, contextColor.territoryColor),
+              ),
+              SizedBox(width: 10.rw(context)),
+              Expanded(
+                child: _buildButton(
+                  _isDeactivatingHiringPost ? 'Deactivating...' : 'Deactivate Ad',
+                  () => _deactivateOwnedHiringPost(model),
+                  null,
+                  null,
+                ),
+              ),
+            ],
+          );
+        }
+        if (status == 'inactive') {
+          return _buildButton("Activate Ad", () {
+            context
+                .read<ChangeMyItemStatusCubit>()
+                .changeMyItemStatus(id: model.id!, status: 'active');
+          }, null, null);
+        }
+        return const SizedBox.shrink();
       }
       final editStatus = _editStatusFor(model);
       if (_isPaymentPendingStatus(editStatus)) {
@@ -4384,31 +4406,61 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                                   status == "payment_pending";
                           final isExpired = status == "expired";
 
-                          if (_isHiringPost()) {
-                            return isLive
-                                ? [
-                                    PopupMenuItem(
-                                      value: "deactivate",
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.pause_circle_outline_rounded,
-                                            size: 18,
-                                            color: Colors.amber.shade800,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            "Deactivate Ad",
-                                            style: TextStyle(
-                                              color: Colors.amber.shade800,
-                                              fontSize: 13.5,
-                                            ),
-                                          ),
-                                        ],
+                          final isJobOrHiring = _isHiringPost() || _isJobAd();
+                          if (isJobOrHiring) {
+                            return [
+                              PopupMenuItem(
+                                value: "edit",
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.edit_outlined,
+                                        size: 18,
+                                        color: context.color.textDefaultColor),
+                                    const SizedBox(width: 8),
+                                    Text("Edit Ad",
+                                        style: TextStyle(
+                                            color: context.color.textDefaultColor,
+                                            fontSize: 13.5)),
+                                  ],
+                                ),
+                              ),
+                              if (isLive)
+                                PopupMenuItem(
+                                  value: "deactivate",
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.pause_circle_outline_rounded,
+                                        size: 18,
+                                        color: Colors.amber.shade800,
                                       ),
-                                    ),
-                                  ]
-                                : const <PopupMenuEntry<String>>[];
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        "Deactivate Ad",
+                                        style: TextStyle(
+                                          color: Colors.amber.shade800,
+                                          fontSize: 13.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              if (isInactive)
+                                PopupMenuItem(
+                                  value: "activate",
+                                  child: const Row(
+                                    children: [
+                                      Icon(Icons.play_circle_outline_rounded,
+                                          size: 18, color: Colors.green),
+                                      SizedBox(width: 8),
+                                      Text("Activate Ad",
+                                          style: TextStyle(
+                                              color: Colors.green,
+                                              fontSize: 13.5)),
+                                    ],
+                                  ),
+                                ),
+                            ];
                           }
 
                           return [

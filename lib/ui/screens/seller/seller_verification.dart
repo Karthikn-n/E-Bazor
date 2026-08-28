@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/seller/fetch_seller_verification_field.dart';
+import 'package:Ebozor/data/cubits/seller/fetch_verification_request_cubit.dart';
 import 'package:Ebozor/data/cubits/seller/send_verification_field_cubit.dart';
 import 'package:Ebozor/data/helper/widgets.dart';
 import 'package:Ebozor/data/model/custom_field/custom_field_model.dart';
@@ -52,6 +53,11 @@ class _SellerVerificationScreenState extends State<SellerVerificationScreen> {
       context
           .read<FetchSellerVerificationFieldsCubit>()
           .fetchSellerVerificationFields();
+      if (widget.isResubmitted) {
+        context
+            .read<FetchVerificationRequestsCubit>()
+            .fetchVerificationRequests();
+      }
     });
   }
 
@@ -266,6 +272,11 @@ class _SellerVerificationScreenState extends State<SellerVerificationScreen> {
           Widgets.showLoader(context);
         } else if (state is SendVerificationFieldSuccess) {
           Widgets.hideLoder(context);
+          try {
+            context
+                .read<FetchVerificationRequestsCubit>()
+                .fetchVerificationRequests();
+          } catch (_) {}
           HelperUtils.showSnackBarMessage(
             context,
             state.message.isNotEmpty

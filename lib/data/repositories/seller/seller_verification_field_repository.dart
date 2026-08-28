@@ -1,4 +1,5 @@
 import 'package:Ebozor/data/model/custom_field/custom_field_model.dart';
+import 'package:Ebozor/data/model/verification_request_model.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 
@@ -50,4 +51,37 @@ class SellerVerificationFieldRepository {
       rethrow;
     }
   }
+
+  Future<VerificationRequestModel> getVerificationRequest() async {
+    final user = HiveUtils.getUserDetails();
+    final userId = user.id ?? int.tryParse(HiveUtils.getUserId()?.trim() ?? '');
+
+    try {
+      Map<String, dynamic> response = await Api.get(
+        url: Api.getVerificationRequestApi,
+      );
+
+      final data = response['data'];
+      if (data is! Map<String, dynamic>) {
+        return VerificationRequestModel(
+          userId: userId,
+          verificationFieldValues: const <VerificationFieldValues>[],
+        );
+      }
+
+      VerificationRequestModel model = VerificationRequestModel.fromJson(data);
+
+      return model;
+    } catch (e) {
+      if (e.toString().toLowerCase().contains('no request found') ||
+          e.toString().toLowerCase().contains('103')) {
+        return VerificationRequestModel(
+          userId: userId,
+          verificationFieldValues: const <VerificationFieldValues>[],
+        );
+      }
+      rethrow;
+    }
+  }
 }
+

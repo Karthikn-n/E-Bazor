@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/auth/auth_cubit.dart';
+import 'package:Ebozor/data/cubits/seller/fetch_verification_request_cubit.dart';
 import 'package:Ebozor/data/repositories/job_repository.dart';
 import 'package:Ebozor/data/repositories/seller/seller_verification_field_repository.dart';
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
@@ -225,6 +226,12 @@ class _ConfirmPhoneNumberScreenState extends State<ConfirmPhoneNumberScreen>
       } catch (err) {
         debugPrint("Notice: profile sync after phone verification: $err");
       }
+
+      try {
+        context
+            .read<FetchVerificationRequestsCubit>()
+            .fetchVerificationRequests();
+      } catch (_) {}
 
       widget.onVerified?.call();
 

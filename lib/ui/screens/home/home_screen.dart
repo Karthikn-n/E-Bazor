@@ -12,6 +12,7 @@ import 'package:Ebozor/ui/screens/home/widgets/grid_list_adapter.dart';
 import 'package:Ebozor/data/cubits/home/fetch_home_all_items_cubit.dart';
 import 'package:Ebozor/data/cubits/home/fetch_home_screen_cubit.dart';
 import 'package:Ebozor/data/cubits/favorite/favorite_cubit.dart';
+import 'package:Ebozor/data/cubits/seller/fetch_verification_request_cubit.dart';
 
 import 'package:Ebozor/data/model/home/home_screen_section.dart';
 import 'package:Ebozor/data/repositories/job_repository.dart';
@@ -130,6 +131,9 @@ class HomeScreenState extends State<HomeScreen>
       //fetchApiKeys();
       context.read<GetBuyerChatListCubit>().fetch();
       context.read<BlockedUsersListCubit>().blockedUsersList();
+      context
+          .read<FetchVerificationRequestsCubit>()
+          .fetchVerificationRequests();
     }
 
     _scrollController.addListener(() {

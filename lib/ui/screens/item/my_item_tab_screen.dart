@@ -277,7 +277,7 @@ class _MyItemTabState extends CloudState<MyItemTab> {
                     },
                     itemBuilder: (context, index) {
                       ItemModel item = state.items[index];
-                      final isJob = item.isJobsCategory;
+                      final isJob = item.isJobsCategory || item.isHiringPost;
                       final hasImage = item.image?.trim().isNotEmpty == true;
                       final location = <String>[
                         item.area ?? '',
@@ -288,6 +288,38 @@ class _MyItemTabState extends CloudState<MyItemTab> {
                           .where((value) => value.trim().isNotEmpty)
                           .toSet()
                           .join(', ');
+                      String salaryText = "";
+                      if (isJob) {
+                        if (item.customFields != null) {
+                          for (final cf in item.customFields!) {
+                            final name = (cf.name ?? '').toLowerCase();
+                            if (name.contains('salary')) {
+                              if (cf.value != null && cf.value!.isNotEmpty) {
+                                final val = cf.value!.first.toString().trim();
+                                if (val.isNotEmpty && val.toLowerCase() != 'null') {
+                                  if (val.toLowerCase() == 'negotiable') {
+                                    salaryText = 'Negotiable';
+                                  } else if (val.toLowerCase().contains('aed') ||
+                                      val.toLowerCase().contains('month') ||
+                                      val.toLowerCase().contains('less than')) {
+                                    salaryText = val;
+                                  } else {
+                                    salaryText = 'AED $val / month';
+                                  }
+                                  break;
+                                }
+                              }
+                            }
+                          }
+                        }
+                        if (salaryText.isEmpty) {
+                          if (item.price != null && item.price! > 0) {
+                            salaryText = "AED ${item.price} / month";
+                          } else {
+                            salaryText = "Negotiable";
+                          }
+                        }
+                      }
                       final hasPrice = !isJob && (item.price ?? 0) > 0;
 
                       return InkWell(
@@ -333,21 +365,75 @@ class _MyItemTabState extends CloudState<MyItemTab> {
                                             height: double.infinity,
                                             fit: BoxFit.cover,
                                           )
-                                        : Container(
-                                            color: context.color.territoryColor
-                                                .withValues(alpha: 0.08),
-                                            alignment: Alignment.center,
-                                            child: Icon(
-                                              isJob
-                                                  ? Icons
-                                                      .business_center_outlined
-                                                  : Icons.image_outlined,
-                                              size: 38,
-                                              color: context
-                                                  .color.territoryColor
-                                                  .withValues(alpha: 0.75),
-                                            ),
-                                          ),
+                                        : isJob
+                                            ? Container(
+                                                decoration: BoxDecoration(
+                                                  gradient: LinearGradient(
+                                                    colors: [
+                                                      context
+                                                          .color.territoryColor
+                                                          .withValues(
+                                                              alpha: 0.12),
+                                                      context
+                                                          .color.territoryColor
+                                                          .withValues(
+                                                              alpha: 0.04),
+                                                    ],
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
+                                                  ),
+                                                ),
+                                                child: Column(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    Container(
+                                                      padding:
+                                                          const EdgeInsets.all(
+                                                              9),
+                                                      decoration: BoxDecoration(
+                                                        color: context
+                                                            .color.territoryColor
+                                                            .withValues(
+                                                                alpha: 0.15),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      child: Icon(
+                                                        Icons
+                                                            .business_center_rounded,
+                                                        size: 26,
+                                                        color: context.color
+                                                            .territoryColor,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 5),
+                                                    Text(
+                                                      "Hiring",
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color: context.color
+                                                            .territoryColor,
+                                                        letterSpacing: 0.3,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              )
+                                            : Container(
+                                                color: context
+                                                    .color.territoryColor
+                                                    .withValues(alpha: 0.08),
+                                                alignment: Alignment.center,
+                                                child: Icon(
+                                                  Icons.image_outlined,
+                                                  size: 38,
+                                                  color: context
+                                                      .color.territoryColor
+                                                      .withValues(alpha: 0.75),
+                                                ),
+                                              ),
                                   ),
                                 ),
                                 Expanded(
@@ -365,7 +451,14 @@ class _MyItemTabState extends CloudState<MyItemTab> {
                                         Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            if (hasPrice)
+                                            if (isJob)
+                                              Text(
+                                                salaryText,
+                                              )
+                                                  .color(context
+                                                      .color.territoryColor)
+                                                  .bold()
+                                            else if (hasPrice)
                                               Text(
                                                 "${Constant.currencySymbol}\t${item.price}",
                                               )
@@ -834,10 +927,10 @@ class _MyItemTabState extends CloudState<MyItemTab> {
                                                              .color(context.color
                                                                  .buttonColor),
                                                        ),
-                                                   if (item.status == "active" ||
+                                                   if (!isJob && (item.status == "active" ||
                                                        item.status ==
                                                            "inactive" ||
-                                                       item.status == "approved")
+                                                       item.status == "approved"))
                                                      PopupMenuItem(
                                                        onTap: () async {
                                                          var soldOut = await UiUtils
