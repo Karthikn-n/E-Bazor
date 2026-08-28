@@ -19,8 +19,6 @@ import 'package:Ebozor/utils/validator.dart';
 
 enum _JobProfilePhotoAction { view, camera, gallery, remove }
 
-
-
 String _firstNonEmptyProfileValue(
   Map<dynamic, dynamic> entry,
   List<String> keys,
@@ -94,7 +92,6 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
   String? _experienceStartDate;
   String? _experienceEndDate;
   bool _currentlyWorking = false;
-
 
   // Skills fields
   final List<String> _skillsList = [];
@@ -193,6 +190,22 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
     "5-10 Years",
     "10+ Years",
   ];
+
+  static const int _requiredProfileSectionCount = 9;
+
+  String? _matchingOptionIgnoreCase(
+    dynamic rawValue,
+    List<String> options,
+  ) {
+    final value = rawValue?.toString().trim();
+    if (value == null || value.isEmpty) return null;
+
+    for (final option in options) {
+      if (option.toLowerCase() == value.toLowerCase()) return option;
+    }
+    return null;
+  }
+
   final List<String> _categories = [
     "Information Technology",
     "Accounting / Finance",
@@ -511,10 +524,11 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
         if (userDetail['current_location'] != null) {
           _locationController.text = userDetail['current_location'].toString();
         }
+        _languagesController.clear();
+        _languagesList.clear();
         if (userDetail['language'] != null) {
-          final rawLang = userDetail['language'].toString();
+          final rawLang = userDetail['language'].toString().trim();
           _languagesController.text = rawLang;
-          _languagesList.clear();
           for (var l in rawLang.split(',')) {
             final trimmed = l.trim();
             if (trimmed.isNotEmpty && !_languagesList.contains(trimmed)) {
@@ -522,14 +536,9 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
             }
           }
         }
-        if (userDetail['gender'] != null &&
-            _genders.contains(userDetail['gender'])) {
-          _gender = userDetail['gender'].toString();
-        }
-        if (userDetail['visa_status'] != null &&
-            _visaStatuses.contains(userDetail['visa_status'])) {
-          _visaStatus = userDetail['visa_status'].toString();
-        }
+        _gender = _matchingOptionIgnoreCase(userDetail['gender'], _genders);
+        _visaStatus =
+            _matchingOptionIgnoreCase(userDetail['visa_status'], _visaStatuses);
         _profileSummary =
             userDetail['profile_summary']?.toString().trim() ?? '';
         final jobStatus = userDetail['job_status']?.toString().trim();
@@ -629,17 +638,19 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
           }
         }
 
+        _skillsList.clear();
         if (userDetail['skills'] != null) {
           final sList = userDetail['skills'].toString().split(',');
-          _skillsList.clear();
           for (var s in sList) {
             if (s.trim().isNotEmpty && !_skillsList.contains(s.trim())) {
               _skillsList.add(s.trim());
             }
           }
         }
-        if (userDetail['resume'] != null) {
-          _existingResumeUrl = userDetail['resume'].toString();
+        _existingResumeUrl = null;
+        if (userDetail['resume'] != null &&
+            userDetail['resume'].toString().trim().isNotEmpty) {
+          _existingResumeUrl = userDetail['resume'].toString().trim();
         }
         if (userDetail['audio_introduction'] != null &&
             userDetail['audio_introduction'].toString().trim().isNotEmpty) {
@@ -650,9 +661,11 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
           _audioIntroPath = userDetail['audio'].toString().trim();
           HiveUtils.setAudioIntroPath(_audioIntroPath);
         } else {
+          _audioIntroPath = null;
           final localAudio = HiveUtils.getAudioIntroPath();
           if (localAudio != null &&
-              (localAudio.startsWith('http') || File(localAudio).existsSync())) {
+              (localAudio.startsWith('http') ||
+                  File(localAudio).existsSync())) {
             _audioIntroPath = localAudio;
           }
         }
@@ -665,9 +678,11 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
           _videoIntroPath = userDetail['video'].toString().trim();
           HiveUtils.setVideoIntroPath(_videoIntroPath);
         } else {
+          _videoIntroPath = null;
           final localVideo = HiveUtils.getVideoIntroPath();
           if (localVideo != null &&
-              (localVideo.startsWith('http') || File(localVideo).existsSync())) {
+              (localVideo.startsWith('http') ||
+                  File(localVideo).existsSync())) {
             _videoIntroPath = localVideo;
           }
         }
@@ -753,11 +768,18 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
   }
 
   int _calculateRemainingSections() {
-    int totalSections = 6;
     int filled = 0;
     // 1. Basic Info
     if (_nameController.text.trim().isNotEmpty &&
-        _emailController.text.trim().isNotEmpty) {
+        _emailController.text.trim().isNotEmpty &&
+        _phoneController.text.trim().isNotEmpty &&
+        _nationalityController.text.trim().isNotEmpty &&
+        _locationController.text.trim().isNotEmpty &&
+        _languagesController.text.trim().isNotEmpty &&
+        _gender != null &&
+        _gender!.trim().isNotEmpty &&
+        _visaStatus != null &&
+        _visaStatus!.trim().isNotEmpty) {
       filled++;
     }
     // 2. Qualifications
@@ -767,30 +789,45 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
     }
     // 3. Experience
     if (_experiencesList.isNotEmpty ||
-        _experienceType == "Fresher" ||
         _companyController.text.trim().isNotEmpty ||
         _positionController.text.trim().isNotEmpty) {
       filled++;
     }
-    // 4. Skills
-    if (_skillsList.isNotEmpty || _jobCategory != null) {
+    // 4. Licenses or Certificates
+    if (_licencesList.isNotEmpty) {
       filled++;
     }
-    // 5. Resume
+    // 5. Skills
+    if (_skillsList.isNotEmpty ||
+        (_jobCategory != null && _jobCategory!.trim().isNotEmpty)) {
+      filled++;
+    }
+    // 6. Resume
     if (_resumeFile != null ||
         (_existingResumeUrl != null && _existingResumeUrl!.isNotEmpty)) {
       filled++;
     }
-    // 6. Digital Profile (Audio or Video introduction)
-    if (_audioIntroPath != null || _videoIntroPath != null) {
+    // 7. Digital Profile (Audio or Video introduction)
+    if ((_audioIntroPath != null && _audioIntroPath!.trim().isNotEmpty) ||
+        (_videoIntroPath != null && _videoIntroPath!.trim().isNotEmpty)) {
       filled++;
     }
-    return (totalSections - filled).clamp(0, totalSections);
+    // 8. Portfolio
+    if (_portfoliosList.isNotEmpty) {
+      filled++;
+    }
+    // 9. Reference
+    if (_referencesList.isNotEmpty) {
+      filled++;
+    }
+    return (_requiredProfileSectionCount - filled)
+        .clamp(0, _requiredProfileSectionCount);
   }
 
   double _calculateProgress() {
     int remaining = _calculateRemainingSections();
-    return (6 - remaining) / 6.0;
+    return (_requiredProfileSectionCount - remaining) /
+        _requiredProfileSectionCount;
   }
 
   Future<void> _pickResumeFile() async {
@@ -828,8 +865,7 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
           'nationality': _nationalityController.text.trim(),
         if (_locationController.text.trim().isNotEmpty)
           'current_location': _locationController.text.trim(),
-        if (langValue.isNotEmpty)
-          'language': langValue,
+        if (langValue.isNotEmpty) 'language': langValue,
         if (_gender != null) 'gender': _gender,
         if (_visaStatus != null) 'visa_status': _visaStatus,
         if (_skillsList.isNotEmpty) 'skills': _skillsList.join(', '),
@@ -898,7 +934,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        HelperUtils.showSnackBarMessage(context, e.toString(), type: MessageType.error);
+        HelperUtils.showSnackBarMessage(context, e.toString(),
+            type: MessageType.error);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -928,7 +965,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        HelperUtils.showSnackBarMessage(context, e.toString(), type: MessageType.error);
+        HelperUtils.showSnackBarMessage(context, e.toString(),
+            type: MessageType.error);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -960,7 +998,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        HelperUtils.showSnackBarMessage(context, e.toString(), type: MessageType.error);
+        HelperUtils.showSnackBarMessage(context, e.toString(),
+            type: MessageType.error);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -998,7 +1037,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        HelperUtils.showSnackBarMessage(context, e.toString(), type: MessageType.error);
+        HelperUtils.showSnackBarMessage(context, e.toString(),
+            type: MessageType.error);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -1044,7 +1084,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        HelperUtils.showSnackBarMessage(context, e.toString(), type: MessageType.error);
+        HelperUtils.showSnackBarMessage(context, e.toString(),
+            type: MessageType.error);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -1377,7 +1418,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                                 _languagesList.clear();
                                 for (var l in textCtrl.text.split(',')) {
                                   final t = l.trim();
-                                  if (t.isNotEmpty && !_languagesList.contains(t)) {
+                                  if (t.isNotEmpty &&
+                                      !_languagesList.contains(t)) {
                                     _languagesList.add(t);
                                   }
                                 }
@@ -1455,7 +1497,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                   const SizedBox(height: 14),
                   _buildFieldLabel("Select Language"),
                   DropdownButtonFormField<String>(
-                    key: ValueKey("lang_dd_sheet_${tempLanguages.length}_${tempLanguages.hashCode}"),
+                    key: ValueKey(
+                        "lang_dd_sheet_${tempLanguages.length}_${tempLanguages.hashCode}"),
                     isExpanded: true,
                     initialValue: null,
                     hint: Text(
@@ -1715,7 +1758,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                       const SizedBox(height: 12),
                       _buildFieldLabel("Languages"),
                       DropdownButtonFormField<String>(
-                        key: ValueKey("lang_dd_basic_${tempLanguages.length}_${tempLanguages.hashCode}"),
+                        key: ValueKey(
+                            "lang_dd_basic_${tempLanguages.length}_${tempLanguages.hashCode}"),
                         isExpanded: true,
                         initialValue: null,
                         hint: Text(
@@ -2355,9 +2399,10 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                       _buildFieldLabel("Job Category"),
                       DropdownButtonFormField<String>(
                         isExpanded: true,
-                        initialValue: tempCat != null && _categories.contains(tempCat)
-                            ? tempCat
-                            : null,
+                        initialValue:
+                            tempCat != null && _categories.contains(tempCat)
+                                ? tempCat
+                                : null,
                         hint: Text("Select Category",
                             style:
                                 TextStyle(color: context.color.textLightColor)),
@@ -2372,9 +2417,10 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                       _buildFieldLabel("Industry"),
                       DropdownButtonFormField<String>(
                         isExpanded: true,
-                        initialValue: tempInd != null && _categories.contains(tempInd)
-                            ? tempInd
-                            : null,
+                        initialValue:
+                            tempInd != null && _categories.contains(tempInd)
+                                ? tempInd
+                                : null,
                         hint: Text("Select Industry",
                             style:
                                 TextStyle(color: context.color.textLightColor)),
@@ -3141,8 +3187,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                           : () async {
                               final hasPhoto = selectedProfilePhoto != null ||
                                   (user.profile ?? '').isNotEmpty;
-                              final action =
-                                  await showModalBottomSheet<_JobProfilePhotoAction>(
+                              final action = await showModalBottomSheet<
+                                  _JobProfilePhotoAction>(
                                 context: context,
                                 backgroundColor: context.color.secondaryColor,
                                 shape: const RoundedRectangleBorder(
@@ -3152,8 +3198,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                                 builder: (ctx) => SafeArea(
                                   top: false,
                                   child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                        8, 12, 8, 16),
+                                    padding:
+                                        const EdgeInsets.fromLTRB(8, 12, 8, 16),
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
@@ -3172,8 +3218,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                                           ListTile(
                                             leading: const Icon(
                                                 Icons.visibility_outlined),
-                                            title:
-                                                const Text('View current photo'),
+                                            title: const Text(
+                                                'View current photo'),
                                             onTap: () => Navigator.pop(
                                               ctx,
                                               _JobProfilePhotoAction.view,
@@ -3232,10 +3278,10 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                                 setSheetState(
                                     () => selectedProfilePhoto = null);
                               } else {
-                                final source = action ==
-                                        _JobProfilePhotoAction.camera
-                                    ? ImageSource.camera
-                                    : ImageSource.gallery;
+                                final source =
+                                    action == _JobProfilePhotoAction.camera
+                                        ? ImageSource.camera
+                                        : ImageSource.gallery;
                                 CropImage.init(context);
                                 final pickedPhoto =
                                     await ImagePicker().pickImage(
@@ -3285,13 +3331,12 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                                             fit: BoxFit.cover,
                                           )
                                         : Container(
-                                            color:
-                                                context.color.secondaryColor,
+                                            color: context.color.secondaryColor,
                                             child: Icon(
                                               Icons.person_outline_rounded,
                                               size: 34,
-                                              color: context
-                                                  .color.territoryColor,
+                                              color:
+                                                  context.color.territoryColor,
                                             ),
                                           ),
                               ),
@@ -3350,8 +3395,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                           child: InkWell(
                             onTap: isSaving
                                 ? null
-                                : () => setSheetState(() =>
-                                    selectedAvailability = 'Immediate'),
+                                : () => setSheetState(
+                                    () => selectedAvailability = 'Immediate'),
                             borderRadius: BorderRadius.circular(10),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -3385,12 +3430,11 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                                     'Immediate',
                                     style: TextStyle(
                                       fontSize: 13,
-                                      fontWeight: selectedAvailability ==
-                                              'Immediate'
-                                          ? FontWeight.bold
-                                          : FontWeight.w600,
-                                      color: selectedAvailability ==
-                                              'Immediate'
+                                      fontWeight:
+                                          selectedAvailability == 'Immediate'
+                                              ? FontWeight.bold
+                                              : FontWeight.w600,
+                                      color: selectedAvailability == 'Immediate'
                                           ? const Color(0xFF10B981)
                                           : context.color.textDefaultColor,
                                     ),
@@ -3414,28 +3458,27 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                             onTap: isSaving
                                 ? null
                                 : () => setSheetState(() =>
-                                    selectedAvailability =
-                                        'Actively Looking'),
+                                    selectedAvailability = 'Actively Looking'),
                             borderRadius: BorderRadius.circular(10),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 10, vertical: 12),
                               decoration: BoxDecoration(
-                                color: selectedAvailability ==
-                                        'Actively Looking'
-                                    ? const Color(0xFF2563EB)
-                                        .withValues(alpha: 0.1)
-                                    : context.color.backgroundColor,
+                                color:
+                                    selectedAvailability == 'Actively Looking'
+                                        ? const Color(0xFF2563EB)
+                                            .withValues(alpha: 0.1)
+                                        : context.color.backgroundColor,
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                  color: selectedAvailability ==
-                                          'Actively Looking'
-                                      ? const Color(0xFF2563EB)
-                                      : context.color.borderColor,
-                                  width: selectedAvailability ==
-                                          'Actively Looking'
-                                      ? 1.8
-                                      : 1.0,
+                                  color:
+                                      selectedAvailability == 'Actively Looking'
+                                          ? const Color(0xFF2563EB)
+                                          : context.color.borderColor,
+                                  width:
+                                      selectedAvailability == 'Actively Looking'
+                                          ? 1.8
+                                          : 1.0,
                                 ),
                               ),
                               child: Column(
@@ -3487,13 +3530,11 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                                 ? null
                                 : () => Navigator.pop(sheetContext),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor:
-                                  context.color.textDefaultColor,
+                              foregroundColor: context.color.textDefaultColor,
                               side: BorderSide(
                                 color: context.color.borderColor,
                               ),
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 13),
+                              padding: const EdgeInsets.symmetric(vertical: 13),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(9),
                               ),
@@ -3531,8 +3572,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                                         },
                                         profileFile: selectedProfilePhoto,
                                       );
-                                      final refreshedUser =
-                                          await _jobRepository.fetchUserDetail();
+                                      final refreshedUser = await _jobRepository
+                                          .fetchUserDetail();
                                       final profileUrl =
                                           _extractProfileUrl(refreshedUser) ??
                                               _extractProfileUrl(response) ??
@@ -3548,8 +3589,7 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                                         _nameController.text = profileName;
                                         _profileSummary =
                                             summaryController.text.trim();
-                                        _jobAvailability =
-                                            selectedAvailability;
+                                        _jobAvailability = selectedAvailability;
                                         _profilePhotoPreview = null;
                                       });
                                       if (sheetContext.mounted) {
@@ -3577,11 +3617,9 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                                     }
                                   },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  context.color.territoryColor,
+                              backgroundColor: context.color.territoryColor,
                               foregroundColor: Colors.white,
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 13),
+                              padding: const EdgeInsets.symmetric(vertical: 13),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(9),
                               ),
@@ -3651,7 +3689,6 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-
               if (showLicence) ...[
                 _buildAddSectionOption(
                   icon: Icons.military_tech_outlined,
@@ -3671,7 +3708,6 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                   const SizedBox(height: 12),
                 ],
               ],
-
               if (showPortfolio) ...[
                 _buildAddSectionOption(
                   icon: Icons.link_rounded,
@@ -3690,7 +3726,6 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                   const SizedBox(height: 12),
                 ],
               ],
-
               if (showReference) ...[
                 _buildAddSectionOption(
                   icon: Icons.person_outline_rounded,
@@ -3703,7 +3738,6 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                   },
                 ),
               ],
-
               if (!showLicence && !showPortfolio && !showReference) ...[
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 20),
@@ -3718,7 +3752,6 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                   ),
                 ),
               ],
-
               const SizedBox(height: 16),
             ],
           ),
@@ -3789,7 +3822,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
   // ---------------------------------------------------------------------------
   // Licences, Portfolio & Reference Forms
   // ---------------------------------------------------------------------------
-  void _showLicenceFormSheet({int? editIndex, Map<String, String>? initialData}) {
+  void _showLicenceFormSheet(
+      {int? editIndex, Map<String, String>? initialData}) {
     final nameCtrl = TextEditingController(text: initialData?['name'] ?? '');
     final orgCtrl = TextEditingController(text: initialData?['org'] ?? '');
     final isEditing = editIndex != null;
@@ -3815,7 +3849,9 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                isEditing ? "Edit Licence or Certificate" : "Add Licence or Certificate",
+                isEditing
+                    ? "Edit Licence or Certificate"
+                    : "Add Licence or Certificate",
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -3902,7 +3938,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
     );
   }
 
-  void _showPortfolioFormSheet({int? editIndex, Map<String, String>? initialData}) {
+  void _showPortfolioFormSheet(
+      {int? editIndex, Map<String, String>? initialData}) {
     final nameCtrl = TextEditingController(text: initialData?['name'] ?? '');
     final linkCtrl = TextEditingController(text: initialData?['link'] ?? '');
     final isEditing = editIndex != null;
@@ -4015,7 +4052,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
     );
   }
 
-  void _showReferenceFormSheet({int? editIndex, Map<String, String>? initialData}) {
+  void _showReferenceFormSheet(
+      {int? editIndex, Map<String, String>? initialData}) {
     final nameCtrl = TextEditingController(text: initialData?['name'] ?? '');
     final compCtrl = TextEditingController(text: initialData?['company'] ?? '');
     final emailCtrl = TextEditingController(text: initialData?['email'] ?? '');
@@ -4228,43 +4266,43 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
 
                     // 3. "Add More Sections" Button – hidden when all sections are filled
                     if (_hasAddableMoreSections)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: InkWell(
-                        onTap: _showAddMoreSectionsBottomSheet,
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          decoration: BoxDecoration(
-                            color: context.color.secondaryColor,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: context.color.borderColor,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: InkWell(
+                          onTap: _showAddMoreSectionsBottomSheet,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            decoration: BoxDecoration(
+                              color: context.color.secondaryColor,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: context.color.borderColor,
+                              ),
                             ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.add_circle_outline_rounded,
-                                color: context.color.territoryColor,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                "Add More Sections",
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.add_circle_outline_rounded,
                                   color: context.color.territoryColor,
+                                  size: 20,
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 8),
+                                Text(
+                                  "Add More Sections",
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: context.color.territoryColor,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -4561,7 +4599,7 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
           // Remaining Sections & Progress
           Text(
             remainingSections > 0
-                ? "$remainingSections Sections Remaining"
+                ? "$remainingSections Required ${remainingSections == 1 ? 'Section' : 'Sections'} Remaining"
                 : "Profile Completed 🎉",
             style: TextStyle(
               fontSize: 16,
@@ -6548,9 +6586,8 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
                         child: InkWell(
                           onTap: () async {
                             final raw = p['link']!;
-                            final url = raw.startsWith('http')
-                                ? raw
-                                : 'https://$raw';
+                            final url =
+                                raw.startsWith('http') ? raw : 'https://$raw';
                             final uri = Uri.parse(url);
                             if (await canLaunchUrl(uri)) {
                               await launchUrl(uri,
