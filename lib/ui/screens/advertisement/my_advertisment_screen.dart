@@ -1,7 +1,6 @@
 import 'dart:developer';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/item/fetch_my_promoted_items_cubit.dart';
-import 'package:Ebozor/data/cubits/seller/fetch_verification_request_cubit.dart';
 import 'package:Ebozor/data/model/category_model.dart';
 import 'package:Ebozor/data/model/item/item_model.dart';
 import 'package:Ebozor/data/helper/widgets.dart';
@@ -13,8 +12,10 @@ import 'package:Ebozor/ui/screens/widgets/intertitial_ads_screen.dart';
 import 'package:Ebozor/ui/screens/widgets/shimmerLoadingContainer.dart';
 import 'package:Ebozor/ui/screens/home/widgets/verification_banner.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
+import 'package:Ebozor/utils/LocalStoreage/hive_keys.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:Ebozor/utils/cloudState/cloud_state.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
@@ -826,6 +827,7 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
 
   Widget _buildAdTile(BuildContext context, ItemModel item) {
     final statusStr = (item.status ?? "").toLowerCase();
+    final isHiringPost = item.isHiringPost;
     final isLive = statusStr == "approved" ||
         statusStr == "live" ||
         statusStr == "1" ||
@@ -834,7 +836,8 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
         statusStr == "0" ||
         statusStr == "deactive" ||
         statusStr == "deactivated";
-    final isSoldOut = statusStr == "sold out" || statusStr == "sold_out";
+    final hasSoldOutStatus = statusStr == "sold out" || statusStr == "sold_out";
+    final isSoldOut = !isHiringPost && hasSoldOutStatus;
     final isPaymentPending = statusStr == "pending payment" ||
         statusStr == "payment_pending" ||
         statusStr == "pending";
@@ -852,6 +855,10 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
       badgeBg = Colors.green.withValues(alpha: 0.12);
       badgeFg = Colors.green;
       badgeLabel = "Live";
+    } else if (isHiringPost && hasSoldOutStatus) {
+      badgeBg = Colors.blueGrey.withValues(alpha: 0.14);
+      badgeFg = Colors.blueGrey.shade700;
+      badgeLabel = "Inactive";
     } else if (isSoldOut) {
       badgeBg = Colors.purple.withValues(alpha: 0.12);
       badgeFg = Colors.purple.shade700;
@@ -1033,7 +1040,7 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                             //   ),
                             //   const SizedBox(width: 4),
                             // ],
-                            if (!_isSelectionMode)
+                            if (!_isSelectionMode && (!isHiringPost || isLive))
                               PopupMenuButton<String>(
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(),
@@ -1080,71 +1087,81 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
                                     _confirmDeleteAd(context, item);
                                   }
                                 },
-                                itemBuilder: (ctx) => [
-                                  _buildMenuItem(
-                                    context,
-                                    "view",
-                                    Icons.visibility_outlined,
-                                    "View Details",
-                                    context.color.textDefaultColor,
-                                  ),
-                                  _buildMenuItem(
-                                    context,
-                                    "edit",
-                                    Icons.edit_outlined,
-                                    "Edit Ad",
-                                    context.color.textDefaultColor,
-                                  ),
-                                  if (isLive) ...[
-                                    _buildMenuItem(
-                                      context,
-                                      "deactivate",
-                                      Icons.pause_circle_outline_rounded,
-                                      "Deactivate Ad",
-                                      Colors.amber.shade800,
-                                    ),
-                                    _buildMenuItem(
-                                      context,
-                                      "sold_out",
-                                      Icons.check_circle_outline_rounded,
-                                      "Mark as Sold Out",
-                                      Colors.purple,
-                                    ),
-                                  ],
-                                  if (isInactive || isSoldOut)
-                                    _buildMenuItem(
-                                      context,
-                                      "activate",
-                                      Icons.play_circle_outline_rounded,
-                                      "Activate Ad",
-                                      Colors.green,
-                                    ),
-                                  if (requiresPayment)
-                                    _buildMenuItem(
-                                      context,
-                                      "pay",
-                                      Icons.payment_outlined,
-                                      "Pay & Activate",
-                                      const Color(0xFFD31027),
-                                      bold: true,
-                                    ),
-                                  if (isExpired)
-                                    _buildMenuItem(
-                                      context,
-                                      "renew",
-                                      Icons.refresh_rounded,
-                                      "Renew Ad",
-                                      Colors.amber.shade800,
-                                      bold: true,
-                                    ),
-                                  _buildMenuItem(
-                                    context,
-                                    "delete",
-                                    Icons.delete_outline_rounded,
-                                    "Delete Ad",
-                                    Colors.red,
-                                  ),
-                                ],
+                                itemBuilder: (ctx) => isHiringPost
+                                    ? [
+                                        _buildMenuItem(
+                                          context,
+                                          "deactivate",
+                                          Icons.pause_circle_outline_rounded,
+                                          "Deactivate Ad",
+                                          Colors.amber.shade800,
+                                        ),
+                                      ]
+                                    : [
+                                        _buildMenuItem(
+                                          context,
+                                          "view",
+                                          Icons.visibility_outlined,
+                                          "View Details",
+                                          context.color.textDefaultColor,
+                                        ),
+                                        _buildMenuItem(
+                                          context,
+                                          "edit",
+                                          Icons.edit_outlined,
+                                          "Edit Ad",
+                                          context.color.textDefaultColor,
+                                        ),
+                                        if (isLive) ...[
+                                          _buildMenuItem(
+                                            context,
+                                            "deactivate",
+                                            Icons.pause_circle_outline_rounded,
+                                            "Deactivate Ad",
+                                            Colors.amber.shade800,
+                                          ),
+                                          _buildMenuItem(
+                                            context,
+                                            "sold_out",
+                                            Icons.check_circle_outline_rounded,
+                                            "Mark as Sold Out",
+                                            Colors.purple,
+                                          ),
+                                        ],
+                                        if (isInactive || isSoldOut)
+                                          _buildMenuItem(
+                                            context,
+                                            "activate",
+                                            Icons.play_circle_outline_rounded,
+                                            "Activate Ad",
+                                            Colors.green,
+                                          ),
+                                        if (requiresPayment)
+                                          _buildMenuItem(
+                                            context,
+                                            "pay",
+                                            Icons.payment_outlined,
+                                            "Pay & Activate",
+                                            const Color(0xFFD31027),
+                                            bold: true,
+                                          ),
+                                        if (isExpired)
+                                          _buildMenuItem(
+                                            context,
+                                            "renew",
+                                            Icons.refresh_rounded,
+                                            "Renew Ad",
+                                            Colors.amber.shade800,
+                                            bold: true,
+                                          ),
+                                        _buildMenuItem(
+                                          context,
+                                          "delete",
+                                          Icons.delete_outline_rounded,
+                                          "Delete Ad",
+                                          Colors.red,
+                                        ),
+                                      ],
                               ),
                           ],
                         ),
@@ -1519,13 +1536,10 @@ class _MyAdsBannerCarousel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<FetchVerificationRequestsCubit,
-        FetchVerificationRequestState>(
-      builder: (context, state) {
-        final requestApproved = state is FetchVerificationRequestSuccess &&
-            state.data.status?.toLowerCase() == 'approved';
-        final isVerified =
-            requestApproved || HiveUtils.getUserDetails().isVerified == 1;
+    return ValueListenableBuilder(
+      valueListenable: Hive.box(HiveKeys.userDetailsBox).listenable(),
+      builder: (context, Box box, _) {
+        final isVerified = HiveUtils.getUserDetails().isVerified == 1;
 
         if (isVerified) {
           return const _InsightsBanner();

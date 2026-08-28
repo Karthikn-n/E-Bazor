@@ -52,6 +52,10 @@ class CarPackagePaymentScreen extends StatefulWidget {
 }
 
 class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
+  // Coupon entry is temporarily disabled. Keep the implementation behind one
+  // flag so it can be restored without changing payment calculations.
+  static const bool _couponFeatureEnabled = false;
+
   final SubscriptionRepository _subscriptionRepository =
       SubscriptionRepository();
 
@@ -1209,87 +1213,89 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
             ),
           ],
 
-          const SizedBox(height: 16),
-          Divider(color: context.color.borderColor.withValues(alpha: 0.5)),
-          const SizedBox(height: 12),
+          if (_couponFeatureEnabled) ...[
+            const SizedBox(height: 16),
+            Divider(color: context.color.borderColor.withValues(alpha: 0.5)),
+            const SizedBox(height: 12),
 
-          // Promo code input
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _discountController,
-                  textCapitalization: TextCapitalization.characters,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    color: context.color.textDefaultColor,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: "Discount code",
-                    hintStyle: TextStyle(
-                      fontSize: 13,
-                      color:
-                          context.color.textLightColor.withValues(alpha: 0.7),
-                    ),
-                    filled: true,
-                    fillColor: context.color.backgroundColor,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(
-                        color: context.color.borderColor,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(
-                        color: context.color.borderColor,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              ElevatedButton(
-                onPressed: _applyDiscountCode,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: context.color.secondaryColor,
-                  foregroundColor: context.color.textDefaultColor,
-                  side: BorderSide(color: context.color.borderColor),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  elevation: 0,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-                ),
-                child: const Text(
-                  "Apply",
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                ),
-              ),
-            ],
-          ),
-
-          if (_appliedPromoCode != null) ...[
-            const SizedBox(height: 8),
+            // Promo/coupon UI temporarily disabled by the feature flag.
             Row(
               children: [
-                const Icon(Icons.check_circle_rounded,
-                    color: Colors.green, size: 16),
-                const SizedBox(width: 6),
-                Text(
-                  "Code $_appliedPromoCode applied (-${(_discountPercent * 100).toInt()}%)",
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.green,
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: TextField(
+                    controller: _discountController,
+                    textCapitalization: TextCapitalization.characters,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: context.color.textDefaultColor,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: "Discount code",
+                      hintStyle: TextStyle(
+                        fontSize: 13,
+                        color:
+                            context.color.textLightColor.withValues(alpha: 0.7),
+                      ),
+                      filled: true,
+                      fillColor: context.color.backgroundColor,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                          color: context.color.borderColor,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                          color: context.color.borderColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton(
+                  onPressed: _applyDiscountCode,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: context.color.secondaryColor,
+                    foregroundColor: context.color.textDefaultColor,
+                    side: BorderSide(color: context.color.borderColor),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 13),
+                  ),
+                  child: const Text(
+                    "Apply",
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                   ),
                 ),
               ],
             ),
+
+            if (_appliedPromoCode != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded,
+                      color: Colors.green, size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    "Code $_appliedPromoCode applied (-${(_discountPercent * 100).toInt()}%)",
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.green,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
 
           const SizedBox(height: 16),

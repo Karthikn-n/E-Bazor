@@ -12,6 +12,7 @@ import 'package:Ebozor/data/cubits/item/fetch_item_from_category_cubit.dart';
 import 'package:Ebozor/data/cubits/category/fetch_sub_categories_cubit.dart';
 import 'package:Ebozor/data/model/category_model.dart';
 import 'package:Ebozor/data/repositories/category_repository.dart';
+import 'package:Ebozor/data/repositories/item/item_repository.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
@@ -98,6 +99,7 @@ class ItemsListState extends State<ItemsList> {
   late final FetchSubCategoriesCubit _chipFilterCubit;
   List<String> _currentCategoryIds = [];
   FilterCategory? _propertyFilterConfiguration;
+  final Set<int> _deactivatingHiringItemIds = <int>{};
 
   bool _showVerifiedOnly = false;
 
@@ -2365,6 +2367,49 @@ class ItemsListState extends State<ItemsList> {
         catName.contains('job');
   }
 
+  bool _isOwnedByCurrentUser(ItemModel item) {
+    final currentUserId = HiveUtils.getUserId()?.trim() ?? '';
+    final ownerId = (item.user?.id ?? item.userId)?.toString() ?? '';
+    return currentUserId.isNotEmpty && ownerId == currentUserId;
+  }
+
+  Future<void> _deactivateOwnedHiringPost(ItemModel item) async {
+    final itemId = item.id;
+    if (itemId == null || _deactivatingHiringItemIds.contains(itemId)) return;
+    setState(() => _deactivatingHiringItemIds.add(itemId));
+    try {
+      final response = await ItemRepository().changeMyItemStatus(
+        itemId: itemId,
+        status: 'inactive',
+      );
+      if (response['error'] == true) {
+        throw response['message']?.toString() ?? 'Could not deactivate ad';
+      }
+      if (!mounted) return;
+      item
+        ..status = 'inactive'
+        ..active = false;
+      HelperUtils.showSnackBarMessage(
+        context,
+        response['message']?.toString() ?? 'Ad deactivated successfully',
+        type: MessageType.success,
+      );
+      _fetchFilteredItems();
+    } catch (error) {
+      if (mounted) {
+        HelperUtils.showSnackBarMessage(
+          context,
+          error.toString(),
+          type: MessageType.error,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _deactivatingHiringItemIds.remove(itemId));
+      }
+    }
+  }
+
   String? _getJobCustomField(ItemModel item, List<String> aliases) {
     if (item.customFields == null || item.customFields!.isEmpty) return null;
     for (final alias in aliases) {
@@ -2949,6 +2994,56 @@ class ItemsListState extends State<ItemsList> {
                           (item.category?.name ?? '')
                               .toLowerCase()
                               .contains('hire');
+
+                      final isOwnedHiringPost =
+                          item.isHiringPost && _isOwnedByCurrentUser(item);
+
+                      if (isOwnedHiringPost) {
+                        final isUpdating = item.id != null &&
+                            _deactivatingHiringItemIds.contains(item.id);
+                        return InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: isUpdating
+                              ? null
+                              : () => _deactivateOwnedHiringPost(item),
+                          child: Container(
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade800,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (isUpdating)
+                                  const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                else
+                                  const Icon(
+                                    Icons.pause_circle_outline_rounded,
+                                    size: 17,
+                                    color: Colors.white,
+                                  ),
+                                const SizedBox(width: 6),
+                                const Text(
+                                  "Deactivate Ad",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
 
                       if (isJobItem) {
                         if (isHireTalent) {

@@ -1,8 +1,6 @@
 import 'package:Ebozor/data/model/custom_field/custom_field_model.dart';
-import 'package:Ebozor/data/model/verification_request_model.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
-
 
 class SellerVerificationFieldRepository {
   Future<List<VerificationFieldModel>> getSellerVerificationFields() async {
@@ -50,22 +48,6 @@ class SellerVerificationFieldRepository {
       return response;
     } catch (e) {
       rethrow;
-    }
-  }
-
-  Future<VerificationRequestModel> getVerificationRequest() async {
-    try {
-      Map<String, dynamic> parameters = {};
-
-      Map<String, dynamic> response = await Api.get(
-          url: Api.getVerificationRequestApi, queryParameters: parameters);
-
-      VerificationRequestModel model =
-          VerificationRequestModel.fromJson(response['data']);
-
-      return model;
-    } catch (e) {
-      throw "$e";
     }
   }
 }

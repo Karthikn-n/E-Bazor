@@ -19,7 +19,6 @@ import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/data/cubits/chat/blocked_users_list_cubit.dart';
 import 'package:Ebozor/data/cubits/favorite/favorite_cubit.dart';
-import 'package:Ebozor/data/cubits/seller/fetch_verification_request_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hive_flutter/adapters.dart';
@@ -68,9 +67,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     super.initState();
     final settings = context.read<FetchSystemSettingsCubit>();
     if (HiveUtils.isUserAuthenticated()) {
-      context
-          .read<FetchVerificationRequestsCubit>()
-          .fetchVerificationRequests();
       _refreshUserVerificationStatus();
     }
     if (!const bool.fromEnvironment("force-disable-demo-mode",
@@ -111,26 +107,14 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  void _handleVerificationTap(FetchVerificationRequestState state) {
-    if (state is FetchVerificationRequestSuccess) {
-      final status =
-          state.data.status?.trim().toLowerCase().replaceAll('_', ' ');
-      if (status == 'pending' || status == 'under review') {
-        HelperUtils.showSnackBarMessage(
-          context,
-          "verificationUnderReview".translate(context),
-          type: MessageType.warning,
-        );
-        return;
-      }
-      if (status == 'rejected') {
-        Navigator.pushNamed(
-          context,
-          Routes.sellerVerificationScreen,
-          arguments: {'isResubmitted': true},
-        );
-        return;
-      }
+  void _handleVerificationTap() {
+    if (HiveUtils.getUserDetails().isVerified == 1) {
+      HelperUtils.showSnackBarMessage(
+        context,
+        "Your account is already verified!",
+        type: MessageType.success,
+      );
+      return;
     }
 
     Navigator.pushNamed(
@@ -409,16 +393,12 @@ class _ProfileScreenState extends State<ProfileScreen>
   // Top Profile Card
   // ---------------------------------------------------------------------------
   Widget _buildProfileHeader() {
-    return BlocBuilder<FetchVerificationRequestsCubit,
-        FetchVerificationRequestState>(builder: (context, state) {
-      return ValueListenableBuilder(
-        valueListenable: Hive.box(HiveKeys.userDetailsBox).listenable(),
-        builder: (context, Box box, _) {
-          final user = HiveUtils.getUserDetails();
-          final isAuthenticated = HiveUtils.isUserAuthenticated();
-          final isVerified = user.isVerified == 1 ||
-              (state is FetchVerificationRequestSuccess &&
-                  state.data.status == "approved");
+    return ValueListenableBuilder(
+      valueListenable: Hive.box(HiveKeys.userDetailsBox).listenable(),
+      builder: (context, Box box, _) {
+        final user = HiveUtils.getUserDetails();
+        final isAuthenticated = HiveUtils.isUserAuthenticated();
+        final isVerified = user.isVerified == 1;
 
           String joinedDate = "";
           if (isAuthenticated &&
@@ -570,7 +550,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       if (isAuthenticated) ...[
                         if (isVerified)
                           GestureDetector(
-                            onTap: () => _handleVerificationTap(state),
+                            onTap: _handleVerificationTap,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 10, vertical: 4),
@@ -602,7 +582,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           )
                         else
                           InkWell(
-                            onTap: () => _handleVerificationTap(state),
+                            onTap: _handleVerificationTap,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 10, vertical: 4),
@@ -679,7 +659,6 @@ class _ProfileScreenState extends State<ProfileScreen>
           );
         },
       );
-    });
   }
 
   // ---------------------------------------------------------------------------

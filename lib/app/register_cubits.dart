@@ -31,7 +31,6 @@ import 'package:Ebozor/data/cubits/report/fetch_item_report_reason_list.dart';
 import 'package:Ebozor/data/cubits/report/item_report_cubit.dart';
 import 'package:Ebozor/data/cubits/report/update_report_items_list_cubit.dart';
 import 'package:Ebozor/data/cubits/seller/fetch_seller_verification_field.dart';
-import 'package:Ebozor/data/cubits/seller/fetch_verification_request_cubit.dart';
 import 'package:Ebozor/data/cubits/slider_cubit.dart';
 import 'package:Ebozor/data/cubits/subscription/in_app_purchase_cubit.dart';
 import 'package:Ebozor/data/cubits/subscription/assign_free_package_cubit.dart';
@@ -148,7 +147,6 @@ class RegisterCubits {
     BlocProvider(create: (context) => FetchSellerRatingsCubit()),
     BlocProvider(create: (context) => FetchSellerVerificationFieldsCubit()),
     BlocProvider(create: (context) => SendVerificationFieldCubit()),
-    BlocProvider(create: (context) => FetchVerificationRequestsCubit()),
     BlocProvider(create: (context) => FetchMyRatingsCubit()),
     BlocProvider(create: (context) => AddMyItemReviewReportCubit()),
     BlocProvider(create: (context) => RenewItemCubit()),

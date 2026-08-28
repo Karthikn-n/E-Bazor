@@ -178,7 +178,6 @@ class Api {
   static String addItemReviewApi = "add-item-review";
   static String getVerificationFieldApi = "verification-fields";
   static String sendVerificationRequestApi = "send-verification-request";
-  static String getVerificationRequestApi = "verification-request";
   static String setUserPhoneNumberApi = "set-user-phonenumber";
   static String getMyReviewApi = "my-review";
   static String addReviewReportApi = "add-review-report";

@@ -34,5 +34,20 @@ void main() {
 
       expect(item.status, isEmpty);
     });
+
+    test('identifies employer hiring posts without matching candidate posts',
+        () {
+      final hiringPost = ItemModel.fromJson({
+        'category_id': 440,
+        'all_category_ids': '4,356,404,440',
+      });
+      final candidatePost = ItemModel.fromJson({
+        'category_id': 357,
+        'all_category_ids': '4,357',
+      });
+
+      expect(hiringPost.isHiringPost, isTrue);
+      expect(candidatePost.isHiringPost, isFalse);
+    });
   });
 }

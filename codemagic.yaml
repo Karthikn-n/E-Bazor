@@ -7,7 +7,7 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 60
     integrations:
-      app_store_connect: codemagic_api_key # Matches the key name you save in Codemagic Integrations > Apple Developer Portal
+      app_store_connect: ebazor_codemagic_api_key # Matches the key name you save in Codemagic Integrations > Apple Developer Portal
     environment:
       ios_signing:
         distribution_type: ad_hoc # Creates an Ad-Hoc provisioning profile containing all registered test devices
@@ -36,7 +36,7 @@ workflows:
     publishing:
       email:
         recipients:
-          - your-email@example.com # Replace with your email to receive build download link
+          - karthikn11092001@gmail.com # Replace with your email to receive build download link
         notify:
           success: true
           failure: true

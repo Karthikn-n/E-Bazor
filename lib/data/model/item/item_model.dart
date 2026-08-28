@@ -81,6 +81,12 @@ class ItemModel {
   bool get isJobsCategory =>
       categoryPathIds.contains(4) || _categorySearchText.contains('job');
 
+  /// Employer-created job vacancy posts live under the "I'm hiring" branch
+  /// (category 356). Candidate/"I want a job" posts use category 357 and must
+  /// keep their separate CV actions.
+  bool get isHiringPost =>
+      categoryPathIds.contains(356) || _categorySearchText.contains('hiring');
+
   bool get isClassifiedsCategory =>
       categoryPathIds.contains(2) ||
       _categorySearchText.contains('classified') ||

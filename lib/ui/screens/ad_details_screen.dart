@@ -146,6 +146,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
       HiveUtils.getUserId();
 
   bool isFeaturedWidget = true;
+  bool _isDeactivatingHiringPost = false;
   String youtubeVideoThumbnail = "";
   int? categoryId;
   FlickManager? flickManager;
@@ -3000,6 +3001,20 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     if (isAddedByMe) {
       final model = this.model;
       final contextColor = context.color;
+      if (_isHiringPost()) {
+        final status = (model.status ?? '').trim().toLowerCase();
+        final isLive = status == 'active' ||
+            status == 'approved' ||
+            status == 'live' ||
+            status == '1';
+        if (!isLive) return const SizedBox.shrink();
+        return _buildButton(
+          _isDeactivatingHiringPost ? 'Deactivating...' : 'Deactivate Ad',
+          () => _deactivateOwnedHiringPost(model),
+          null,
+          null,
+        );
+      }
       final editStatus = _editStatusFor(model);
       if (_isPaymentPendingStatus(editStatus)) {
         model.status = editStatus;
@@ -3170,6 +3185,42 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
         catId == 357 ||
         catSlug.contains('job') ||
         catName.contains('job');
+  }
+
+  bool _isHiringPost() => model.isHiringPost || widget.model.isHiringPost;
+
+  Future<void> _deactivateOwnedHiringPost(ItemModel item) async {
+    if (_isDeactivatingHiringPost || item.id == null) return;
+    setState(() => _isDeactivatingHiringPost = true);
+    try {
+      final response = await ItemRepository().changeMyItemStatus(
+        itemId: item.id!,
+        status: 'inactive',
+      );
+      if (response['error'] == true) {
+        throw response['message']?.toString() ?? 'Could not deactivate ad';
+      }
+      if (!mounted) return;
+      setState(() {
+        item
+          ..status = 'inactive'
+          ..active = false;
+        _isDeactivatingHiringPost = false;
+      });
+      HelperUtils.showSnackBarMessage(
+        context,
+        response['message']?.toString() ?? 'Ad deactivated successfully',
+        type: MessageType.success,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isDeactivatingHiringPost = false);
+      HelperUtils.showSnackBarMessage(
+        context,
+        error.toString(),
+        type: MessageType.error,
+      );
+    }
   }
 
   bool _isHireTalentAd() {
@@ -4189,7 +4240,10 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
           ),
         ),
         // Top Floating More Button (if added by me)
-        if (isAddedByMe)
+        if (isAddedByMe &&
+            (!_isHiringPost() ||
+                const {'active', 'approved', 'live', '1'}
+                    .contains((model.status ?? '').trim().toLowerCase())))
           Positioned(
             top: MediaQuery.of(context).padding.top + 8,
             right: 14,
@@ -4329,6 +4383,33 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                               status == "pending payment" ||
                                   status == "payment_pending";
                           final isExpired = status == "expired";
+
+                          if (_isHiringPost()) {
+                            return isLive
+                                ? [
+                                    PopupMenuItem(
+                                      value: "deactivate",
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.pause_circle_outline_rounded,
+                                            size: 18,
+                                            color: Colors.amber.shade800,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            "Deactivate Ad",
+                                            style: TextStyle(
+                                              color: Colors.amber.shade800,
+                                              fontSize: 13.5,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ]
+                                : const <PopupMenuEntry<String>>[];
+                          }
 
                           return [
                             PopupMenuItem(
