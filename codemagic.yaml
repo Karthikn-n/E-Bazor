@@ -6,11 +6,9 @@ workflows:
     name: iOS Ad-Hoc Release Build (For Loadly.io)
     instance_type: mac_mini_m2
     max_build_duration: 60
-    integrations:
-      app_store_connect: ebazor_codemagic_api_key # Matches the key name you save in Codemagic Integrations > Apple Developer Portal
     environment:
       ios_signing:
-        distribution_type: ad_hoc # Creates an Ad-Hoc provisioning profile containing all registered test devices
+        distribution_type: ad_hoc # Matches the uploaded Ad-Hoc profile for com.ebozor.app
         bundle_identifier: com.ebozor.app # Your iOS Bundle ID
       flutter: stable
       xcode: latest
