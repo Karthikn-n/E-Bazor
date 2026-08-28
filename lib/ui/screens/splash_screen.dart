@@ -81,8 +81,10 @@ class SplashScreenState extends State<SplashScreen> {
       _settingsLoaded = true;
 
       final cachedLanguage = HiveUtils.getLanguage();
-      final defaultLanguage =
-          settingsCubit.getRawSettings()['default_language']?.toString();
+      final defaultLanguage = settingsCubit
+          .getRawSettings()['default_language']
+          ?.toString()
+          .trim();
       final needsLanguage = cachedLanguage == null ||
           cachedLanguage['data'] == null ||
           (HiveUtils.isUserFirstTime() &&
@@ -90,10 +92,14 @@ class SplashScreenState extends State<SplashScreen> {
 
       if (!needsLanguage) {
         _languageLoaded = true;
-      } else if (defaultLanguage != null && defaultLanguage.isNotEmpty) {
+      } else {
+        final languageCode =
+            defaultLanguage == null || defaultLanguage.isEmpty
+                ? 'en'
+                : defaultLanguage;
         final languageCubit = context.read<FetchLanguageCubit>();
         await languageCubit
-            .getLanguage(defaultLanguage)
+            .getLanguage(languageCode)
             .timeout(const Duration(seconds: 15));
         final state = languageCubit.state;
         if (state is FetchLanguageSuccess) {
@@ -107,7 +113,7 @@ class SplashScreenState extends State<SplashScreen> {
         } else if (cachedLanguage?['data'] != null) {
           _languageLoaded = true;
         } else {
-          throw StateError('Language could not be loaded');
+          await _useBundledLanguageFallback(languageCode);
         }
       }
     } catch (_) {
@@ -117,6 +123,22 @@ class SplashScreenState extends State<SplashScreen> {
       if (mounted) setState(() {});
       _tryNavigate();
     }
+  }
+
+  Future<void> _useBundledLanguageFallback(String languageCode) async {
+    final fallbackLanguage = <String, dynamic>{
+      'code': languageCode,
+      'name': languageCode == 'en' ? 'English' : languageCode,
+      'name_in_english': languageCode == 'en' ? 'English' : languageCode,
+      'image': '',
+      'data': <String, String>{},
+      'rtl': false,
+    };
+    await HiveUtils.storeLanguage(fallbackLanguage);
+    if (mounted) {
+      context.read<LanguageCubit>().changeLanguage(fallbackLanguage);
+    }
+    _languageLoaded = true;
   }
 
   Future<void> _tryNavigate() async {
