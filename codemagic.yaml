@@ -14,6 +14,9 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
+      - name: Disable experimental Swift Package Manager
+        script: |
+          flutter config --no-enable-swift-package-manager
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
@@ -22,7 +25,7 @@ workflows:
           flutter packages pub get
       - name: Install CocoaPods dependencies
         script: |
-          find . -name "Podfile" -execdir pod install \;
+          cd ios && pod install --repo-update && cd ..
       - name: Flutter build iOS (.ipa)
         script: |
           flutter build ipa --release \

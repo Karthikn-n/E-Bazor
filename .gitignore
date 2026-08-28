@@ -22,8 +22,7 @@ build/
 *.ipa
 ios/Flutter/App.framework
 ios/Flutter/Flutter.framework
-*.xcworkspace
-ios/Runner.xcworkspace
+**/xcuserdata/
 android/.gradle/
 android/app/build/
 coverage/
