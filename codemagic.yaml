@@ -1,14 +1,16 @@
-# Codemagic CI/CD Configuration for iOS Ad-Hoc Build (Loadly.io Distribution)
+# Codemagic CI/CD Configuration for TestFlight Build & Distribution
 # Documentation: https://docs.codemagic.io/flutter-code-signing/ios-code-signing/
 
 workflows:
-  ios-ad-hoc:
-    name: iOS Ad-Hoc Release Build (For Loadly.io)
+  ios-testflight:
+    name: iOS TestFlight Release Build
     instance_type: mac_mini_m2
     max_build_duration: 60
+    integrations:
+      app_store_connect: ebazor_codemagic_api_key
     environment:
       ios_signing:
-        distribution_type: ad_hoc # Matches the uploaded Ad-Hoc profile for com.ebozor.app
+        distribution_type: app_store # For TestFlight
         bundle_identifier: com.ebozor.app # Your iOS Bundle ID
       flutter: stable
       xcode: latest
@@ -42,6 +44,9 @@ workflows:
       - /tmp/xcodebuild_logs/*.log
       - flutter_drive.log
     publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true # Automatically sends to all Internal Testers
       email:
         recipients:
           - karthikn11092001@gmail.com # Replace with your email to receive build download link
