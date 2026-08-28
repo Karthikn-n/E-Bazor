@@ -57,6 +57,40 @@ class FetchMyPromotedItemsCubit extends Cubit<FetchMyPromotedItemsState> {
   final ItemRepository _itemRepository = ItemRepository();
   String? _currentStatus;
 
+  bool _isLiveFilter(String? status) {
+    final normalized = status?.trim().toLowerCase() ?? '';
+    return normalized == 'approved' ||
+        normalized == 'active' ||
+        normalized == 'live';
+  }
+
+  bool _isLiveItem(ItemModel item) {
+    final normalized = item.status?.trim().toLowerCase() ?? '';
+    return normalized == 'approved' ||
+        normalized == 'active' ||
+        normalized == 'live' ||
+        normalized == '1';
+  }
+
+  Future<DataOutput<ItemModel>> _fetchAllLiveItems() async {
+    final items = <ItemModel>[];
+    var page = 1;
+    var fetchedCount = 0;
+    var serverTotal = 0;
+
+    do {
+      final result = await _itemRepository.fetchMyItems(page: page);
+      serverTotal = result.total;
+      fetchedCount += result.modelList.length;
+      items.addAll(result.modelList.where(_isLiveItem));
+      page++;
+
+      if (result.modelList.isEmpty) break;
+    } while (fetchedCount < serverTotal);
+
+    return DataOutput(total: items.length, modelList: items);
+  }
+
   void resetState() {
     if (isClosed) return;
     emit(FetchMyPromotedItemsInitial());
@@ -76,11 +110,16 @@ class FetchMyPromotedItemsCubit extends Cubit<FetchMyPromotedItemsState> {
       _currentStatus = status;
       emit(FetchMyPromotedItemsInProgress());
 
-      DataOutput<ItemModel> result = await _itemRepository.fetchMyItems(
-        getItemsWithStatus:
-            (status != null && status.isNotEmpty) ? status : null,
-        page: 1,
-      );
+      // The backend currently stores some paid ads with a blank status, so an
+      // `approved` server filter excludes them. Fetch and normalize all pages
+      // for Live while retaining server-side filters for every other tab.
+      DataOutput<ItemModel> result = _isLiveFilter(status)
+          ? await _fetchAllLiveItems()
+          : await _itemRepository.fetchMyItems(
+              getItemsWithStatus:
+                  (status != null && status.isNotEmpty) ? status : null,
+              page: 1,
+            );
 
       if (isClosed) return;
 
@@ -125,6 +164,11 @@ class FetchMyPromotedItemsCubit extends Cubit<FetchMyPromotedItemsState> {
 
   Future<void> fetchMyPromotedItemsMore({String? status}) async {
     if (isClosed) return;
+    if (_isLiveFilter(status ?? _currentStatus)) {
+      // Live is fetched across all server pages in the initial request so
+      // package-backed items with a blank server status are not missed.
+      return;
+    }
     try {
       if (state is FetchMyPromotedItemsSuccess) {
         if ((state as FetchMyPromotedItemsSuccess).isLoadingMore) {

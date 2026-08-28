@@ -51,7 +51,7 @@ windows/build/
 # Web build artifacts
 web/.dart_tool/
 web/build/
-
+*.md
 # Firebase configuration files
 #google-services.json
 #ios/Runner/GoogleService-Info.plist

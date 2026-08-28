@@ -62,9 +62,11 @@ class LoadChatMessagesCubit extends Cubit<LoadChatMessagesState> {
   LoadChatMessagesCubit() : super(LoadChatMessagesInitial());
   final ChatRepostiory _chatRepostiory = ChatRepostiory();
 
-  Future<void> load({required int itemOfferId}) async {
+  Future<void> load({required int itemOfferId, bool isBackground = false}) async {
     try {
-      emit(LoadChatMessagesInProgress());
+      if (!isBackground) {
+        emit(LoadChatMessagesInProgress());
+      }
       final result = await _chatRepostiory.getMessagesApi(
         itemOfferId: itemOfferId,
         page: 1,
@@ -72,6 +74,19 @@ class LoadChatMessagesCubit extends Cubit<LoadChatMessagesState> {
 
       var messages = List<ChatMessage>.of(result.modelList);
       var currentPage = 1;
+
+      if (isBackground && state is LoadChatMessagesSuccess) {
+        final currentMessages = (state as LoadChatMessagesSuccess).messages;
+        final merged = _mergeMessages(currentMessages, messages);
+        if (merged.length != currentMessages.length) {
+          emit((state as LoadChatMessagesSuccess).copyWith(
+            messages: merged,
+            totalPage: result.total,
+          ));
+        }
+        return;
+      }
+
       emit(LoadChatMessagesSuccess(
         messages: messages,
         currentPage: currentPage,
@@ -112,7 +127,9 @@ class LoadChatMessagesCubit extends Cubit<LoadChatMessagesState> {
         emit((state as LoadChatMessagesSuccess).copyWith(isLoadingMore: false));
       }
     } catch (e) {
-      emit(LoadChatMessagesFailed(error: e.toString()));
+      if (!isBackground) {
+        emit(LoadChatMessagesFailed(error: e.toString()));
+      }
     }
   }
 

@@ -176,7 +176,7 @@ class FilterRepository {
         queryParameters: {"slug": slug},
       );
 
-      log("📦 [FILTER API RES] → Status: ${response.statusCode} | Data: ${response.data}");
+      log("Status: ${response.statusCode} | Data: ${response.data}", name: Api.getCategoryFiltersApi);
 
       if (response.statusCode == 200) {
         final raw = response.data['data'];

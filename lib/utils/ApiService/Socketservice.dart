@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer';
+import 'package:Ebozor/settings.dart';
 import 'package:Ebozor/ui/screens/chat/chat_audio/widgets/chat_widget.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/notification/chat_message_handler.dart';
@@ -17,6 +19,7 @@ class ChatSocketService {
   Timer? _presenceTimer;
   bool _isConnecting = false;
   final Set<int> _joinedOfferIds = <int>{};
+  bool _attemptedFallback = false;
 
   bool get isConnected => _socket?.connected ?? false;
   final ValueNotifier<bool> isOtherUserTyping = ValueNotifier(false);
@@ -25,68 +28,90 @@ class ChatSocketService {
   void connect() {
     if (_socket?.connected == true || _isConnecting) return;
 
-    // Reuse the existing Socket.IO instance so repeated join calls while the
-    // handshake is in progress cannot tear it down and lose the room join.
     if (_socket != null) {
       _isConnecting = true;
       _socket!.connect();
       return;
     }
 
+    _connectWithUrl(AppSettings.socketUrl);
+  }
+
+  void _connectWithUrl(String targetUrl) {
     _isConnecting = true;
+    final token = HiveUtils.getJWT();
+    log("[ChatSocket] Connecting to: $targetUrl (JWT present: ${token != null && token.isNotEmpty})");
 
     _socket = IO.io(
-      "http://143.110.251.34:6002",
+      targetUrl,
       IO.OptionBuilder()
-          .setTransports(['websocket'])
+          .setTransports(['websocket', 'polling'])
           .disableAutoConnect()
           .enableReconnection()
-          .setReconnectionDelay(1000)
-          .setAuth({"token": "Bearer ${HiveUtils.getJWT()}"})
+          .setReconnectionDelay(2000)
+          .setReconnectionAttempts(5)
+          .setTimeout(5000)
+          .setAuth({"token": "Bearer $token"})
+          .setExtraHeaders({"Authorization": "Bearer $token"})
           .build(),
     );
 
     _socket!.on("typing", (data) {
       final myId = HiveUtils.getUserId();
+      final senderId = data is Map ? (data["userId"] ?? data["sender_id"] ?? data["senderId"])?.toString() : null;
 
       // ignore own typing
-      if (data["userId"].toString() == myId) return;
+      if (senderId != null && senderId == myId) return;
 
-      if (data["status"] == "start") {
-        print("✍️ Other user typing");
+      final status = data is Map ? data["status"]?.toString() : null;
+      if (status == "start") {
+        print("[ChatSocket] ✍️ Other user typing");
         isOtherUserTyping.value = true;
       } else {
-        print("🛑 Other user stopped typing");
+        print("[ChatSocket] 🛑 Other user stopped typing");
         isOtherUserTyping.value = false;
       }
     });
 
-    // Add listeners once
+    // Add listeners
     _socket!.off("message");
+    _socket!.off("chat-message");
+    _socket!.off("receive-message");
+    _socket!.off("newMessage");
+
     _socket!.on("message", _onMessageReceived);
+    _socket!.on("chat-message", _onMessageReceived);
+    _socket!.on("receive-message", _onMessageReceived);
+    _socket!.on("newMessage", _onMessageReceived);
 
     _socket!.onConnect((_) {
       _isConnecting = false;
+      log("[ChatSocket] 🔥 Socket Connected successfully to $targetUrl");
       for (final offerId in _joinedOfferIds) {
         _emitJoin(offerId);
       }
-      print("🔥 Socket Connected");
       _startPresencePing();
     });
 
-    _socket!.onDisconnect((_) {
+    _socket!.onDisconnect((reason) {
       _isConnecting = false;
-      print("🔥 Socket Disconnected");
+      log("[ChatSocket] 🔥 Socket Disconnected: $reason");
       _stopPresencePing();
     });
 
     _socket!.onConnectError((error) {
       _isConnecting = false;
-      print("Socket connection error: $error");
+      log("[ChatSocket] Socket connection error ($targetUrl): $error");
+      if (!_attemptedFallback && targetUrl.contains(":6002")) {
+        _attemptedFallback = true;
+        log("[ChatSocket] Retrying connection on host URL without port 6002: ${AppSettings.hostUrl}");
+        disconnect();
+        _connectWithUrl(AppSettings.hostUrl);
+      }
     });
 
     _socket!.onError((error) {
-      print("Socket error: $error");
+      log("[ChatSocket] Socket error ($targetUrl): $error");
     });
 
     _socket!.connect();
@@ -106,7 +131,7 @@ class ChatSocketService {
 
     // Ignore own messages
     if (senderId.toString() == myId) {
-      print("🔥 Ignored own message");
+      log("🔥 Ignored own message");
       return;
     }
 
@@ -165,51 +190,69 @@ class ChatSocketService {
   }
 
   void _emitJoin(int offerId) {
-    print("🔥 Emitting join: {offerId: $offerId}");
-    _socket?.emit("join", {
+    log("[ChatSocket] 🔥 Emitting join for room: $offerId");
+    final payload = {
       "offerId": offerId,
       "item_offer_id": offerId,
-    });
+      "room": "offer_$offerId",
+      "user_id": HiveUtils.getUserId(),
+    };
+    _socket?.emit("join", payload);
+    _socket?.emit("join-room", payload);
+    _socket?.emit("join_room", payload);
   }
 
   /// Send a chat message
-  void sendMessage(int offerId, String message) {
+  void sendMessage(int offerId, String message, {String? file, String? audio}) {
     if (_socket?.connected != true) {
       connect();
       return;
     }
-    print("🔥 Emitting message: {offerId: $offerId, message: $message}");
-    _socket?.emit("message", {
+    final payload = {
       "offerId": offerId,
       "item_offer_id": offerId,
       "message": message,
-    });
+      "sender_id": HiveUtils.getUserId(),
+      "file": file ?? "",
+      "audio": audio ?? "",
+      "created_at": DateTime.now().toUtc().toIso8601String(),
+    };
+    log("[ChatSocket] 🔥 Emitting message: $payload");
+    _socket?.emit("message", payload);
+    _socket?.emit("send-message", payload);
+    _socket?.emit("sendMessage", payload);
   }
 
   /// Typing indicators
   void typingStart(int offerId) {
     if (_socket?.connected != true) return;
-    _socket?.emit("typing", {
+    final payload = {
       "offerId": offerId,
       "item_offer_id": offerId,
+      "userId": HiveUtils.getUserId(),
+      "sender_id": HiveUtils.getUserId(),
       "status": "start",
-    });
+    };
+    _socket?.emit("typing", payload);
   }
 
   void typingStop(int offerId) {
     if (_socket?.connected != true) return;
-    _socket?.emit("typing", {
+    final payload = {
       "offerId": offerId,
       "item_offer_id": offerId,
+      "userId": HiveUtils.getUserId(),
+      "sender_id": HiveUtils.getUserId(),
       "status": "stop",
-    });
+    };
+    _socket?.emit("typing", payload);
   }
 
   /// Presence ping
   void _startPresencePing() {
     _presenceTimer?.cancel();
     _presenceTimer = Timer.periodic(const Duration(seconds: 60), (_) {
-      print("🔥 Emitting presence:ping");
+      log("🔥 Emitting presence:ping");
       _socket?.emit("presence:ping");
     });
   }
@@ -222,7 +265,7 @@ class ChatSocketService {
   void leaveOffer(int offerId) {
     _joinedOfferIds.remove(offerId);
     if (_socket != null && _socket!.connected) {
-      print("🔥 Emitting leave: {offerId: $offerId}");
+      log("🔥 Emitting leave: {offerId: $offerId}");
       _socket?.emit("leave", {
         "offerId": offerId,
         "item_offer_id": offerId,
@@ -317,7 +360,7 @@ class ChatSocketService {
   @mustCallSuper
   void reassemble() {
     // This runs on hot reload
-    print("🔥 Hot reload detected, disconnecting old socket");
+    log("🔥 Hot reload detected, disconnecting old socket");
     disconnect();
   }
 }

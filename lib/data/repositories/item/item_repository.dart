@@ -10,6 +10,22 @@ import 'package:Ebozor/data/model/item/item_model.dart';
 import 'package:path/path.dart' as path;
 
 class ItemRepository {
+  static void _sanitizeContact(Map<String, dynamic> parameters) {
+    if (parameters.containsKey('contact')) {
+      final raw = parameters['contact']?.toString().trim() ?? '';
+      final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+      if (digits.isNotEmpty) {
+        parameters['contact'] = digits;
+      } else {
+        final userMobile =
+            HiveUtils.getUserDetails().mobile?.replaceAll(RegExp(r'[^0-9]'), '') ?? '';
+        if (userMobile.isNotEmpty) {
+          parameters['contact'] = userMobile;
+        }
+      }
+    }
+  }
+
   Future<ItemModel> createItem(
     Map<String, dynamic> itemDetails,
     File? mainImage,
@@ -18,6 +34,7 @@ class ItemRepository {
     try {
       Map<String, dynamic> parameters = {};
       parameters.addAll(itemDetails);
+      _sanitizeContact(parameters);
 
       // Main image
       if (mainImage != null) {
@@ -177,10 +194,17 @@ class ItemRepository {
     return DataOutput(total: modelList.length, modelList: modelList);
   }
 
-  Future<DataOutput<ItemModel>> fetchItemFromItemSlug(String slug) async {
+  Future<DataOutput<ItemModel>> fetchItemFromItemSlug(String slug,
+      {int? categoryId, String? status}) async {
     Map<String, dynamic> parameters = {
       "slug": slug,
     };
+    if (categoryId != null) {
+      parameters[Api.categoryId] = categoryId;
+    }
+    if (status != null && status.isNotEmpty) {
+      parameters['status'] = status;
+    }
 
     Map<String, dynamic> response = await Api.get(
       url: Api.getItemApi,
@@ -235,41 +259,74 @@ class ItemRepository {
       Api.page: page,
     };
 
+    final effRadius = filter?.radius ?? HiveUtils.getNearbyRadius();
+    final effLat = filter?.latitude ??
+        HiveUtils.getLatitude() ??
+        HiveUtils.getCurrentLatitude();
+    final effLong = filter?.longitude ??
+        HiveUtils.getLongitude() ??
+        HiveUtils.getCurrentLongitude();
+
+    if (effRadius != null && effLat != null && effLong != null) {
+      parameters['radius'] = effRadius;
+      parameters['latitude'] = effLat;
+      parameters['longitude'] = effLong;
+    } else {
+      final effCountry = (filter?.country != null &&
+              filter!.country!.trim().isNotEmpty)
+          ? filter.country!.trim()
+          : (country != null && country.trim().isNotEmpty)
+              ? country.trim()
+              : HiveUtils.getCountryName();
+
+      final effState = (filter?.state != null &&
+              filter!.state!.trim().isNotEmpty)
+          ? filter.state!.trim()
+          : (state != null && state.trim().isNotEmpty)
+              ? state.trim()
+              : HiveUtils.getStateName();
+
+      final effCity = (filter?.city != null && filter!.city!.trim().isNotEmpty)
+          ? filter.city!.trim()
+          : (city != null && city.trim().isNotEmpty)
+              ? city.trim()
+              : HiveUtils.getCityName();
+
+      final effAreaId = filter?.areaId ?? areaId ?? HiveUtils.getAreaId();
+
+      if (effCountry != null && effCountry.trim().isNotEmpty) {
+        parameters['country'] = effCountry.trim();
+      }
+      if (effState != null && effState.trim().isNotEmpty) {
+        parameters['state'] = effState.trim();
+      }
+      if (effCity != null && effCity.trim().isNotEmpty) {
+        parameters['city'] = effCity.trim();
+      }
+      if (effAreaId != null && effAreaId > 0) {
+        parameters['area_id'] = effAreaId;
+      }
+    }
+
     if (filter != null) {
-      parameters.addAll(filter.toMap());
-
-      // If radius is present, include latitude and longitude
-      // and remove location-related fields
-      if (filter.radius != null) {
-        if (filter.latitude != null && filter.longitude != null) {
-          parameters['latitude'] = filter.latitude;
-          parameters['longitude'] = filter.longitude;
-        }
-
-        parameters.remove('city');
-        parameters.remove('area');
-        parameters.remove('area_id');
-        parameters.remove('country');
-        parameters.remove('state');
-      } else {
-        if (city != null && city != "") parameters['city'] = city;
-        if (areaId != null) parameters['area_id'] = areaId;
-        if (country != null && country != "") parameters['country'] = country;
-        if (state != null && state != "") parameters['state'] = state;
+      if (filter.minPrice != null &&
+          filter.minPrice!.trim().isNotEmpty &&
+          filter.minPrice != '0') {
+        parameters['min_price'] = filter.minPrice!.trim();
       }
-
-      if (filter.areaId == null && areaId == null) {
-        parameters.remove('area_id');
+      if (filter.maxPrice != null && filter.maxPrice!.trim().isNotEmpty) {
+        parameters['max_price'] = filter.maxPrice!.trim();
       }
-
-      parameters.remove('area');
-
-      if (filter.categorySlug != null && filter.categorySlug!.isNotEmpty) {
-        parameters['category_slug'] = filter.categorySlug;
+      if (filter.postedSince != null && filter.postedSince!.trim().isNotEmpty) {
+        parameters['posted_since'] = filter.postedSince!.trim();
+      }
+      if (filter.categorySlug != null &&
+          filter.categorySlug!.trim().isNotEmpty) {
+        parameters['category_slug'] = filter.categorySlug!.trim();
       }
 
       // Add custom fields / filters separately to the parameters
-      if (filter.customFields != null) {
+      if (filter.customFields != null && filter.customFields!.isNotEmpty) {
         filter.customFields!.forEach((key, value) {
           if (value == null) return;
           String paramKey = key;
@@ -295,20 +352,19 @@ class ItemRepository {
           }
         });
       }
-    } else {
-      if (city != null && city != "") parameters['city'] = city;
-      if (areaId != null) parameters['area_id'] = areaId;
-      if (country != null && country != "") parameters['country'] = country;
-      if (state != null && state != "") parameters['state'] = state;
     }
 
-    if (search != null) {
-      parameters[Api.search] = search;
+    if (search != null && search.trim().isNotEmpty) {
+      parameters[Api.search] = search.trim();
     }
 
-    if (sortBy != null) {
-      parameters[Api.sortBy] = sortBy;
+    if (sortBy != null && sortBy.trim().isNotEmpty) {
+      parameters[Api.sortBy] = sortBy.trim();
     }
+
+    // Clean up empty strings and nulls
+    parameters.removeWhere((k, v) =>
+        v == null || (v is String && v.trim().isEmpty) || v == 'null');
 
     Map<String, dynamic> response =
         await Api.get(url: Api.getItemApi, queryParameters: parameters);
@@ -399,6 +455,7 @@ class ItemRepository {
   ) async {
     Map<String, dynamic> parameters = {};
     parameters.addAll(itemDetails);
+    _sanitizeContact(parameters);
 
     if (mainImage != null) {
       MultipartFile image = await MultipartFile.fromFile(mainImage.path,

@@ -263,26 +263,8 @@ class _AddItemDetailsState extends CloudState<AddItemDetails> {
                             ? int.tryParse(item!.allCategoryIds!.split(',').last)
                             : null);
 
-                    addCloudData("item_details", {
-                      "name": adTitleController.text,
-                      "slug": adSlugController.text,
-                      "description": adDescriptionController.text,
-                      "category_id": widget.isEdit == true
-                          ? editCategoryId
-                          : (selectedCategoryList.isNotEmpty ? selectedCategoryList.last : editCategoryId),
-                      if (widget.isEdit == true) "id": item?.id,
-                      "price": adPriceController.text,
-                      "contact": adPhoneNumberController.text,
-                      "video_link": adAdditionalDetailsController.text,
-                      if (widget.isEdit == true)
-                        "delete_item_image_id": deleteItemImageList.join(','),
-                      "all_category_ids": widget.isEdit == true
-                          ? item?.allCategoryIds
-                          : selectedCategoryList.join(',')
-                    });
-                    screenStack++;
-                    if (context.read<FetchCustomFieldsCubit>().isEmpty()!) {
-                      addCloudData("with_more_details", {
+                      final contactDigits = adPhoneNumberController.text.replaceAll(RegExp(r'[^0-9]'), '');
+                      addCloudData("item_details", {
                         "name": adTitleController.text,
                         "slug": adSlugController.text,
                         "description": adDescriptionController.text,
@@ -291,14 +273,33 @@ class _AddItemDetailsState extends CloudState<AddItemDetails> {
                             : (selectedCategoryList.isNotEmpty ? selectedCategoryList.last : editCategoryId),
                         if (widget.isEdit == true) "id": item?.id,
                         "price": adPriceController.text,
-                        "contact": adPhoneNumberController.text,
+                        "contact": contactDigits,
                         "video_link": adAdditionalDetailsController.text,
+                        if (widget.isEdit == true)
+                          "delete_item_image_id": deleteItemImageList.join(','),
                         "all_category_ids": widget.isEdit == true
                             ? item?.allCategoryIds
-                            : selectedCategoryList.join(','),
-                        if (widget.isEdit == true)
-                          "delete_item_image_id": deleteItemImageList.join(',')
+                            : selectedCategoryList.join(',')
                       });
+                      screenStack++;
+                      if (context.read<FetchCustomFieldsCubit>().isEmpty()!) {
+                        addCloudData("with_more_details", {
+                          "name": adTitleController.text,
+                          "slug": adSlugController.text,
+                          "description": adDescriptionController.text,
+                          "category_id": widget.isEdit == true
+                              ? editCategoryId
+                              : (selectedCategoryList.isNotEmpty ? selectedCategoryList.last : editCategoryId),
+                          if (widget.isEdit == true) "id": item?.id,
+                          "price": adPriceController.text,
+                          "contact": contactDigits,
+                          "video_link": adAdditionalDetailsController.text,
+                          "all_category_ids": widget.isEdit == true
+                              ? item?.allCategoryIds
+                              : selectedCategoryList.join(','),
+                          if (widget.isEdit == true)
+                            "delete_item_image_id": deleteItemImageList.join(',')
+                        });
 
                       Navigator.pushNamed(context, Routes.confirmLocationScreen,
                           arguments: {

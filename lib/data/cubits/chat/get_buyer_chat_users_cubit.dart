@@ -1,4 +1,3 @@
-
 import 'package:Ebozor/data/model/chat/chated_user_model.dart';
 import 'package:Ebozor/data/model/data_output.dart';
 import 'package:Ebozor/data/model/seller_ratings_model.dart';
@@ -53,8 +52,7 @@ class GetBuyerChatListFailed extends GetBuyerChatListState {
   GetBuyerChatListFailed(this.error);
 }
 
-class GetBuyerChatListCubit extends Cubit<GetBuyerChatListState>
-   {
+class GetBuyerChatListCubit extends Cubit<GetBuyerChatListState> {
   GetBuyerChatListCubit() : super(GetBuyerChatListInitial());
   final ChatRepostiory _chatRepository = ChatRepostiory();
 
@@ -117,6 +115,16 @@ class GetBuyerChatListCubit extends Cubit<GetBuyerChatListState>
             .copyWith(chatedUserList: chatedUserList));
       }
     }
+  }
+
+  void updateItemStatus(int itemId, String status) {
+    if (state is! GetBuyerChatListSuccess || isClosed) return;
+    final current = state as GetBuyerChatListSuccess;
+    final chats = List<ChatedUser>.from(current.chatedUserList);
+    for (final chat in chats.where((chat) => chat.itemId == itemId)) {
+      chat.item?.status = status;
+    }
+    emit(current.copyWith(chatedUserList: chats));
   }
 
   Future<void> loadMore() async {

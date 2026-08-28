@@ -71,20 +71,25 @@ class ItemFilterModel {
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
-      'max_price': maxPrice,
-      'min_price': minPrice,
-      'category_id': categoryId,
-      if (categorySlug != null && categorySlug!.isNotEmpty)
-        'category_slug': categorySlug,
-      'posted_since': postedSince,
-      'city': city,
-      'state': state,
-      'country': country,
-      'area': area,
-      'radius': radius,
-      'area_id': areaId,
-      'longitude': longitude,
-      'latitude': latitude,
+      if (maxPrice != null && maxPrice!.trim().isNotEmpty)
+        'max_price': maxPrice!.trim(),
+      if (minPrice != null && minPrice!.trim().isNotEmpty)
+        'min_price': minPrice!.trim(),
+      if (categoryId != null && categoryId!.trim().isNotEmpty)
+        'category_id': categoryId!.trim(),
+      if (categorySlug != null && categorySlug!.trim().isNotEmpty)
+        'category_slug': categorySlug!.trim(),
+      if (postedSince != null && postedSince!.trim().isNotEmpty)
+        'posted_since': postedSince!.trim(),
+      if (city != null && city!.trim().isNotEmpty) 'city': city!.trim(),
+      if (state != null && state!.trim().isNotEmpty) 'state': state!.trim(),
+      if (country != null && country!.trim().isNotEmpty)
+        'country': country!.trim(),
+      if (area != null && area!.trim().isNotEmpty) 'area': area!.trim(),
+      if (radius != null) 'radius': radius,
+      if (areaId != null && areaId! > 0) 'area_id': areaId,
+      if (longitude != null) 'longitude': longitude,
+      if (latitude != null) 'latitude': latitude,
     };
   }
 

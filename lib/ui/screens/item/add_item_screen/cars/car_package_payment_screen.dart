@@ -304,7 +304,6 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
                     Material(
                       color: context.color.territoryColor
                           .withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                         side: BorderSide(

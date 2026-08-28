@@ -260,10 +260,16 @@ class _MotorPostingFormScreenState extends State<MotorPostingFormScreen> {
       return;
     }
 
-    if (_phoneController.text.trim().isEmpty) {
+    final savedCode = HiveUtils.getCountryCode();
+    final countryCodeDigits = (savedCode ?? '971').replaceAll(RegExp(r'[^0-9]'), '');
+    final contactDigits = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (contactDigits.isEmpty ||
+        contactDigits == countryCodeDigits ||
+        contactDigits.length < 7) {
       HelperUtils.showSnackBarMessage(
         context,
-        "Please enter a contact Phone number",
+        "Please enter a valid contact phone number",
         type: MessageType.warning,
       );
       return;
@@ -338,7 +344,7 @@ class _MotorPostingFormScreenState extends State<MotorPostingFormScreen> {
       'all_category_ids': allCategoryIds,
       'price': (price % 1 == 0) ? price.toInt() : price,
       'description': _descriptionController.text.trim(),
-      'contact': _phoneController.text.trim(),
+      'contact': contactDigits,
       'hide_phone_number': _showPhone ? 0 : 1,
       ..._location.toItemDetails(),
     };
@@ -397,7 +403,8 @@ class _MotorPostingFormScreenState extends State<MotorPostingFormScreen> {
       itemDetails.addAll(
         await _adminFieldsController.toFileSubmissionMap(),
       );
-      final mainImg = _selectedImages.first;
+      final mainImg =
+          _selectedImages.isNotEmpty ? _selectedImages.first : null;
       final otherImgs =
           _selectedImages.length > 1 ? _selectedImages.sublist(1) : <File>[];
       createdItemModel =
@@ -408,7 +415,7 @@ class _MotorPostingFormScreenState extends State<MotorPostingFormScreen> {
       if (mounted) {
         HelperUtils.showSnackBarMessage(
           context,
-          "Failed to create ad: $e",
+          "Failed to create ad: ${e.toString().replaceAll("ApiException: ", "").replaceAll("Exception: ", "")}",
           type: MessageType.error,
         );
       }

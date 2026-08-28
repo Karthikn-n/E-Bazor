@@ -5,6 +5,7 @@ import 'package:Ebozor/data/model/data_output.dart';
 import 'package:Ebozor/data/repositories/chat_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+
 abstract class GetSellerChatListState {}
 
 class GetSellerChatListInitial extends GetSellerChatListState {}
@@ -121,6 +122,16 @@ class GetSellerChatListCubit extends Cubit<GetSellerChatListState> {
     }
   }
 
+  void updateItemStatus(int itemId, String status) {
+    if (state is! GetSellerChatListSuccess || isClosed) return;
+    final current = state as GetSellerChatListSuccess;
+    final chats = List<ChatedUser>.from(current.chatedUserList);
+    for (final chat in chats.where((chat) => chat.itemId == itemId)) {
+      chat.item?.status = status;
+    }
+    emit(current.copyWith(chatedUserList: chats));
+  }
+
   Future<void> loadMore() async {
     try {
       if (state is GetSellerChatListSuccess) {
@@ -161,5 +172,4 @@ class GetSellerChatListCubit extends Cubit<GetSellerChatListState> {
 
     return false;
   }
-
 }

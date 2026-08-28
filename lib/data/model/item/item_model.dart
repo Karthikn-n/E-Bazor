@@ -284,7 +284,7 @@ class ItemModel {
     address = json['address'];
     contact = json['contact'];
     type = json['type'];
-    status = json['status'];
+    status = _normalizedListingStatus(json);
     active = json['active'] == 0 ? false : true;
     videoLink = json['video_link'];
     isLike = json['is_liked'];
@@ -378,6 +378,20 @@ class ItemModel {
     } else {
       customFields = <CustomFieldModel>[];
     }
+  }
+
+  /// Older API responses can return an empty status after a listing package
+  /// has already been assigned. Those listings are paid/live; treating every
+  /// blank value as payment-pending makes paid ads show another Pay action.
+  static String? _normalizedListingStatus(Map<String, dynamic> json) {
+    final rawStatus = json['status']?.toString().trim() ?? '';
+    if (rawStatus.isNotEmpty) return rawStatus;
+
+    final hasAssignedPackage =
+        json['package_id'] != null || json['listing_package_id'] != null;
+    if (hasAssignedPackage) return 'active';
+
+    return rawStatus;
   }
 
   Map<String, dynamic> toJson() {

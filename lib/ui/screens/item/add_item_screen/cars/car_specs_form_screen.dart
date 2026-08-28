@@ -378,10 +378,16 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
       return;
     }
 
-    if (_phoneController.text.trim().isEmpty) {
+    final savedCode = HiveUtils.getCountryCode();
+    final countryCodeDigits = (savedCode ?? '971').replaceAll(RegExp(r'[^0-9]'), '');
+    final contactDigits = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (contactDigits.isEmpty ||
+        contactDigits == countryCodeDigits ||
+        contactDigits.length < 7) {
       HelperUtils.showSnackBarMessage(
         context,
-        "Please enter a contact Phone number",
+        "Please enter a valid contact phone number",
         type: MessageType.warning,
       );
       return;
@@ -412,7 +418,7 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
       model: _selectedModel!,
       trim: _selectedTrim,
       price: price,
-      phoneNumber: _phoneController.text.trim(),
+      phoneNumber: contactDigits,
       showPhoneNumber: _showPhoneNumber,
       customFields: customFields,
       customFieldLabels: customFieldLabels,

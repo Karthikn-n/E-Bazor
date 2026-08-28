@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/confirm_location_screen.dart';
@@ -6,25 +7,12 @@ import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
+import 'package:Ebozor/utils/location_search_helper.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-
-class LocationSearchResult {
-  final String title;
-  final String subtitle;
-  final double latitude;
-  final double longitude;
-
-  LocationSearchResult({
-    required this.title,
-    required this.subtitle,
-    required this.latitude,
-    required this.longitude,
-  });
-}
 
 class LocationMapScreen extends StatefulWidget {
   const LocationMapScreen({super.key});
@@ -59,6 +47,13 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
 
   bool get _returnsLocationSelection =>
       from == "addItem" || from == "filter";
+
+  bool get _isAuthFlow =>
+      from == "login" ||
+      from == "signup" ||
+      from == "signin" ||
+      from == "locationPermission" ||
+      from == "auth";
 
   @override
   void initState() {
@@ -273,45 +268,10 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
     }
 
     try {
-      List<Location> locations = await locationFromAddress(trimmedQuery);
-      List<LocationSearchResult> results = [];
-
-      for (var loc in locations.take(5)) {
-        try {
-          List<Placemark> marks = await placemarkFromCoordinates(
-            loc.latitude,
-            loc.longitude,
-          );
-          if (marks.isNotEmpty) {
-            final mark = marks.first;
-            final title = [
-              mark.name,
-              mark.subLocality,
-              mark.locality,
-            ].where((e) => e != null && e.isNotEmpty).toSet().join(", ");
-
-            final subtitle = [
-              mark.administrativeArea,
-              mark.country,
-            ].where((e) => e != null && e.isNotEmpty).join(", ");
-
-            results.add(LocationSearchResult(
-              title: title.isNotEmpty ? title : trimmedQuery,
-              subtitle: subtitle,
-              latitude: loc.latitude,
-              longitude: loc.longitude,
-            ));
-          }
-        } catch (_) {
-          results.add(LocationSearchResult(
-            title: trimmedQuery,
-            subtitle:
-                "${loc.latitude.toStringAsFixed(4)}, ${loc.longitude.toStringAsFixed(4)}",
-            latitude: loc.latitude,
-            longitude: loc.longitude,
-          ));
-        }
-      }
+      final results = await LocationSearchHelper.search(
+        trimmedQuery,
+        defaultCountry: HiveUtils.getCountryName() ?? 'United Arab Emirates',
+      );
 
       if (mounted) {
         setState(() {
@@ -320,16 +280,12 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
           _isSearching = false;
         });
       }
-
-      // If user pressed enter and we have results, fly to first
-      if (results.isNotEmpty && !searchFocusNode.hasFocus) {
-        _selectSearchResult(results.first);
-      }
     } catch (e) {
-      debugPrint("Search error: $e");
+      log("[LocationSearch-Map] ❌ Search error: $e");
       if (mounted) {
         setState(() {
           _searchResults = [];
+          _showSuggestions = false;
           _isSearching = false;
         });
       }
@@ -343,7 +299,7 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
     final targetLatLng = LatLng(result.latitude, result.longitude);
     latitude = result.latitude;
     longitude = result.longitude;
-    _cameraPosition = CameraPosition(target: targetLatLng, zoom: 15.0);
+    _cameraPosition = CameraPosition(target: targetLatLng, zoom: 16.0);
 
     mapController?.animateCamera(
       CameraUpdate.newCameraPosition(_cameraPosition!),
@@ -351,6 +307,15 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
 
     setState(() {
       _showSuggestions = false;
+      if (result.area != null || result.city != null) {
+        formatedAddress = AddressComponent(
+          area: result.area,
+          areaId: null,
+          city: result.city,
+          country: result.country,
+          state: result.state,
+        );
+      }
     });
 
     getLocationFromLatitudeLongitude(latLng: targetLatLng);
@@ -726,7 +691,7 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                                     latitude: latitude,
                                     longitude: longitude,
                                   );
-                                  if (from == "login") {
+                                  if (_isAuthFlow) {
                                     Navigator.pushNamedAndRemoveUntil(
                                       context,
                                       Routes.main,
@@ -742,7 +707,7 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                                     latitude: latitude,
                                     longitude: longitude,
                                   );
-                                  if (from == "login") {
+                                  if (_isAuthFlow) {
                                     Navigator.pushNamedAndRemoveUntil(
                                       context,
                                       Routes.main,
@@ -776,157 +741,160 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
             top: 14,
             left: 16,
             right: 16,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: context.color.secondaryColor,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.12),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: TextField(
-                    controller: searchController,
-                    focusNode: searchFocusNode,
-                    onChanged: (query) {
-                      if (_searchDebounce?.isActive ?? false) {
-                        _searchDebounce!.cancel();
-                      }
-                      _searchDebounce = Timer(
-                        const Duration(milliseconds: 400),
-                        () => _searchLocation(query),
-                      );
-                    },
-                    textInputAction: TextInputAction.search,
-                    onSubmitted: (query) {
-                      searchFocusNode.unfocus();
-                      _searchLocation(query);
-                    },
-                    style: TextStyle(
-                      color: context.color.textDefaultColor,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    decoration: InputDecoration(
-                      hintText:
-                          "Search city, area or landmark...".translate(context),
-                      hintStyle: TextStyle(
-                        color: context.color.textLightColor,
-                        fontSize: 14,
-                      ),
-                      border: InputBorder.none,
-                      prefixIcon: Icon(
-                        Icons.search_rounded,
-                        color: context.color.territoryColor,
-                        size: 22,
-                      ),
-                      suffixIcon: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (_isSearching)
-                            Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: context.color.territoryColor,
-                                ),
-                              ),
-                            ),
-                          if (searchController.text.isNotEmpty)
-                            IconButton(
-                              icon: Icon(
-                                Icons.close_rounded,
-                                color: context.color.textLightColor,
-                                size: 20,
-                              ),
-                              onPressed: () {
-                                searchController.clear();
-                                setState(() {
-                                  _searchResults = [];
-                                  _showSuggestions = false;
-                                });
-                              },
-                            ),
-                        ],
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Live Suggestions Dropdown
-                if (_showSuggestions && _searchResults.isNotEmpty)
-                  Container(
-                    margin: const EdgeInsets.only(top: 8),
-                    constraints: const BoxConstraints(maxHeight: 240),
-                    decoration: BoxDecoration(
-                      color: context.color.secondaryColor,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.15),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ListView.separated(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      shrinkWrap: true,
-                      itemCount: _searchResults.length,
-                      separatorBuilder: (_, __) => Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        color: context.color.borderColor.withValues(alpha: 0.5),
-                      ),
-                      itemBuilder: (context, index) {
-                        final result = _searchResults[index];
-                        return ListTile(
-                          dense: true,
-                          leading: Icon(
-                            Icons.location_on_outlined,
-                            color: context.color.territoryColor,
-                            size: 20,
-                          ),
-                          title: Text(
-                            result.title,
-                            style: TextStyle(
-                              color: context.color.textDefaultColor,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: result.subtitle.isNotEmpty
-                              ? Text(
-                                  result.subtitle,
-                                  style: TextStyle(
-                                    color: context.color.textLightColor,
-                                    fontSize: 11,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                )
-                              : null,
-                          onTap: () => _selectSearchResult(result),
+            child: Material(
+              color: context.color.secondaryColor,
+              borderRadius: BorderRadius.circular(14),
+              clipBehavior: Clip.antiAlias,
+              elevation: 4,
+              shadowColor: Colors.black.withValues(alpha: 0.15),
+              child: AnimatedSize(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                alignment: Alignment.topCenter,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 1. Search Bar Field
+                    TextField(
+                      controller: searchController,
+                      focusNode: searchFocusNode,
+                      onChanged: (query) {
+                        if (_searchDebounce?.isActive ?? false) {
+                          _searchDebounce!.cancel();
+                        }
+                        _searchDebounce = Timer(
+                          const Duration(milliseconds: 400),
+                          () => _searchLocation(query),
                         );
                       },
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: (query) {
+                        searchFocusNode.unfocus();
+                        _searchLocation(query);
+                      },
+                      style: TextStyle(
+                        color: context.color.textDefaultColor,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: "Search city, area or landmark..."
+                            .translate(context),
+                        hintStyle: TextStyle(
+                          color: context.color.textLightColor,
+                          fontSize: 14,
+                        ),
+                        border: InputBorder.none,
+                        prefixIcon: Icon(
+                          Icons.search_rounded,
+                          color: context.color.territoryColor,
+                          size: 22,
+                        ),
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_isSearching)
+                              Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: context.color.territoryColor,
+                                  ),
+                                ),
+                              ),
+                            if (searchController.text.isNotEmpty)
+                              IconButton(
+                                icon: Icon(
+                                  Icons.close_rounded,
+                                  color: context.color.textLightColor,
+                                  size: 20,
+                                ),
+                                onPressed: () {
+                                  searchController.clear();
+                                  setState(() {
+                                    _searchResults = [];
+                                    _showSuggestions = false;
+                                  });
+                                },
+                              ),
+                          ],
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                      ),
                     ),
-                  ),
-              ],
+
+                    // 2. Seamlessly Extended Suggestions Dropdown
+                    if (_showSuggestions && _searchResults.isNotEmpty) ...[
+                      Divider(
+                        height: 1,
+                        thickness: 0.8,
+                        color: context.color.borderColor.withValues(alpha: 0.6),
+                      ),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 240),
+                        child: ListView.separated(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          shrinkWrap: true,
+                          itemCount: _searchResults.length,
+                          separatorBuilder: (_, __) => Divider(
+                            height: 1,
+                            thickness: 0.5,
+                            color:
+                                context.color.borderColor.withValues(alpha: 0.4),
+                          ),
+                          itemBuilder: (context, index) {
+                            final result = _searchResults[index];
+                            return ListTile(
+                              dense: true,
+                              leading: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: context.color.territoryColor
+                                      .withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.location_on_outlined,
+                                  color: context.color.territoryColor,
+                                  size: 18,
+                                ),
+                              ),
+                              title: Text(
+                                result.title,
+                                style: TextStyle(
+                                  color: context.color.textDefaultColor,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: result.subtitle.isNotEmpty
+                                  ? Text(
+                                      result.subtitle,
+                                      style: TextStyle(
+                                        color: context.color.textLightColor,
+                                        fontSize: 11,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    )
+                                  : null,
+                              onTap: () => _selectSearchResult(result),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
         ],

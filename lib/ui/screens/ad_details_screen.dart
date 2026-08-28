@@ -195,9 +195,13 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   }
 
   Future<void> _fetchFullItemDetails() async {
-    if (widget.model.id == null) return;
+    final slug = widget.model.slug?.trim();
+    final id = widget.model.id;
+    if ((slug == null || slug.isEmpty) && id == null) return;
     try {
-      final res = await ItemRepository().fetchItemFromItemId(widget.model.id!);
+      final res = (slug != null && slug.isNotEmpty)
+          ? await ItemRepository().fetchItemFromItemSlug(slug)
+          : await ItemRepository().fetchItemFromItemId(id!);
       if (res.modelList.isNotEmpty && mounted) {
         final fullModel = res.modelList.first;
         if (fullModel.status?.trim().isEmpty ?? true) {
@@ -467,10 +471,9 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     return AnnotatedRegion(
       value: SystemUiOverlayStyle(
         statusBarColor: context.color.secondaryColor,
-        statusBarIconBrightness:
-            Theme.of(context).brightness == Brightness.dark
-                ? Brightness.light
-                : Brightness.dark,
+        statusBarIconBrightness: Theme.of(context).brightness == Brightness.dark
+            ? Brightness.light
+            : Brightness.dark,
       ),
       child: Scaffold(
         backgroundColor: context.color.secondaryDetailsColor,
@@ -542,8 +545,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                             height: 1.2,
                           ),
                         ),
-                        if (companyName != null &&
-                            companyName.isNotEmpty) ...[
+                        if (companyName != null && companyName.isNotEmpty) ...[
                           const SizedBox(height: 5),
                           Text(
                             companyName,
@@ -577,8 +579,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                           context.color.territoryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: context.color.territoryColor
-                            .withValues(alpha: 0.2),
+                        color:
+                            context.color.territoryColor.withValues(alpha: 0.2),
                       ),
                     ),
                     child: model.user?.profile?.trim().isNotEmpty == true
@@ -612,8 +614,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                 Text(
                   model.description!.trim(),
                   style: TextStyle(
-                    color: context.color.textDefaultColor
-                        .withValues(alpha: 0.82),
+                    color:
+                        context.color.textDefaultColor.withValues(alpha: 0.82),
                     fontSize: 14,
                     height: 1.55,
                   ),
@@ -691,7 +693,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     for (final value in values) {
       final trimmed = value.trim();
       if (trimmed.isNotEmpty &&
-          !unique.any((entry) => entry.toLowerCase() == trimmed.toLowerCase())) {
+          !unique
+              .any((entry) => entry.toLowerCase() == trimmed.toLowerCase())) {
         unique.add(trimmed);
       }
     }
@@ -797,8 +800,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   if (index != fields.length - 1)
                     Divider(
                       height: 1,
-                      color:
-                          context.color.borderColor.withValues(alpha: 0.45),
+                      color: context.color.borderColor.withValues(alpha: 0.45),
                     ),
                 ],
               );
@@ -2853,10 +2855,12 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     Widgets.showLoader(context);
     ItemModel fullItem = item;
     try {
-      // Keep this identical to the My Ads popup: get-item must be ID-only so
-      // the API returns saved values such as Bedrooms for nested categories.
-      final res = await ItemRepository().fetchItemFromItemId(item.id!);
-      if (res.modelList.isNotEmpty) {
+      final res = (item.slug != null && item.slug!.trim().isNotEmpty)
+          ? await ItemRepository().fetchItemFromItemSlug(item.slug!.trim())
+          : (item.id != null
+              ? await ItemRepository().fetchItemFromItemId(item.id!)
+              : null);
+      if (res != null && res.modelList.isNotEmpty) {
         fullItem = res.modelList.first;
         if ((fullItem.image ?? '').trim().isEmpty) {
           fullItem.image = item.image;
@@ -2973,6 +2977,25 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     );
   }
 
+  Future<void> _openBuyerSelection(ItemModel item) async {
+    final result = await Navigator.pushNamed(
+      context,
+      Routes.soldOutBoughtScreen,
+      arguments: {
+        'itemId': item.id,
+        'price': item.price,
+        'itemName': item.name,
+        'itemImage': item.image,
+      },
+    );
+    if (result == 'refresh' && mounted) {
+      setState(() {
+        model.status = 'sold out';
+        model.active = false;
+      });
+    }
+  }
+
   Widget bottomButtonWidget() {
     if (isAddedByMe) {
       final model = this.model;
@@ -3041,21 +3064,17 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
             ),
             SizedBox(width: 10.rw(context)),
             Expanded(
-              child: _buildButton("soldOut".translate(context), () async {
-                Navigator.pushNamed(context, Routes.soldOutBoughtScreen,
-                    arguments: {
-                      "itemId": model.id,
-                      "price": model.price,
-                      "itemName": model.name,
-                      "itemImage": model.image
-                    });
+              child: _buildButton("soldOut".translate(context), () {
+                _openBuyerSelection(model);
               }, null, null),
             ),
           ],
         );
-      } else if (model.status == "sold out" ||
-          model.status == "inactive" ||
-          model.status == "rejected") {
+      } else if (model.status == 'sold out') {
+        return _buildButton('Manage buyers / Sell again', () {
+          _openBuyerSelection(model);
+        }, null, null);
+      } else if (model.status == "inactive" || model.status == "rejected") {
         return BlocProvider(
           create: (context) => DeleteItemCubit(),
           child: Builder(builder: (context) {
@@ -4633,8 +4652,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
             decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(cornerRadius),
                 color: backgroundColor),
-            child: childWidget)
-        );
+            child: childWidget));
   }
 
   Widget buildDot(int index) {
@@ -4813,8 +4831,9 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("aboutThisItemLbl".translate(context)).bold().size(context
-            .font.large),
+        Text("aboutThisItemLbl".translate(context))
+            .bold()
+            .size(context.font.large),
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 5.0),
           child: Text(model.description ?? "")

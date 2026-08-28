@@ -106,6 +106,33 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
   Future<void> _fetchCounts() async {
     try {
       final counts = await ItemRepository().fetchMyItemsCount();
+      final allItems = <ItemModel>[];
+      var page = 1;
+      var fetchedCount = 0;
+      var serverTotal = 0;
+      do {
+        final result = await ItemRepository().fetchMyItems(page: page);
+        serverTotal = result.total;
+        fetchedCount += result.modelList.length;
+        allItems.addAll(result.modelList);
+        page++;
+        if (result.modelList.isEmpty) break;
+      } while (fetchedCount < serverTotal);
+
+      bool hasStatus(ItemModel item, Set<String> statuses) => statuses.contains(
+          (item.status ?? '').trim().toLowerCase().replaceAll('_', ' '));
+
+      if (allItems.isNotEmpty) {
+        counts['all_ads'] = allItems.length;
+        counts['live'] = allItems
+            .where(
+                (item) => hasStatus(item, {'active', 'approved', 'live', '1'}))
+            .length;
+        counts['payment_pending'] = allItems
+            .where((item) => hasStatus(item, {'pending payment', 'pending'}))
+            .length;
+      }
+
       if (mounted && counts.isNotEmpty) {
         setState(() {
           _itemsCount = counts;
@@ -705,10 +732,12 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
     Widgets.showLoader(context);
     ItemModel fullItem = item;
     try {
-      // The API omits saved custom-field values for some nested categories
-      // when category_id is supplied. The web edit flow also fetches by ID only.
-      final res = await ItemRepository().fetchItemFromItemId(item.id!);
-      if (res.modelList.isNotEmpty) {
+      final res = (item.slug != null && item.slug!.trim().isNotEmpty)
+          ? await ItemRepository().fetchItemFromItemSlug(item.slug!.trim())
+          : (item.id != null
+              ? await ItemRepository().fetchItemFromItemId(item.id!)
+              : null);
+      if (res != null && res.modelList.isNotEmpty) {
         fullItem = res.modelList.first;
         if ((fullItem.image ?? '').trim().isEmpty) {
           fullItem.image = item.image;

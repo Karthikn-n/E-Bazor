@@ -51,8 +51,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class LoginScreenState extends State<LoginScreen> {
-  final TextEditingController emailMobileTextController = TextEditingController(
-      text: Constant.isDemoModeOn ? Constant.demoMobileNumber : "");
+  final TextEditingController emailMobileTextController =
+      TextEditingController();
   bool isOtpSent = false;
   String? phone, otp, countryCode, countryName, flagEmoji;
 
@@ -93,12 +93,6 @@ class LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
 
-    if (Constant.mobileAuthentication == "1") {
-      if (Constant.isDemoModeOn) {
-        isMobileNumberField = true;
-        numberOrEmail = Constant.demoMobileNumber;
-      }
-    }
     getSignature();
     context.read<AuthenticationCubit>().init();
     context.read<FetchSystemSettingsCubit>().fetchSettings();

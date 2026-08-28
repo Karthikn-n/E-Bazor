@@ -55,21 +55,21 @@ class ChatRepostiory {
 
     List<ChatMessage> modelList = (response['data']['data'] as List).map(
       (result) {
-        int senderId = result['sender_id'];
-        String? message = result['message'];
-        String? file = result['file'];
-        String? audio = result['audio'];
-        String createdAt = result['created_at'];
-        int itemOfferId = result['item_offer_id'];
-        int id = result['id'];
+        int senderId = int.tryParse(result['sender_id']?.toString() ?? '0') ?? 0;
+        String message = result['message']?.toString() ?? "";
+        String file = result['file']?.toString() ?? "";
+        String audio = result['audio']?.toString() ?? "";
+        String createdAt = result['created_at']?.toString() ?? DateTime.now().toIso8601String();
+        int itemOfferId = int.tryParse(result['item_offer_id']?.toString() ?? '0') ?? 0;
+        int id = int.tryParse(result['id']?.toString() ?? '0') ?? 0;
 
         return ChatMessage(
           key: ValueKey(id),
-          message: message ?? "",
+          message: message,
           senderId: senderId,
           createdAt: createdAt,
-          file: file!,
-          audio: audio!,
+          file: file,
+          audio: audio,
           itemOfferId: itemOfferId,
           updatedAt: createdAt,
         );

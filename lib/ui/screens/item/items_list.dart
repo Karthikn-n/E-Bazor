@@ -816,18 +816,39 @@ class ItemsListState extends State<ItemsList> {
     searchController.addListener(searchItemListener);
     controller = ScrollController()..addListener(_loadMore);
 
-    ItemFilterModel initialFilter = filter ??
-        ItemFilterModel(
+    ItemFilterModel initialFilter = filter != null
+        ? filter!.copyWith(
+            country: (filter!.country != null &&
+                    filter!.country!.trim().isNotEmpty)
+                ? filter!.country
+                : (HiveUtils.getCountryName() ?? ""),
+            state:
+                (filter!.state != null && filter!.state!.trim().isNotEmpty)
+                    ? filter!.state
+                    : (HiveUtils.getStateName() ?? ""),
+            city: (filter!.city != null && filter!.city!.trim().isNotEmpty)
+                ? filter!.city
+                : (HiveUtils.getCityName() ?? ""),
+            areaId: filter!.areaId ??
+                (HiveUtils.getAreaId() != null
+                    ? int.tryParse(HiveUtils.getAreaId().toString())
+                    : null),
+            radius: filter!.radius ?? HiveUtils.getNearbyRadius(),
+            latitude: filter!.latitude ?? HiveUtils.getLatitude(),
+            longitude: filter!.longitude ?? HiveUtils.getLongitude(),
+          )
+        : ItemFilterModel(
             country: HiveUtils.getCountryName() ?? "",
             areaId: HiveUtils.getAreaId() != null
-                ? int.parse(HiveUtils.getAreaId().toString())
+                ? int.tryParse(HiveUtils.getAreaId().toString())
                 : null,
             city: HiveUtils.getCityName() ?? "",
             state: HiveUtils.getStateName() ?? "",
             categoryId: widget.categoryId,
-            radius: HiveUtils.getNearbyRadius() ?? null,
-            latitude: HiveUtils.getLatitude() ?? null,
-            longitude: HiveUtils.getLongitude() ?? null);
+            radius: HiveUtils.getNearbyRadius(),
+            latitude: HiveUtils.getLatitude(),
+            longitude: HiveUtils.getLongitude(),
+          );
 
     if ((initialFilter.categorySlug?.trim().isEmpty ?? true) &&
         (widget.categorySlug?.trim().isNotEmpty ?? false)) {

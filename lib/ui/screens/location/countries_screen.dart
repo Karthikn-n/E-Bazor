@@ -58,6 +58,13 @@ class CountriesScreenState extends State<CountriesScreen> {
   bool get _returnsLocationSelection =>
       widget.from == "addItem" || widget.from == "filter";
 
+  bool get _isAuthFlow =>
+      widget.from == "login" ||
+      widget.from == "signup" ||
+      widget.from == "signin" ||
+      widget.from == "locationPermission" ||
+      widget.from == "auth";
+
   @override
   void initState() {
     super.initState();
@@ -752,7 +759,7 @@ class CountriesScreenState extends State<CountriesScreen> {
       );
 
       if (!mounted) return;
-      if (widget.from == "login") {
+      if (_isAuthFlow) {
         Navigator.pushNamedAndRemoveUntil(
           context,
           Routes.main,

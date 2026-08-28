@@ -32,6 +32,7 @@ class SavedSearchesScreen extends StatefulWidget {
 class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   bool _isSearching = false;
   String _localSearchQuery = "";
   String _selectedSort = "newest"; // newest, oldest, name_asc
@@ -46,6 +47,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
   void dispose() {
     _scrollController.dispose();
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -702,99 +704,107 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: context.color.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: context.color.secondaryColor,
-        elevation: 0,
-        centerTitle: !_isSearching,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            size: 18,
-            color: context.color.textDefaultColor,
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.opaque,
+      child: Scaffold(
+        backgroundColor: context.color.backgroundColor,
+        appBar: AppBar(
+          backgroundColor: context.color.secondaryColor,
+          elevation: 0,
+          centerTitle: !_isSearching,
+          leading: IconButton(
+            icon: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 18,
+              color: context.color.textDefaultColor,
+            ),
+            onPressed: () {
+              _searchFocusNode.unfocus();
+              if (_isSearching) {
+                setState(() {
+                  _isSearching = false;
+                  _localSearchQuery = "";
+                  _searchController.clear();
+                });
+              } else {
+                Navigator.pop(context);
+              }
+            },
           ),
-          onPressed: () {
-            if (_isSearching) {
-              setState(() {
-                _isSearching = false;
-                _localSearchQuery = "";
-                _searchController.clear();
-              });
-            } else {
-              Navigator.pop(context);
-            }
-          },
-        ),
-        title: _isSearching
-            ? TextField(
-                controller: _searchController,
-                autofocus: true,
-                style: TextStyle(
-                  color: context.color.textDefaultColor,
-                  fontSize: 15,
-                ),
-                decoration: InputDecoration(
-                  hintText: "searchSavedSearches".translate(context),
-                  hintStyle: TextStyle(
-                    color: context.color.textLightColor.withValues(alpha: 0.6),
-                    fontSize: 14,
+          title: _isSearching
+              ? TextField(
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  autofocus: true,
+                  onTapOutside: (_) => _searchFocusNode.unfocus(),
+                  style: TextStyle(
+                    color: context.color.textDefaultColor,
+                    fontSize: 15,
                   ),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: InputDecoration(
+                    hintText: "searchSavedSearches".translate(context),
+                    hintStyle: TextStyle(
+                      color:
+                          context.color.textLightColor.withValues(alpha: 0.6),
+                      fontSize: 14,
+                    ),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  onChanged: (val) {
+                    setState(() {
+                      _localSearchQuery = val;
+                    });
+                  },
+                )
+              : Text(
+                  "mySearches".translate(context),
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: context.color.textDefaultColor,
+                  ),
                 ),
-                onChanged: (val) {
-                  setState(() {
-                    _localSearchQuery = val;
-                  });
+          actions: [
+            if (_isSearching)
+              IconButton(
+                icon: Icon(
+                  Icons.close_rounded,
+                  color: context.color.textDefaultColor,
+                  size: 20,
+                ),
+                onPressed: () {
+                  if (_searchController.text.isNotEmpty) {
+                    _searchController.clear();
+                    setState(() {
+                      _localSearchQuery = "";
+                    });
+                  } else {
+                    _searchFocusNode.unfocus();
+                    setState(() {
+                      _isSearching = false;
+                    });
+                  }
                 },
               )
-            : Text(
-                "mySearches".translate(context),
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
+            else
+              IconButton(
+                icon: Icon(
+                  Icons.search_rounded,
                   color: context.color.textDefaultColor,
+                  size: 22,
                 ),
-              ),
-        actions: [
-          if (_isSearching)
-            IconButton(
-              icon: Icon(
-                Icons.close_rounded,
-                color: context.color.textDefaultColor,
-                size: 20,
-              ),
-              onPressed: () {
-                if (_searchController.text.isNotEmpty) {
-                  _searchController.clear();
+                onPressed: () {
                   setState(() {
-                    _localSearchQuery = "";
+                    _isSearching = true;
                   });
-                } else {
-                  setState(() {
-                    _isSearching = false;
-                  });
-                }
-              },
-            )
-          else
-            IconButton(
-              icon: Icon(
-                Icons.search_rounded,
-                color: context.color.textDefaultColor,
-                size: 22,
+                },
               ),
-              onPressed: () {
-                setState(() {
-                  _isSearching = true;
-                });
-              },
-            ),
-        ],
-      ),
+          ],
+        ),
       floatingActionButton: Container(
         decoration: BoxDecoration(
           color: context.color.secondaryColor,
@@ -961,6 +971,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
           },
         ),
       ),
+      )
     );
   }
 }

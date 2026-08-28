@@ -403,6 +403,21 @@ class _ClassifiedsPostingFormScreenState
       price = parsedPrice;
     }
 
+    final savedCode = HiveUtils.getCountryCode();
+    final countryCodeDigits = (savedCode ?? '971').replaceAll(RegExp(r'[^0-9]'), '');
+    final contactDigits = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (contactDigits.isEmpty ||
+        contactDigits == countryCodeDigits ||
+        contactDigits.length < 7) {
+      HelperUtils.showSnackBarMessage(
+        context,
+        "Please enter a valid contact phone number",
+        type: MessageType.warning,
+      );
+      return;
+    }
+
     final categoryId = widget.category?.id ??
         widget.item?.categoryId ??
         (widget.breadcrumbs != null && widget.breadcrumbs!.isNotEmpty
@@ -421,8 +436,8 @@ class _ClassifiedsPostingFormScreenState
 
     final mergedCustomFields = _adminFieldsController.toSubmissionMap();
     for (final pf in _phoneCustomFields) {
-      if (pf.id != null && _phoneController.text.trim().isNotEmpty) {
-        mergedCustomFields[pf.id.toString()] = [_phoneController.text.trim()];
+      if (pf.id != null && contactDigits.isNotEmpty) {
+        mergedCustomFields[pf.id.toString()] = [contactDigits];
       }
     }
 
@@ -439,7 +454,7 @@ class _ClassifiedsPostingFormScreenState
       'all_category_ids': allCategoryIds,
       'price': (price % 1 == 0) ? price.toInt() : price,
       'description': _descriptionController.text.trim(),
-      'contact': _phoneController.text.trim(),
+      'contact': contactDigits,
       'hide_phone_number': _showPhoneNumber ? 0 : 1,
       if (_isClassifiedsAd) 'video_link': _youtubeUrlController.text.trim(),
       ..._location.toItemDetails(),

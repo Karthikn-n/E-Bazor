@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:developer';
 
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/ui/screens/location/location_map_screen.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
+import 'package:Ebozor/utils/location_search_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
@@ -34,6 +36,13 @@ class SelectLocationScreen extends StatefulWidget {
 class _SelectLocationScreenState extends State<SelectLocationScreen> {
   bool get _returnsLocationSelection =>
       widget.from == "addItem" || widget.from == "filter";
+
+  bool get _isAuthFlow =>
+      widget.from == "login" ||
+      widget.from == "signup" ||
+      widget.from == "signin" ||
+      widget.from == "locationPermission" ||
+      widget.from == "auth";
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   Timer? _searchDebounce;
@@ -175,7 +184,7 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
           longitude: position.longitude,
         );
 
-        if (widget.from == "addItem") {
+        if (_returnsLocationSelection) {
           if (mounted) {
             Navigator.pop(context, {
               "area_id": null,
@@ -198,7 +207,7 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
           );
 
           if (mounted) {
-            if (widget.from == "login") {
+            if (_isAuthFlow) {
               Navigator.pushNamedAndRemoveUntil(
                 context,
                 Routes.main,
@@ -244,45 +253,10 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
     });
 
     try {
-      List<Location> locations = await locationFromAddress(trimmed);
-      List<LocationSearchResult> results = [];
-
-      for (var loc in locations.take(6)) {
-        try {
-          List<Placemark> marks = await placemarkFromCoordinates(
-            loc.latitude,
-            loc.longitude,
-          );
-          if (marks.isNotEmpty) {
-            final mark = marks.first;
-            final title = [
-              mark.name,
-              mark.subLocality,
-              mark.locality,
-            ].where((e) => e != null && e.isNotEmpty).toSet().join(", ");
-
-            final subtitle = [
-              mark.administrativeArea,
-              mark.country,
-            ].where((e) => e != null && e.isNotEmpty).join(", ");
-
-            results.add(LocationSearchResult(
-              title: title.isNotEmpty ? title : trimmed,
-              subtitle: subtitle,
-              latitude: loc.latitude,
-              longitude: loc.longitude,
-            ));
-          }
-        } catch (_) {
-          results.add(LocationSearchResult(
-            title: trimmed,
-            subtitle:
-                "${loc.latitude.toStringAsFixed(4)}, ${loc.longitude.toStringAsFixed(4)}",
-            latitude: loc.latitude,
-            longitude: loc.longitude,
-          ));
-        }
-      }
+      final results = await LocationSearchHelper.search(
+        trimmed,
+        defaultCountry: HiveUtils.getCountryName() ?? 'United Arab Emirates',
+      );
 
       if (mounted) {
         setState(() {
@@ -291,7 +265,7 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
         });
       }
     } catch (e) {
-      debugPrint("Search error: $e");
+      log("[LocationSearch] ❌ Search error: $e");
       if (mounted) {
         setState(() {
           _searchResults = [];
@@ -305,29 +279,32 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
     _searchFocusNode.unfocus();
 
     try {
-      List<Placemark> marks = await placemarkFromCoordinates(
-        result.latitude,
-        result.longitude,
-      );
+      String? area = result.area;
+      String? city = result.city;
+      String? state = result.state;
+      String? country = result.country;
 
-      String? area;
-      String? city;
-      String? state;
-      String? country;
-
-      if (marks.isNotEmpty) {
-        final mark = marks.first;
-        area = mark.subLocality?.isNotEmpty == true
-            ? mark.subLocality
-            : mark.thoroughfare;
-        city = mark.locality?.isNotEmpty == true
-            ? mark.locality
-            : mark.subAdministrativeArea;
-        state = mark.administrativeArea;
-        country = mark.country;
+      if (area == null && city == null) {
+        try {
+          List<Placemark> marks = await placemarkFromCoordinates(
+            result.latitude,
+            result.longitude,
+          );
+          if (marks.isNotEmpty) {
+            final mark = marks.first;
+            area = mark.subLocality?.isNotEmpty == true
+                ? mark.subLocality
+                : mark.thoroughfare;
+            city = mark.locality?.isNotEmpty == true
+                ? mark.locality
+                : mark.subAdministrativeArea;
+            state = mark.administrativeArea;
+            country = mark.country;
+          }
+        } catch (_) {}
       }
 
-      if (widget.from == "addItem") {
+      if (_returnsLocationSelection) {
         if (mounted) {
           Navigator.pop(context, {
             "area_id": null,
@@ -350,7 +327,7 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
         );
 
         if (mounted) {
-          if (widget.from == "login") {
+          if (_isAuthFlow) {
             Navigator.pushNamedAndRemoveUntil(
               context,
               Routes.main,
@@ -543,62 +520,61 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
             // Search Results Dropdown List
             if (_searchResults.isNotEmpty) ...[
               const SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  color: context.color.secondaryColor,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: context.color.borderColor.withValues(alpha: 0.6),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+              Material(
+                color: context.color.secondaryColor,
+                borderRadius: BorderRadius.circular(14),
+                clipBehavior: Clip.antiAlias,
+                elevation: 3,
+                shadowColor: Colors.black.withValues(alpha: 0.1),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: context.color.borderColor.withValues(alpha: 0.6),
                     ),
-                  ],
-                ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _searchResults.length,
-                  separatorBuilder: (_, __) => Divider(
-                    height: 1,
-                    color: context.color.borderColor.withValues(alpha: 0.5),
                   ),
-                  itemBuilder: (context, index) {
-                    final item = _searchResults[index];
-                    return ListTile(
-                      dense: true,
-                      leading: Icon(
-                        Icons.location_on_outlined,
-                        color: context.color.territoryColor,
-                        size: 20,
-                      ),
-                      title: Text(
-                        item.title,
-                        style: TextStyle(
-                          color: context.color.textDefaultColor,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _searchResults.length,
+                    separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      color: context.color.borderColor.withValues(alpha: 0.5),
+                    ),
+                    itemBuilder: (context, index) {
+                      final item = _searchResults[index];
+                      return ListTile(
+                        dense: true,
+                        leading: Icon(
+                          Icons.location_on_outlined,
+                          color: context.color.territoryColor,
+                          size: 20,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: item.subtitle.isNotEmpty
-                          ? Text(
-                              item.subtitle,
-                              style: TextStyle(
-                                color: context.color.textLightColor,
-                                fontSize: 11,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            )
-                          : null,
-                      onTap: () => _onSelectPlaceResult(item),
-                    );
-                  },
+                        title: Text(
+                          item.title,
+                          style: TextStyle(
+                            color: context.color.textDefaultColor,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: item.subtitle.isNotEmpty
+                            ? Text(
+                                item.subtitle,
+                                style: TextStyle(
+                                  color: context.color.textLightColor,
+                                  fontSize: 11,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              )
+                            : null,
+                        onTap: () => _onSelectPlaceResult(item),
+                      );
+                    },
+                  ),
                 ),
               ),
             ],
