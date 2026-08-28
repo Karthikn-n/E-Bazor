@@ -11,7 +11,7 @@ workflows:
     environment:
       ios_signing:
         distribution_type: ad_hoc # Creates an Ad-Hoc provisioning profile containing all registered test devices
-        bundle_identifier: com.app.ebazar # Your iOS Bundle ID
+        bundle_identifier: com.ebozor.app # Your iOS Bundle ID
       flutter: stable
       xcode: latest
       cocoapods: default

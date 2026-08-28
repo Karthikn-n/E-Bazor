@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>655632443224-962i5tpnps5l782th633actn19rb0p9e.apps.googleusercontent.com</string>
+	<string>655632443224-quel8ra5ns2hrsu4shnngjimseo5ejla.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.655632443224-962i5tpnps5l782th633actn19rb0p9e</string>
+	<string>com.googleusercontent.apps.655632443224-quel8ra5ns2hrsu4shnngjimseo5ejla</string>
 	<key>ANDROID_CLIENT_ID</key>
-	<string>655632443224-bfci01i5lr1kds9cfkp0m9f2l0gka91r.apps.googleusercontent.com</string>
+	<string>655632443224-aua64m8spd0iaelr3ornuhalr5410r2r.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
 	<string>AIzaSyA6btHOHSWRKyoERLlpnVsdxmFHnb4YzXQ</string>
 	<key>GCM_SENDER_ID</key>
@@ -15,7 +15,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.app.ebazar</string>
+	<string>com.ebozor.app</string>
 	<key>PROJECT_ID</key>
 	<string>ebazar-ef30c</string>
 	<key>STORAGE_BUCKET</key>
@@ -31,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:655632443224:ios:e7a00a71604cff6a60e72d</string>
+	<string>1:655632443224:ios:ba9c90b698d88d5260e72d</string>
 </dict>
 </plist>

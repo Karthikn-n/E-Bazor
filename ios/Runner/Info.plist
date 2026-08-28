@@ -29,7 +29,7 @@
 				<string>Editor</string>
 				<key>CFBundleURLSchemes</key>
 				<array>
-					<string>com.googleusercontent.apps.655632443224-962i5tpnps5l782th633actn19rb0p9e</string>
+					<string>com.googleusercontent.apps.655632443224-2uq13ucpp07u9r9ukme1hs46c6kvi9c3</string>
 				</array>
 			</dict>
 			<dict>
@@ -47,7 +47,7 @@
 				<string>Bundle ID</string>
 				<key>CFBundleURLSchemes</key>
 				<array>
-					<string>com.app.ebozor</string>
+					<string>com.ebozor.app</string>
 				</array>
 			</dict>
 		</array>
