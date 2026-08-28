@@ -31,6 +31,11 @@ workflows:
             echo "Flutter did not generate ios/Flutter/Generated.xcconfig"
             exit 1
           fi
+          launch_storyboard_name=$(/usr/libexec/PlistBuddy -c "Print :UILaunchStoryboardName" ios/Runner/Info.plist)
+          if [ "$launch_storyboard_name" != "LaunchScreen" ] || [ ! -s ios/Runner/Base.lproj/LaunchScreen.storyboard ]; then
+            echo "The iOS launch storyboard configuration is missing or invalid"
+            exit 1
+          fi
           (
             cd ios
             pod update razorpay-pod razorpay-core-pod --repo-update
