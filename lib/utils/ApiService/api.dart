@@ -67,8 +67,7 @@ class Api {
     final jwtToken = HiveUtils.getJWT();
     final langCode = language?['code']?.toString().trim() ?? "";
 
-    AppLog.i(
-        'headers() — auth: ${jwtToken != null}, lang: $langCode',
+    AppLog.i('headers() — auth: ${jwtToken != null}, lang: $langCode',
         name: 'Api');
 
     Map<String, dynamic> header = {
@@ -99,6 +98,7 @@ class Api {
 
   static String stripeIntentAPI = "https://api.stripe.com/v1/payment_intents";
   static String getCategoryFiltersApi = "get-category-filters";
+  static String getCategorySubdataApi = "category-subdata";
   static String getCategoryChildrenByParentApi =
       "get-category-children-by-parent";
   static String getParentCategoryListApi = "get-parent-category-list";
@@ -188,7 +188,8 @@ class Api {
   static String userAddressChangesApi = "user-address-changes";
   @Deprecated("Use Firebase Phone Auth SMS OTP instead")
   static String sendOtpApi = "send-otp";
-  @Deprecated("Use Firebase Phone Auth SMS OTP and set-user-phonenumber instead")
+  @Deprecated(
+      "Use Firebase Phone Auth SMS OTP and set-user-phonenumber instead")
   static String verifyOtpApi = "verify-otp";
   static String getCategoriesApi = "get-categories";
   static String getHomeCategoriesApi = "get-home-categories";

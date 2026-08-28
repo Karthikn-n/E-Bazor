@@ -176,7 +176,8 @@ class FilterRepository {
         queryParameters: {"slug": slug},
       );
 
-      log("Status: ${response.statusCode} | Data: ${response.data}", name: Api.getCategoryFiltersApi);
+      log("Status: ${response.statusCode} | Data: ${response.data}",
+          name: Api.getCategoryFiltersApi);
 
       if (response.statusCode == 200) {
         final raw = response.data['data'];
@@ -191,15 +192,72 @@ class FilterRepository {
         if (categoryData is! Map) {
           throw Exception("Invalid filter configuration for '$slug'");
         }
-        return FilterCategory.fromJson(
+        final configuration = FilterCategory.fromJson(
           Map<String, dynamic>.from(categoryData),
         );
+        return await _withCategorySubdata(configuration);
       } else {
         throw Exception("Failed to load filters");
       }
     } on DioException catch (e) {
       log("❌ [FILTER API ERR] → ${e.message} | Response: ${e.response?.data}");
       throw Exception(e.message ?? "Dio error");
+    }
+  }
+
+  Future<FilterCategory> _withCategorySubdata(
+      FilterCategory configuration) async {
+    final categoryId = configuration.id;
+    final modelIndex = configuration.filters.indexWhere((filter) {
+      final name = filter.name?.trim().toLowerCase() ?? '';
+      return name == 'model' || name == 'models';
+    });
+    if (categoryId == null || categoryId <= 0 || modelIndex < 0) {
+      return configuration;
+    }
+
+    try {
+      final response = await _dio.get(
+        Api.getCategorySubdataApi,
+        queryParameters: {Api.categoryId: categoryId},
+      );
+      final rawData = response.data is Map ? response.data['data'] : null;
+      if (rawData is! List) return configuration;
+
+      final subdata = rawData
+          .whereType<Map>()
+          .map((entry) =>
+              (entry['title'] ?? entry['name'])?.toString().trim() ?? '')
+          .where((value) => value.isNotEmpty)
+          .toSet()
+          .toList(growable: false);
+      if (subdata.isEmpty) return configuration;
+
+      final filters = List<FilterItem>.from(configuration.filters);
+      filters[modelIndex] = filters[modelIndex].copyWith(
+        type: 'dropdown',
+        values: subdata,
+        multiSelect: false,
+      );
+      return FilterCategory(
+        id: configuration.id,
+        name: configuration.name,
+        slug: configuration.slug,
+        children: configuration.children,
+        filters: filters,
+      );
+    } on DioException catch (error) {
+      log(
+        'Could not refresh model options for category $categoryId: ${error.message}',
+        name: Api.getCategorySubdataApi,
+      );
+      return configuration;
+    } catch (error) {
+      log(
+        'Invalid model options for category $categoryId: $error',
+        name: Api.getCategorySubdataApi,
+      );
+      return configuration;
     }
   }
 }

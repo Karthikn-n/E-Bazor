@@ -49,12 +49,11 @@ class HomeSearchField extends StatelessWidget {
                         width: 1.5,
                         color: context.color.borderColor.withValues(alpha: 0.8),
                       ),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(50),
                     ),
                     child: Row(
                       children: [
                         const SizedBox(width: 10),
-
                         Expanded(
                           child: _DynamicSearchText(
                             categories: categories,
@@ -69,24 +68,22 @@ class HomeSearchField extends StatelessWidget {
           ),
         ),
 
-
-
         /// 📍 LOCATION ICON
-        GestureDetector(
-          onTap: () {
-            Navigator.pushNamed(
-              context,
-              Routes.countriesScreen,
-              arguments: {"from": "home"},
-            );
-          },
-          child: UiUtils.getSvg(
-            AppIcons.location,
-            color: context.color.textColorDark.withValues(alpha: 0.7),
-            width: 28, // 👈 reduce size slightly
-            height: 28,
-          ),
-        ),
+          // GestureDetector(
+          //   onTap: () {
+          //     Navigator.pushNamed(
+          //       context,
+          //       Routes.countriesScreen,
+          //       arguments: {"from": "home"},
+          //     );
+          //   },
+          //   child: UiUtils.getSvg(
+          //     AppIcons.location,
+          //     color: context.color.textColorDark.withValues(alpha: 0.7),
+          //     width: 28, // 👈 reduce size slightly
+          //     height: 28,
+          //   ),
+          // ),
 
         const SizedBox(width: 10),
 
@@ -189,7 +186,6 @@ class _DynamicSearchTextState extends State<_DynamicSearchText>
 
   @override
   Widget build(BuildContext context) {
-
     /// SVG
 
     if (widget.categories.isEmpty) {
@@ -233,7 +229,8 @@ class _DynamicSearchTextState extends State<_DynamicSearchText>
                 child: Text(
                   category.name ?? "",
                   style: TextStyle(
-                    color: context.color.textDefaultColor.withValues(alpha: 0.6),
+                    color:
+                        context.color.textDefaultColor.withValues(alpha: 0.6),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -244,6 +241,7 @@ class _DynamicSearchTextState extends State<_DynamicSearchText>
       ],
     );
   }
+
   Widget _buildCategoryIcon(String? url) {
     if (url == null || url.isEmpty) {
       return const Icon(Icons.image, size: 18);
@@ -255,8 +253,7 @@ class _DynamicSearchTextState extends State<_DynamicSearchText>
         url,
         width: 18,
         height: 18,
-        placeholderBuilder: (context) =>
-        const SizedBox(
+        placeholderBuilder: (context) => const SizedBox(
           width: 18,
           height: 18,
           child: CircularProgressIndicator(strokeWidth: 2),
@@ -270,8 +267,7 @@ class _DynamicSearchTextState extends State<_DynamicSearchText>
       width: 18,
       height: 18,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) =>
-      const Icon(Icons.broken_image, size: 18),
+      errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 18),
     );
   }
 }

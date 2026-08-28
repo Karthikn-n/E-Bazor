@@ -290,6 +290,28 @@ class FilterItem {
     this.placeholder,
   });
 
+  FilterItem copyWith({
+    String? name,
+    String? type,
+    List<String>? values,
+    List<Map<String, dynamic>>? valuesObject,
+    bool? multiSelect,
+    int? sortOrder,
+    bool? isActive,
+    String? placeholder,
+  }) {
+    return FilterItem(
+      name: name ?? this.name,
+      type: type ?? this.type,
+      values: values ?? this.values,
+      valuesObject: valuesObject ?? this.valuesObject,
+      multiSelect: multiSelect ?? this.multiSelect,
+      sortOrder: sortOrder ?? this.sortOrder,
+      isActive: isActive ?? this.isActive,
+      placeholder: placeholder ?? this.placeholder,
+    );
+  }
+
   factory FilterItem.fromJson(Map<String, dynamic> json) {
     final rawValues = json['values'];
     final rawObjects = json['values_obj'];

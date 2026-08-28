@@ -1292,8 +1292,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             color: dialogCtx.color.textDefaultColor,
                           ),
                           children: [
-                            TextSpan(
-                                text: "orEmailUsAt".translate(dialogCtx)),
+                            TextSpan(text: "orEmailUsAt".translate(dialogCtx)),
                             const TextSpan(
                               text: "customersupport@ebozor.com",
                               style: TextStyle(
@@ -1527,8 +1526,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                     icon: Icons.apartment_rounded,
                     title: "city".translate(context),
                     trailingText: cityName,
-                    onTap: () {
-                      Navigator.pushNamed(context, Routes.citiesScreen);
+                    onTap: () async {
+                      final result = await Navigator.pushNamed(
+                        context,
+                        Routes.citiesScreen,
+                        arguments: const {"from": "profile"},
+                      );
+                      if (result != null && mounted) setState(() {});
                     },
                   ),
                   // _buildMenuTile(

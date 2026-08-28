@@ -71,7 +71,7 @@ class _MotorPostingFormScreenState extends State<MotorPostingFormScreen> {
   bool _termsAgreed = true;
   bool _isLoadingDynamicFields = false;
   // Location Data
-  PostingLocationData _location = const PostingLocationData.dubai();
+  PostingLocationData _location = PostingLocationData.saved();
 
   final DynamicCustomFieldsController _adminFieldsController =
       DynamicCustomFieldsController();
@@ -116,11 +116,11 @@ class _MotorPostingFormScreenState extends State<MotorPostingFormScreen> {
       if (item.latitude != null && item.longitude != null) {
         _location = PostingLocationData(
           coordinates: LatLng(item.latitude!, item.longitude!),
-          city: item.city ?? 'Dubai',
-          state: item.state ?? item.city ?? 'Dubai',
-          country: item.country ?? 'United Arab Emirates',
-          address: item.address ?? item.city ?? 'Dubai',
-          area: item.area ?? item.address ?? item.city ?? 'Dubai',
+          city: item.city ?? _location.city,
+          state: item.state ?? item.city ?? _location.state,
+          country: item.country ?? _location.country,
+          address: item.address ?? item.city ?? _location.address,
+          area: item.area ?? item.address ?? item.city ?? _location.area,
         );
       }
       if (item.image != null && item.image!.trim().isNotEmpty) {
@@ -261,8 +261,10 @@ class _MotorPostingFormScreenState extends State<MotorPostingFormScreen> {
     }
 
     final savedCode = HiveUtils.getCountryCode();
-    final countryCodeDigits = (savedCode ?? '971').replaceAll(RegExp(r'[^0-9]'), '');
-    final contactDigits = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final countryCodeDigits =
+        (savedCode ?? '971').replaceAll(RegExp(r'[^0-9]'), '');
+    final contactDigits =
+        _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
 
     if (contactDigits.isEmpty ||
         contactDigits == countryCodeDigits ||
@@ -403,8 +405,7 @@ class _MotorPostingFormScreenState extends State<MotorPostingFormScreen> {
       itemDetails.addAll(
         await _adminFieldsController.toFileSubmissionMap(),
       );
-      final mainImg =
-          _selectedImages.isNotEmpty ? _selectedImages.first : null;
+      final mainImg = _selectedImages.isNotEmpty ? _selectedImages.first : null;
       final otherImgs =
           _selectedImages.length > 1 ? _selectedImages.sublist(1) : <File>[];
       createdItemModel =

@@ -78,7 +78,7 @@ class _ClassifiedsPostingFormScreenState
   final List<String> _existingNetworkImages = [];
   final ImagePicker _picker = ImagePicker();
   // Location / Google Maps
-  PostingLocationData _location = const PostingLocationData.dubai();
+  PostingLocationData _location = PostingLocationData.saved();
   GoogleMapController? _mapController;
   bool _isLocating = false;
 
@@ -105,18 +105,18 @@ class _ClassifiedsPostingFormScreenState
     ];
     final allCategoryIds = widget.item?.allCategoryIds?.split(',') ?? [];
     return categories.any((category) {
-      final slug = category.slug?.trim().toLowerCase() ?? '';
-      final name = category.name?.trim().toLowerCase() ?? '';
-      final id = category.id?.toString() ?? '';
-      return id == '4' ||
-          id == '356' ||
-          id == '357' ||
-          slug.contains('job') ||
-          name.contains('job') ||
-          name.contains('hiring') ||
-          name.contains('recruit') ||
-          name.contains('talent');
-    }) ||
+          final slug = category.slug?.trim().toLowerCase() ?? '';
+          final name = category.name?.trim().toLowerCase() ?? '';
+          final id = category.id?.toString() ?? '';
+          return id == '4' ||
+              id == '356' ||
+              id == '357' ||
+              slug.contains('job') ||
+              name.contains('job') ||
+              name.contains('hiring') ||
+              name.contains('recruit') ||
+              name.contains('talent');
+        }) ||
         allCategoryIds.contains('4') ||
         allCategoryIds.contains('356') ||
         allCategoryIds.contains('357');
@@ -182,11 +182,11 @@ class _ClassifiedsPostingFormScreenState
       if (item.latitude != null && item.longitude != null) {
         _location = PostingLocationData(
           coordinates: LatLng(item.latitude!, item.longitude!),
-          city: item.city ?? 'Dubai',
-          state: item.state ?? item.city ?? 'Dubai',
-          country: item.country ?? 'United Arab Emirates',
-          address: item.address ?? item.city ?? 'Dubai',
-          area: item.area ?? item.address ?? item.city ?? 'Dubai',
+          city: item.city ?? _location.city,
+          state: item.state ?? item.city ?? _location.state,
+          country: item.country ?? _location.country,
+          address: item.address ?? item.city ?? _location.address,
+          area: item.area ?? item.address ?? item.city ?? _location.area,
         );
       }
       if (item.image != null && item.image!.trim().isNotEmpty) {
@@ -404,8 +404,10 @@ class _ClassifiedsPostingFormScreenState
     }
 
     final savedCode = HiveUtils.getCountryCode();
-    final countryCodeDigits = (savedCode ?? '971').replaceAll(RegExp(r'[^0-9]'), '');
-    final contactDigits = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final countryCodeDigits =
+        (savedCode ?? '971').replaceAll(RegExp(r'[^0-9]'), '');
+    final contactDigits =
+        _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
 
     if (contactDigits.isEmpty ||
         contactDigits == countryCodeDigits ||
@@ -512,8 +514,7 @@ class _ClassifiedsPostingFormScreenState
       itemDetails.addAll(
         await _adminFieldsController.toFileSubmissionMap(),
       );
-      final mainImg =
-          _selectedImages.isNotEmpty ? _selectedImages.first : null;
+      final mainImg = _selectedImages.isNotEmpty ? _selectedImages.first : null;
       final otherImgs =
           _selectedImages.length > 1 ? _selectedImages.sublist(1) : <File>[];
       createdItemModel =
@@ -664,8 +665,8 @@ class _ClassifiedsPostingFormScreenState
                       onAdd: _pickImages,
                       onRemove: (index) =>
                           setState(() => _selectedImages.removeAt(index)),
-                      onRemoveExisting: (index) =>
-                          setState(() => _existingNetworkImages.removeAt(index)),
+                      onRemoveExisting: (index) => setState(
+                          () => _existingNetworkImages.removeAt(index)),
                     ),
                     const SizedBox(height: 18),
                   ],

@@ -299,7 +299,19 @@ class ItemsListState extends State<ItemsList> {
           item.values.isNotEmpty;
     }).toList();
     items.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-    return items.take(4).toList();
+    final visible = items.take(4).toList();
+    final modelFilter = items.cast<FilterItem?>().firstWhere(
+      (item) {
+        final name = item?.name?.trim().toLowerCase();
+        return name == 'model' || name == 'models';
+      },
+      orElse: () => null,
+    );
+    if (modelFilter != null && !visible.contains(modelFilter)) {
+      if (visible.length == 4) visible.removeLast();
+      visible.add(modelFilter);
+    }
+    return visible;
   }
 
   String _apiFilterLabel(FilterItem item) {
@@ -336,13 +348,14 @@ class ItemsListState extends State<ItemsList> {
     } else if (existing != null && existing.toString().trim().isNotEmpty) {
       selected.add(existing.toString());
     }
+    String? dropdownValue =
+        selected.length == 1 && item.values.contains(selected.first)
+            ? selected.first
+            : null;
     var showAllOptions = false;
     final canCollapseOptions =
         item.multiSelect && type == 'button' && item.values.length > 5;
 
-    final optionCount = item.values.length;
-    final initialSize =
-        (0.38 + (optionCount.clamp(0, 12) * 0.032)).clamp(0.46, 0.82);
     final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
@@ -354,215 +367,262 @@ class ItemsListState extends State<ItemsList> {
             final visibleOptions = canCollapseOptions && !showAllOptions
                 ? item.values.take(5).toList()
                 : item.values;
-            return DraggableScrollableSheet(
-              initialChildSize: initialSize.toDouble(),
-              minChildSize: 0.36,
-              maxChildSize: 0.92,
-              expand: false,
-              builder: (sheetContext, scrollController) => Material(
-                color: sheetContext.color.secondaryColor,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(24)),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 4,
-                      margin: const EdgeInsets.only(top: 10, bottom: 8),
-                      decoration: BoxDecoration(
-                        color: sheetContext.color.borderColor,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 12, 12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  fieldName,
-                                  style: TextStyle(
-                                    color: sheetContext.color.textDefaultColor,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  item.multiSelect
-                                      ? 'Choose one or more options'
-                                      : 'Choose an option',
-                                  style: TextStyle(
-                                    color: sheetContext.color.textLightColor,
-                                    fontSize: 12.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () => Navigator.pop(sheetContext),
-                            icon: const Icon(Icons.close_rounded),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Divider(height: 1, color: sheetContext.color.borderColor),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        controller: scrollController,
-                        physics: const BouncingScrollPhysics(),
-                        padding: EdgeInsets.fromLTRB(
-                          20,
-                          20,
-                          20,
-                          MediaQuery.viewInsetsOf(sheetContext).bottom + 20,
+            final keyboardInset = MediaQuery.viewInsetsOf(sheetContext).bottom;
+            final availableHeight =
+                MediaQuery.sizeOf(sheetContext).height - keyboardInset;
+            return AnimatedPadding(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              padding: EdgeInsets.only(bottom: keyboardInset),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: availableHeight * 0.92),
+                child: Material(
+                  color: sheetContext.color.secondaryColor,
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(24)),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 4,
+                        margin: const EdgeInsets.only(top: 10, bottom: 8),
+                        decoration: BoxDecoration(
+                          color: sheetContext.color.borderColor,
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                        child: isInput
-                            ? TextField(
-                                controller: inputController,
-                                autofocus: true,
-                                keyboardType: type == 'number'
-                                    ? const TextInputType.numberWithOptions(
-                                        decimal: true)
-                                    : TextInputType.text,
-                                decoration: InputDecoration(
-                                  hintText:
-                                      item.placeholder ?? 'Enter $fieldName',
-                                  prefixIcon: Icon(
-                                    type == 'number'
-                                        ? Icons.numbers_rounded
-                                        : Icons.edit_outlined,
-                                  ),
-                                  filled: true,
-                                  fillColor: sheetContext.color.backgroundColor,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                    borderSide: BorderSide(
-                                      color: sheetContext.color.borderColor,
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : Column(
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 12, 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Wrap(
-                                    spacing: 10,
-                                    runSpacing: 10,
-                                    children: visibleOptions.map((option) {
-                                      final isSelected =
-                                          selected.contains(option);
-                                      return FilterChip(
-                                        label: Text(option),
-                                        selected: isSelected,
-                                        showCheckmark: true,
-                                        selectedColor: sheetContext
-                                            .color.territoryColor
-                                            .withValues(alpha: 0.12),
-                                        side: BorderSide(
-                                          color: isSelected
-                                              ? sheetContext
-                                                  .color.territoryColor
-                                              : sheetContext.color.borderColor,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                        ),
-                                        onSelected: (_) {
-                                          setSheetState(() {
-                                            if (item.multiSelect) {
-                                              isSelected
-                                                  ? selected.remove(option)
-                                                  : selected.add(option);
-                                            } else {
-                                              selected
-                                                ..clear()
-                                                ..add(option);
-                                            }
-                                          });
-                                        },
-                                      );
-                                    }).toList(),
-                                  ),
-                                  if (canCollapseOptions) ...[
-                                    const SizedBox(height: 8),
-                                    TextButton.icon(
-                                      onPressed: () => setSheetState(
-                                        () => showAllOptions = !showAllOptions,
-                                      ),
-                                      icon: Icon(
-                                        showAllOptions
-                                            ? Icons.keyboard_arrow_up_rounded
-                                            : Icons.keyboard_arrow_down_rounded,
-                                      ),
-                                      label: Text(
-                                        showAllOptions
-                                            ? 'Show less'
-                                            : 'Show more (${item.values.length - 5})',
-                                      ),
+                                  Text(
+                                    fieldName,
+                                    style: TextStyle(
+                                      color:
+                                          sheetContext.color.textDefaultColor,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
                                     ),
-                                  ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    item.multiSelect
+                                        ? 'Choose one or more options'
+                                        : 'Choose an option',
+                                    style: TextStyle(
+                                      color: sheetContext.color.textLightColor,
+                                      fontSize: 12.5,
+                                    ),
+                                  ),
                                 ],
                               ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-                      decoration: BoxDecoration(
-                        border: Border(
-                          top: BorderSide(
-                            color: sheetContext.color.borderColor,
-                          ),
+                            ),
+                            IconButton(
+                              onPressed: () => Navigator.pop(sheetContext),
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                          ],
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => Navigator.pop(
-                                sheetContext,
-                                <String, dynamic>{
-                                  'apply': true,
-                                  'value': null,
-                                },
-                              ),
-                              child: const Text('Clear'),
+                      Divider(height: 1, color: sheetContext.color.borderColor),
+                      Flexible(
+                        fit: FlexFit.loose,
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                          child: isInput
+                              ? TextField(
+                                  controller: inputController,
+                                  autofocus: true,
+                                  keyboardType: type == 'number'
+                                      ? const TextInputType.numberWithOptions(
+                                          decimal: true)
+                                      : TextInputType.text,
+                                  decoration: InputDecoration(
+                                    hintText:
+                                        item.placeholder ?? 'Enter $fieldName',
+                                    prefixIcon: Icon(
+                                      type == 'number'
+                                          ? Icons.numbers_rounded
+                                          : Icons.edit_outlined,
+                                    ),
+                                    filled: true,
+                                    fillColor:
+                                        sheetContext.color.backgroundColor,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: BorderSide(
+                                        color: sheetContext.color.borderColor,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : type == 'dropdown'
+                                  ? DropdownButtonFormField<String>(
+                                      initialValue: dropdownValue,
+                                      isExpanded: true,
+                                      menuMaxHeight: availableHeight * 0.55,
+                                      decoration: InputDecoration(
+                                        hintText: item.placeholder ??
+                                            'Select $fieldName',
+                                        filled: true,
+                                        fillColor:
+                                            sheetContext.color.backgroundColor,
+                                        border: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                        ),
+                                      ),
+                                      items: item.values
+                                          .map((option) => DropdownMenuItem(
+                                                value: option,
+                                                child: Text(
+                                                  option,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ))
+                                          .toList(),
+                                      onChanged: (value) => setSheetState(() {
+                                        dropdownValue = value;
+                                        selected
+                                          ..clear()
+                                          ..addAll(value == null
+                                              ? const <String>[]
+                                              : <String>[value]);
+                                      }),
+                                    )
+                                  : Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Wrap(
+                                          spacing: 10,
+                                          runSpacing: 10,
+                                          children:
+                                              visibleOptions.map((option) {
+                                            final isSelected =
+                                                selected.contains(option);
+                                            return FilterChip(
+                                              label: Text(option),
+                                              selected: isSelected,
+                                              showCheckmark: true,
+                                              selectedColor: sheetContext
+                                                  .color.territoryColor
+                                                  .withValues(alpha: 0.12),
+                                              side: BorderSide(
+                                                color: isSelected
+                                                    ? sheetContext
+                                                        .color.territoryColor
+                                                    : sheetContext
+                                                        .color.borderColor,
+                                              ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              onSelected: (_) {
+                                                setSheetState(() {
+                                                  if (item.multiSelect) {
+                                                    isSelected
+                                                        ? selected
+                                                            .remove(option)
+                                                        : selected.add(option);
+                                                  } else {
+                                                    selected
+                                                      ..clear()
+                                                      ..add(option);
+                                                  }
+                                                });
+                                              },
+                                            );
+                                          }).toList(),
+                                        ),
+                                        if (canCollapseOptions) ...[
+                                          const SizedBox(height: 8),
+                                          TextButton.icon(
+                                            onPressed: () => setSheetState(
+                                              () => showAllOptions =
+                                                  !showAllOptions,
+                                            ),
+                                            icon: Icon(
+                                              showAllOptions
+                                                  ? Icons
+                                                      .keyboard_arrow_up_rounded
+                                                  : Icons
+                                                      .keyboard_arrow_down_rounded,
+                                            ),
+                                            label: Text(
+                                              showAllOptions
+                                                  ? 'Show less'
+                                                  : 'Show more (${item.values.length - 5})',
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            top: BorderSide(
+                              color: sheetContext.color.borderColor,
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                final dynamic value = isInput
-                                    ? (inputController.text.trim().isEmpty
-                                        ? null
-                                        : inputController.text.trim())
-                                    : item.multiSelect
-                                        ? selected.toList()
-                                        : (selected.isEmpty
-                                            ? null
-                                            : selected.first);
-                                Navigator.pop(
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.pop(
                                   sheetContext,
                                   <String, dynamic>{
                                     'apply': true,
-                                    'value': value,
+                                    'value': null,
                                   },
-                                );
-                              },
-                              child: const Text('Apply'),
+                                ),
+                                child: const Text('Clear'),
+                              ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  final dynamic value = isInput
+                                      ? (inputController.text.trim().isEmpty
+                                          ? null
+                                          : inputController.text.trim())
+                                      : type == 'dropdown'
+                                          ? dropdownValue
+                                          : item.multiSelect
+                                              ? selected.toList()
+                                              : (selected.isEmpty
+                                                  ? null
+                                                  : selected.first);
+                                  Navigator.pop(
+                                    sheetContext,
+                                    <String, dynamic>{
+                                      'apply': true,
+                                      'value': value,
+                                    },
+                                  );
+                                },
+                                child: const Text('Apply'),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             );
@@ -818,14 +878,13 @@ class ItemsListState extends State<ItemsList> {
 
     ItemFilterModel initialFilter = filter != null
         ? filter!.copyWith(
-            country: (filter!.country != null &&
-                    filter!.country!.trim().isNotEmpty)
-                ? filter!.country
-                : (HiveUtils.getCountryName() ?? ""),
-            state:
-                (filter!.state != null && filter!.state!.trim().isNotEmpty)
-                    ? filter!.state
-                    : (HiveUtils.getStateName() ?? ""),
+            country:
+                (filter!.country != null && filter!.country!.trim().isNotEmpty)
+                    ? filter!.country
+                    : (HiveUtils.getCountryName() ?? ""),
+            state: (filter!.state != null && filter!.state!.trim().isNotEmpty)
+                ? filter!.state
+                : (HiveUtils.getStateName() ?? ""),
             city: (filter!.city != null && filter!.city!.trim().isNotEmpty)
                 ? filter!.city
                 : (HiveUtils.getCityName() ?? ""),
@@ -2355,10 +2414,10 @@ class ItemsListState extends State<ItemsList> {
   }
 
   Widget _buildJobCard(BuildContext context, ItemModel item) {
-    final hideCompany = _getJobCustomField(
-            item, ['hide company name', 'hide company'])
-        ?.toLowerCase() ==
-        'yes';
+    final hideCompany =
+        _getJobCustomField(item, ['hide company name', 'hide company'])
+                ?.toLowerCase() ==
+            'yes';
     String companyName = 'Confidential';
     if (!hideCompany) {
       final customCompany =
@@ -2392,12 +2451,11 @@ class ItemsListState extends State<ItemsList> {
     }
 
     // Experience formatting
-    final rawExp = _getJobCustomField(item,
-        ['minimum work experience', 'work experience', 'experience']);
+    final rawExp = _getJobCustomField(
+        item, ['minimum work experience', 'work experience', 'experience']);
     String expText = '0-1 Years Exp';
     if (rawExp != null && rawExp.trim().isNotEmpty) {
-      expText =
-          rawExp.toLowerCase().contains('exp') ? rawExp : '$rawExp Exp';
+      expText = rawExp.toLowerCase().contains('exp') ? rawExp : '$rawExp Exp';
     }
 
     // Education formatting
@@ -2448,9 +2506,7 @@ class ItemsListState extends State<ItemsList> {
         border: Border.all(
           color: context.color.borderColor.withValues(alpha: 0.5),
         ),
-        boxShadow: [
-         
-        ],
+        boxShadow: [],
       ),
       child: Material(
         color: Colors.transparent,
@@ -3597,7 +3653,7 @@ class ItemsListState extends State<ItemsList> {
       },
     );
   }
-  
+
   Widget buildItemsShimmer(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(8.0),

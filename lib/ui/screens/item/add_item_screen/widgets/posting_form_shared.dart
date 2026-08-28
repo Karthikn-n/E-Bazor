@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
+import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -24,13 +25,22 @@ class PostingLocationData {
     this.area,
   });
 
-  const PostingLocationData.dubai()
-      : coordinates = const LatLng(25.2048, 55.2708),
-        area = 'Downtown Dubai',
-        city = 'Dubai',
-        state = 'Dubai',
-        country = 'United Arab Emirates',
-        address = 'Downtown Dubai, Dubai, United Arab Emirates';
+  factory PostingLocationData.saved() {
+    final city = HiveUtils.getCityName()?.toString().trim() ?? '';
+    final country = HiveUtils.getSelectedCityCountryCode()?.trim() ?? '';
+    final latitude = HiveUtils.getSelectedCityLatitude() ?? 25.2048;
+    final longitude = HiveUtils.getSelectedCityLongitude() ?? 55.2708;
+    final label = city.isNotEmpty ? city : 'Location';
+    return PostingLocationData(
+      coordinates: LatLng(latitude, longitude),
+      area: null,
+      city: city,
+      state: '',
+      country: country,
+      address:
+          [label, country].where((value) => value.trim().isNotEmpty).join(', '),
+    );
+  }
 
   String get label {
     if (area?.trim().isNotEmpty == true) return area!.trim();

@@ -1,8 +1,8 @@
-
 import 'package:Ebozor/data/model/data_output.dart';
 import 'package:Ebozor/data/model/location/cityModel.dart';
 import 'package:Ebozor/data/repositories/location/cities_repository.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+
 abstract class FetchCitiesState {}
 
 class FetchCitiesInitial extends FetchCitiesState {}
@@ -52,30 +52,79 @@ class FetchCitiesCubit extends Cubit<FetchCitiesState> {
   FetchCitiesCubit() : super(FetchCitiesInitial());
 
   final CitiesRepository _citiesRepository = CitiesRepository();
+  List<CityModel> _allCities = const [];
+  String _query = '';
 
-  Future<void> fetchCities({required int stateId, String? search}) async {
-    try {
+  Future<void> fetchCities({int? stateId, String? search}) async {
+    if (search != null) _query = search;
+    final cached = (stateId == null || stateId <= 0)
+        ? _citiesRepository.getCachedCities()
+        : const <CityModel>[];
+    if (cached.isNotEmpty) {
+      _allCities = cached;
+      emit(FetchCitiesSuccess(
+        isLoadingMore: false,
+        loadingMoreError: false,
+        citiesModel: _filter(_query),
+        page: 1,
+        total: cached.length,
+        stateId: stateId,
+      ));
+    } else {
       emit(FetchCitiesInProgress());
+    }
 
-      DataOutput<CityModel> result = await _citiesRepository.fetchCities(
-          stateId: stateId, page: 1, search: search);
+    try {
+      DataOutput<CityModel> result =
+          await _citiesRepository.fetchAllCities(stateId: stateId);
+      _allCities = result.modelList;
       emit(
         FetchCitiesSuccess(
           isLoadingMore: false,
           loadingMoreError: false,
-          citiesModel: result.modelList,
+          citiesModel: _filter(_query),
           page: 1,
           total: result.total,
           stateId: stateId,
         ),
       );
     } catch (e) {
-      emit(
-        FetchCitiesFailure(
-          e.toString(),
-        ),
-      );
+      if (_allCities.isEmpty) {
+        emit(FetchCitiesFailure(e.toString()));
+      } else {
+        emit(FetchCitiesSuccess(
+          isLoadingMore: false,
+          loadingMoreError: true,
+          citiesModel: _filter(_query),
+          page: 1,
+          total: _allCities.length,
+          stateId: stateId,
+        ));
+      }
     }
+  }
+
+  void search(String query) {
+    _query = query;
+    if (_allCities.isEmpty) return;
+    final current = state;
+    emit(FetchCitiesSuccess(
+      isLoadingMore: false,
+      loadingMoreError:
+          current is FetchCitiesSuccess && current.loadingMoreError,
+      citiesModel: _filter(query),
+      page: 1,
+      total: _allCities.length,
+      stateId: current is FetchCitiesSuccess ? current.stateId : null,
+    ));
+  }
+
+  List<CityModel> _filter(String? query) {
+    final normalized = query?.trim().toLowerCase() ?? '';
+    if (normalized.isEmpty) return List<CityModel>.from(_allCities);
+    return _allCities
+        .where((city) => (city.name ?? '').toLowerCase().contains(normalized))
+        .toList(growable: false);
   }
 
   Future<void> fetchCitiesMore({required int stateId, String? search}) async {
@@ -93,8 +142,8 @@ class FetchCitiesCubit extends Cubit<FetchCitiesState> {
 
         FetchCitiesSuccess cities = (state as FetchCitiesSuccess);
 
-        List<CityModel> updatedList =
-            List<CityModel>.from(cities.citiesModel)..addAll(result.modelList);
+        List<CityModel> updatedList = List<CityModel>.from(cities.citiesModel)
+          ..addAll(result.modelList);
 
         emit(
           FetchCitiesSuccess(

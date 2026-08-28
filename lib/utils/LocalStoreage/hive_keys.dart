@@ -9,6 +9,9 @@ class HiveKeys {
   static const String countryKey = "countryKey";
   static const String latitudeKey = "latitudeKey";
   static const String longitudeKey = "longitudeKey";
+  static const String selectedCityLatitude = "selectedCityLatitudeKey";
+  static const String selectedCityLongitude = "selectedCityLongitudeKey";
+  static const String selectedCityCountryCode = "selectedCityCountryCodeKey";
   static const String currentLocationCity = "currentLocationCityKey";
   static const String currentLocationArea = "currentLocationAreaKey";
   static const String currentLocationState = "currentLocationStateKey";

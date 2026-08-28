@@ -9,8 +9,6 @@ import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:geolocator/geolocator.dart';
 
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/category/subcategory_filters_cubit.dart';
@@ -149,6 +147,13 @@ class _FiltersPageState extends State<FiltersPage> {
     ];
     return values
             .whereType<String>()
+            .where((value) => value.trim().isNotEmpty)
+            .firstOrNull ??
+        '';
+  }
+
+  String get _selectedLocationLabel {
+    return [_selectedArea, _selectedCity, _selectedState, _selectedCountry]
             .where((value) => value.trim().isNotEmpty)
             .firstOrNull ??
         '';
@@ -627,7 +632,7 @@ class _FiltersPageState extends State<FiltersPage> {
 
   void _onTapChooseLocation() async {
     FocusManager.instance.primaryFocus?.unfocus();
-    Navigator.pushNamed(context, Routes.countriesScreen,
+    Navigator.pushNamed(context, Routes.citiesScreen,
         arguments: {"from": "filter"}).then((value) {
       if (value != null) {
         Map<String, dynamic> location = value as Map<String, dynamic>;
@@ -665,56 +670,19 @@ class _FiltersPageState extends State<FiltersPage> {
     });
   }
 
-  Future<void> _fetchCurrentLocation() async {
-    try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied ||
-            permission == LocationPermission.deniedForever) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Location permission denied')),
-            );
-          }
-          return;
-        }
-      }
-
-      Position position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.best,
-        ),
-      );
-
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-
-      if (placemarks.isNotEmpty && mounted) {
-        Placemark place = placemarks[0];
-        String locName = place.locality ??
-            place.subAdministrativeArea ??
-            place.administrativeArea ??
-            place.name ??
-            "Dubai";
-
-        setState(() {
-          _locationController.text = locName;
-          _selectedCity = locName;
-          _selectedLat = position.latitude;
-          _selectedLong = position.longitude;
-        });
-        _onFilterChanged();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not fetch location: $e')),
-        );
-      }
-    }
+  void _clearSelectedLocation() {
+    setState(() {
+      _selectedArea = '';
+      _selectedCity = '';
+      _selectedState = '';
+      _selectedCountry = '';
+      _selectedAreaId = null;
+      _selectedRadius = null;
+      _selectedLat = null;
+      _selectedLong = null;
+      _locationController.clear();
+    });
+    _onFilterChanged();
   }
 
   void _resetAllFilters() {
@@ -1107,31 +1075,26 @@ class _FiltersPageState extends State<FiltersPage> {
             child: IgnorePointer(
               ignoring: true,
               child: TextField(
-                controller: _locationController,
                 style: TextStyle(
                   color: context.color.textDefaultColor,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
                 decoration: InputDecoration(
-                  hintText: 'e.g. Dubai Marina, Deira...'.translate(context),
+                  hintText: 'Search Location'.translate(context),
                   hintStyle: TextStyle(
                     color: context.color.textLightColor,
                     fontSize: 13,
                   ),
                   prefixIcon: Icon(
-                    Icons.location_on_rounded,
+                    Icons.search_rounded,
                     color: context.color.territoryColor,
                     size: 20,
                   ),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      Icons.my_location_rounded,
-                      color: context.color.territoryColor,
-                      size: 20,
-                    ),
-                    tooltip: 'Use current location'.translate(context),
-                    onPressed: _fetchCurrentLocation,
+                  suffixIcon: Icon(
+                    Icons.chevron_right_rounded,
+                    color: context.color.textLightColor,
+                    size: 20,
                   ),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(
@@ -1143,6 +1106,38 @@ class _FiltersPageState extends State<FiltersPage> {
             ),
           ),
         ),
+        if (_selectedLocationLabel.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 10),
+            padding: const EdgeInsets.only(left: 14),
+            decoration: BoxDecoration(
+              color: context.color.territoryColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: context.color.territoryColor.withValues(alpha: 0.45),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    _selectedLocationLabel,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: context.color.textDefaultColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Remove location',
+                  onPressed: _clearSelectedLocation,
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }

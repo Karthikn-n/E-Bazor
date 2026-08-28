@@ -15,6 +15,7 @@ import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
+import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/payment/gatways/stripe_service.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 
@@ -302,8 +303,8 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
 
                     // Stripe Only Card Tile
                     Material(
-                      color: context.color.territoryColor
-                          .withValues(alpha: 0.08),
+                      color:
+                          context.color.territoryColor.withValues(alpha: 0.08),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                         side: BorderSide(
@@ -593,7 +594,10 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
         widget.postingData?.price ??
         double.tryParse(widget.genericAdData?['price']?.toString() ?? '0') ??
         0.0;
-    final city = widget.model?.city ?? widget.genericAdData?['city'] ?? "Dubai";
+    final city = widget.model?.city ??
+        widget.genericAdData?['city'] ??
+        HiveUtils.getCityName() ??
+        '';
     final imagePath = widget.model?.image ??
         ((widget.postingData != null &&
                 widget.postingData!.imageFiles.isNotEmpty)

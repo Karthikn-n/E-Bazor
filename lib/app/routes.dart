@@ -34,14 +34,11 @@ import 'package:Ebozor/ui/screens/location/location_details_form_screen.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/confirm_location_screen.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/more_details.dart';
 import 'package:Ebozor/ui/screens/item/items_list.dart';
-import 'package:Ebozor/ui/screens/location/cities_screen.dart';
-import 'package:Ebozor/ui/screens/location/countries_screen.dart';
-import 'package:Ebozor/ui/screens/location/states_screen.dart';
+import 'package:Ebozor/ui/screens/location/city_selection_screen.dart';
 import 'package:Ebozor/ui/screens/seller/seller_verification_complete.dart';
 
 import 'package:Ebozor/ui/screens/ad_details_screen.dart';
 import 'package:Ebozor/ui/screens/faqs_screen.dart';
-import 'package:Ebozor/ui/screens/location_permission_screen.dart';
 import 'package:Ebozor/ui/screens/my_review_screen.dart';
 import 'package:Ebozor/ui/screens/sold_out_bought_screen.dart';
 import 'package:Ebozor/ui/screens/user_profile/edit_profile.dart';
@@ -70,8 +67,6 @@ import 'package:Ebozor/ui/screens/item/my_items_screen.dart';
 
 import 'package:Ebozor/ui/screens/location/areas_screen.dart';
 import 'package:Ebozor/ui/screens/location/location_map_screen.dart';
-import 'package:Ebozor/ui/screens/location/nearby_location.dart';
-import 'package:Ebozor/ui/screens/location/select_location_screen.dart';
 import 'package:Ebozor/ui/screens/onboarding/onboarding_screen.dart';
 
 import 'package:Ebozor/ui/screens/seller/seller_intro_verification.dart';
@@ -292,7 +287,15 @@ class Routes {
       case contactUs:
         return ContactUs.route(routeSettings);
       case locationPermissionScreen:
-        return LocationPermissionScreen.route(routeSettings);
+        return CitySelectionScreen.route(
+          const RouteSettings(
+            name: locationPermissionScreen,
+            arguments: {
+              'from': 'auth',
+              'title': 'Choose your city',
+            },
+          ),
+        );
       case profileSettings:
         return ProfileSettings.route(routeSettings);
       case filterScreen:
@@ -322,12 +325,12 @@ class Routes {
       case blockedUserListScreen:
         return BlockedUserListScreen.route(routeSettings);
       case countriesScreen:
-        return CountriesScreen.route(routeSettings);
+        return CitySelectionScreen.route(routeSettings);
 
       case statesScreen:
-        return StatesScreen.route(routeSettings);
+        return CitySelectionScreen.route(routeSettings);
       case citiesScreen:
-        return CitiesScreen.route(routeSettings);
+        return CitySelectionScreen.route(routeSettings);
       case areasScreen:
         return AreasScreen.route(routeSettings);
 
@@ -374,9 +377,9 @@ class Routes {
       case sellerVerificationComplteScreen:
         return SellerVerificationCompleteScreen.route(routeSettings);
       case nearbyLocationScreen:
-        return NearbyLocationScreen.route(routeSettings);
+        return CitySelectionScreen.route(routeSettings);
       case selectLocationScreen:
-        return SelectLocationScreen.route(routeSettings);
+        return CitySelectionScreen.route(routeSettings);
       case locationMapScreen:
         return LocationMapScreen.route(routeSettings);
       case myReviewsScreen:

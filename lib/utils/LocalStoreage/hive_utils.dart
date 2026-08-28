@@ -248,6 +248,47 @@ class HiveUtils {
     }
   }
 
+  /// Stores a city chosen from the API city list exactly as selected.
+  ///
+  /// City-based browsing must not inherit a previous nearby radius, map
+  /// coordinates, area, state, or country because those parameters would make
+  /// `get-item` ignore or over-constrain the selected city.
+  static Future<void> setSelectedCity(
+    String city, {
+    double? latitude,
+    double? longitude,
+    String? countryCode,
+  }) async {
+    await Hive.box(HiveKeys.userDetailsBox).putAll({
+      HiveKeys.city: city.trim(),
+      HiveKeys.stateKey: null,
+      HiveKeys.countryKey: null,
+      HiveKeys.areaId: null,
+      HiveKeys.area: null,
+      HiveKeys.nearbyRadius: null,
+      HiveKeys.latitudeKey: null,
+      HiveKeys.longitudeKey: null,
+      HiveKeys.selectedCityLatitude: latitude,
+      HiveKeys.selectedCityLongitude: longitude,
+      HiveKeys.selectedCityCountryCode: countryCode,
+    });
+  }
+
+  static double? getSelectedCityLatitude() =>
+      (Hive.box(HiveKeys.userDetailsBox).get(HiveKeys.selectedCityLatitude)
+              as num?)
+          ?.toDouble();
+
+  static double? getSelectedCityLongitude() =>
+      (Hive.box(HiveKeys.userDetailsBox).get(HiveKeys.selectedCityLongitude)
+              as num?)
+          ?.toDouble();
+
+  static String? getSelectedCityCountryCode() =>
+      Hive.box(HiveKeys.userDetailsBox)
+          .get(HiveKeys.selectedCityCountryCode)
+          ?.toString();
+
   static void setCurrentLocation(
       {required String city,
       required String state,

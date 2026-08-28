@@ -13,7 +13,6 @@ import 'package:flutter/services.dart';
 
 import 'package:Ebozor/data/cubits/custom_field/fetch_custom_fields_cubit.dart';
 
-
 import 'package:Ebozor/utils/ApiService/api.dart';
 
 import 'package:Ebozor/utils/ui_utils.dart';
@@ -145,14 +144,14 @@ class FilterScreenState extends State<FilterScreen> {
     setDefaultVal(isRefresh: false);
     //clearFieldData();
     getCustomFieldsData();
-    
-         // Initialize slider values
+
+    // Initialize slider values
     double min = double.tryParse(minController.text.replaceAll(',', '')) ?? 0;
-    double max = double.tryParse(maxController.text.replaceAll(',', '')) ?? 1000000;
+    double max =
+        double.tryParse(maxController.text.replaceAll(',', '')) ?? 1000000;
     if (max < min) max = min + 1000;
     _priceRangeValues = RangeValues(min, max);
   }
-
 
   void setCategories() {
     if (widget.categoryIds != null && widget.categoryIds!.isNotEmpty) {
@@ -225,17 +224,17 @@ class FilterScreenState extends State<FilterScreen> {
         minController.text.trim().isNotEmpty ||
         maxController.text.trim().isNotEmpty ||
         selectedCategory != defaultCategory) {
-            print("true");
+      print("true");
       return true;
     }
 
-            print("fase");
+    print("fase");
     return false;
   }
 
   void _onTapChooseLocation() async {
     FocusManager.instance.primaryFocus?.unfocus();
-    Navigator.pushNamed(context, Routes.countriesScreen,
+    Navigator.pushNamed(context, Routes.citiesScreen,
         arguments: {"from": "filter"}).then((value) {
       if (value != null) {
         Map<String, dynamic> location = value as Map<String, dynamic>;
@@ -274,6 +273,19 @@ class FilterScreenState extends State<FilterScreen> {
     }*/
   }
 
+  void _clearLocationFilter() {
+    setState(() {
+      area = '';
+      city = '';
+      areaId = null;
+      radius = null;
+      country = '';
+      _state = '';
+      latitude = null;
+      longitude = null;
+    });
+  }
+
   Map<String, dynamic> convertToCustomFields(Map<dynamic, dynamic> fieldsData) {
     return fieldsData.map((key, value) {
       return MapEntry('custom_fields[$key]', value);
@@ -284,7 +296,7 @@ class FilterScreenState extends State<FilterScreen> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: true,
-      onPopInvokedWithResult: (didPop, result)  {
+      onPopInvokedWithResult: (didPop, result) {
         checkFilterValSet();
         return;
       },
@@ -410,55 +422,58 @@ class FilterScreenState extends State<FilterScreen> {
             ],
           ),
         ),
-        body: isProperty ? propertyFilterBody() : SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          child: Padding(
-            padding: const EdgeInsets.all(
-              20.0,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              //mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: <Widget>[
-                Text('locationLbl'.translate(context))
-                    .bold(weight: FontWeight.w600)
-                    .color(context.color.textDefaultColor),
-                const SizedBox(height: 5),
-                locationWidget(context),
-                if (widget.categoryIds == null ||
-                    widget.categoryIds!.isEmpty) ...[
-                  const SizedBox(height: 15),
-                  Text('category'.translate(context))
-                      .bold(weight: FontWeight.w600)
-                      .color(context.color.textDefaultColor),
-                  const SizedBox(height: 5),
-                  categoryWidget(context),
-                  const SizedBox(height: 5),
-                ],
-                //categoryModule(),
-                const SizedBox(
-                  height: 15,
+        body: isProperty
+            ? propertyFilterBody()
+            : SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                child: Padding(
+                  padding: const EdgeInsets.all(
+                    20.0,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    //mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: <Widget>[
+                      Text('locationLbl'.translate(context))
+                          .bold(weight: FontWeight.w600)
+                          .color(context.color.textDefaultColor),
+                      const SizedBox(height: 5),
+                      locationWidget(context),
+                      if (widget.categoryIds == null ||
+                          widget.categoryIds!.isEmpty) ...[
+                        const SizedBox(height: 15),
+                        Text('category'.translate(context))
+                            .bold(weight: FontWeight.w600)
+                            .color(context.color.textDefaultColor),
+                        const SizedBox(height: 5),
+                        categoryWidget(context),
+                        const SizedBox(height: 5),
+                      ],
+                      //categoryModule(),
+                      const SizedBox(
+                        height: 15,
+                      ),
+                      Text(isJobs
+                              ? "Expected Monthly Salary (AED)"
+                              : 'budgetLbl'.translate(context))
+                          .bold(weight: FontWeight.w600)
+                          .color(context.color.textDefaultColor),
+                      const SizedBox(height: 15),
+                      budgetOption(),
+                      const SizedBox(height: 15),
+                      Text('postedSinceLbl'.translate(context))
+                          .bold(weight: FontWeight.w600)
+                          .color(context.color.textDefaultColor),
+                      const SizedBox(height: 5),
+                      postedSinceOption(context),
+                      const SizedBox(height: 15),
+                      customFields()
+                    ],
+                  ),
                 ),
-                Text(isJobs
-                        ? "Expected Monthly Salary (AED)"
-                        : 'budgetLbl'.translate(context))
-                    .bold(weight: FontWeight.w600)
-                    .color(context.color.textDefaultColor),
-                const SizedBox(height: 15),
-                budgetOption(),
-                const SizedBox(height: 15),
-                Text('postedSinceLbl'.translate(context))
-                    .bold(weight: FontWeight.w600)
-                    .color(context.color.textDefaultColor),
-                const SizedBox(height: 5),
-                postedSinceOption(context),
-                const SizedBox(height: 15),
-                customFields()
-              ],
-            ),
-          ),
-        ),
+              ),
       ),
     );
   }
@@ -478,7 +493,6 @@ class FilterScreenState extends State<FilterScreen> {
             const SizedBox(height: 10),
             locationWidgetProperty(context),
             const SizedBox(height: 20),
-            
             Text('Price Range')
                 .bold(weight: FontWeight.w600)
                 .color(context.color.textDefaultColor),
@@ -493,11 +507,11 @@ class FilterScreenState extends State<FilterScreen> {
                 Expanded(child: minMaxTFFProperty("maxLbl".translate(context))),
               ],
             ),
-             const SizedBox(height: 10),
+            const SizedBox(height: 10),
             RangeSlider(
               values: _priceRangeValues,
               min: 0,
-              max: 1000000, 
+              max: 1000000,
               activeColor: Color(0xFFE52D2D),
               inactiveColor: Color(0xFFE52D2D).withValues(alpha: 0.2),
               onChanged: (RangeValues values) {
@@ -508,9 +522,7 @@ class FilterScreenState extends State<FilterScreen> {
                 });
               },
             ),
-
             const SizedBox(height: 20),
-            
             Text('postedSinceLbl'.translate(context))
                 .bold(weight: FontWeight.w600)
                 .color(context.color.textDefaultColor),
@@ -579,22 +591,22 @@ class FilterScreenState extends State<FilterScreen> {
         style: TextStyle(color: Colors.black),
         textAlign: TextAlign.center,
         onChanged: (value) {
-            double? val = double.tryParse(value);
-            if(val != null) {
-              if (minMax == "minLbl".translate(context)) {
-                 if(val <= _priceRangeValues.end) {
-                   setState(() {
-                     _priceRangeValues = RangeValues(val, _priceRangeValues.end);
-                   });
-                 }
-              } else {
-                 if(val >= _priceRangeValues.start) {
-                   setState(() {
-                      _priceRangeValues = RangeValues(_priceRangeValues.start, val);
-                   });
-                 }
+          double? val = double.tryParse(value);
+          if (val != null) {
+            if (minMax == "minLbl".translate(context)) {
+              if (val <= _priceRangeValues.end) {
+                setState(() {
+                  _priceRangeValues = RangeValues(val, _priceRangeValues.end);
+                });
+              }
+            } else {
+              if (val >= _priceRangeValues.start) {
+                setState(() {
+                  _priceRangeValues = RangeValues(_priceRangeValues.start, val);
+                });
               }
             }
+          }
         },
         decoration: InputDecoration(
           border: InputBorder.none,
@@ -630,7 +642,8 @@ class FilterScreenState extends State<FilterScreen> {
         ),
         child: Row(
           children: [
-            Icon(Icons.calendar_today_outlined, color: Colors.black54, size: 20),
+            Icon(Icons.calendar_today_outlined,
+                color: Colors.black54, size: 20),
             const SizedBox(width: 10),
             Expanded(
               child: Text(Constant.postedSince[index].status)
@@ -651,7 +664,9 @@ class FilterScreenState extends State<FilterScreen> {
               .read<FetchCustomFieldsCubit>()
               .getFields()
               .where((field) =>
-                  field.type != "fileinput" && field.type != "textbox" && field.type != "number")
+                  field.type != "fileinput" &&
+                  field.type != "textbox" &&
+                  field.type != "number")
               .map((field) {
             Map<String, dynamic> fieldData = field.toMap();
 
@@ -700,69 +715,102 @@ class FilterScreenState extends State<FilterScreen> {
         .where((element) => element != null && element.isNotEmpty)
         .join(", ");
 
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      decoration: BoxDecoration(
-        color: context.color.secondaryColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: context.color.borderColor.withValues(alpha: 0.6),
-          width: 1,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: _onTapChooseLocation,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: context.color.territoryColor.withValues(alpha: 0.1),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      Icons.location_on_outlined,
-                      size: 20,
-                      color: context.color.territoryColor,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          margin: const EdgeInsets.only(top: 8),
+          decoration: BoxDecoration(
+            color: context.color.secondaryColor,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: context.color.borderColor.withValues(alpha: 0.6),
+              width: 1,
+            ),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: _onTapChooseLocation,
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color:
+                            context.color.territoryColor.withValues(alpha: 0.1),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          Icons.search_rounded,
+                          size: 20,
+                          color: context.color.territoryColor,
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Search Location'.translate(context),
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                          color: context.color.textLightColor,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 14,
+                      color: context.color.textLightColor,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
+              ),
+            ),
+          ),
+        ),
+        if (locationText.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 10),
+            padding: const EdgeInsets.only(left: 14),
+            decoration: BoxDecoration(
+              color: context.color.territoryColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: context.color.territoryColor.withValues(alpha: 0.45),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
                   child: Text(
-                    locationText.isNotEmpty
-                        ? locationText
-                        : "allCities".translate(context),
+                    locationText,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: locationText.isNotEmpty
-                          ? FontWeight.w600
-                          : FontWeight.w400,
-                      color: locationText.isNotEmpty
-                          ? context.color.textDefaultColor
-                          : context.color.textLightColor,
+                      color: context.color.textDefaultColor,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 14,
-                  color: context.color.textLightColor,
+                IconButton(
+                  tooltip: 'Remove location',
+                  onPressed: _clearLocationFilter,
+                  icon: const Icon(Icons.close_rounded, size: 18),
                 ),
               ],
             ),
           ),
-        ),
-      ),
+      ],
     );
   }
 
@@ -839,9 +887,8 @@ class FilterScreenState extends State<FilterScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 14,
-                      fontWeight: hasCategory
-                          ? FontWeight.w600
-                          : FontWeight.w400,
+                      fontWeight:
+                          hasCategory ? FontWeight.w600 : FontWeight.w400,
                       color: hasCategory
                           ? context.color.textDefaultColor
                           : context.color.textLightColor,
@@ -886,7 +933,8 @@ class FilterScreenState extends State<FilterScreen> {
 
   Widget budgetOption() {
     double min = double.tryParse(minController.text.replaceAll(',', '')) ?? 0;
-    double max = double.tryParse(maxController.text.replaceAll(',', '')) ?? 1000000;
+    double max =
+        double.tryParse(maxController.text.replaceAll(',', '')) ?? 1000000;
     if (min < 0) min = 0;
     if (max > 1000000) max = 1000000;
     if (max < min) max = min;
@@ -969,7 +1017,8 @@ class FilterScreenState extends State<FilterScreen> {
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         decoration: InputDecoration(
           isDense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           border: InputBorder.none,
           labelText: minMax,
           labelStyle: TextStyle(
@@ -993,7 +1042,8 @@ class FilterScreenState extends State<FilterScreen> {
   }
 
   Widget postedSinceOption(BuildContext context) {
-    int index = Constant.postedSince.indexWhere((item) => item.value == postedOn);
+    int index =
+        Constant.postedSince.indexWhere((item) => item.value == postedOn);
     if (index == -1) index = 0;
 
     return Container(

@@ -2,6 +2,7 @@ import 'package:Ebozor/data/model/custom_field/custom_field_model.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/dynamic_custom_fields_form.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/posting_form_shared.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 void main() {
   test('parses the get-customfields-by-category-id response keys', () {
@@ -70,7 +71,13 @@ void main() {
         'latitude': 25.1122,
         'longitude': 55.1888,
       },
-      const PostingLocationData.dubai(),
+      const PostingLocationData(
+        coordinates: const LatLng(25.2048, 55.2708),
+        city: 'Dubai',
+        state: 'Dubai',
+        country: 'United Arab Emirates',
+        address: 'Dubai, United Arab Emirates',
+      ),
     );
 
     expect(location.label, 'Al Barsha');

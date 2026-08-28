@@ -149,7 +149,8 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
       if (currentLocation == "") {
         Position position = await Geolocator.getCurrentPosition(
             locationSettings: LocationSettings(
-                accuracy: LocationAccuracy.high,));
+          accuracy: LocationAccuracy.high,
+        ));
         _cameraPosition = CameraPosition(
           target: LatLng(position.latitude, position.longitude),
           zoom: 14.4746,
@@ -264,7 +265,7 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
   Widget build(BuildContext context) {
     return PopScope(
       canPop: true,
-      onPopInvokedWithResult: (didPop, result)  async {
+      onPopInvokedWithResult: (didPop, result) async {
         Future.delayed(Duration(milliseconds: 500), () {
           return;
         });
@@ -400,7 +401,7 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
                   padding: EdgeInsets.only(top: 20, right: 15, left: 15),
                   child: UiUtils.buildButton(context, height: 48,
                       onPressed: () {
-                    Navigator.pushNamed(context, Routes.countriesScreen,
+                    Navigator.pushNamed(context, Routes.locationMapScreen,
                         arguments: {"from": "addItem"}).then((value) {
                       if (value != null) {
                         Map<String, dynamic> location =
@@ -448,15 +449,15 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
                       textColor: context.color.textDefaultColor,
                       buttonColor: context.color.secondaryColor,
                       border: BorderSide(
-                          color:
-                              context.color.textDefaultColor.withValues(alpha: 0.3),
+                          color: context.color.textDefaultColor
+                              .withValues(alpha: 0.3),
                           width: 1.5),
                       radius: 5),
                 ),
                 SizedBox(
                   height: 20,
                 ),
-                  Expanded(
+                Expanded(
                   child: Stack(
                     children: <Widget>[
                       Container(
@@ -470,8 +471,9 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
                                 _cameraPosition = position;
                               },
                               onCameraIdle: () async {
-                                if (markerMove == false) { // Assuming markerMove logic is relevant or can be removed if unused
-                                    getLocationFromLatitudeLongitude();
+                                if (markerMove == false) {
+                                  // Assuming markerMove logic is relevant or can be removed if unused
+                                  getLocationFromLatitudeLongitude();
                                 }
                               },
                               initialCameraPosition: _cameraPosition!,
@@ -486,11 +488,12 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
                               mapType: MapType.normal,
                               scrollGesturesEnabled: true,
                               zoomGesturesEnabled: true,
-                              gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                              Factory<EagerGestureRecognizer>(
-                                () => EagerGestureRecognizer(),
-                              ),
-                             },
+                              gestureRecognizers: <Factory<
+                                  OneSequenceGestureRecognizer>>{
+                                Factory<EagerGestureRecognizer>(
+                                  () => EagerGestureRecognizer(),
+                                ),
+                              },
                               onMapCreated: (GoogleMapController controller) {
                                 Future.delayed(
                                         const Duration(milliseconds: 500))
@@ -504,13 +507,14 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
                                 });
                               },
                               onTap: (latLng) {
-                                 // Optional tap logic
+                                // Optional tap logic
                               }),
                         ),
                       ),
                       Center(
                         child: Padding(
-                          padding: const EdgeInsets.only(bottom: 40), // Adjust to align tip of pin
+                          padding: const EdgeInsets.only(
+                              bottom: 40), // Adjust to align tip of pin
                           child: Icon(
                             Icons.location_on,
                             size: 45,
@@ -540,9 +544,10 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
                             ),
                           ),
                           onTap: () async {
-                            Position position = await Geolocator.getCurrentPosition(
-                                locationSettings: LocationSettings(
-                                    accuracy: LocationAccuracy.high));
+                            Position position =
+                                await Geolocator.getCurrentPosition(
+                                    locationSettings: LocationSettings(
+                                        accuracy: LocationAccuracy.high));
 
                             _cameraPosition = CameraPosition(
                               target:
@@ -744,7 +749,8 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
                   textAlign: TextAlign.center,
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: context.color.textDefaultColor.withValues(alpha: 0.5)),
+                      color: context.color.textDefaultColor
+                          .withValues(alpha: 0.5)),
                   controller: controller,
                   cursorColor: context.color.territoryColor,
                   validator: (val) {
@@ -763,8 +769,8 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
                       hintText: hintText,
                       hintStyle: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color:
-                              context.color.textDefaultColor.withValues(alpha: 0.5)),
+                          color: context.color.textDefaultColor
+                              .withValues(alpha: 0.5)),
                       focusColor: context.color.territoryColor,
                       enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),

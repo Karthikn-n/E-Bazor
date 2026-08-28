@@ -46,7 +46,7 @@ class _CarPostingDetailsScreenState extends State<CarPostingDetailsScreen> {
   final DynamicCustomFieldsController _detailsFieldsController =
       DynamicCustomFieldsController();
 
-  PostingLocationData _location = const PostingLocationData.dubai();
+  PostingLocationData _location = PostingLocationData.saved();
   int _descriptionCharCount = 0;
   @override
   void initState() {
@@ -58,11 +58,11 @@ class _CarPostingDetailsScreenState extends State<CarPostingDetailsScreen> {
       if (item.latitude != null && item.longitude != null) {
         _location = PostingLocationData(
           coordinates: LatLng(item.latitude!, item.longitude!),
-          city: item.city ?? 'Dubai',
-          state: item.state ?? item.city ?? 'Dubai',
-          country: item.country ?? 'United Arab Emirates',
-          address: item.address ?? item.city ?? 'Dubai',
-          area: item.area ?? item.address ?? item.city ?? 'Dubai',
+          city: item.city ?? _location.city,
+          state: item.state ?? item.city ?? _location.state,
+          country: item.country ?? _location.country,
+          address: item.address ?? item.city ?? _location.address,
+          area: item.area ?? item.address ?? item.city ?? _location.area,
         );
       }
       if (item.image != null && item.image!.trim().isNotEmpty) {

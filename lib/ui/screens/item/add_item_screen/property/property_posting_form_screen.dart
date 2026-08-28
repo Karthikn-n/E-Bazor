@@ -80,7 +80,7 @@ class _PropertyPostingFormScreenState
   final DynamicCustomFieldsController _adminFieldsController =
       DynamicCustomFieldsController();
   // Location / Google Maps
-  PostingLocationData _location = const PostingLocationData.dubai();
+  PostingLocationData _location = PostingLocationData.saved();
   GoogleMapController? _mapController;
   bool _isLocating = false;
 
@@ -148,11 +148,11 @@ class _PropertyPostingFormScreenState
       if (item.latitude != null && item.longitude != null) {
         _location = PostingLocationData(
           coordinates: LatLng(item.latitude!, item.longitude!),
-          city: item.city ?? 'Dubai',
-          state: item.state ?? item.city ?? 'Dubai',
-          country: item.country ?? 'United Arab Emirates',
-          address: item.address ?? item.city ?? 'Dubai',
-          area: item.area ?? item.address ?? item.city ?? 'Dubai',
+          city: item.city ?? _location.city,
+          state: item.state ?? item.city ?? _location.state,
+          country: item.country ?? _location.country,
+          address: item.address ?? item.city ?? _location.address,
+          area: item.area ?? item.address ?? item.city ?? _location.area,
         );
       }
       if (item.image != null && item.image!.trim().isNotEmpty) {
@@ -368,8 +368,10 @@ class _PropertyPostingFormScreenState
     }
 
     final savedCode = HiveUtils.getCountryCode();
-    final countryCodeDigits = (savedCode ?? '971').replaceAll(RegExp(r'[^0-9]'), '');
-    final contactDigits = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final countryCodeDigits =
+        (savedCode ?? '971').replaceAll(RegExp(r'[^0-9]'), '');
+    final contactDigits =
+        _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
 
     if (contactDigits.isEmpty ||
         contactDigits == countryCodeDigits ||

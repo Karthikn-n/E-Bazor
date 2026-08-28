@@ -75,7 +75,7 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
   final DynamicCustomFieldsController _adminFieldsController =
       DynamicCustomFieldsController();
 
-  static const _emirates = [
+  final List<String> _emirates = [
     'Dubai',
     'Abu Dhabi',
     'Sharjah',
@@ -89,6 +89,24 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
   @override
   void initState() {
     super.initState();
+    final savedCity = HiveUtils.getCityName()?.toString().toLowerCase() ?? '';
+    if (savedCity.isNotEmpty) {
+      var matched = false;
+      for (final emirate in _emirates) {
+        if (savedCity.contains(emirate.toLowerCase())) {
+          _selectedEmirate = emirate;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        final originalCity = HiveUtils.getCityName()?.toString().trim() ?? '';
+        if (originalCity.isNotEmpty) {
+          _emirates.insert(0, originalCity);
+          _selectedEmirate = originalCity;
+        }
+      }
+    }
     final savedCode = HiveUtils.getCountryCode();
     final countryCode = savedCode != null && savedCode.isNotEmpty
         ? (savedCode.startsWith('+') ? savedCode : '+$savedCode')
@@ -379,8 +397,10 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
     }
 
     final savedCode = HiveUtils.getCountryCode();
-    final countryCodeDigits = (savedCode ?? '971').replaceAll(RegExp(r'[^0-9]'), '');
-    final contactDigits = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final countryCodeDigits =
+        (savedCode ?? '971').replaceAll(RegExp(r'[^0-9]'), '');
+    final contactDigits =
+        _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
 
     if (contactDigits.isEmpty ||
         contactDigits == countryCodeDigits ||
