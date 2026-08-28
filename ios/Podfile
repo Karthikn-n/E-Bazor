@@ -32,6 +32,10 @@ target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
+  # razorpay_flutter 1.4.2+ uses checkout analytics APIs introduced after
+  # razorpay-pod 1.5.2. Keep the native SDK aligned with the Flutter plugin.
+  pod 'razorpay-pod', '1.5.7'
+
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
 

@@ -32,7 +32,7 @@ workflows:
           fi
           (
             cd ios
-            pod install --repo-update
+            pod update razorpay-pod razorpay-core-pod --repo-update
           )
       - name: Flutter build iOS (.ipa)
         script: |
