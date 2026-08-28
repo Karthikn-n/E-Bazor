@@ -15,6 +15,10 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
+    cache:
+      cache_paths:
+        - ~/.pub-cache
+        - ~/Library/Caches/CocoaPods
     scripts:
       - name: Disable experimental Swift Package Manager
         script: |
@@ -26,7 +30,6 @@ workflows:
         script: |
           set -e
           flutter pub get
-          flutter precache --ios
           if [ ! -s ios/Flutter/Generated.xcconfig ]; then
             echo "Flutter did not generate ios/Flutter/Generated.xcconfig"
             exit 1
@@ -38,12 +41,29 @@ workflows:
           fi
           (
             cd ios
-            pod update razorpay-pod razorpay-core-pod --repo-update
+            if ! pod update razorpay-pod razorpay-core-pod; then
+              echo "Cached CocoaPods specs are stale; refreshing once"
+              pod update razorpay-pod razorpay-core-pod --repo-update
+            fi
           )
       - name: Flutter build iOS (.ipa)
         script: |
-          flutter build ipa --release \
-            --export-options-plist=/Users/builder/export_options.plist
+          set -e
+          pubspec_build_name=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | cut -d+ -f1 | tr -d '[:space:]')
+          pubspec_build_number=$(sed -n 's/^version:.*+//p' pubspec.yaml | tr -d '[:space:]')
+          ios_build_number="$PROJECT_BUILD_NUMBER"
+          if [ -z "$ios_build_number" ]; then
+            ios_build_number="$pubspec_build_number"
+          fi
+          if ! echo "$ios_build_number" | grep -Eq '^[0-9]+$'; then
+            echo "Unable to determine a numeric iOS build number"
+            exit 1
+          fi
+          if [ "$ios_build_number" -lt "$pubspec_build_number" ]; then
+            ios_build_number="$pubspec_build_number"
+          fi
+          echo "Building TestFlight version $pubspec_build_name ($ios_build_number)"
+          flutter build ipa --release --build-number="$ios_build_number" --export-options-plist=/Users/builder/export_options.plist
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log

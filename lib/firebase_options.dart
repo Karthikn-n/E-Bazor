@@ -86,13 +86,13 @@ class DefaultFirebaseOptions {
   */
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAyObg0okwSIGdKQpHyzWHqk8xSBlwLK7w',  // API Key
-    appId: '1:655632443224:ios:ba9c90b698d88d5260e72d',  // App ID for iOS
-    messagingSenderId: '655632443224',  // Messaging Sender ID (project_number)
-    projectId: 'ebazar-ef30c',  // Project ID
-    storageBucket: 'ebazar-ef30c.firebasestorage.app',  // Storage Bucket
-    iosClientId: '655632443224-quel8ra5ns2hrsu4shnngjimseo5ejla.apps.googleusercontent.com',  // iOS Client ID
-    iosBundleId: 'com.ebozor.app',  // iOS Bundle ID
+    apiKey: 'AIzaSyA6btHOHSWRKyoERLlpnVsdxmFHnb4YzXQ', // API Key
+    appId: '1:655632443224:ios:ba9c90b698d88d5260e72d', // App ID for iOS
+    messagingSenderId: '655632443224', // Messaging Sender ID (project_number)
+    projectId: 'ebazar-ef30c', // Project ID
+    storageBucket: 'ebazar-ef30c.firebasestorage.app', // Storage Bucket
+    iosClientId:
+        '655632443224-quel8ra5ns2hrsu4shnngjimseo5ejla.apps.googleusercontent.com', // iOS Client ID
+    iosBundleId: 'com.ebozor.app', // iOS Bundle ID
   );
-
 }

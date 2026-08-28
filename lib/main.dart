@@ -19,7 +19,71 @@ import 'package:Ebozor/data/cubits/system/language_cubit.dart';
 ///V-1.0.0//
 ////////////
 
-void main() => initApp();
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await initApp();
+  } catch (error, stackTrace) {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'application bootstrap',
+      ),
+    );
+    runApp(const StartupFailureApp());
+  }
+}
+
+class StartupFailureApp extends StatelessWidget {
+  const StartupFailureApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    color: Colors.redAccent,
+                    size: 48,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Unable to start the app',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Please check your connection and try again.',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton(
+                    onPressed: main,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class EntryPoint extends StatefulWidget {
   const EntryPoint({

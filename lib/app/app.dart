@@ -1,4 +1,3 @@
-
 import 'package:Ebozor/data/model/personalized/personalized_settings.dart';
 import 'package:Ebozor/firebase_options.dart';
 import 'package:Ebozor/main.dart';
@@ -14,7 +13,6 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 PersonalizedInterestSettings personalizedInterestSettings =
     PersonalizedInterestSettings.empty();
-
 
 // void initApp() async {
 //   ///Note: this file's code is very necessary and sensitive if you change it, this might affect whole app , So change it carefully.
@@ -100,7 +98,7 @@ PersonalizedInterestSettings personalizedInterestSettings =
 //     );
 //   }
 
-void initApp() async {
+Future<void> initApp() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Google Maps setup
@@ -114,29 +112,31 @@ void initApp() async {
   if (kReleaseMode) {
     ErrorWidget.builder =
         (FlutterErrorDetails flutterErrorDetails) => SomethingWentWrong(
-      error: flutterErrorDetails,
-    );
+              error: flutterErrorDetails,
+            );
   }
 
-  // Firebase init
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // AppDelegate may already configure the default iOS Firebase app from
+  // GoogleService-Info.plist. Do not initialize the same app twice.
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ).timeout(const Duration(seconds: 15));
+  }
 
   // Ads init
   MobileAds.instance.initialize();
 
   // Initialize hive and open boxes
-  await HiveUtils.initHive();
+  await HiveUtils.initHive().timeout(const Duration(seconds: 15));
 
   // ✅ Use await instead of .then() to avoid async issues
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+  ]).timeout(const Duration(seconds: 5));
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
   );
 
   runApp(const EntryPoint());
 }
-
-
-
