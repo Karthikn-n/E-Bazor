@@ -20,16 +20,20 @@ workflows:
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
-      - name: Generate iOS configs & get Flutter dependencies
+      - name: Generate iOS configs and install CocoaPods dependencies
         script: |
-          rm -f ios/Flutter/Generated.xcconfig
-          rm -f ios/Flutter/flutter_export_environment.sh
-          flutter packages pub get
+          set -e
+          flutter pub get
           flutter precache --ios
           flutter build ios --config-only --release --no-codesign
-      - name: Install CocoaPods dependencies
-        script: |
-          cd ios && pod install --repo-update && cd ..
+          if [ ! -s ios/Flutter/Generated.xcconfig ]; then
+            echo "Flutter did not generate ios/Flutter/Generated.xcconfig"
+            exit 1
+          fi
+          (
+            cd ios
+            pod install --repo-update
+          )
       - name: Flutter build iOS (.ipa)
         script: |
           flutter build ipa --release \
