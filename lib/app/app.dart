@@ -4,6 +4,7 @@ import 'package:Ebozor/main.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -124,11 +125,16 @@ Future<void> initApp() async {
     ).timeout(const Duration(seconds: 15));
   }
 
+  await _configureCrashlytics();
+  await _setBootstrapStage('initializing_local_storage');
+
   // Ads init
   MobileAds.instance.initialize();
 
   // Initialize hive and open boxes
   await HiveUtils.initHive().timeout(const Duration(seconds: 15));
+
+  await _setBootstrapStage('configuring_orientation');
 
   // ✅ Use await instead of .then() to avoid async issues
   await SystemChrome.setPreferredOrientations([
@@ -138,5 +144,39 @@ Future<void> initApp() async {
     const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
   );
 
+  await _setBootstrapStage('running_app');
   runApp(const EntryPoint());
+}
+
+Future<void> _configureCrashlytics() async {
+  try {
+    final FirebaseCrashlytics crashlytics = FirebaseCrashlytics.instance;
+    await crashlytics.setCrashlyticsCollectionEnabled(!kDebugMode);
+
+    FlutterError.onError = crashlytics.recordFlutterFatalError;
+    PlatformDispatcher.instance.onError = (error, stackTrace) {
+      crashlytics.recordError(
+        error,
+        stackTrace,
+        reason: 'Uncaught asynchronous platform error',
+        fatal: true,
+      );
+      return true;
+    };
+
+    await crashlytics.setCustomKey('app_bootstrap_stage', 'firebase_ready');
+  } catch (error) {
+    debugPrint('Crashlytics setup failed: $error');
+  }
+}
+
+Future<void> _setBootstrapStage(String stage) async {
+  try {
+    await FirebaseCrashlytics.instance.setCustomKey(
+      'app_bootstrap_stage',
+      stage,
+    );
+  } catch (_) {
+    // Crash reporting must never prevent the application from starting.
+  }
 }
