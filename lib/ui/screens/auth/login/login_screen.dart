@@ -29,6 +29,7 @@ import 'package:Ebozor/utils/logger.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:sms_autofill/sms_autofill.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -705,8 +706,11 @@ class LoginScreenState extends State<LoginScreen> {
           UiUtils.buildButton(context,
               prefixWidget: Padding(
                 padding: EdgeInsetsDirectional.only(end: 10.0),
-                child:
-                    UiUtils.getSvg(AppIcons.appleIcon, width: 22, height: 22),
+                child: const FaIcon(
+                  FontAwesomeIcons.apple,
+                  size: 22,
+                  color: textDarkColor,
+                ),
               ),
               showElevation: false,
               buttonColor: secondaryColor_,

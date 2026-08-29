@@ -7,6 +7,7 @@ import 'package:Ebozor/utils/login/phone_login/phone_login.dart';
 import 'package:Ebozor/utils/login/lib/login_system.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:flutter/services.dart';
 import 'package:Ebozor/utils/login/lib/login_status.dart';
 import 'package:Ebozor/utils/login/lib/payloads.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -58,7 +59,10 @@ String authenticationErrorMessage(dynamic error) {
   if (error is GoogleSignInCancelledException) return '';
   if (error is SignInWithAppleAuthorizationException) {
     if (error.code == AuthorizationErrorCode.canceled) return '';
-    return 'Apple authentication could not be completed. Check that Sign in with Apple is enabled for this app build.';
+    return 'Apple authentication failed (${error.code.name}). Please try again.';
+  }
+  if (error is PlatformException) {
+    return 'Authentication failed (${error.code}). Please try again.';
   }
   if (error is AuthenticationFlowException) {
     switch (error.code) {
@@ -112,6 +116,7 @@ String authenticationErrorMessage(dynamic error) {
       case 'too-many-requests':
         return 'Too many attempts. Please try again later.';
     }
+    return 'Authentication failed (${error.code}). Please try again.';
   }
   return 'Authentication failed. Please try again.';
 }

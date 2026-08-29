@@ -25,6 +25,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:Ebozor/utils/login/lib/payloads.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class SignUpMainScreen extends StatefulWidget {
   const SignUpMainScreen({super.key});
@@ -474,8 +475,11 @@ class LoginScreenState extends State<SignUpMainScreen> {
               UiUtils.buildButton(context,
                   prefixWidget: Padding(
                     padding: EdgeInsetsDirectional.only(end: 10.0),
-                    child: UiUtils.getSvg(AppIcons.appleIcon,
-                        width: 22, height: 22),
+                    child: const FaIcon(
+                      FontAwesomeIcons.apple,
+                      size: 22,
+                      color: textDarkColor,
+                    ),
                   ),
                   showElevation: false,
                   buttonColor: secondaryColor_,

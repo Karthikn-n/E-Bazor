@@ -26,6 +26,7 @@ import 'package:Ebozor/ui/screens/auth/sign_up/signup_auth_listener.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:sms_autofill/sms_autofill.dart';
 
 class MobileSignUpScreen extends StatefulWidget {
@@ -354,10 +355,9 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
                   buttonTitle: "verifyMobileNumberLbl".translate(context),
                   radius: 10,
                   disabledColor: const Color.fromARGB(255, 104, 102, 106)),
-                
-                const SizedBox(
-                  height: 36,
-                ),
+              const SizedBox(
+                height: 36,
+              ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -435,8 +435,11 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
           UiUtils.buildButton(context,
               prefixWidget: Padding(
                 padding: EdgeInsetsDirectional.only(end: 10.0),
-                child:
-                    UiUtils.getSvg(AppIcons.appleIcon, width: 22, height: 22),
+                child: const FaIcon(
+                  FontAwesomeIcons.apple,
+                  size: 22,
+                  color: textDarkColor,
+                ),
               ),
               showElevation: false,
               buttonColor: secondaryColor_,

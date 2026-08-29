@@ -18,6 +18,7 @@ import 'package:Ebozor/ui/screens/auth/sign_up/signup_auth_listener.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import 'package:Ebozor/ui/screens/auth/sign_up/email_verification_screen.dart';
 
@@ -284,8 +285,9 @@ class _SignupScreenState extends CloudState<SignupScreen> {
         if (Constant.googleAuthentication == "1")
           UiUtils.buildButton(context,
               prefixWidget: Padding(
-              padding: EdgeInsetsDirectional.only(end: 10.0),
-                child: UiUtils.getSvg(AppIcons.googleIcon, width: 22, height: 22),
+                padding: EdgeInsetsDirectional.only(end: 10.0),
+                child:
+                    UiUtils.getSvg(AppIcons.googleIcon, width: 22, height: 22),
               ),
               outerPadding: EdgeInsets.symmetric(vertical: 6.0),
               showElevation: false,
@@ -314,8 +316,11 @@ class _SignupScreenState extends CloudState<SignupScreen> {
             UiUtils.buildButton(context,
                 prefixWidget: Padding(
                   padding: EdgeInsetsDirectional.only(end: 10.0),
-                  child:
-                      UiUtils.getSvg(AppIcons.appleIcon, width: 22, height: 22),
+                  child: const FaIcon(
+                    FontAwesomeIcons.apple,
+                    size: 22,
+                    color: textDarkColor,
+                  ),
                 ),
                 showElevation: false,
                 buttonColor: secondaryColor_,
