@@ -123,5 +123,14 @@ void main() {
         contains('not configured'),
       );
     });
+
+    test('expired Firebase sessions ask for a clean retry', () {
+      for (final code in ['invalid-user-token', 'user-token-expired']) {
+        expect(
+          authenticationErrorMessage(FirebaseAuthException(code: code)),
+          'Your previous session expired. Please try signing in again.',
+        );
+      }
+    });
   });
 }

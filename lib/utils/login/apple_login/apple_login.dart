@@ -88,6 +88,13 @@ class AppleLogin extends LoginSystem {
       emit(MSuccess());
       return userCredential;
     } catch (e, stackTrace) {
+      try {
+        if (firebaseAuth.currentUser != null) {
+          await firebaseAuth.signOut();
+        }
+      } catch (_) {
+        // Never replace the original Apple authentication error.
+      }
       await _recordFailure(e, stackTrace, stage);
       print("apple error catch***${e.toString()}");
       emit(MFail(e));

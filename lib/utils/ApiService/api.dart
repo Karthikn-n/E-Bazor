@@ -62,13 +62,14 @@ class Api {
   //   }
   // }
 
-  static Map<String, dynamic> headers() {
+  static Map<String, dynamic> headers({bool useAuthToken = true}) {
     final language = HiveUtils.getLanguage();
     final jwtToken = HiveUtils.getJWT();
     final langCode = language?['code']?.toString().trim() ?? "";
+    final hasAuthHeader =
+        useAuthToken && HiveUtils.isUserAuthenticated() && jwtToken != null;
 
-    AppLog.i('headers() — auth: ${jwtToken != null}, lang: $langCode',
-        name: 'Api');
+    AppLog.i('headers() — auth: $hasAuthHeader, lang: $langCode', name: 'Api');
 
     Map<String, dynamic> header = {
       "Accept": "application/json",
@@ -78,7 +79,7 @@ class Api {
       if (langCode.isNotEmpty) "Language": langCode,
     };
 
-    if (HiveUtils.isUserAuthenticated() && jwtToken != null) {
+    if (hasAuthHeader) {
       header["Authorization"] = "Bearer $jwtToken";
     }
 
@@ -361,6 +362,7 @@ class Api {
     dynamic parameter,
     Options? options,
     bool? useBaseUrl,
+    bool useAuthToken = true,
   }) async {
     try {
       final Dio dio = _dio();
@@ -403,7 +405,7 @@ class Api {
         data: formData,
         options: Options(
           contentType: "multipart/form-data",
-          headers: headers(),
+          headers: headers(useAuthToken: useAuthToken),
         ),
       );
 
@@ -417,7 +419,7 @@ class Api {
 
       return Map.from(resp);
     } on DioException catch (e) {
-      if (e.response?.statusCode == 401) {
+      if (e.response?.statusCode == 401 && useAuthToken) {
         userExpired();
       }
 

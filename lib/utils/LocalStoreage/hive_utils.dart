@@ -175,6 +175,14 @@ class HiveUtils {
     await Hive.box(HiveKeys.userDetailsBox).put(HiveKeys.jwtToken, token);
   }
 
+  /// Clears only authentication credentials while preserving preferences and
+  /// the selected location needed by the unauthenticated screens.
+  static Future<void> clearAuthenticationSession() async {
+    await Hive.box(HiveKeys.userDetailsBox).delete(HiveKeys.jwtToken);
+    await setUserIsAuthenticated(false);
+    setEmailVerificationPending(false);
+  }
+
   static UserModel getUserDetails() {
     return UserModel.fromJson(
         Map.from(Hive.box(HiveKeys.userDetailsBox).toMap()));

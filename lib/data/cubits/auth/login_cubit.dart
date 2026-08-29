@@ -95,6 +95,7 @@ class LoginCubit extends Cubit<LoginState> {
   }) async {
     try {
       emit(LoginInProgress());
+      await HiveUtils.clearAuthenticationSession();
 
       /*String? token = await getDeviceToken();*/
       String? token = await () async {
@@ -164,6 +165,11 @@ class LoginCubit extends Cubit<LoginState> {
       }
     } catch (e) {
       if (e is ApiException) {}
+
+      try {
+        await FirebaseAuth.instance.signOut();
+      } catch (_) {}
+      await HiveUtils.clearAuthenticationSession();
 
       emit(LoginFailure(e));
     }

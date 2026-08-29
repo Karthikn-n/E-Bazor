@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:Ebozor/utils/logger.dart';
+import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/login/apple_login/apple_login.dart';
 import 'package:Ebozor/utils/login/email_login/email_login.dart';
 import 'package:Ebozor/utils/login/google_login/google_login.dart';
@@ -166,6 +167,9 @@ class AuthenticationCubit extends Cubit<AuthenticationState> {
 
     try {
       emit(AuthenticationInProcess(type!));
+      if (type == AuthenticationType.apple) {
+        await HiveUtils.clearAuthenticationSession();
+      }
       mMultiAuthentication.setActive(type!.name);
       mMultiAuthentication.payload = MultiLoginPayload({
         type!.name: payload!,

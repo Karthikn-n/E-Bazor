@@ -31,7 +31,8 @@ class AuthRepository {
 
     Map<String, dynamic> response = await Api.post(
       url: Api.loginApi,
-      parameter: parameters, /* useAuthToken: false*/
+      parameter: parameters,
+      useAuthToken: false,
     );
 
     print("//////////////");
@@ -48,7 +49,6 @@ class AuthRepository {
 
     return response;
   }
-
 
   Future<void> sendOTP(
       {required String phoneNumber,
