@@ -64,8 +64,38 @@ workflows:
           fi
           echo "Building TestFlight version $pubspec_build_name ($ios_build_number)"
           flutter build ipa --release --build-number="$ios_build_number" --export-options-plist=/Users/builder/export_options.plist
+      - name: Upload Crashlytics dSYMs
+        script: |
+          set -e
+          upload_symbols="ios/Pods/FirebaseCrashlytics/upload-symbols"
+          archive_path=""
+          for candidate in build/ios/archive/*.xcarchive; do
+            if [ -d "$candidate" ]; then
+              archive_path="$candidate"
+              break
+            fi
+          done
+          if [ ! -x "$upload_symbols" ]; then
+            echo "Firebase Crashlytics upload-symbols was not installed"
+            exit 1
+          fi
+          if [ -z "$archive_path" ] || [ ! -d "$archive_path/dSYMs" ]; then
+            echo "The iOS archive dSYM directory was not generated"
+            exit 1
+          fi
+          dsym_count=$(find "$archive_path/dSYMs" -type d -name '*.dSYM' -prune -print | wc -l | tr -d '[:space:]')
+          if [ "$dsym_count" -eq 0 ]; then
+            echo "The iOS archive contains no dSYM bundles"
+            exit 1
+          fi
+          echo "Uploading $dsym_count dSYM bundles from $archive_path"
+          find "$archive_path/dSYMs" -type d -name '*.dSYM' -prune -exec dwarfdump --uuid {} \;
+          "$upload_symbols" -gsp ios/Runner/GoogleService-Info.plist -p ios "$archive_path/dSYMs"
+          mkdir -p build/ios/symbols
+          ditto -c -k --sequesterRsrc --keepParent "$archive_path/dSYMs" build/ios/symbols/Runner-dSYMs.zip
     artifacts:
       - build/ios/ipa/*.ipa
+      - build/ios/symbols/*.zip
       - /tmp/xcodebuild_logs/*.log
       - flutter_drive.log
     publishing:
