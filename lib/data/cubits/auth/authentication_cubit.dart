@@ -6,6 +6,7 @@ import 'package:Ebozor/utils/login/google_login/google_login.dart';
 import 'package:Ebozor/utils/login/phone_login/phone_login.dart';
 import 'package:Ebozor/utils/login/lib/login_system.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:Ebozor/utils/login/lib/login_status.dart';
 import 'package:Ebozor/utils/login/lib/payloads.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -55,6 +56,10 @@ const passwordResetRequestMessage =
 
 String authenticationErrorMessage(dynamic error) {
   if (error is GoogleSignInCancelledException) return '';
+  if (error is SignInWithAppleAuthorizationException) {
+    if (error.code == AuthorizationErrorCode.canceled) return '';
+    return 'Apple authentication could not be completed. Check that Sign in with Apple is enabled for this app build.';
+  }
   if (error is AuthenticationFlowException) {
     switch (error.code) {
       case 'account-not-found':
@@ -78,6 +83,9 @@ String authenticationErrorMessage(dynamic error) {
       case 'wrong-password':
       case 'invalid-credential':
         return 'No account matches these credentials. Check your email and password, or sign up first.';
+      case 'missing-apple-identity-token':
+      case 'missing-or-invalid-nonce':
+        return 'Apple authentication could not be verified. Please try again.';
       case 'account-exists-with-different-credential':
       case 'credential-already-in-use':
         return 'An account already exists for this email. Continue with Google if you registered with Google, or use Login/Forgot Password.';
@@ -92,7 +100,7 @@ String authenticationErrorMessage(dynamic error) {
       case 'captcha-check-failed':
         return '';
       case 'operation-not-allowed':
-        return 'Phone sign-in is not enabled. Please contact support.';
+        return 'This sign-in method is not enabled. Please contact support.';
       case 'quota-exceeded':
         return 'The SMS limit has been reached. Please try again later.';
       case 'invalid-verification-code':
