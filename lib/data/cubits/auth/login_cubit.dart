@@ -115,7 +115,6 @@ class LoginCubit extends Cubit<LoginState> {
               'Apple login: display name present: ${updatedUser.displayName != null}',
               name: 'LoginCubit');
         }
-        await user.reload();
       }
 
       final provider =

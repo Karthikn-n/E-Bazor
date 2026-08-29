@@ -21,6 +21,12 @@ class AppleLogin extends LoginSystem {
       emit(MProgress());
       await _recordStage(stage);
 
+      stage = 'clearing_previous_firebase_session';
+      await _recordStage(stage);
+      if (firebaseAuth.currentUser != null) {
+        await firebaseAuth.signOut();
+      }
+
       stage = 'generating_nonce';
       await _recordStage(stage);
       final String rawNonce = _generateNonce();
@@ -76,7 +82,6 @@ class AppleLogin extends LoginSystem {
         stage = 'updating_firebase_profile';
         await _recordStage(stage);
         await user.updateDisplayName(displayName);
-        await user.reload();
       }
 
       await _recordStage('completed');

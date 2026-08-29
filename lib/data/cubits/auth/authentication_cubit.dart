@@ -113,6 +113,9 @@ String authenticationErrorMessage(dynamic error) {
         return 'The verification code expired. Please request a new one.';
       case 'network-request-failed':
         return 'Please check your internet connection.';
+      case 'invalid-user-token':
+      case 'user-token-expired':
+        return 'Your previous session expired. Please try signing in again.';
       case 'too-many-requests':
         return 'Too many attempts. Please try again later.';
     }
@@ -234,6 +237,12 @@ class AuthenticationCubit extends Cubit<AuthenticationState> {
         name: 'AuthCubit');
     try {
       await user.delete();
+    } on FirebaseAuthException catch (error) {
+      if (error.code != 'invalid-user-token' &&
+          error.code != 'user-token-expired' &&
+          error.code != 'user-not-found') {
+        rethrow;
+      }
     } finally {
       if (FirebaseAuth.instance.currentUser != null) {
         await FirebaseAuth.instance.signOut();
