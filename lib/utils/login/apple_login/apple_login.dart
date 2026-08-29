@@ -1,20 +1,13 @@
-import 'dart:convert';
-import 'dart:math';
-
 import 'package:Ebozor/utils/login/lib/login_status.dart';
-import 'package:crypto/crypto.dart';
+import 'package:Ebozor/utils/login/lib/login_system.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-
-import 'package:Ebozor/utils/login/lib/login_system.dart';
 
 class AppleLogin extends LoginSystem {
-  OAuthCredential? credential;
-
   @override
   void init() async {}
 
+  @override
   Future<UserCredential?> login() async {
     String stage = 'starting';
     try {
@@ -27,67 +20,24 @@ class AppleLogin extends LoginSystem {
         await firebaseAuth.signOut();
       }
 
-      stage = 'generating_nonce';
+      stage = 'creating_native_apple_provider';
       await _recordStage(stage);
-      final String rawNonce = _generateNonce();
-      final String hashedNonce =
-          sha256.convert(utf8.encode(rawNonce)).toString();
+      final AppleAuthProvider appleProvider = AppleAuthProvider()
+        ..addScope('email')
+        ..addScope('name');
 
-      stage = 'requesting_apple_credential';
-      await _recordStage(stage);
-      final AuthorizationCredentialAppleID appleIdCredential =
-          await SignInWithApple.getAppleIDCredential(
-        scopes: [
-          AppleIDAuthorizationScopes.email,
-          AppleIDAuthorizationScopes.fullName,
-        ],
-        nonce: hashedNonce,
-      );
-
-      stage = 'validating_identity_token';
-      await _recordStage(stage);
-      final String? identityToken = appleIdCredential.identityToken;
-      if (identityToken == null || identityToken.isEmpty) {
-        throw FirebaseAuthException(
-          code: 'missing-apple-identity-token',
-          message: 'Apple did not return an identity token.',
-        );
-      }
-
-      stage = 'creating_firebase_credential';
-      await _recordStage(stage);
-      credential = AppleAuthProvider.credentialWithIDToken(
-        identityToken,
-        rawNonce,
-        AppleFullPersonName(
-          givenName: appleIdCredential.givenName,
-          familyName: appleIdCredential.familyName,
-        ),
-      );
-
-      stage = 'signing_into_firebase';
+      // On iOS, Firebase's native provider owns the Apple request, nonce,
+      // credential exchange, and Firebase session. Keeping this in one SDK
+      // avoids transferring an Apple token between two auth plugins.
+      stage = 'signing_into_firebase_with_native_apple_provider';
       await _recordStage(stage);
       final UserCredential userCredential =
-          await firebaseAuth.signInWithCredential(credential!);
-
-      final User? user = userCredential.user;
-      final String displayName = [
-        appleIdCredential.givenName,
-        appleIdCredential.familyName,
-      ].whereType<String>().where((part) => part.trim().isNotEmpty).join(' ');
-
-      if ((userCredential.additionalUserInfo?.isNewUser ?? false) &&
-          user != null &&
-          displayName.isNotEmpty) {
-        stage = 'updating_firebase_profile';
-        await _recordStage(stage);
-        await user.updateDisplayName(displayName);
-      }
+          await firebaseAuth.signInWithProvider(appleProvider);
 
       await _recordStage('completed');
       emit(MSuccess());
       return userCredential;
-    } catch (e, stackTrace) {
+    } catch (error, stackTrace) {
       try {
         if (firebaseAuth.currentUser != null) {
           await firebaseAuth.signOut();
@@ -95,9 +45,8 @@ class AppleLogin extends LoginSystem {
       } catch (_) {
         // Never replace the original Apple authentication error.
       }
-      await _recordFailure(e, stackTrace, stage);
-      print("apple error catch***${e.toString()}");
-      emit(MFail(e));
+      await _recordFailure(error, stackTrace, stage);
+      emit(MFail(error));
       rethrow;
     }
   }
@@ -118,17 +67,15 @@ class AppleLogin extends LoginSystem {
     StackTrace stackTrace,
     String stage,
   ) async {
-    final bool wasCancelled = error is SignInWithAppleAuthorizationException &&
-        error.code == AuthorizationErrorCode.canceled;
+    final bool wasCancelled =
+        error is FirebaseAuthException && _isCancellation(error.code);
     if (wasCancelled) return;
 
     try {
       final FirebaseCrashlytics crashlytics = FirebaseCrashlytics.instance;
       final String errorCode = error is FirebaseAuthException
           ? error.code
-          : error is SignInWithAppleAuthorizationException
-              ? error.code.name
-              : error.runtimeType.toString();
+          : error.runtimeType.toString();
 
       await crashlytics.setCustomKey('auth_provider', 'apple');
       await crashlytics.setCustomKey('apple_auth_stage', stage);
@@ -144,18 +91,11 @@ class AppleLogin extends LoginSystem {
     }
   }
 
-  String _generateNonce([int length = 32]) {
-    const String characters =
-        '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-._';
-    final Random random = Random.secure();
-    return List<String>.generate(
-      length,
-      (_) => characters[random.nextInt(characters.length)],
-    ).join();
-  }
+  bool _isCancellation(String code) =>
+      code == 'canceled' ||
+      code == 'cancelled' ||
+      code == 'web-context-canceled';
 
   @override
-  void onEvent(MLoginState state) {
-    print("Login state is $state");
-  }
+  void onEvent(MLoginState state) {}
 }

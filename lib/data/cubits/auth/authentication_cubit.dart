@@ -7,7 +7,6 @@ import 'package:Ebozor/utils/login/google_login/google_login.dart';
 import 'package:Ebozor/utils/login/phone_login/phone_login.dart';
 import 'package:Ebozor/utils/login/lib/login_system.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:flutter/services.dart';
 import 'package:Ebozor/utils/login/lib/login_status.dart';
 import 'package:Ebozor/utils/login/lib/payloads.dart';
@@ -58,10 +57,6 @@ const passwordResetRequestMessage =
 
 String authenticationErrorMessage(dynamic error) {
   if (error is GoogleSignInCancelledException) return '';
-  if (error is SignInWithAppleAuthorizationException) {
-    if (error.code == AuthorizationErrorCode.canceled) return '';
-    return 'Apple authentication failed (${error.code.name}). Please try again.';
-  }
   if (error is PlatformException) {
     return 'Authentication failed (${error.code}). Please try again.';
   }
@@ -81,6 +76,10 @@ String authenticationErrorMessage(dynamic error) {
   }
   if (error is FirebaseAuthException) {
     switch (error.code) {
+      case 'canceled':
+      case 'cancelled':
+      case 'web-context-canceled':
+        return '';
       case 'email-already-in-use':
         return 'An account already exists. Please sign in instead.';
       case 'user-not-found':
