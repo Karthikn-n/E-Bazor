@@ -3,6 +3,7 @@ import 'package:Ebozor/firebase_options.dart';
 import 'package:Ebozor/main.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
@@ -125,6 +126,7 @@ Future<void> initApp() async {
     ).timeout(const Duration(seconds: 15));
   }
 
+  await _configureAppCheck();
   await _configureCrashlytics();
   await _setBootstrapStage('initializing_local_storage');
 
@@ -146,6 +148,21 @@ Future<void> initApp() async {
 
   await _setBootstrapStage('running_app');
   runApp(const EntryPoint());
+}
+
+Future<void> _configureAppCheck() async {
+  try {
+    await FirebaseAppCheck.instance.activate(
+      androidProvider:
+          kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
+      appleProvider:
+          kDebugMode ? AppleProvider.debug : AppleProvider.deviceCheck,
+    );
+  } catch (error) {
+    // App Check failures must not prevent the app from starting. Firestore
+    // diagnostics report their own write failures through Crashlytics.
+    debugPrint('Firebase App Check setup failed: $error');
+  }
 }
 
 Future<void> _configureCrashlytics() async {

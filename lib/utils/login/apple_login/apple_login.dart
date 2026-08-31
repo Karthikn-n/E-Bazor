@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:Ebozor/utils/login/apple_login/apple_auth_diagnostics.dart';
 import 'package:Ebozor/utils/login/lib/login_status.dart';
 import 'package:Ebozor/utils/login/lib/login_system.dart';
 import 'package:Ebozor/utils/login/lib/payloads.dart';
@@ -15,21 +16,30 @@ class AppleLogin extends LoginSystem {
   @override
   Future<UserCredential?> login() async {
     String stage = 'starting';
-    final String attemptId =
-        DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+    final AppleAuthDiagnostics diagnostics = AppleAuthDiagnostics.create();
+    final String attemptId = diagnostics.attemptId;
     final Stopwatch stopwatch = Stopwatch()..start();
     try {
       emit(MProgress());
+      await diagnostics.recordContext(
+        intent: payload is AppleLoginPayload
+            ? (payload as AppleLoginPayload).intent.name
+            : 'unknown',
+        existingUser: firebaseAuth.currentUser,
+      );
+      diagnostics.recordStage(stage, stopwatch.elapsedMilliseconds);
       await _recordContext(attemptId);
       await _recordStage(stage, attemptId, stopwatch.elapsedMilliseconds);
 
       stage = 'clearing_previous_firebase_session';
+      diagnostics.recordStage(stage, stopwatch.elapsedMilliseconds);
       await _recordStage(stage, attemptId, stopwatch.elapsedMilliseconds);
       if (firebaseAuth.currentUser != null) {
         await firebaseAuth.signOut();
       }
 
       stage = 'creating_native_apple_provider';
+      diagnostics.recordStage(stage, stopwatch.elapsedMilliseconds);
       await _recordStage(stage, attemptId, stopwatch.elapsedMilliseconds);
       final AppleAuthProvider appleProvider = AppleAuthProvider()
         ..addScope('email')
@@ -39,20 +49,37 @@ class AppleLogin extends LoginSystem {
       // credential exchange, and Firebase session. Keeping this in one SDK
       // avoids transferring an Apple token between two auth plugins.
       stage = 'signing_into_firebase_with_native_apple_provider';
+      diagnostics.recordStage(stage, stopwatch.elapsedMilliseconds);
       await _recordStage(stage, attemptId, stopwatch.elapsedMilliseconds);
       final UserCredential userCredential =
           await firebaseAuth.signInWithProvider(appleProvider);
 
+      diagnostics.recordSuccess(
+        userCredential,
+        stopwatch.elapsedMilliseconds,
+      );
       await _recordResult(userCredential, attemptId);
+      diagnostics.recordStage('completed', stopwatch.elapsedMilliseconds);
       await _recordStage(
         'completed',
         attemptId,
         stopwatch.elapsedMilliseconds,
       );
+      await diagnostics.flush();
       emit(MSuccess());
       return userCredential;
     } catch (error, stackTrace) {
-      final bool hadFirebaseUserOnError = firebaseAuth.currentUser != null;
+      final User? firebaseUserOnError = firebaseAuth.currentUser;
+      final bool wasCancelled =
+          error is FirebaseAuthException && _isCancellation(error.code);
+      diagnostics.recordFailure(
+        error: error,
+        stackTrace: stackTrace,
+        stage: stage,
+        elapsedMilliseconds: stopwatch.elapsedMilliseconds,
+        firebaseUserOnError: firebaseUserOnError,
+        wasCancelled: wasCancelled,
+      );
       try {
         if (firebaseAuth.currentUser != null) {
           await firebaseAuth.signOut();
@@ -66,8 +93,9 @@ class AppleLogin extends LoginSystem {
         stage,
         attemptId,
         stopwatch.elapsedMilliseconds,
-        hadFirebaseUserOnError,
+        firebaseUserOnError != null,
       );
+      await diagnostics.flush();
       emit(MFail(error));
       rethrow;
     }

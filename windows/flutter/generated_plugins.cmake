@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   audioplayers_windows
   awesome_notifications
+  cloud_firestore
   connectivity_plus
   device_region
   file_selector_windows
