@@ -202,7 +202,8 @@ class AppleAuthDiagnostics {
     if (!enabled) return child;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onLongPress: () {
+      onLongPress: () async {
+        await HapticFeedback.mediumImpact();
         if (_reports.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -211,7 +212,7 @@ class AppleAuthDiagnostics {
           );
           return;
         }
-        _confirmAndShare(context);
+        await _confirmAndShare(context);
       },
       child: child,
     );

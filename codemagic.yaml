@@ -63,7 +63,10 @@ workflows:
             ios_build_number="$pubspec_build_number"
           fi
           echo "Building TestFlight version $pubspec_build_name ($ios_build_number)"
-          flutter build ipa --release --build-number="$ios_build_number" --export-options-plist=/Users/builder/export_options.plist
+          flutter build ipa --release \
+            --build-number="$ios_build_number" \
+            --dart-define=ENABLE_AUTH_DIAGNOSTICS=true \
+            --export-options-plist=/Users/builder/export_options.plist
       - name: Upload Crashlytics dSYMs
         script: |
           set -e
