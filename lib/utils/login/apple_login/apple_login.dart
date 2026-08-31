@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:Ebozor/utils/login/lib/login_status.dart';
 import 'package:Ebozor/utils/login/lib/login_system.dart';
 import 'package:Ebozor/utils/login/lib/payloads.dart';
+import 'package:Ebozor/utils/login/apple_login/apple_auth_diagnostics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -74,12 +75,22 @@ class AppleLogin extends LoginSystem {
   }
 
   Future<void> _recordContext(String attemptId) async {
+    final String intent = payload is AppleLoginPayload
+        ? (payload as AppleLoginPayload).intent.name
+        : 'unknown';
+    try {
+      await AppleAuthDiagnostics.instance.begin(
+        attemptId: attemptId,
+        intent: intent,
+        hadExistingFirebaseUser: firebaseAuth.currentUser != null,
+      );
+    } catch (_) {
+      // Diagnostics must never interrupt authentication.
+    }
+
     try {
       final FirebaseCrashlytics crashlytics = FirebaseCrashlytics.instance;
       final PackageInfo packageInfo = await PackageInfo.fromPlatform();
-      final String intent = payload is AppleLoginPayload
-          ? (payload as AppleLoginPayload).intent.name
-          : 'unknown';
 
       await crashlytics.setCustomKey('auth_provider', 'apple');
       await crashlytics.setCustomKey('apple_auth_attempt_id', attemptId);
@@ -115,6 +126,7 @@ class AppleLogin extends LoginSystem {
     String attemptId,
     int elapsedMilliseconds,
   ) async {
+    AppleAuthDiagnostics.instance.recordStep(stage);
     try {
       final FirebaseCrashlytics crashlytics = FirebaseCrashlytics.instance;
       await crashlytics.setCustomKey('auth_provider', 'apple');
@@ -137,6 +149,7 @@ class AppleLogin extends LoginSystem {
     UserCredential credential,
     String attemptId,
   ) async {
+    AppleAuthDiagnostics.instance.recordFirebaseResult(credential);
     try {
       final FirebaseCrashlytics crashlytics = FirebaseCrashlytics.instance;
       await crashlytics.setCustomKey('apple_auth_attempt_id', attemptId);
@@ -172,6 +185,12 @@ class AppleLogin extends LoginSystem {
     final bool wasCancelled =
         error is FirebaseAuthException && _isCancellation(error.code);
     if (wasCancelled) return;
+
+    AppleAuthDiagnostics.instance.markFailure(
+      error,
+      stackTrace,
+      stage: stage,
+    );
 
     try {
       final FirebaseCrashlytics crashlytics = FirebaseCrashlytics.instance;

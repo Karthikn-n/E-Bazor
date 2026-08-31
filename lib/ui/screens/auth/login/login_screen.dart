@@ -24,6 +24,7 @@ import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/login/lib/login_status.dart';
 import 'package:Ebozor/utils/login/lib/payloads.dart';
+import 'package:Ebozor/utils/login/apple_login/apple_auth_diagnostics.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/utils/logger.dart';
 import 'package:flutter/material.dart';
@@ -578,9 +579,12 @@ class LoginScreenState extends State<LoginScreen> {
               const SizedBox(
                 height: 66,
               ),
-              Text("welcomeback".translate(context))
-                  .size(context.font.extraLarge)
-                  .color(context.color.textDefaultColor),
+              AppleAuthDiagnostics.instance.welcomeShareGesture(
+                context: context,
+                child: Text("welcomeback".translate(context))
+                    .size(context.font.extraLarge)
+                    .color(context.color.textDefaultColor),
+              ),
               const SizedBox(
                 height: 8,
               ),

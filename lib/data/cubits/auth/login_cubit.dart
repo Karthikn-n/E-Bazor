@@ -6,6 +6,7 @@ import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/logger.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/data/repositories/auth_repository.dart';
+import 'package:Ebozor/utils/login/apple_login/apple_auth_diagnostics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -93,6 +94,7 @@ class LoginCubit extends Cubit<LoginState> {
     UserCredential? credential,
     String? countryCode,
   }) async {
+    String appleStage = 'preparing_backend_login';
     try {
       emit(LoginInProgress());
       await HiveUtils.clearAuthenticationSession();
@@ -120,21 +122,40 @@ class LoginCubit extends Cubit<LoginState> {
 
       final provider =
           user.providerData.isEmpty ? null : user.providerData.first;
+      final backendEmail = user.email ?? provider?.email;
+      final backendName = type == AuthenticationType.apple.name
+          ? updatedUser?.displayName ??
+              user.displayName ??
+              provider?.displayName
+          : user.displayName ?? provider?.displayName;
+      final backendPhone =
+          phoneNumber ?? user.phoneNumber ?? provider?.phoneNumber;
+
+      if (type == AuthenticationType.apple.name) {
+        appleStage = 'backend_user_signup';
+        AppleAuthDiagnostics.instance.recordBackendRequest(
+          firebaseUid: firebaseUserId,
+          email: backendEmail,
+          hasName: backendName?.isNotEmpty ?? false,
+          hasPhone: backendPhone?.isNotEmpty ?? false,
+        );
+      }
 
       Map<String, dynamic> result = await _authRepository.numberLoginWithApi(
-        phone: phoneNumber ?? user.phoneNumber ?? provider?.phoneNumber,
+        phone: backendPhone,
         type: type,
         uid: firebaseUserId,
         fcmId: token,
-        email: user.email ?? provider?.email,
-        name: type == AuthenticationType.apple.name
-            ? updatedUser?.displayName ??
-                user.displayName ??
-                provider?.displayName
-            : user.displayName ?? provider?.displayName,
+        email: backendEmail,
+        name: backendName,
         profile: user.photoURL ?? provider?.photoURL,
         countryCode: countryCode,
       );
+
+      if (type == AuthenticationType.apple.name) {
+        appleStage = 'processing_backend_response';
+        AppleAuthDiagnostics.instance.recordBackendSuccess(result);
+      }
 
       // Storing data to local database {HIVE}
       await HiveUtils.setJWT(result['token']);
@@ -146,6 +167,9 @@ class LoginCubit extends Cubit<LoginState> {
         var data = result['data'];
         // data['countryCode'] = countryCode;
         await HiveUtils.setUserData(data);
+        if (type == AuthenticationType.apple.name) {
+          AppleAuthDiagnostics.instance.markSuccess();
+        }
         emit(LoginSuccess(
           apiResponse: Map<String, dynamic>.from(result['data']),
           isProfileCompleted: false,
@@ -156,6 +180,9 @@ class LoginCubit extends Cubit<LoginState> {
         var data = result['data'];
         // data['countryCode'] = countryCode;
         await HiveUtils.setUserData(data);
+        if (type == AuthenticationType.apple.name) {
+          AppleAuthDiagnostics.instance.markSuccess();
+        }
         emit(LoginSuccess(
           apiResponse: Map<String, dynamic>.from(result['data']),
           isProfileCompleted: true,
@@ -163,8 +190,16 @@ class LoginCubit extends Cubit<LoginState> {
           credential: credential,
         ));
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       if (e is ApiException) {}
+
+      if (type == AuthenticationType.apple.name) {
+        AppleAuthDiagnostics.instance.markFailure(
+          e,
+          stackTrace,
+          stage: appleStage,
+        );
+      }
 
       try {
         await FirebaseAuth.instance.signOut();
