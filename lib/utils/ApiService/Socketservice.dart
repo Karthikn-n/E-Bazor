@@ -19,7 +19,6 @@ class ChatSocketService {
   Timer? _presenceTimer;
   bool _isConnecting = false;
   final Set<int> _joinedOfferIds = <int>{};
-  bool _attemptedFallback = false;
 
   bool get isConnected => _socket?.connected ?? false;
   final ValueNotifier<bool> isOtherUserTyping = ValueNotifier(false);
@@ -102,12 +101,6 @@ class ChatSocketService {
     _socket!.onConnectError((error) {
       _isConnecting = false;
       log("[ChatSocket] Socket connection error ($targetUrl): $error");
-      if (!_attemptedFallback && targetUrl.contains(":6002")) {
-        _attemptedFallback = true;
-        log("[ChatSocket] Retrying connection on host URL without port 6002: ${AppSettings.hostUrl}");
-        disconnect();
-        _connectWithUrl(AppSettings.hostUrl);
-      }
     });
 
     _socket!.onError((error) {

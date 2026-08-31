@@ -89,6 +89,7 @@ String authenticationErrorMessage(dynamic error) {
       case 'invalid-credential':
         return 'No account matches these credentials. Check your email and password, or sign up first.';
       case 'missing-apple-identity-token':
+      case 'missing-apple-authorization-code':
       case 'missing-or-invalid-nonce':
         return 'Apple authentication could not be verified. Please try again.';
       case 'account-exists-with-different-credential':
@@ -115,6 +116,7 @@ String authenticationErrorMessage(dynamic error) {
       case 'network-request-failed':
         return 'Please check your internet connection.';
       case 'invalid-user-token':
+        return 'The authentication token was rejected. Please try again.';
       case 'user-token-expired':
         return 'Your previous session expired. Please try signing in again.';
       case 'too-many-requests':

@@ -33,15 +33,8 @@ class AppSettings {
   ///static const String hostUrl = "https://admin.Ebozor.co"; //don't add / at end but https:// is required
   static const String hostUrl = "http://13.233.244.104";
 
-  /// Socket.IO URL
-  static String get socketUrl {
-    try {
-      final uri = Uri.parse(hostUrl);
-      return "${uri.scheme}://${uri.host}:6002";
-    } catch (_) {
-      return "http://13.233.244.104:6002";
-    }
-  }
+  /// Socket.IO URL supplied by the chat backend.
+  static const String socketUrl = "http://13.233.244.104:6002";
 
   ///API Setting
 

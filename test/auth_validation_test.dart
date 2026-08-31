@@ -124,13 +124,33 @@ void main() {
       );
     });
 
+    test('rejected provider tokens do not claim an old session expired', () {
+      expect(
+        authenticationErrorMessage(
+          FirebaseAuthException(code: 'invalid-user-token'),
+        ),
+        'The authentication token was rejected. Please try again.',
+      );
+    });
+
     test('expired Firebase sessions ask for a clean retry', () {
-      for (final code in ['invalid-user-token', 'user-token-expired']) {
-        expect(
-          authenticationErrorMessage(FirebaseAuthException(code: code)),
-          'Your previous session expired. Please try signing in again.',
-        );
-      }
+      expect(
+        authenticationErrorMessage(
+          FirebaseAuthException(code: 'user-token-expired'),
+        ),
+        'Your previous session expired. Please try signing in again.',
+      );
+    });
+
+    test(
+        'missing Apple authorization codes are reported as verification failures',
+        () {
+      expect(
+        authenticationErrorMessage(
+          FirebaseAuthException(code: 'missing-apple-authorization-code'),
+        ),
+        'Apple authentication could not be verified. Please try again.',
+      );
     });
   });
 }
