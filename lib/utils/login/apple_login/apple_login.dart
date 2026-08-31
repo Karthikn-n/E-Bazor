@@ -1,9 +1,9 @@
 import 'dart:io';
 
+import 'package:Ebozor/utils/login/apple_login/apple_auth_diagnostics.dart';
 import 'package:Ebozor/utils/login/lib/login_status.dart';
 import 'package:Ebozor/utils/login/lib/login_system.dart';
 import 'package:Ebozor/utils/login/lib/payloads.dart';
-import 'package:Ebozor/utils/login/apple_login/apple_auth_diagnostics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
