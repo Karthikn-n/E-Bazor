@@ -200,20 +200,22 @@ class AuthenticationCubit extends Cubit<AuthenticationState> {
       final isUnverifiedEmailRecovery = payloadData is EmailLoginPayload &&
           payloadData.recoveredUnverifiedAccount;
 
-      if (intent == AuthenticationIntent.signIn && isNewUser) {
-        await _deleteAccidentallyCreatedUser(credential.user!);
-        throw AuthenticationFlowException(payloadData is PhoneLoginPayload
-            ? 'phone-account-not-found'
-            : 'account-not-found');
-      }
+      if (type == AuthenticationType.email || type == AuthenticationType.phone) {
+        if (intent == AuthenticationIntent.signIn && isNewUser) {
+          await _deleteAccidentallyCreatedUser(credential.user!);
+          throw AuthenticationFlowException(payloadData is PhoneLoginPayload
+              ? 'phone-account-not-found'
+              : 'account-not-found');
+        }
 
-      if (intent == AuthenticationIntent.signUp &&
-          !isNewUser &&
-          !isUnverifiedEmailRecovery) {
-        await FirebaseAuth.instance.signOut();
-        throw AuthenticationFlowException(payloadData is PhoneLoginPayload
-            ? 'phone-account-already-exists'
-            : 'account-already-exists');
+        if (intent == AuthenticationIntent.signUp &&
+            !isNewUser &&
+            !isUnverifiedEmailRecovery) {
+          await FirebaseAuth.instance.signOut();
+          throw AuthenticationFlowException(payloadData is PhoneLoginPayload
+              ? 'phone-account-already-exists'
+              : 'account-already-exists');
+        }
       }
 
       if (payloadData is EmailLoginPayload &&
