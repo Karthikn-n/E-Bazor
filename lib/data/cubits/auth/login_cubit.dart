@@ -1,17 +1,12 @@
-// ignore_for_file: public_member_api_docs, sort_constructors_first
-
 import 'dart:io';
 
 import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/logger.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/data/repositories/auth_repository.dart';
-import 'package:Ebozor/utils/login/apple_login/apple_auth_diagnostics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-import 'package:Ebozor/data/cubits/auth/authentication_cubit.dart';
 
 abstract class LoginState {}
 
@@ -94,12 +89,10 @@ class LoginCubit extends Cubit<LoginState> {
     UserCredential? credential,
     String? countryCode,
   }) async {
-    String appleStage = 'preparing_backend_login';
     try {
       emit(LoginInProgress());
       await HiveUtils.clearAuthenticationSession();
 
-      /*String? token = await getDeviceToken();*/
       String? token = await () async {
         try {
           return await FirebaseMessaging.instance.getToken();
@@ -108,38 +101,12 @@ class LoginCubit extends Cubit<LoginState> {
         }
       }();
 
-      FirebaseAuth firebaseAuth = FirebaseAuth.instance;
-
-      User? updatedUser;
-      if (type == AuthenticationType.apple.name) {
-        updatedUser = firebaseAuth.currentUser;
-        if (updatedUser != null) {
-          AppLog.i(
-              'Apple login: display name present: ${updatedUser.displayName != null}',
-              name: 'LoginCubit');
-        }
-      }
-
       final provider =
           user.providerData.isEmpty ? null : user.providerData.first;
       final backendEmail = user.email ?? provider?.email;
-      final backendName = type == AuthenticationType.apple.name
-          ? updatedUser?.displayName ??
-              user.displayName ??
-              provider?.displayName
-          : user.displayName ?? provider?.displayName;
+      final backendName = user.displayName ?? provider?.displayName;
       final backendPhone =
           phoneNumber ?? user.phoneNumber ?? provider?.phoneNumber;
-
-      if (type == AuthenticationType.apple.name) {
-        appleStage = 'backend_user_signup';
-        AppleAuthDiagnostics.instance.recordBackendRequest(
-          firebaseUid: firebaseUserId,
-          email: backendEmail,
-          hasName: backendName?.isNotEmpty ?? false,
-          hasPhone: backendPhone?.isNotEmpty ?? false,
-        );
-      }
 
       Map<String, dynamic> result = await _authRepository.numberLoginWithApi(
         phone: backendPhone,
@@ -152,11 +119,6 @@ class LoginCubit extends Cubit<LoginState> {
         countryCode: countryCode,
       );
 
-      if (type == AuthenticationType.apple.name) {
-        appleStage = 'processing_backend_response';
-        AppleAuthDiagnostics.instance.recordBackendSuccess(result);
-      }
-
       // Storing data to local database {HIVE}
       await HiveUtils.setJWT(result['token']);
 
@@ -165,11 +127,7 @@ class LoginCubit extends Cubit<LoginState> {
         HiveUtils.setProfileNotCompleted();
 
         var data = result['data'];
-        // data['countryCode'] = countryCode;
         await HiveUtils.setUserData(data);
-        if (type == AuthenticationType.apple.name) {
-          AppleAuthDiagnostics.instance.markSuccess();
-        }
         emit(LoginSuccess(
           apiResponse: Map<String, dynamic>.from(result['data']),
           isProfileCompleted: false,
@@ -178,11 +136,7 @@ class LoginCubit extends Cubit<LoginState> {
         ));
       } else {
         var data = result['data'];
-        // data['countryCode'] = countryCode;
         await HiveUtils.setUserData(data);
-        if (type == AuthenticationType.apple.name) {
-          AppleAuthDiagnostics.instance.markSuccess();
-        }
         emit(LoginSuccess(
           apiResponse: Map<String, dynamic>.from(result['data']),
           isProfileCompleted: true,
@@ -190,15 +144,9 @@ class LoginCubit extends Cubit<LoginState> {
           credential: credential,
         ));
       }
-    } catch (e, stackTrace) {
-      if (e is ApiException) {}
-
-      if (type == AuthenticationType.apple.name) {
-        AppleAuthDiagnostics.instance.markFailure(
-          e,
-          stackTrace,
-          stage: appleStage,
-        );
+    } catch (e) {
+      if (e is ApiException) {
+        AppLog.e('Login ApiException: ${e.errorMessage}', name: 'LoginCubit');
       }
 
       try {
@@ -210,3 +158,4 @@ class LoginCubit extends Cubit<LoginState> {
     }
   }
 }
+

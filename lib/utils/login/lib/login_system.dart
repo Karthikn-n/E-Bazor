@@ -81,15 +81,12 @@ class MMultiAuthentication {
   }
 
   void requestVerification() {
-    systems.forEach((String key, LoginSystem value) async {
-      //like assign the particular payload if key is matching to selected login system
-      LoginSystem? selectedSystem;
-      if (_selectedLoginSystem == key) {
-        selectedSystem = systems[key];
-        selectedSystem?.payload = payload?.payloads[key];
-        selectedSystem?.requestVerification();
+    for (final entry in systems.entries) {
+      if (_selectedLoginSystem == entry.key) {
+        entry.value.payload = payload?.payloads[entry.key];
+        entry.value.requestVerification();
       }
-    });
+    }
   }
 
   ///This method ensures which login system is active
@@ -99,41 +96,32 @@ class MMultiAuthentication {
 
   ///This will listen changes in state (replaces previous listener to avoid accumulation)
   void listen(Function(MLoginState state) fn) {
-    systems.forEach((String key, LoginSystem value) {
-      // Clear previous listeners first so they don't accumulate across screens
-      systems[key]?.listeners.clear();
-      systems[key]?.listeners.add(fn);
-    });
+    for (final system in systems.values) {
+      system.listeners.clear();
+      system.listeners.add(fn);
+    }
   }
 
   ///This method will called for login
   Future<UserCredential?>? login() async {
-
-
     if (_selectedLoginSystem == "" || _selectedLoginSystem == null) {
       throw "Please select login system using setActive method";
     }
     LoginSystem? selectedSystem;
 
-    //assign payload and login system
-    systems.forEach((String key, LoginSystem value) async {
-      //like assign the particular payload if key is matching to selected login system
-
-      if (_selectedLoginSystem == key) {
-        systems[key]?.payload = payload?.payloads[key];
-        selectedSystem = systems[key];
+    for (final entry in systems.entries) {
+      if (_selectedLoginSystem == entry.key) {
+        entry.value.payload = payload?.payloads[entry.key];
+        selectedSystem = entry.value;
       }
-    });
-
+    }
 
     UserCredential? credential;
     if (selectedSystem != null) {
-
-
-      credential = await selectedSystem?.login();
+      credential = await selectedSystem.login();
     }
-
 
     return credential;
   }
 }
+

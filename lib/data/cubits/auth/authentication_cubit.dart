@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:Ebozor/utils/logger.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/login/apple_login/apple_login.dart';
-import 'package:Ebozor/utils/login/apple_login/apple_auth_diagnostics.dart';
 import 'package:Ebozor/utils/login/email_login/email_login.dart';
 import 'package:Ebozor/utils/login/google_login/google_login.dart';
 import 'package:Ebozor/utils/login/phone_login/phone_login.dart';
@@ -57,8 +56,16 @@ const passwordResetRequestMessage =
     'If this email has an email/password account, a reset link will arrive shortly. Check Spam too. If you registered with Google, return to Login and use Continue with Google.';
 
 String authenticationErrorMessage(dynamic error) {
-  if (error is GoogleSignInCancelledException) return '';
+  if (error is GoogleSignInCancelledException ||
+      error is AppleLoginCancelledException) {
+    return '';
+  }
   if (error is PlatformException) {
+    if (error.code == 'canceled' ||
+        error.code == 'cancelled' ||
+        error.code == '1001') {
+      return '';
+    }
     return 'Authentication failed (${error.code}). Please try again.';
   }
   if (error is AuthenticationFlowException) {
@@ -80,6 +87,7 @@ String authenticationErrorMessage(dynamic error) {
       case 'canceled':
       case 'cancelled':
       case 'web-context-canceled':
+      case '1001':
         return '';
       case 'email-already-in-use':
         return 'An account already exists. Please sign in instead.';
@@ -186,10 +194,6 @@ class AuthenticationCubit extends Cubit<AuthenticationState> {
         throw const AuthenticationFlowException('authentication-failed');
       }
 
-      if (type == AuthenticationType.apple) {
-        AppleAuthDiagnostics.instance.recordStep('validating_app_auth_intent');
-      }
-
       final payloadData = payload!;
       final intent = _intentFor(payloadData);
       final isNewUser = credential.additionalUserInfo?.isNewUser ?? false;
@@ -224,15 +228,7 @@ class AuthenticationCubit extends Cubit<AuthenticationState> {
         }
       }
       emit(AuthenticationSuccess(type!, credential, payload!));
-    } catch (e, stackTrace) {
-      if (type == AuthenticationType.apple &&
-          !AppleAuthDiagnostics.instance.hasFailure) {
-        AppleAuthDiagnostics.instance.markFailure(
-          e,
-          stackTrace,
-          stage: 'app_auth_validation',
-        );
-      }
+    } catch (e) {
       AppLog.e('Authentication exception', error: e, name: 'AuthCubit');
       emit(AuthenticationFail(e));
     }

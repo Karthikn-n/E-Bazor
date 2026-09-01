@@ -15,7 +15,6 @@ import 'package:Ebozor/utils/app_icon.dart';
 import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
-import 'package:Ebozor/utils/login/apple_login/apple_auth_diagnostics.dart';
 import 'package:Ebozor/utils/login/lib/login_status.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/data/cubits/auth/authentication_cubit.dart';
@@ -387,12 +386,9 @@ class LoginScreenState extends State<SignUpMainScreen> {
               const SizedBox(
                 height: 66,
               ),
-              AppleAuthDiagnostics.instance.welcomeShareGesture(
-                context: context,
-                child: Text("welcome".translate(context))
-                    .size(context.font.extraLarge)
-                    .color(context.color.textDefaultColor),
-              ),
+              Text("welcome".translate(context))
+                  .size(context.font.extraLarge)
+                  .color(context.color.textDefaultColor),
               const SizedBox(
                 height: 8,
               ),
