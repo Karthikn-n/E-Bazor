@@ -320,7 +320,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/FirebaseCrashlytics/run\"\nif [ -d \"${DWARF_DSYM_FOLDER_PATH}/App.framework.dSYM\" ]; then\n  \"${PODS_ROOT}/FirebaseCrashlytics/upload-symbols\" --build-phase --validate -ai \"1:655632443224:ios:ba9c90b698d88d5260e72d\" -- \"${DWARF_DSYM_FOLDER_PATH}/App.framework.dSYM\"\n  \"${PODS_ROOT}/FirebaseCrashlytics/upload-symbols\" --build-phase -ai \"1:655632443224:ios:ba9c90b698d88d5260e72d\" -- \"${DWARF_DSYM_FOLDER_PATH}/App.framework.dSYM\"\nfi\n";
+			shellScript = "if [ -f \\\"${PODS_ROOT}/FirebaseCrashlytics/run\\\" ]; then\\n  \\\"${PODS_ROOT}/FirebaseCrashlytics/run\\\"\\nfi\\nif [ -d \\\"${DWARF_DSYM_FOLDER_PATH}/App.framework.dSYM\\\" ] && [ -f \\\"${PODS_ROOT}/FirebaseCrashlytics/upload-symbols\\\" ]; then\\n  \\\"${PODS_ROOT}/FirebaseCrashlytics/upload-symbols\\\" --build-phase --validate -ai \\\"1:655632443224:ios:ba9c90b698d88d5260e72d\\\" -- \\\"${DWARF_DSYM_FOLDER_PATH}/App.framework.dSYM\\\"\\n  \\\"${PODS_ROOT}/FirebaseCrashlytics/upload-symbols\\\" --build-phase -ai \\\"1:655632443224:ios:ba9c90b698d88d5260e72d\\\" -- \\\"${DWARF_DSYM_FOLDER_PATH}/App.framework.dSYM\\\"\\nfi\\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
