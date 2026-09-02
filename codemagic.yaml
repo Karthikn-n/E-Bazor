@@ -25,7 +25,9 @@ workflows:
           flutter pub get
       - name: Install CocoaPods
         script: |
-          cd ios && pod install
+          cd ios
+          rm -f Podfile.lock
+          pod install --repo-update
       - name: Set up code signing
         script: |
           xcode-project use-profiles
