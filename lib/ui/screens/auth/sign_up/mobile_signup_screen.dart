@@ -21,6 +21,7 @@ import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/data/cubits/auth/authentication_cubit.dart';
 import 'package:Ebozor/utils/login/lib/payloads.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
+import 'package:Ebozor/utils/log_exporter.dart';
 import 'package:Ebozor/ui/screens/auth/sign_up/signup_auth_listener.dart';
 
 import 'package:flutter/material.dart';
@@ -309,9 +310,13 @@ class MobileSignUpScreenState extends State<MobileSignUpScreen> {
               const SizedBox(
                 height: 66,
               ),
-              Text("welcome".translate(context))
-                  .size(context.font.extraLarge)
-                  .color(context.color.textDefaultColor),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onLongPress: () => LogExporter.exportAndShareLogs(context),
+                child: Text("welcome".translate(context))
+                    .size(context.font.extraLarge)
+                    .color(context.color.textDefaultColor),
+              ),
               const SizedBox(
                 height: 8,
               ),

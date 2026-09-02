@@ -1,8 +1,6 @@
 import UIKit
 import Flutter
-import FirebaseCore
 import GoogleMaps
-import FirebaseAuth
 import awesome_notifications
 import FirebaseMessaging
 
@@ -15,19 +13,15 @@ import FirebaseMessaging
     GMSServices.provideAPIKey("AIzaSyCioMAZGMr91AatzOSWZiLmDSYqkvVhGDE")
     GeneratedPluginRegistrant.register(with: self)
       
-      SwiftAwesomeNotificationsPlugin.setPluginRegistrantCallback { registry in
-               SwiftAwesomeNotificationsPlugin.register(
-                 with: registry.registrar(forPlugin: "io.flutter.plugins.awesomenotifications.AwesomeNotificationsPlugin")!)
-           }
-        if FirebaseApp.app() == nil {
-            FirebaseApp.configure()
-        }
+    SwiftAwesomeNotificationsPlugin.setPluginRegistrantCallback { registry in
+      SwiftAwesomeNotificationsPlugin.register(
+        with: registry.registrar(forPlugin: "io.flutter.plugins.awesomenotifications.AwesomeNotificationsPlugin")!)
+    }
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
- override func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+
+  override func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
     Messaging.messaging().apnsToken = deviceToken
   }
-
 }
-

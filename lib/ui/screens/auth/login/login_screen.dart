@@ -26,6 +26,7 @@ import 'package:Ebozor/utils/login/lib/login_status.dart';
 import 'package:Ebozor/utils/login/lib/payloads.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/utils/logger.dart';
+import 'package:Ebozor/utils/log_exporter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -578,9 +579,13 @@ class LoginScreenState extends State<LoginScreen> {
               const SizedBox(
                 height: 66,
               ),
-              Text("welcomeback".translate(context))
-                  .size(context.font.extraLarge)
-                  .color(context.color.textDefaultColor),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onLongPress: () => LogExporter.exportAndShareLogs(context),
+                child: Text("welcomeback".translate(context))
+                    .size(context.font.extraLarge)
+                    .color(context.color.textDefaultColor),
+              ),
               const SizedBox(
                 height: 8,
               ),
