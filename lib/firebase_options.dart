@@ -56,35 +56,6 @@ class DefaultFirebaseOptions {
     projectId: 'ebazar-ef30c',
     storageBucket: 'ebazar-ef30c.firebasestorage.app',
   );
-/*
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDmUQcHSujt5ZZC0_ME7stWuMXx1FZR5is',  // API Key from your Firebase configuration
-    appId: '1:36985304599:android:1f681bceb3fcd589d44e52',  // Android App ID from the JSON
-    messagingSenderId: '6343732161',  // Messaging Sender ID
-    projectId: 'Ebozor-bee45',  // Project ID
-    storageBucket: 'Ebozor-bee45.firebasestorage.app',  // Storage Bucket
-  );
-
-  // static const FirebaseOptions android = FirebaseOptions(
-  //   apiKey: 'AIzaSyApCJcVfUTKAdfiNB2vZ399YgJEFy_d-vk',
-  //   appId: '1:6343732161:android:be9cbc67ef8a19792b5d40',
-  //   messagingSenderId: '6343732161',
-  //   projectId: 'eclassify-wrteam',
-  //   storageBucket: 'Ebozor-bee45.firebasestorage.app',
-  // );
-
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyA6btHOHSWRKyoERLlpnVsdxmFHnb4YzXQ',
-    appId: '1:655632443224:ios:a26f11f5048c148a60e72d',
-    messagingSenderId: '655632443224',
-    projectId: 'ebazar-ef30c',
-    storageBucket: 'ebazar-ef30c.firebasestorage.app',
-    androidClientId: '655632443224-aua64m8spd0iaelr3ornuhalr5410r2r.apps.googleusercontent.com',
-    iosClientId: '655632443224-962i5tpnps5l782th633actn19rb0p9e.apps.googleusercontent.com',
-    iosBundleId: 'com.app.ebazar',
-  );
-  */
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyA6btHOHSWRKyoERLlpnVsdxmFHnb4YzXQ', // API Key
     appId: '1:655632443224:ios:ba9c90b698d88d5260e72d', // App ID for iOS
