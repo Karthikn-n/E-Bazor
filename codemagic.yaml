@@ -1,19 +1,17 @@
-# Codemagic CI/CD Configuration for TestFlight Build & Distribution
-# Documentation: https://docs.codemagic.io/flutter-code-signing/ios-code-signing/
+# Codemagic CI/CD – Simple iOS TestFlight Pipeline
+# Docs: https://docs.codemagic.io/flutter-code-signing/ios-code-signing/
 
 workflows:
   ios-testflight:
-    name: iOS TestFlight Release Build
+    name: iOS TestFlight
     instance_type: mac_mini_m2
     max_build_duration: 60
     integrations:
       app_store_connect: ebazor_codemagic_api_key
     environment:
-      groups:
-        - firebase_credentials
       ios_signing:
-        distribution_type: app_store # For TestFlight
-        bundle_identifier: com.ebozor.app # Your iOS Bundle ID
+        distribution_type: app_store
+        bundle_identifier: com.ebozor.app
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -22,107 +20,30 @@ workflows:
         - ~/.pub-cache
         - ~/Library/Caches/CocoaPods
     scripts:
-      - name: Generate Firebase iOS configuration
+      - name: Install dependencies
         script: |
-          set -eu
-          : "${IOS_FIREBASE_SECRET:?IOS_FIREBASE_SECRET is not configured in Codemagic}"
-          firebase_plist="$CM_BUILD_DIR/ios/Runner/GoogleService-Info.plist"
-          printf '%s' "$IOS_FIREBASE_SECRET" > "$firebase_plist"
-          /usr/libexec/PlistBuddy -c "Print :GOOGLE_APP_ID" "$firebase_plist" >/dev/null
-          project_id=$(/usr/libexec/PlistBuddy -c "Print :PROJECT_ID" "$firebase_plist")
-          bundle_id=$(/usr/libexec/PlistBuddy -c "Print :BUNDLE_ID" "$firebase_plist")
-          if [ "$project_id" != "ebazar-ef30c" ] || [ "$bundle_id" != "com.ebozor.app" ]; then
-            echo "Firebase iOS configuration does not match the expected project and bundle"
-            exit 1
-          fi
-      - name: Disable experimental Swift Package Manager
+          flutter pub get
+      - name: Install CocoaPods
         script: |
-          flutter config --no-enable-swift-package-manager
-      - name: Set up code signing settings on Xcode project
+          cd ios && pod install
+      - name: Set up code signing
         script: |
           xcode-project use-profiles
-      - name: Generate iOS configs and install CocoaPods dependencies
+      - name: Build iOS IPA
         script: |
-          set -e
-          flutter pub get
-          if [ ! -s ios/Flutter/Generated.xcconfig ]; then
-            echo "Flutter did not generate ios/Flutter/Generated.xcconfig"
-            exit 1
-          fi
-          launch_storyboard_name=$(/usr/libexec/PlistBuddy -c "Print :UILaunchStoryboardName" ios/Runner/Info.plist)
-          if [ "$launch_storyboard_name" != "LaunchScreen" ] || [ ! -s ios/Runner/Base.lproj/LaunchScreen.storyboard ]; then
-            echo "The iOS launch storyboard configuration is missing or invalid"
-            exit 1
-          fi
-          (
-            cd ios
-            if ! pod update; then
-              echo "Cached CocoaPods specs are stale; refreshing once"
-              pod update --repo-update
-            fi
-          )
-      - name: Flutter build iOS (.ipa)
-        script: |
-          set -e
-          pubspec_build_name=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | cut -d+ -f1 | tr -d '[:space:]')
-          pubspec_build_number=$(sed -n 's/^version:.*+//p' pubspec.yaml | tr -d '[:space:]')
-          ios_build_number="$PROJECT_BUILD_NUMBER"
-          if [ -z "$ios_build_number" ]; then
-            ios_build_number="$pubspec_build_number"
-          fi
-          if ! echo "$ios_build_number" | grep -Eq '^[0-9]+$'; then
-            echo "Unable to determine a numeric iOS build number"
-            exit 1
-          fi
-          if [ "$ios_build_number" -lt "$pubspec_build_number" ]; then
-            ios_build_number="$pubspec_build_number"
-          fi
-          echo "Building TestFlight version $pubspec_build_name ($ios_build_number)"
           flutter build ipa --release \
-            --build-number="$ios_build_number" \
-            --dart-define=ENABLE_AUTH_DIAGNOSTICS=true \
+            --build-number=$PROJECT_BUILD_NUMBER \
             --export-options-plist=/Users/builder/export_options.plist
-      - name: Upload Crashlytics dSYMs
-        script: |
-          set -e
-          upload_symbols="ios/Pods/FirebaseCrashlytics/upload-symbols"
-          archive_path=""
-          for candidate in build/ios/archive/*.xcarchive; do
-            if [ -d "$candidate" ]; then
-              archive_path="$candidate"
-              break
-            fi
-          done
-          if [ ! -x "$upload_symbols" ]; then
-            echo "Firebase Crashlytics upload-symbols was not installed"
-            exit 1
-          fi
-          if [ -z "$archive_path" ] || [ ! -d "$archive_path/dSYMs" ]; then
-            echo "The iOS archive dSYM directory was not generated"
-            exit 1
-          fi
-          dsym_count=$(find "$archive_path/dSYMs" -type d -name '*.dSYM' -prune -print | wc -l | tr -d '[:space:]')
-          if [ "$dsym_count" -eq 0 ]; then
-            echo "The iOS archive contains no dSYM bundles"
-            exit 1
-          fi
-          echo "Uploading $dsym_count dSYM bundles from $archive_path"
-          find "$archive_path/dSYMs" -type d -name '*.dSYM' -prune -exec dwarfdump --uuid {} \;
-          "$upload_symbols" -gsp ios/Runner/GoogleService-Info.plist -p ios "$archive_path/dSYMs"
-          mkdir -p build/ios/symbols
-          ditto -c -k --sequesterRsrc --keepParent "$archive_path/dSYMs" build/ios/symbols/Runner-dSYMs.zip
     artifacts:
       - build/ios/ipa/*.ipa
-      - build/ios/symbols/*.zip
       - /tmp/xcodebuild_logs/*.log
-      - flutter_drive.log
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_testflight: true # Automatically sends to all Internal Testers
+        submit_to_testflight: true
       email:
         recipients:
-          - karthikn11092001@gmail.com # Replace with your email to receive build download link
+          - karthikn11092001@gmail.com
         notify:
           success: true
           failure: true
