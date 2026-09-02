@@ -132,7 +132,14 @@ class _BlogDetailsState extends State<BlogDetails> {
               const SizedBox(height: 14),
 
               // Tags Chips
-              if (_tags.isNotEmpty) ...[
+              if (_isLoadingTags) ...[
+                const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(height: 16),
+              ] else if (_tags.isNotEmpty) ...[
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,

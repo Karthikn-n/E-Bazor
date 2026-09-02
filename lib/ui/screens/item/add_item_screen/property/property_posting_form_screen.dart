@@ -279,7 +279,7 @@ class _PropertyPostingFormScreenState
         }
         _mapController?.animateCamera(CameraUpdate.newLatLngZoom(target, 15));
 
-        List<Placemark> placemarks = await placemarkFromCoordinates(
+        List<Placemark> placemarks = await Geocoding().placemarkFromCoordinates(
           position.latitude,
           position.longitude,
         );

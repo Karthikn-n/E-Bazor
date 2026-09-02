@@ -820,14 +820,14 @@ class _JobApplyFormScreenState extends State<JobApplyFormScreen> {
   }
 
   Future<void> _pickResumeFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'doc', 'docx'],
     );
 
-    if (result != null && result.files.single.path != null) {
+    if (result.isNotEmpty && result.first.path != null) {
       setState(() {
-        _resumeFile = File(result.files.single.path!);
+        _resumeFile = File(result.first.path!);
       });
     }
   }

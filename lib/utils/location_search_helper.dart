@@ -145,10 +145,10 @@ class LocationSearchHelper {
 
     // 2. Native platform Geocoder (locationFromAddress)
     try {
-      List<Location> locations = await locationFromAddress(trimmed);
+      List<Location> locations = await Geocoding().locationFromAddress(trimmed);
       for (var loc in locations.take(5)) {
         try {
-          List<Placemark> marks = await placemarkFromCoordinates(
+          List<Placemark> marks = await Geocoding().placemarkFromCoordinates(
             loc.latitude,
             loc.longitude,
           );
@@ -201,11 +201,11 @@ class LocationSearchHelper {
         defaultCountry != null &&
         defaultCountry.isNotEmpty) {
       try {
-        final locs = await locationFromAddress("$trimmed, $defaultCountry");
+        final locs = await Geocoding().locationFromAddress("$trimmed, $defaultCountry");
         for (var loc in locs.take(4)) {
           try {
             final marks =
-                await placemarkFromCoordinates(loc.latitude, loc.longitude);
+                await Geocoding().placemarkFromCoordinates(loc.latitude, loc.longitude);
             if (marks.isNotEmpty) {
               final mark = marks.first;
               final title = [mark.name, mark.subLocality, mark.locality]

@@ -831,14 +831,14 @@ class _MyJobProfileScreenState extends State<MyJobProfileScreen> {
   }
 
   Future<void> _pickResumeFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'doc', 'docx'],
     );
 
-    if (result != null && result.files.single.path != null) {
+    if (result != null) {
       setState(() {
-        _resumeFile = File(result.files.single.path!);
+        _resumeFile = File(result.path!);
       });
       await _saveJobProfileData();
     }

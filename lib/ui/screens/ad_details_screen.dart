@@ -285,9 +285,14 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     if (model.videoLink != "" &&
         model.videoLink != null &&
         HelperUtils.isYoutubeVideo(model.videoLink ?? "")) {
-      String? videoId = YoutubePlayer.convertUrlToId(model.videoLink!);
+      String? videoId =
+          YoutubePlayerController.convertUrlToId(model.videoLink!) ??
+              RegExp(
+                r'(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/)|youtu\.be\/)([\w-]{11})',
+                caseSensitive: false,
+              ).firstMatch(model.videoLink!)?.group(1);
       if (videoId != null) {
-        String thumbnail = YoutubePlayer.getThumbnail(videoId: videoId);
+        String thumbnail = "https://img.youtube.com/vi/$videoId/0.jpg";
 
         youtubeVideoThumbnail = thumbnail;
       }

@@ -684,9 +684,10 @@ class _AddItemDetailsState extends CloudState<AddItemDetails> {
         children: [
           if (file == null && titleImageURL.isEmpty)
             DottedBorder(
-              color: context.color.textLightColor,
-              borderType: BorderType.RRect,
-              radius: const Radius.circular(12),
+              options: RoundedRectDottedBorderOptions(
+                color: context.color.textLightColor,
+                radius: const Radius.circular(12),
+              ),
               child: GestureDetector(
                 onTap: () {
                   showImageSourceDialog(context, (source) {
@@ -817,9 +818,10 @@ class _AddItemDetailsState extends CloudState<AddItemDetails> {
         children: [
           if ((files == null || files.isEmpty) && mixedItemImageList.isEmpty)
             DottedBorder(
-              color: context.color.textLightColor,
-              borderType: BorderType.RRect,
-              radius: const Radius.circular(12),
+              options: RoundedRectDottedBorderOptions(
+                color: context.color.textLightColor,
+                radius: const Radius.circular(12),
+              ),
               child: GestureDetector(
                 onTap: () {
                   showImageSourceDialog(context, (source) {
@@ -900,9 +902,10 @@ class _AddItemDetailsState extends CloudState<AddItemDetails> {
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(borderRadius: BorderRadius.circular(10)),
         child: DottedBorder(
-            color: context.color.textColorDark.withValues(alpha: 0.5),
-            borderType: BorderType.RRect,
-            radius: const Radius.circular(10),
+            options: RoundedRectDottedBorderOptions(
+              color: context.color.textColorDark.withValues(alpha: 0.5),
+              radius: const Radius.circular(10),
+            ),
             child: Container(
               alignment: AlignmentDirectional.center,
               child: Text("uploadPhoto".translate(context)),

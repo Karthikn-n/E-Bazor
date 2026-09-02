@@ -213,7 +213,7 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
     }
 
     try {
-      List<Placemark> placemarks = await placemarkFromCoordinates(
+      List<Placemark> placemarks = await Geocoding().placemarkFromCoordinates(
         targetLat,
         targetLng,
       );

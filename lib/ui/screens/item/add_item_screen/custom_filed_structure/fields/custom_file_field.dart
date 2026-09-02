@@ -33,14 +33,12 @@ class CustomFileField extends CustomField {
   }
 
   Future<File?> pickFile() async {
-    FilePickerResult? picker = await FilePicker.platform.pickFiles(
+    PlatformFile? picker = await FilePicker.pickFile(
       type: FileType.custom,
-      allowMultiple: false,
       allowedExtensions: ['png', 'jpg', 'jpeg', 'svg', 'pdf'],
     );
     if (picker != null) {
-      PlatformFile file = picker.files.first;
-      File selectedFile = File(file.path!);
+      File selectedFile = File(picker.path!);
       picked = selectedFile.path;
 
       if (_isImageFile(selectedFile)) {
@@ -153,14 +151,15 @@ class CustomFileField extends CustomField {
                 }
               },
               child: DottedBorder(
-                borderType: BorderType.RRect,
-                radius: const Radius.circular(10),
-                color: state.hasError
-                    ? context.color.error
-                    : context.color.textLightColor.darken(50),
-                strokeCap: StrokeCap.round,
-                padding: const EdgeInsets.all(5),
-                dashPattern: const [3, 3],
+                options: RoundedRectDottedBorderOptions(
+                  radius: const Radius.circular(10),
+                  color: state.hasError
+                      ? context.color.error
+                      : context.color.textLightColor.darken(50),
+                  strokeCap: StrokeCap.round,
+                  padding: const EdgeInsets.all(5),
+                  dashPattern: const [3, 3],
+                ),
                 child: Container(
                   width: double.infinity,
                   height: 43,

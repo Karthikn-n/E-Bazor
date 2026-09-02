@@ -8,32 +8,28 @@ class GoogleSignInCancelledException implements Exception {
 }
 
 class GoogleLogin extends LoginSystem {
-  GoogleSignIn? _googleSignIn;
-
   @override
-  void init() {
-    _googleSignIn = GoogleSignIn(
-      scopes: ["profile", "email"],
-    );
-  }
+  void init() {}
 
   @override
   Future<UserCredential?> login() async {
     try {
       emit(MProgress());
+      final googleSignIn = GoogleSignIn.instance;
+
       // Clear the cached Google account so an explicit button press always
       // presents the account chooser instead of silently reusing it.
-      await _googleSignIn?.signOut();
-      final googleSignIn = await _googleSignIn?.signIn();
-      if (googleSignIn == null) {
-        throw const GoogleSignInCancelledException();
-      }
+      try {
+        await googleSignIn.signOut();
+      } catch (_) {}
 
-      GoogleSignInAuthentication? googleAuth =
-          await googleSignIn.authentication;
+      final googleUser = await googleSignIn.authenticate();
+
+      final googleAuth = await googleUser.authentication;
+      final clientAuth = await googleUser.authorizationClient.authorizeScopes(["email", "profile"]);
 
       AuthCredential authCredential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
+        accessToken: clientAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
@@ -43,11 +39,17 @@ class GoogleLogin extends LoginSystem {
 
       return userCredential;
     } catch (e) {
+      if (e.toString().contains('canceled') ||
+          e.toString().contains('cancelled') ||
+          e.toString().contains('aborted') ||
+          e.toString().contains('ERROR_ABORTED_BY_USER')) {
+        emit(MFail(const GoogleSignInCancelledException()));
+        throw const GoogleSignInCancelledException();
+      }
       rethrow;
     }
   }
 
   @override
-  void onEvent(MLoginState state) {
-  }
+  void onEvent(MLoginState state) {}
 }

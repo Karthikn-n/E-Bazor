@@ -191,8 +191,7 @@ class _ConfirmLocationScreenState extends CloudState<ConfirmLocationScreen>
 
   Future<void> getLocationFromLatitudeLongitude({LatLng? latLng}) async {
     try {
-      await setLocaleIdentifier("en_US");
-      Placemark? placeMark = (await placemarkFromCoordinates(
+      Placemark? placeMark = (await Geocoding().placemarkFromCoordinates(
               latLng?.latitude ?? _cameraPosition!.target.latitude,
               latLng?.longitude ?? _cameraPosition!.target.longitude))
           .first;

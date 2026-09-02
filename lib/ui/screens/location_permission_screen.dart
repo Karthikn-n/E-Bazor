@@ -90,7 +90,7 @@ class LocationPermissionScreenState extends State<LocationPermissionScreen>
       double latitude = double.parse(Constant.defaultLatitude);
       double longitude = double.parse(Constant.defaultLongitude);
 
-      List<Placemark> placemarks = await placemarkFromCoordinates(
+      List<Placemark> placemarks = await Geocoding().placemarkFromCoordinates(
         latitude,
         longitude,
       );
@@ -149,7 +149,7 @@ class LocationPermissionScreenState extends State<LocationPermissionScreen>
         accuracy: LocationAccuracy.high,
       ));
 
-      List<Placemark> placemarks = await placemarkFromCoordinates(
+      List<Placemark> placemarks = await Geocoding().placemarkFromCoordinates(
         position.latitude,
         position.longitude,
       );

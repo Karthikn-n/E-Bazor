@@ -226,7 +226,7 @@ class NearbyLocationScreenState extends State<NearbyLocationScreen>
 
   Future<void> getLocationFromLatitudeLongitude({LatLng? latLng}) async {
     try {
-      Placemark? placeMark = (await placemarkFromCoordinates(
+      Placemark? placeMark = (await Geocoding().placemarkFromCoordinates(
               latLng?.latitude ?? _cameraPosition!.target.latitude,
               latLng?.longitude ?? _cameraPosition!.target.longitude))
           .first;

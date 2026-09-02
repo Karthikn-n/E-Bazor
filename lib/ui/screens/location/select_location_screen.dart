@@ -147,7 +147,7 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
         ),
       );
 
-      List<Placemark> placemarks = await placemarkFromCoordinates(
+      List<Placemark> placemarks = await Geocoding().placemarkFromCoordinates(
         position.latitude,
         position.longitude,
       );
@@ -286,7 +286,7 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
 
       if (area == null && city == null) {
         try {
-          List<Placemark> marks = await placemarkFromCoordinates(
+          List<Placemark> marks = await Geocoding().placemarkFromCoordinates(
             result.latitude,
             result.longitude,
           );

@@ -170,7 +170,7 @@ class _LocationDetailsFormScreenState extends State<LocationDetailsFormScreen> {
     _mapController?.animateCamera(CameraUpdate.newLatLngZoom(target, 15));
 
     try {
-      List<Placemark> placemarks = await placemarkFromCoordinates(
+      List<Placemark> placemarks = await Geocoding().placemarkFromCoordinates(
         target.latitude,
         target.longitude,
       );

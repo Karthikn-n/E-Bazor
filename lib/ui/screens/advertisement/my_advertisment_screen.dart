@@ -66,7 +66,7 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
 
   bool _isSelectionMode = false;
   final Set<int> _selectedItemIds = {};
-  bool _isDeleting = false;
+  bool isDeleting = false;
 
   final List<Map<String, String>> _tabs = [
     {"label": "All Ads", "key": "all_ads", "status": ""},
@@ -278,7 +278,7 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
   }
 
   Future<void> _deleteSelectedAds() async {
-    setState(() => _isDeleting = true);
+    setState(() => isDeleting = true);
     final idsToDelete = _selectedItemIds.toList();
     try {
       await Future.wait(
@@ -304,7 +304,7 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
         type: MessageType.error,
       );
     } finally {
-      if (mounted) setState(() => _isDeleting = false);
+      if (mounted) setState(() => isDeleting = false);
     }
   }
 

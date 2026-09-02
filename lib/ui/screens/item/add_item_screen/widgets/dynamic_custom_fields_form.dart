@@ -94,12 +94,11 @@ class DynamicCustomFieldsController extends ChangeNotifier {
   Future<void> pickFile(CustomFieldModel field) async {
     final id = field.id;
     if (id == null) return;
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
-      allowMultiple: false,
       allowedExtensions: const ['pdf', 'png', 'jpg', 'jpeg', 'svg'],
     );
-    final filePath = result?.files.single.path;
+    final filePath = (result.isNotEmpty) ? result.first.path : null;
     if (filePath == null || filePath.isEmpty) return;
     _files[id] = File(filePath);
     notifyListeners();

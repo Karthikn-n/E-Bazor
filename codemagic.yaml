@@ -9,6 +9,8 @@ workflows:
     integrations:
       app_store_connect: ebazor_codemagic_api_key
     environment:
+      groups:
+        - firebase_credentials
       ios_signing:
         distribution_type: app_store # For TestFlight
         bundle_identifier: com.ebozor.app # Your iOS Bundle ID
@@ -20,6 +22,19 @@ workflows:
         - ~/.pub-cache
         - ~/Library/Caches/CocoaPods
     scripts:
+      - name: Generate Firebase iOS configuration
+        script: |
+          set -eu
+          : "${IOS_FIREBASE_SECRET:?IOS_FIREBASE_SECRET is not configured in Codemagic}"
+          firebase_plist="$CM_BUILD_DIR/ios/Runner/GoogleService-Info.plist"
+          printf '%s' "$IOS_FIREBASE_SECRET" > "$firebase_plist"
+          /usr/libexec/PlistBuddy -c "Print :GOOGLE_APP_ID" "$firebase_plist" >/dev/null
+          project_id=$(/usr/libexec/PlistBuddy -c "Print :PROJECT_ID" "$firebase_plist")
+          bundle_id=$(/usr/libexec/PlistBuddy -c "Print :BUNDLE_ID" "$firebase_plist")
+          if [ "$project_id" != "ebazar-ef30c" ] || [ "$bundle_id" != "com.ebozor.app" ]; then
+            echo "Firebase iOS configuration does not match the expected project and bundle"
+            exit 1
+          fi
       - name: Disable experimental Swift Package Manager
         script: |
           flutter config --no-enable-swift-package-manager
@@ -41,9 +56,9 @@ workflows:
           fi
           (
             cd ios
-            if ! pod update razorpay-pod razorpay-core-pod; then
+            if ! pod update; then
               echo "Cached CocoaPods specs are stale; refreshing once"
-              pod update razorpay-pod razorpay-core-pod --repo-update
+              pod update --repo-update
             fi
           )
       - name: Flutter build iOS (.ipa)

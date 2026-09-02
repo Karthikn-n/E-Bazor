@@ -1092,7 +1092,11 @@ class _ChatScreenState extends State<ChatScreen>
                             const SizedBox(height: 4),
                             Text(
                               HelperUtils.getFileSizeString(
-                                bytes: messageAttachment!.size,
+                                bytes: (messageAttachment?.path != null &&
+                                        messageAttachment!.path!.isNotEmpty)
+                                    ? File(messageAttachment!.path!)
+                                        .lengthSync()
+                                    : 0,
                               ).toString(),
                               style: TextStyle(
                                 color: context.color.textLightColor,
@@ -1285,10 +1289,9 @@ class _ChatScreenState extends State<ChatScreen>
                                       IconButton(
                                         onPressed: () async {
                                           if (messageAttachment == null) {
-                                            FilePickerResult? pickedAttachment =
-                                                await FilePicker.platform
-                                                    .pickFiles(
-                                              allowMultiple: false,
+                                            PlatformFile? pickedAttachment =
+                                                await FilePicker
+                                                    .pickFile(
                                               type: FileType.custom,
                                               allowedExtensions: [
                                                 'jpg',
@@ -1296,8 +1299,10 @@ class _ChatScreenState extends State<ChatScreen>
                                                 'png'
                                               ],
                                             );
-                                            messageAttachment =
-                                                pickedAttachment?.files.first;
+                                            if (pickedAttachment != null) {
+                                              messageAttachment =
+                                                  pickedAttachment;
+                                            }
                                             showRecordButton = false;
                                             setState(() {});
                                           } else {

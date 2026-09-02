@@ -34,7 +34,6 @@ class AccountSettingsScreen extends StatefulWidget {
 
 class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   Widget _buildItemTile({
     required IconData icon,
@@ -286,7 +285,9 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
   Future<void> _signOut(AuthenticationType? type) async {
     if (type == AuthenticationType.google) {
-      await _googleSignIn.signOut();
+      try {
+        await GoogleSignIn.instance.signOut();
+      } catch (_) {}
     }
     await _auth.signOut();
   }

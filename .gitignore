@@ -57,4 +57,5 @@ web/build/
 *.md
 # Firebase configuration files
 #google-services.json
-#ios/Runner/GoogleService-Info.plist
+# Generated from the protected IOS_FIREBASE_SECRET variable in Codemagic.
+ios/Runner/GoogleService-Info.plist

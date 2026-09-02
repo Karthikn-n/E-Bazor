@@ -310,7 +310,7 @@ class _ClassifiedsPostingFormScreenState
         }
         _mapController?.animateCamera(CameraUpdate.newLatLngZoom(target, 15));
 
-        List<Placemark> placemarks = await placemarkFromCoordinates(
+        List<Placemark> placemarks = await Geocoding().placemarkFromCoordinates(
           position.latitude,
           position.longitude,
         );
@@ -535,16 +535,6 @@ class _ClassifiedsPostingFormScreenState
     Widgets.hideLoder(context);
 
     // ignore: unnecessary_null_comparison
-    if (createdItemModel == null) {
-      if (mounted) {
-        HelperUtils.showSnackBarMessage(
-          context,
-          "Failed to create classified ad. Please check your fields and try again.",
-          type: MessageType.error,
-        );
-      }
-      return;
-    }
 
     try {
       MyAdvertisementScreen.refreshCallback?.call();

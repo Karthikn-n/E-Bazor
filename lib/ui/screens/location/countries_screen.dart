@@ -162,7 +162,7 @@ class CountriesScreenState extends State<CountriesScreen> {
           ),
         );
 
-        List<Placemark> placemarks = await placemarkFromCoordinates(
+        List<Placemark> placemarks = await Geocoding().placemarkFromCoordinates(
           position.latitude,
           position.longitude,
         );
