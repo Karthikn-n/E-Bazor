@@ -5,8 +5,10 @@ import 'package:Ebozor/utils/logger.dart';
 import 'package:Ebozor/utils/login/lib/login_status.dart';
 import 'package:Ebozor/utils/login/lib/login_system.dart';
 import 'package:Ebozor/utils/login/lib/payloads.dart';
+import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class AppleLoginCancelledException implements Exception {
   const AppleLoginCancelledException();
@@ -116,13 +118,68 @@ class AppleLogin extends LoginSystem {
         await firebaseAuth.signOut();
       }
 
-      attempt.addStep('signing_in_with_apple_provider');
-      final appleProvider = AppleAuthProvider()
-        ..addScope('email')
-        ..addScope('name');
+      attempt.addStep('generating_apple_nonce');
+      final rawNonce = generateNonce();
+      final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
 
+      attempt.addStep('requesting_apple_credential');
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: const [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: hashedNonce,
+      );
+
+      final identityToken = appleCredential.identityToken;
+      final authorizationCode = appleCredential.authorizationCode;
+
+      attempt.addStep('apple_credential_received', details: {
+        'has_identity_token': identityToken?.isNotEmpty ?? false,
+        'has_authorization_code': authorizationCode.isNotEmpty,
+        'has_email': appleCredential.email?.isNotEmpty ?? false,
+        'has_given_name': appleCredential.givenName?.isNotEmpty ?? false,
+        'has_family_name': appleCredential.familyName?.isNotEmpty ?? false,
+      });
+
+      if (identityToken == null || identityToken.isEmpty) {
+        throw FirebaseAuthException(
+          code: 'missing-apple-identity-token',
+          message: 'Apple did not return an identity token.',
+        );
+      }
+
+      attempt.addStep('creating_firebase_apple_credential');
+      final firebaseCredential = OAuthProvider('apple.com').credential(
+        idToken: identityToken,
+        rawNonce: rawNonce,
+        accessToken: authorizationCode.isNotEmpty ? authorizationCode : null,
+      );
+
+      attempt.addStep('signing_into_firebase_with_apple_credential');
       final userCredential =
-          await firebaseAuth.signInWithProvider(appleProvider);
+          await firebaseAuth.signInWithCredential(firebaseCredential);
+
+      // Save display name if Apple provided it
+      final fullName = [
+        appleCredential.givenName,
+        appleCredential.familyName,
+      ]
+          .whereType<String>()
+          .map((part) => part.trim())
+          .where((part) => part.isNotEmpty)
+          .join(' ');
+
+      if (fullName.isNotEmpty &&
+          userCredential.user != null &&
+          (userCredential.user!.displayName == null ||
+              userCredential.user!.displayName!.isEmpty)) {
+        try {
+          await userCredential.user!.updateDisplayName(fullName);
+          await userCredential.user!.reload();
+          attempt.addStep('apple_display_name_saved', details: {'name': fullName});
+        } catch (_) {}
+      }
 
       attempt.status = 'success';
       attempt.finishedAt = DateTime.now();
