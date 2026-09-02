@@ -158,7 +158,6 @@ class AppleLogin extends LoginSystem {
       final firebaseCredential = OAuthProvider('apple.com').credential(
         idToken: identityToken,
         rawNonce: rawNonce,
-        accessToken: authorizationCode,
       );
 
       attempt.addStep('signing_into_firebase_with_apple_credential');
