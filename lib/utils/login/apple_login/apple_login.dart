@@ -134,12 +134,30 @@ class AppleLogin extends LoginSystem {
       final identityToken = appleCredential.identityToken;
       final authorizationCode = appleCredential.authorizationCode;
 
+      // Inspect Apple identity token claims for diagnostics
+      Map<String, dynamic> tokenClaims = {};
+      if (identityToken != null) {
+        try {
+          final parts = identityToken.split('.');
+          if (parts.length >= 2) {
+            final normalized = base64Url.normalize(parts[1]);
+            final payloadString = utf8.decode(base64Url.decode(normalized));
+            tokenClaims = jsonDecode(payloadString) as Map<String, dynamic>;
+          }
+        } catch (_) {}
+      }
+
       attempt.addStep('apple_credential_received', details: {
         'has_identity_token': identityToken?.isNotEmpty ?? false,
         'has_authorization_code': authorizationCode.isNotEmpty,
         'has_email': appleCredential.email?.isNotEmpty ?? false,
         'has_given_name': appleCredential.givenName?.isNotEmpty ?? false,
         'has_family_name': appleCredential.familyName?.isNotEmpty ?? false,
+        'jwt_aud': tokenClaims['aud'],
+        'jwt_iss': tokenClaims['iss'],
+        'jwt_sub': tokenClaims['sub'],
+        'jwt_nonce_present': tokenClaims.containsKey('nonce'),
+        'nonce_match': tokenClaims['nonce'] == hashedNonce,
       });
 
       if (identityToken == null || identityToken.isEmpty) {
