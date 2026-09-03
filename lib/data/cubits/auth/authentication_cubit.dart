@@ -82,6 +82,14 @@ String authenticationErrorMessage(dynamic error) {
         return 'Please verify your email before signing in.';
     }
   }
+  if (error is AppleServerRejectionException) {
+    // Surface the verbatim Identity Toolkit reason: it is the only place the
+    // real cause appears, and the Firebase SDK discards it.
+    final reason = error.serverError;
+    return (reason == null || reason.isEmpty)
+        ? 'Apple sign-in was rejected. Please try again.'
+        : 'Apple sign-in rejected: $reason';
+  }
   if (error is FirebaseAuthException) {
     switch (error.code) {
       case 'canceled':

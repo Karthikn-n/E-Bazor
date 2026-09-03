@@ -1,18 +1,40 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:Ebozor/utils/logger.dart';
 import 'package:Ebozor/utils/login/lib/login_status.dart';
 import 'package:Ebozor/utils/login/lib/login_system.dart';
 import 'package:Ebozor/utils/login/lib/payloads.dart';
+import 'package:crypto/crypto.dart';
+import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class AppleLoginCancelledException implements Exception {
   const AppleLoginCancelledException();
 
   @override
   String toString() => 'Apple sign-in cancelled by user';
+}
+
+/// Thrown when Apple issued a valid credential but the Firebase Identity
+/// Toolkit backend refused to mint a session for it.
+///
+/// [serverError] holds the verbatim reason reported by
+/// `accounts:signInWithIdp`, which the Firebase SDK itself swallows.
+class AppleServerRejectionException implements Exception {
+  final String code;
+  final String? serverError;
+
+  const AppleServerRejectionException(this.code, this.serverError);
+
+  @override
+  String toString() => serverError == null
+      ? 'Apple sign-in rejected by Firebase ($code)'
+      : 'Apple sign-in rejected by Firebase ($code): $serverError';
 }
 
 /// Represents a single step in an Apple authentication attempt.
@@ -45,6 +67,10 @@ class AppleAuthAttempt {
   String status; // 'in_progress', 'success', 'failed', 'cancelled'
   String? failedStage;
   Map<String, dynamic>? error;
+
+  /// Verbatim `accounts:signInWithIdp` response captured after an SDK failure.
+  Map<String, dynamic>? serverProbe;
+
   final List<AppleAuthStep> steps = [];
 
   AppleAuthAttempt({
@@ -72,6 +98,7 @@ class AppleAuthAttempt {
         'failed_stage': failedStage,
         'steps': steps.map((s) => s.toJson()).toList(),
         if (error != null) 'error': error,
+        if (serverProbe != null) 'identity_toolkit_probe': serverProbe,
       };
 }
 
@@ -93,9 +120,23 @@ class AppleAuthTracker {
   }
 }
 
+/// Sign in with Apple, exchanged for a Firebase session.
+///
+/// Flow (the only one Firebase supports for native iOS apps):
+///   1. Generate a random raw nonce, send SHA-256(rawNonce) to Apple.
+///   2. Ask Apple for an ASAuthorizationAppleIDCredential.
+///   3. Hand Firebase the identity token + the *raw* nonce.
+///
+/// The authorization code is deliberately NOT passed as `accessToken`. The
+/// iOS plugin's `apple.com` branch builds the credential with
+/// `OAuthProvider.appleCredential(withIDToken:rawNonce:fullName:)` and ignores
+/// `accessToken` entirely, so doing so is a no-op that only obscures the flow.
 class AppleLogin extends LoginSystem {
+  static const _identityToolkitEndpoint =
+      'https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp';
+
   @override
-  void init() async {}
+  void init() {}
 
   @override
   Future<UserCredential?> login() async {
@@ -105,149 +146,329 @@ class AppleLogin extends LoginSystem {
         : 'unknown';
     attempt.addStep('starting', details: {'intent': intent});
 
+    String? idToken;
+    String? rawNonce;
+
     try {
       emit(MProgress());
-      AppLog.i('Initiating Firebase Apple login [${attempt.attemptId}]',
+      AppLog.i('Initiating Apple sign-in [${attempt.attemptId}]',
           name: 'AppleLogin');
 
-      // Clear any previous Firebase session
+      if (!await SignInWithApple.isAvailable()) {
+        throw const AppleServerRejectionException(
+          'apple-unavailable',
+          'Sign in with Apple is not available on this device.',
+        );
+      }
+
+      // A stale Firebase session makes the failure diagnostics ambiguous.
       if (firebaseAuth.currentUser != null) {
         attempt.addStep('clearing_previous_firebase_session');
         await firebaseAuth.signOut();
       }
 
-      // Use Firebase's native AppleAuthProvider + signInWithProvider.
-      // This lets the Firebase iOS SDK handle the entire Apple OAuth flow
-      // natively, which avoids the accessToken/refreshToken nil bug that
-      // occurs when manually constructing OAuthProvider credentials and
-      // passing them through signInWithCredential on firebase_auth 6.x.
-      attempt.addStep('creating_apple_auth_provider');
-      final appleProvider = AppleAuthProvider()
-        ..addScope('email')
-        ..addScope('name');
+      attempt.addStep('generating_nonce');
+      rawNonce = _generateRawNonce();
+      final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
 
-      attempt.addStep('signing_in_with_native_apple_provider');
-      final userCredential =
-          await firebaseAuth.signInWithProvider(appleProvider);
+      attempt.addStep('requesting_apple_credential');
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: const [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: hashedNonce,
+      );
 
-      // Persist display name if Firebase captured it from Apple
-      final firebaseDisplayName = userCredential.user?.displayName;
-      attempt.addStep('sign_in_successful', details: {
-        'uid': userCredential.user?.uid,
-        'email': userCredential.user?.email,
-        'display_name': firebaseDisplayName,
-        'is_new_user': userCredential.additionalUserInfo?.isNewUser,
+      idToken = appleCredential.identityToken;
+      if (idToken == null || idToken.isEmpty) {
+        throw const AppleServerRejectionException(
+          'missing-identity-token',
+          'Apple returned a credential without an identity token.',
+        );
+      }
+
+      final claims = _decodeJwtClaims(idToken);
+      attempt.addStep('apple_credential_received', details: {
+        'has_authorization_code':
+            (appleCredential.authorizationCode).isNotEmpty,
+        'has_email': appleCredential.email != null,
+        'has_given_name': appleCredential.givenName != null,
+        'has_family_name': appleCredential.familyName != null,
+        'jwt_aud': claims?['aud'],
+        'jwt_iss': claims?['iss'],
+        'jwt_sub': claims?['sub'],
+        'jwt_email_present': claims?['email'] != null,
+        'jwt_email_verified': claims?['email_verified'],
+        'jwt_is_private_email': claims?['is_private_email'],
+        'jwt_exp': claims?['exp'],
+        'nonce_match': claims?['nonce'] == hashedNonce,
       });
 
-      // If Apple provided a name via the OAuth profile but Firebase didn't
-      // persist it automatically, extract it from additionalUserInfo.
-      if ((firebaseDisplayName == null || firebaseDisplayName.isEmpty) &&
-          userCredential.additionalUserInfo?.profile != null) {
-        final profile = userCredential.additionalUserInfo!.profile!;
-        final firstName = (profile['firstName'] ?? profile['given_name'] ?? '') as String;
-        final lastName = (profile['lastName'] ?? profile['family_name'] ?? '') as String;
-        final fullName = [firstName.trim(), lastName.trim()]
-            .where((part) => part.isNotEmpty)
-            .join(' ');
+      attempt.addStep('creating_firebase_credential');
+      final firebaseCredential = AppleAuthProvider.credentialWithIDToken(
+        idToken,
+        rawNonce,
+        AppleFullPersonName(
+          givenName: appleCredential.givenName,
+          familyName: appleCredential.familyName,
+        ),
+      );
 
-        if (fullName.isNotEmpty && userCredential.user != null) {
-          try {
-            await userCredential.user!.updateDisplayName(fullName);
-            await userCredential.user!.reload();
-            attempt.addStep('apple_display_name_saved',
-                details: {'name': fullName});
-          } catch (_) {}
+      attempt.addStep('signing_into_firebase');
+      final userCredential =
+          await firebaseAuth.signInWithCredential(firebaseCredential);
+
+      // Apple only sends the name on the very first authorization, so persist
+      // it to the Firebase profile while we still have it.
+      final user = userCredential.user;
+      final fullName = [appleCredential.givenName, appleCredential.familyName]
+          .whereType<String>()
+          .map((part) => part.trim())
+          .where((part) => part.isNotEmpty)
+          .join(' ');
+
+      if (user != null &&
+          fullName.isNotEmpty &&
+          (user.displayName == null || user.displayName!.isEmpty)) {
+        try {
+          await user.updateDisplayName(fullName);
+          await user.reload();
+          attempt.addStep('display_name_saved', details: {'name': fullName});
+        } catch (e) {
+          attempt.addStep('display_name_save_failed',
+              details: {'error': e.toString()});
         }
       }
 
       attempt.status = 'success';
       attempt.finishedAt = DateTime.now();
       attempt.addStep('completed', details: {
-        'uid': userCredential.user?.uid,
-        'email': userCredential.user?.email,
+        'uid': user?.uid,
+        'email': user?.email,
+        'is_new_user': userCredential.additionalUserInfo?.isNewUser,
       });
 
       AppLog.i(
-        'Apple login completed successfully [${attempt.attemptId}]. '
-        'UID: ${userCredential.user?.uid}, Email: ${userCredential.user?.email}',
+        'Apple sign-in completed [${attempt.attemptId}]. UID: ${user?.uid}',
         name: 'AppleLogin',
       );
 
       emit(MSuccess());
       return userCredential;
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        return _finishAsCancelled(attempt);
+      }
+      return _finishAsFailure(
+        attempt,
+        error: {
+          'type': 'SignInWithAppleAuthorizationException',
+          'code': e.code.name,
+          'message': e.message,
+        },
+        thrown: e,
+      );
     } on FirebaseAuthException catch (e, stackTrace) {
-      final isCancel =
-          _isCancellation(e.code) || _isCancellation(e.message ?? '');
-      attempt.status = isCancel ? 'cancelled' : 'failed';
-      attempt.failedStage = attempt.steps.isNotEmpty
-          ? attempt.steps.last.name
-          : 'signing_in_with_native_apple_provider';
-      attempt.finishedAt = DateTime.now();
-      attempt.error = {
-        'type': 'FirebaseAuthException',
-        'code': e.code,
-        'message': e.message,
-        'plugin': e.plugin,
-        'stack_trace': stackTrace.toString(),
-      };
-      attempt.addStep('failure', details: {
-        'stage': attempt.failedStage,
-        'code': e.code,
-        'message': e.message,
-      });
-
-      AppLog.w(
-          'FirebaseAuthException in AppleLogin [${attempt.attemptId}]: [${e.code}] ${e.message}',
-          name: 'AppleLogin');
-
-      // Persist failure dump to disk
-      await _saveFailureFile(attempt);
-
-      if (isCancel) {
-        emit(MFail(const AppleLoginCancelledException()));
-        throw const AppleLoginCancelledException();
+      if (_isCancellation(e.code) || _isCancellation(e.message ?? '')) {
+        return _finishAsCancelled(attempt);
       }
-      try {
-        if (firebaseAuth.currentUser != null) {
-          await firebaseAuth.signOut();
-        }
-      } catch (_) {}
-      emit(MFail(e));
-      rethrow;
+
+      // The SDK reports `invalid-user-token / accessToken or refreshToken is
+      // nil` whenever Identity Toolkit answers 200 with no tokens, hiding the
+      // real reason. Replay the assertion with returnIdpCredential=false so the
+      // backend is forced to return its actual error code.
+      attempt.serverProbe = await _probeIdentityToolkit(
+        idToken: idToken,
+        rawNonce: rawNonce,
+      );
+      final serverReason = _serverReasonFrom(attempt.serverProbe);
+
+      AppLog.e(
+        'Apple sign-in rejected [${attempt.attemptId}]: [${e.code}] '
+        '${e.message} | identity-toolkit says: ${serverReason ?? "no probe"}',
+        error: e,
+        stackTrace: stackTrace,
+        name: 'AppleLogin',
+      );
+
+      return _finishAsFailure(
+        attempt,
+        error: {
+          'type': 'FirebaseAuthException',
+          'code': e.code,
+          'message': e.message,
+          'plugin': e.plugin,
+          'server_reason': serverReason,
+          'stack_trace': stackTrace.toString(),
+        },
+        thrown: serverReason == null
+            ? e
+            : AppleServerRejectionException(e.code, serverReason),
+      );
     } catch (error, stackTrace) {
-      final isCancel = _isCancellation(error.toString());
-      attempt.status = isCancel ? 'cancelled' : 'failed';
-      attempt.failedStage =
-          attempt.steps.isNotEmpty ? attempt.steps.last.name : 'unknown';
-      attempt.finishedAt = DateTime.now();
-      attempt.error = {
-        'type': error.runtimeType.toString(),
-        'message': error.toString(),
-        'stack_trace': stackTrace.toString(),
-      };
-      attempt.addStep('failure', details: {
-        'stage': attempt.failedStage,
-        'error': error.toString(),
-      });
-
-      AppLog.e('Exception in AppleLogin [${attempt.attemptId}]: $error',
-          error: error, stackTrace: stackTrace, name: 'AppleLogin');
-
-      // Persist failure dump to disk
-      await _saveFailureFile(attempt);
-
-      if (isCancel) {
-        emit(MFail(const AppleLoginCancelledException()));
-        throw const AppleLoginCancelledException();
+      if (_isCancellation(error.toString())) {
+        return _finishAsCancelled(attempt);
       }
-      try {
-        if (firebaseAuth.currentUser != null) {
-          await firebaseAuth.signOut();
-        }
-      } catch (_) {}
-      emit(MFail(error));
-      rethrow;
+      return _finishAsFailure(
+        attempt,
+        error: {
+          'type': error.runtimeType.toString(),
+          'message': error.toString(),
+          'stack_trace': stackTrace.toString(),
+        },
+        thrown: error,
+      );
     }
+  }
+
+  /// Apple requires the nonce to be URL-safe; keep to the unreserved set.
+  String _generateRawNonce([int length = 32]) {
+    const charset =
+        '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(length, (_) => charset[random.nextInt(charset.length)])
+        .join();
+  }
+
+  Map<String, dynamic>? _decodeJwtClaims(String jwt) {
+    try {
+      final parts = jwt.split('.');
+      if (parts.length != 3) return null;
+      final payload = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
+      return jsonDecode(payload) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Calls `accounts:signInWithIdp` directly with `returnIdpCredential=false`.
+  ///
+  /// Diagnostic only — the resulting tokens cannot be injected back into the
+  /// Firebase SDK session. Its value is the error body, which pinpoints whether
+  /// the rejection is a project/provider configuration problem or a client one.
+  Future<Map<String, dynamic>?> _probeIdentityToolkit({
+    required String? idToken,
+    required String? rawNonce,
+  }) async {
+    if (idToken == null || rawNonce == null) return null;
+
+    try {
+      final options = Firebase.app().options;
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+        validateStatus: (_) => true,
+      ));
+
+      final response = await dio.post<dynamic>(
+        _identityToolkitEndpoint,
+        queryParameters: {'key': options.apiKey},
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            if (Platform.isIOS && options.iosBundleId != null)
+              'X-Ios-Bundle-Identifier': options.iosBundleId,
+          },
+        ),
+        data: {
+          'postBody': 'id_token=$idToken&providerId=apple.com&nonce=$rawNonce',
+          'requestUri': 'https://${options.projectId}.firebaseapp.com',
+          'returnIdpCredential': false,
+          'returnSecureToken': true,
+        },
+      );
+
+      return {
+        'http_status': response.statusCode,
+        'body': _redactTokens(response.data),
+      };
+    } catch (e) {
+      return {'probe_failed': e.toString()};
+    }
+  }
+
+  /// Strips session tokens so the dump can be shared safely, while keeping
+  /// every field that explains a rejection.
+  dynamic _redactTokens(dynamic body) {
+    const secretKeys = {
+      'idToken',
+      'refreshToken',
+      'oauthIdToken',
+      'oauthAccessToken',
+    };
+    if (body is Map) {
+      return body.map((key, value) => MapEntry(
+            key.toString(),
+            secretKeys.contains(key.toString())
+                ? '<redacted len=${value.toString().length}>'
+                : _redactTokens(value),
+          ));
+    }
+    if (body is List) return body.map(_redactTokens).toList();
+    return body;
+  }
+
+  String? _serverReasonFrom(Map<String, dynamic>? probe) {
+    if (probe == null) return null;
+    final body = probe['body'];
+    if (body is Map && body['error'] is Map) {
+      final message = (body['error'] as Map)['message'];
+      if (message != null) return message.toString();
+    }
+    if (probe['probe_failed'] != null) return null;
+    // 200 with no error means the backend accepted the assertion on retry.
+    if (probe['http_status'] == 200) {
+      return 'identity-toolkit accepted the same assertion on direct retry '
+          '(SDK-side failure, not a project configuration problem)';
+    }
+    return null;
+  }
+
+  Future<UserCredential?> _finishAsCancelled(AppleAuthAttempt attempt) async {
+    attempt.status = 'cancelled';
+    attempt.finishedAt = DateTime.now();
+    attempt.addStep('cancelled');
+    AppLog.i('Apple sign-in cancelled by user [${attempt.attemptId}]',
+        name: 'AppleLogin');
+    emit(MFail(const AppleLoginCancelledException()));
+    throw const AppleLoginCancelledException();
+  }
+
+  Future<UserCredential?> _finishAsFailure(
+    AppleAuthAttempt attempt, {
+    required Map<String, dynamic> error,
+    required Object thrown,
+  }) async {
+    attempt.status = 'failed';
+    attempt.failedStage =
+        attempt.steps.isNotEmpty ? attempt.steps.last.name : 'unknown';
+    attempt.finishedAt = DateTime.now();
+    attempt.error = error;
+    attempt.addStep('failure', details: {
+      'stage': attempt.failedStage,
+      'code': error['code'],
+      'message': error['message'],
+      if (error['server_reason'] != null)
+        'server_reason': error['server_reason'],
+    });
+
+    AppLog.w(
+      'Apple sign-in failed [${attempt.attemptId}] at ${attempt.failedStage}: '
+      '${error['code'] ?? error['type']} ${error['message'] ?? ''}',
+      name: 'AppleLogin',
+    );
+
+    await _saveFailureFile(attempt);
+
+    try {
+      if (firebaseAuth.currentUser != null) {
+        await firebaseAuth.signOut();
+      }
+    } catch (_) {}
+
+    emit(MFail(thrown));
+    throw thrown;
   }
 
   static Future<void> _saveFailureFile(AppleAuthAttempt attempt) async {
@@ -255,12 +476,10 @@ class AppleLogin extends LoginSystem {
       final tempDir = await getTemporaryDirectory();
       final file =
           File('${tempDir.path}/ebozor_apple_auth_${attempt.attemptId}.txt');
-      final content = const JsonEncoder.withIndent('  ').convert(
-        {
-          'generated_at_utc': DateTime.now().toUtc().toIso8601String(),
-          'attempt': attempt.toJson(),
-        },
-      );
+      final content = const JsonEncoder.withIndent('  ').convert({
+        'generated_at_utc': DateTime.now().toUtc().toIso8601String(),
+        'attempt': attempt.toJson(),
+      });
       await file.writeAsString(content, flush: true);
       AppLog.i('Saved Apple auth failure dump to: ${file.path}',
           name: 'AppleLogin');
@@ -274,7 +493,6 @@ class AppleLogin extends LoginSystem {
     return lower.contains('canceled') ||
         lower.contains('cancelled') ||
         lower.contains('web-context-canceled') ||
-        lower.contains('1001') ||
         lower.contains('user-cancelled') ||
         lower.contains('user_cancelled');
   }
@@ -282,4 +500,3 @@ class AppleLogin extends LoginSystem {
   @override
   void onEvent(MLoginState state) {}
 }
-
