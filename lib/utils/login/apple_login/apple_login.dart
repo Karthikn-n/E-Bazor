@@ -5,10 +5,8 @@ import 'package:Ebozor/utils/logger.dart';
 import 'package:Ebozor/utils/login/lib/login_status.dart';
 import 'package:Ebozor/utils/login/lib/login_system.dart';
 import 'package:Ebozor/utils/login/lib/payloads.dart';
-import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class AppleLoginCancelledException implements Exception {
   const AppleLoginCancelledException();
@@ -118,85 +116,48 @@ class AppleLogin extends LoginSystem {
         await firebaseAuth.signOut();
       }
 
-      attempt.addStep('generating_apple_nonce');
-      final rawNonce = generateNonce();
-      final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
+      // Use Firebase's native AppleAuthProvider + signInWithProvider.
+      // This lets the Firebase iOS SDK handle the entire Apple OAuth flow
+      // natively, which avoids the accessToken/refreshToken nil bug that
+      // occurs when manually constructing OAuthProvider credentials and
+      // passing them through signInWithCredential on firebase_auth 6.x.
+      attempt.addStep('creating_apple_auth_provider');
+      final appleProvider = AppleAuthProvider()
+        ..addScope('email')
+        ..addScope('name');
 
-      attempt.addStep('requesting_apple_credential');
-      final appleCredential = await SignInWithApple.getAppleIDCredential(
-        scopes: const [
-          AppleIDAuthorizationScopes.email,
-          AppleIDAuthorizationScopes.fullName,
-        ],
-        nonce: hashedNonce,
-      );
+      attempt.addStep('signing_in_with_native_apple_provider');
+      final userCredential =
+          await firebaseAuth.signInWithProvider(appleProvider);
 
-      final identityToken = appleCredential.identityToken;
-      final authorizationCode = appleCredential.authorizationCode;
-
-      // Inspect Apple identity token claims for diagnostics
-      Map<String, dynamic> tokenClaims = {};
-      if (identityToken != null) {
-        try {
-          final parts = identityToken.split('.');
-          if (parts.length >= 2) {
-            final normalized = base64Url.normalize(parts[1]);
-            final payloadString = utf8.decode(base64Url.decode(normalized));
-            tokenClaims = jsonDecode(payloadString) as Map<String, dynamic>;
-          }
-        } catch (_) {}
-      }
-
-      attempt.addStep('apple_credential_received', details: {
-        'has_identity_token': identityToken?.isNotEmpty ?? false,
-        'has_authorization_code': authorizationCode.isNotEmpty,
-        'has_email': appleCredential.email?.isNotEmpty ?? false,
-        'has_given_name': appleCredential.givenName?.isNotEmpty ?? false,
-        'has_family_name': appleCredential.familyName?.isNotEmpty ?? false,
-        'jwt_aud': tokenClaims['aud'],
-        'jwt_iss': tokenClaims['iss'],
-        'jwt_sub': tokenClaims['sub'],
-        'jwt_nonce_present': tokenClaims.containsKey('nonce'),
-        'nonce_match': tokenClaims['nonce'] == hashedNonce,
+      // Persist display name if Firebase captured it from Apple
+      final firebaseDisplayName = userCredential.user?.displayName;
+      attempt.addStep('sign_in_successful', details: {
+        'uid': userCredential.user?.uid,
+        'email': userCredential.user?.email,
+        'display_name': firebaseDisplayName,
+        'is_new_user': userCredential.additionalUserInfo?.isNewUser,
       });
 
-      if (identityToken == null || identityToken.isEmpty) {
-        throw FirebaseAuthException(
-          code: 'missing-apple-identity-token',
-          message: 'Apple did not return an identity token.',
-        );
-      }
+      // If Apple provided a name via the OAuth profile but Firebase didn't
+      // persist it automatically, extract it from additionalUserInfo.
+      if ((firebaseDisplayName == null || firebaseDisplayName.isEmpty) &&
+          userCredential.additionalUserInfo?.profile != null) {
+        final profile = userCredential.additionalUserInfo!.profile!;
+        final firstName = (profile['firstName'] ?? profile['given_name'] ?? '') as String;
+        final lastName = (profile['lastName'] ?? profile['family_name'] ?? '') as String;
+        final fullName = [firstName.trim(), lastName.trim()]
+            .where((part) => part.isNotEmpty)
+            .join(' ');
 
-      attempt.addStep('creating_firebase_apple_credential');
-      final firebaseCredential = OAuthProvider('apple.com').credential(
-        idToken: identityToken,
-        rawNonce: rawNonce,
-        accessToken: authorizationCode.isNotEmpty ? authorizationCode : null,
-      );
-
-      attempt.addStep('signing_into_firebase_with_apple_credential');
-      final userCredential =
-          await firebaseAuth.signInWithCredential(firebaseCredential);
-
-      // Save display name if Apple provided it
-      final fullName = [
-        appleCredential.givenName,
-        appleCredential.familyName,
-      ]
-          .whereType<String>()
-          .map((part) => part.trim())
-          .where((part) => part.isNotEmpty)
-          .join(' ');
-
-      if (fullName.isNotEmpty &&
-          userCredential.user != null &&
-          (userCredential.user!.displayName == null ||
-              userCredential.user!.displayName!.isEmpty)) {
-        try {
-          await userCredential.user!.updateDisplayName(fullName);
-          await userCredential.user!.reload();
-          attempt.addStep('apple_display_name_saved', details: {'name': fullName});
-        } catch (_) {}
+        if (fullName.isNotEmpty && userCredential.user != null) {
+          try {
+            await userCredential.user!.updateDisplayName(fullName);
+            await userCredential.user!.reload();
+            attempt.addStep('apple_display_name_saved',
+                details: {'name': fullName});
+          } catch (_) {}
+        }
       }
 
       attempt.status = 'success';
@@ -207,7 +168,8 @@ class AppleLogin extends LoginSystem {
       });
 
       AppLog.i(
-        'Apple login completed successfully [${attempt.attemptId}]. UID: ${userCredential.user?.uid}, Email: ${userCredential.user?.email}',
+        'Apple login completed successfully [${attempt.attemptId}]. '
+        'UID: ${userCredential.user?.uid}, Email: ${userCredential.user?.email}',
         name: 'AppleLogin',
       );
 
@@ -219,7 +181,7 @@ class AppleLogin extends LoginSystem {
       attempt.status = isCancel ? 'cancelled' : 'failed';
       attempt.failedStage = attempt.steps.isNotEmpty
           ? attempt.steps.last.name
-          : 'signing_into_firebase_with_native_apple_provider';
+          : 'signing_in_with_native_apple_provider';
       attempt.finishedAt = DateTime.now();
       attempt.error = {
         'type': 'FirebaseAuthException',
@@ -288,8 +250,6 @@ class AppleLogin extends LoginSystem {
     }
   }
 
-
-
   static Future<void> _saveFailureFile(AppleAuthAttempt attempt) async {
     try {
       final tempDir = await getTemporaryDirectory();
@@ -322,3 +282,4 @@ class AppleLogin extends LoginSystem {
   @override
   void onEvent(MLoginState state) {}
 }
+
