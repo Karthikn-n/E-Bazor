@@ -86,9 +86,16 @@ String authenticationErrorMessage(dynamic error) {
     // Surface the verbatim Identity Toolkit reason: it is the only place the
     // real cause appears, and the Firebase SDK discards it.
     final reason = error.serverError;
-    return (reason == null || reason.isEmpty)
-        ? 'Apple sign-in was rejected. Please try again.'
-        : 'Apple sign-in rejected: $reason';
+    if (reason == null || reason.isEmpty) {
+      return 'Apple sign-in was rejected. Please try again.';
+    }
+    if (reason.contains('PROVIDER_ALREADY_LINKED')) {
+      // The Apple identity is already attached to a different Firebase account
+      // record. No client retry can clear this — it needs the stale user to be
+      // removed in the Firebase console.
+      return 'This Apple ID is already linked to another account. Please contact support.';
+    }
+    return 'Apple sign-in rejected: $reason';
   }
   if (error is FirebaseAuthException) {
     switch (error.code) {

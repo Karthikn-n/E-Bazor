@@ -143,7 +143,11 @@ class AppleLogin extends LoginSystem {
   /// this enabled the SDK call that follows will fail as a duplicate. That is
   /// expected: the pre-probe body, not the SDK error, is the real result.
   /// Set to `false` once the backend rejection reason is known and fixed.
-  static const bool _probeBeforeSdkSignIn = true;
+  ///
+  /// Build 50 used this to capture `errorMessage: PROVIDER_ALREADY_LINKED`.
+  /// Turn it back on only to diagnose a new unexplained backend rejection —
+  /// while it is on, sign-in cannot succeed.
+  static const bool _probeBeforeSdkSignIn = false;
 
   @override
   void init() {}
