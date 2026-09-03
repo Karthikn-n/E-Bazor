@@ -135,6 +135,16 @@ class AppleLogin extends LoginSystem {
   static const _identityToolkitEndpoint =
       'https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp';
 
+  /// Diagnostic mode. Mirrors the SDK's `signInWithIdp` request *before*
+  /// `signInWithCredential` runs, so the raw response body — including the
+  /// `errorMessage` that firebase-ios-sdk silently discards — is captured.
+  ///
+  /// Identity Toolkit accepts a given Apple assertion exactly once, so with
+  /// this enabled the SDK call that follows will fail as a duplicate. That is
+  /// expected: the pre-probe body, not the SDK error, is the real result.
+  /// Set to `false` once the backend rejection reason is known and fixed.
+  static const bool _probeBeforeSdkSignIn = true;
+
   @override
   void init() {}
 
@@ -204,6 +214,20 @@ class AppleLogin extends LoginSystem {
         'jwt_exp': claims?['exp'],
         'nonce_match': claims?['nonce'] == hashedNonce,
       });
+
+      if (_probeBeforeSdkSignIn) {
+        attempt.addStep('probing_identity_toolkit_before_sdk');
+        attempt.serverProbe = await _probeIdentityToolkit(
+          idToken: idToken,
+          rawNonce: rawNonce,
+          mirrorSdkRequest: true,
+        );
+        AppLog.w(
+          'Pre-probe identity-toolkit response [${attempt.attemptId}]: '
+          '${jsonEncode(attempt.serverProbe)}',
+          name: 'AppleLogin',
+        );
+      }
 
       attempt.addStep('creating_firebase_credential');
       final firebaseCredential = AppleAuthProvider.credentialWithIDToken(
@@ -276,11 +300,13 @@ class AppleLogin extends LoginSystem {
 
       // The SDK reports `invalid-user-token / accessToken or refreshToken is
       // nil` whenever Identity Toolkit answers 200 with no tokens, hiding the
-      // real reason. Replay the assertion with returnIdpCredential=false so the
-      // backend is forced to return its actual error code.
-      attempt.serverProbe = await _probeIdentityToolkit(
+      // real reason. If the pre-probe already captured that response, keep it:
+      // a probe run *after* the SDK call is a duplicate submission and the
+      // backend answers "Duplicate credential received" regardless of cause.
+      attempt.serverProbe ??= await _probeIdentityToolkit(
         idToken: idToken,
         rawNonce: rawNonce,
+        mirrorSdkRequest: false,
       );
       final serverReason = _serverReasonFrom(attempt.serverProbe);
 
@@ -342,14 +368,20 @@ class AppleLogin extends LoginSystem {
     }
   }
 
-  /// Calls `accounts:signInWithIdp` directly with `returnIdpCredential=false`.
+  /// Calls `accounts:signInWithIdp` directly.
+  ///
+  /// With [mirrorSdkRequest] the request is byte-for-byte what
+  /// `Auth.signIn(with:)` sends (`returnIdpCredential: true`), so the captured
+  /// body contains the `errorMessage` field that firebase-ios-sdk drops on the
+  /// floor when it does not recognise the value. Without it, the assertion is
+  /// sent with `returnIdpCredential: false` to force a hard HTTP 4xx instead.
   ///
   /// Diagnostic only — the resulting tokens cannot be injected back into the
-  /// Firebase SDK session. Its value is the error body, which pinpoints whether
-  /// the rejection is a project/provider configuration problem or a client one.
+  /// Firebase SDK session.
   Future<Map<String, dynamic>?> _probeIdentityToolkit({
     required String? idToken,
     required String? rawNonce,
+    required bool mirrorSdkRequest,
   }) async {
     if (idToken == null || rawNonce == null) return null;
 
@@ -374,12 +406,13 @@ class AppleLogin extends LoginSystem {
         data: {
           'postBody': 'id_token=$idToken&providerId=apple.com&nonce=$rawNonce',
           'requestUri': 'https://${options.projectId}.firebaseapp.com',
-          'returnIdpCredential': false,
+          'returnIdpCredential': mirrorSdkRequest,
           'returnSecureToken': true,
         },
       );
 
       return {
+        'mirrors_sdk_request': mirrorSdkRequest,
         'http_status': response.statusCode,
         'body': _redactTokens(response.data),
       };
@@ -410,17 +443,30 @@ class AppleLogin extends LoginSystem {
   }
 
   String? _serverReasonFrom(Map<String, dynamic>? probe) {
-    if (probe == null) return null;
+    if (probe == null || probe['probe_failed'] != null) return null;
     final body = probe['body'];
-    if (body is Map && body['error'] is Map) {
-      final message = (body['error'] as Map)['message'];
-      if (message != null) return message.toString();
+    final mirrored = probe['mirrors_sdk_request'] == true;
+
+    // returnIdpCredential=true: a 200 can still carry the rejection here. This
+    // is the field the SDK discards, so it is the authoritative answer.
+    if (body is Map && body['errorMessage'] != null) {
+      return body['errorMessage'].toString();
     }
-    if (probe['probe_failed'] != null) return null;
-    // 200 with no error means the backend accepted the assertion on retry.
+    // returnIdpCredential=false: the rejection arrives as a normal HTTP error.
+    if (body is Map && body['error'] is Map) {
+      final message = (body['error'] as Map)['message']?.toString();
+      if (message == null) return null;
+      return mirrored
+          ? message
+          : '$message (replayed after the SDK call — a duplicate-credential '
+              'reply here reflects the replay, not the original rejection)';
+    }
     if (probe['http_status'] == 200) {
-      return 'identity-toolkit accepted the same assertion on direct retry '
-          '(SDK-side failure, not a project configuration problem)';
+      return mirrored
+          ? 'identity-toolkit returned a complete session for this assertion — '
+              'the backend and project config are healthy, so the failure is in '
+              'the iOS SDK/plugin layer'
+          : 'identity-toolkit accepted the same assertion on direct retry';
     }
     return null;
   }
