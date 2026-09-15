@@ -5,8 +5,10 @@ import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
+import 'package:Ebozor/data/cubits/seller/fetch_verification_request_cubit.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class ProfileMenuScreen extends StatefulWidget {
   const ProfileMenuScreen({super.key});
@@ -71,6 +73,15 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
     UiUtils.checkUser(
       onNotGuest: () {
         final userDetails = HiveUtils.getUserDetails();
+        bool isVerified = userDetails.isVerified == 1;
+        try {
+          final verState = context.read<FetchVerificationRequestsCubit>().state;
+          if (verState is FetchVerificationRequestSuccess &&
+              verState.data.isApproved) {
+            isVerified = true;
+          }
+        } catch (_) {}
+
         final user = User(
           id: userDetails.id,
           name: userDetails.name,
@@ -80,7 +91,7 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
           profile: userDetails.profile,
           createdAt: userDetails.createdAt,
           updatedAt: userDetails.updatedAt,
-          isVerified: userDetails.isVerified,
+          isVerified: isVerified ? 1 : 0,
         );
 
         Navigator.pushNamed(

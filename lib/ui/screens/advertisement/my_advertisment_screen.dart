@@ -11,6 +11,7 @@ import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
 import 'package:Ebozor/ui/screens/widgets/intertitial_ads_screen.dart';
 import 'package:Ebozor/ui/screens/widgets/shimmerLoadingContainer.dart';
 import 'package:Ebozor/ui/screens/home/widgets/verification_banner.dart';
+import 'package:Ebozor/data/cubits/seller/fetch_verification_request_cubit.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_keys.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
@@ -102,6 +103,13 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
     context
         .read<FetchMyPromotedItemsCubit>()
         .fetchMyPromotedItems(status: status);
+    if (HiveUtils.isUserAuthenticated()) {
+      try {
+        context
+            .read<FetchVerificationRequestsCubit>()
+            .fetchVerificationRequests();
+      } catch (_) {}
+    }
   }
 
   Future<void> _fetchCounts() async {
@@ -1686,28 +1694,36 @@ class _MyAdsBannerCarousel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder(
-      valueListenable: Hive.box(HiveKeys.userDetailsBox).listenable(),
-      builder: (context, Box box, _) {
-        final isVerified = HiveUtils.getUserDetails().isVerified == 1;
+    return BlocBuilder<FetchVerificationRequestsCubit,
+        FetchVerificationRequestState>(
+      builder: (context, state) {
+        return ValueListenableBuilder(
+          valueListenable: Hive.box(HiveKeys.userDetailsBox).listenable(),
+          builder: (context, Box box, _) {
+            final requestApproved = state is FetchVerificationRequestSuccess &&
+                state.data.isApproved;
+            final isVerified =
+                HiveUtils.getUserDetails().isVerified == 1 || requestApproved;
 
-        if (isVerified) {
-          return const _InsightsBanner();
-        }
+            if (isVerified) {
+              return const _InsightsBanner();
+            }
 
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final cardWidth = constraints.maxWidth - 36;
-            final cardHeight = cardWidth * 155 / 320;
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final cardWidth = constraints.maxWidth - 36;
+                final cardHeight = cardWidth * 155 / 320;
 
-            return SizedBox(
-              height: cardHeight + 28,
-              child: PageView(
-                children: const [
-                  VerificationBanner(),
-                  _InsightsBanner(),
-                ],
-              ),
+                return SizedBox(
+                  height: cardHeight + 28,
+                  child: PageView(
+                    children: const [
+                      VerificationBanner(),
+                      _InsightsBanner(),
+                    ],
+                  ),
+                );
+              },
             );
           },
         );

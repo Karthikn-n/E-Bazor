@@ -1,4 +1,4 @@
-﻿class SellerRatingsModel {
+class SellerRatingsModel {
   Seller? seller;
   Ratings? ratings;
 
@@ -49,7 +49,17 @@ class Seller {
     email = json['email'];
     mobile = json['mobile'];
     profile = json['profile'];
-    isVerified = json['is_verified'];
+    final rawVerified = json['is_verified'];
+    if (rawVerified is int) {
+      isVerified = rawVerified;
+    } else if (rawVerified is bool) {
+      isVerified = rawVerified ? 1 : 0;
+    } else if (rawVerified != null) {
+      final s = rawVerified.toString().toLowerCase();
+      isVerified = (s == '1' || s == 'true') ? 1 : 0;
+    } else {
+      isVerified = null;
+    }
     createdAt = json['created_at'];
     if (json['average_rating'] is int) {
       averageRating = (json['average_rating'] as int).toDouble();

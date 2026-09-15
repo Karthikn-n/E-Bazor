@@ -67,7 +67,17 @@ class UserModel {
     profile = json['profile'];
     token = json['token'];
     updatedAt = json['updated_at'];
-    isVerified = json['is_verified'];
+    final rawVerified = json['is_verified'];
+    if (rawVerified is int) {
+      isVerified = rawVerified;
+    } else if (rawVerified is bool) {
+      isVerified = rawVerified ? 1 : 0;
+    } else if (rawVerified != null) {
+      final s = rawVerified.toString().toLowerCase();
+      isVerified = (s == '1' || s == 'true') ? 1 : 0;
+    } else {
+      isVerified = null;
+    }
     isPersonalDetailShow = (json['show_personal_details'] != null
         ? (json['show_personal_details'] is int)
             ? json['show_personal_details']

@@ -105,25 +105,28 @@ class _ProfileScreenState extends State<ProfileScreen>
             rawStatus?.toString() == '1'
         ? 1
         : 0;
-    await HiveUtils.setUserData({'is_verified': isVerified});
-    if (mounted) {
-      context.read<UserDetailsCubit>().copy(HiveUtils.getUserDetails());
+    if (isVerified == 1 || HiveUtils.getUserDetails().isVerified != 1) {
+      await HiveUtils.setUserData({'is_verified': isVerified});
+      if (mounted) {
+        context.read<UserDetailsCubit>().copy(HiveUtils.getUserDetails());
+      }
     }
   }
 
   void _handleVerificationTap(FetchVerificationRequestState? state) {
+    final isApproved =
+        state is FetchVerificationRequestSuccess && state.data.isApproved;
+    if (isApproved || HiveUtils.getUserDetails().isVerified == 1) {
+      HelperUtils.showSnackBarMessage(
+        context,
+        "Your account is already verified!",
+        type: MessageType.success,
+      );
+      return;
+    }
+
     if (state is FetchVerificationRequestSuccess) {
-      final status =
-          state.data.status?.trim().toLowerCase().replaceAll('_', ' ');
-      if (status == 'approved') {
-        HelperUtils.showSnackBarMessage(
-          context,
-          "Your account is already verified!",
-          type: MessageType.success,
-        );
-        return;
-      }
-      if (status == 'pending' || status == 'under review') {
+      if (state.data.isPending) {
         HelperUtils.showSnackBarMessage(
           context,
           "verificationUnderReview".translate(context),
@@ -131,7 +134,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         );
         return;
       }
-      if (status == 'rejected') {
+      if (state.data.isRejected) {
         Navigator.pushNamed(
           context,
           Routes.sellerVerificationScreen,
@@ -435,7 +438,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           final isAuthenticated = HiveUtils.isUserAuthenticated();
           final isVerified = user.isVerified == 1 ||
               (state is FetchVerificationRequestSuccess &&
-                  state.data.status?.trim().toLowerCase() == "approved");
+                  state.data.isApproved);
 
           String joinedDate = "";
           if (isAuthenticated &&

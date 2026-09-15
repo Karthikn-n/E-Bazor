@@ -17,6 +17,21 @@ class VerificationRequestModel {
     this.verificationFieldValues,
   });
 
+  bool get isApproved {
+    final s = status?.trim().toLowerCase().replaceAll('_', ' ');
+    return s == 'approved' || s == 'verified' || s == 'success' || s == '1';
+  }
+
+  bool get isPending {
+    final s = status?.trim().toLowerCase().replaceAll('_', ' ');
+    return s == 'pending' || s == 'under review' || s == 'in review';
+  }
+
+  bool get isRejected {
+    final s = status?.trim().toLowerCase().replaceAll('_', ' ');
+    return s == 'rejected' || s == 'declined' || s == 'failed';
+  }
+
   VerificationRequestModel.fromJson(Map<String, dynamic> json) {
     id = json['id'];
     userId = json['user_id'];

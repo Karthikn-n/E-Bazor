@@ -1,5 +1,8 @@
+import 'package:Ebozor/data/cubits/system/user_details.dart';
 import 'package:Ebozor/data/model/verification_request_model.dart';
 import 'package:Ebozor/data/repositories/seller/seller_verification_field_repository.dart';
+import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
+import 'package:Ebozor/utils/constant.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 abstract class FetchVerificationRequestState {}
@@ -32,10 +35,28 @@ class FetchVerificationRequestsCubit
       emit(FetchVerificationRequestInProgress());
       VerificationRequestModel result =
           await repository.getVerificationRequest();
+
+      if (result.isApproved) {
+        await HiveUtils.setUserData({'is_verified': 1});
+        _syncUserDetails();
+      } else if (result.isRejected) {
+        await HiveUtils.setUserData({'is_verified': 0});
+        _syncUserDetails();
+      }
+
       emit(FetchVerificationRequestSuccess(result));
     } catch (e) {
       emit(FetchVerificationRequestFail(e.toString()));
     }
+  }
+
+  void _syncUserDetails() {
+    try {
+      final context = Constant.navigatorKey.currentContext;
+      if (context != null) {
+        context.read<UserDetailsCubit>().copy(HiveUtils.getUserDetails());
+      }
+    } catch (_) {}
   }
 
 //while edit

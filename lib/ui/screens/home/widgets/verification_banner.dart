@@ -22,7 +22,11 @@ class VerificationBanner extends StatelessWidget {
       return;
     }
 
-    if (HiveUtils.getUserDetails().isVerified == 1) {
+    final requestApproved =
+        state is FetchVerificationRequestSuccess && state.data.isApproved;
+    final userVerified = HiveUtils.getUserDetails().isVerified == 1;
+
+    if (userVerified || requestApproved) {
       HelperUtils.showSnackBarMessage(
         context,
         "Your account is already verified!",
@@ -32,16 +36,7 @@ class VerificationBanner extends StatelessWidget {
     }
 
     if (state is FetchVerificationRequestSuccess) {
-      final status = state.data.status?.trim().toLowerCase();
-      if (status == 'approved') {
-        HelperUtils.showSnackBarMessage(
-          context,
-          "Your account is already verified!",
-          type: MessageType.success,
-        );
-        return;
-      }
-      if (status == 'pending' || status == 'under review') {
+      if (state.data.isPending) {
         HelperUtils.showSnackBarMessage(
           context,
           'Your verification request is currently under review.',
@@ -49,7 +44,7 @@ class VerificationBanner extends StatelessWidget {
         );
         return;
       }
-      if (status == 'rejected') {
+      if (state.data.isRejected) {
         Navigator.pushNamed(
           context,
           Routes.sellerVerificationScreen,
@@ -78,8 +73,8 @@ class VerificationBanner extends StatelessWidget {
         return ValueListenableBuilder(
           valueListenable: Hive.box(HiveKeys.userDetailsBox).listenable(),
           builder: (context, Box box, _) {
-            final requestApproved = state is FetchVerificationRequestSuccess &&
-                state.data.status?.trim().toLowerCase() == 'approved';
+            final requestApproved =
+                state is FetchVerificationRequestSuccess && state.data.isApproved;
             final userVerified = HiveUtils.getUserDetails().isVerified == 1;
             if (requestApproved || userVerified) {
               return const SizedBox.shrink();

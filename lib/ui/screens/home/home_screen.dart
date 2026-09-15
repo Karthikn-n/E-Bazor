@@ -108,8 +108,10 @@ class HomeScreenState extends State<HomeScreen>
             rawStatus?.toString() == '1'
         ? 1
         : 0;
-    await HiveUtils.setUserData({'is_verified': isVerified});
-    if (mounted) setState(() {});
+    if (isVerified == 1 || HiveUtils.getUserDetails().isVerified != 1) {
+      await HiveUtils.setUserData({'is_verified': isVerified});
+      if (mounted) setState(() {});
+    }
   }
 
   @override
