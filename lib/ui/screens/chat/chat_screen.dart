@@ -1795,10 +1795,11 @@ class _ChatScreenState extends State<ChatScreen>
                           ),
                           BlocListener<SendMessageCubit, SendMessageState>(
                             listener: (context, state) {
-                              if (state is SendMessageSuccess) {
+                              if (state is SendMessageSuccess &&
+                                  state.responseData is Map) {
                                 try {
-                                  final confirmedMsg =
-                                      ChatMessage.fromJson(state.responseData);
+                                  final confirmedMsg = ChatMessage.fromJson(
+                                      state.responseData as Map);
                                   ChatMessageHandler.add(confirmedMsg);
                                   context
                                       .read<LoadChatMessagesCubit>()
