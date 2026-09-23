@@ -62,11 +62,9 @@ class LoadChatMessagesCubit extends Cubit<LoadChatMessagesState> {
   LoadChatMessagesCubit() : super(LoadChatMessagesInitial());
   final ChatRepostiory _chatRepostiory = ChatRepostiory();
 
-  Future<void> load({required int itemOfferId, bool isBackground = false}) async {
+  Future<void> load({required int itemOfferId}) async {
     try {
-      if (!isBackground) {
-        emit(LoadChatMessagesInProgress());
-      }
+      emit(LoadChatMessagesInProgress());
       final result = await _chatRepostiory.getMessagesApi(
         itemOfferId: itemOfferId,
         page: 1,
@@ -75,18 +73,6 @@ class LoadChatMessagesCubit extends Cubit<LoadChatMessagesState> {
       var messages = List<ChatMessage>.of(result.modelList);
       var currentPage = 1;
 
-      if (isBackground && state is LoadChatMessagesSuccess) {
-        final currentMessages = (state as LoadChatMessagesSuccess).messages;
-        final merged = _mergeMessages(currentMessages, messages);
-        if (merged.length != currentMessages.length) {
-          emit((state as LoadChatMessagesSuccess).copyWith(
-            messages: merged,
-            totalPage: result.total,
-          ));
-        }
-        return;
-      }
-
       emit(LoadChatMessagesSuccess(
         messages: messages,
         currentPage: currentPage,
@@ -94,42 +80,52 @@ class LoadChatMessagesCubit extends Cubit<LoadChatMessagesState> {
         isLoadingMore: messages.length < result.total,
         totalPage: result.total,
       ));
+    } catch (e) {
+      emit(LoadChatMessagesFailed(error: e.toString()));
+    }
+  }
 
-      // Render the newest page immediately, then hydrate the rest of the
-      // thread without requiring the user to scroll to trigger every page.
-      while (messages.length < result.total) {
-        try {
-          final nextPage = await _chatRepostiory.getMessagesApi(
-            itemOfferId: itemOfferId,
-            page: currentPage + 1,
-          );
-          if (nextPage.modelList.isEmpty) break;
+  void addOrUpdateMessage(ChatMessage message) {
+    if (state is LoadChatMessagesSuccess) {
+      final success = state as LoadChatMessagesSuccess;
+      final currentList = List<ChatMessage>.from(success.messages);
 
-          final merged = _mergeMessages(messages, nextPage.modelList);
-          if (merged.length == messages.length) break;
+      // Check if message with same id already exists
+      if (message.id != null) {
+        final idIndex =
+            currentList.indexWhere((m) => m.id != null && m.id == message.id);
+        if (idIndex != -1) {
+          return;
+        }
 
-          messages = merged;
-          currentPage++;
-          emit(LoadChatMessagesSuccess(
-            messages: messages,
-            currentPage: currentPage,
-            itemOfferId: itemOfferId,
-            isLoadingMore: messages.length < result.total,
-            totalPage: result.total,
-          ));
-        } catch (_) {
-          break;
+        // Check if matching optimistic message exists (same sender, same text, id == null)
+        final optIndex = currentList.indexWhere((m) =>
+            m.id == null &&
+            m.senderId == message.senderId &&
+            m.message == message.message);
+        if (optIndex != -1) {
+          currentList[optIndex] = message;
+          emit(success.copyWith(messages: currentList));
+          return;
         }
       }
 
-      if (state is LoadChatMessagesSuccess &&
-          (state as LoadChatMessagesSuccess).isLoadingMore) {
-        emit((state as LoadChatMessagesSuccess).copyWith(isLoadingMore: false));
+      // Check if key matches
+      if (message.key is ValueKey) {
+        final keyVal = (message.key as ValueKey).value;
+        final keyIndex = currentList.indexWhere(
+            (m) => m.key is ValueKey && (m.key as ValueKey).value == keyVal);
+        if (keyIndex != -1) {
+          return;
+        }
       }
-    } catch (e) {
-      if (!isBackground) {
-        emit(LoadChatMessagesFailed(error: e.toString()));
-      }
+
+      // Add to beginning (index 0 is newest)
+      currentList.insert(0, message);
+      emit(success.copyWith(
+        messages: currentList,
+        totalPage: success.totalPage + 1,
+      ));
     }
   }
 
@@ -176,18 +172,25 @@ class LoadChatMessagesCubit extends Cubit<LoadChatMessagesState> {
     List<ChatMessage> current,
     List<ChatMessage> incoming,
   ) {
+    final existingIds = current.map((m) => m.id).whereType<int>().toSet();
     final existingKeys = current
         .map((message) => message.key)
         .whereType<ValueKey>()
         .map((key) => key.value)
         .toSet();
+
     return <ChatMessage>[
       ...current,
-      ...incoming.where(
-        (message) =>
-            message.key is! ValueKey ||
-            !existingKeys.contains((message.key as ValueKey).value),
-      ),
+      ...incoming.where((message) {
+        if (message.id != null && existingIds.contains(message.id)) {
+          return false;
+        }
+        if (message.key is ValueKey &&
+            existingKeys.contains((message.key as ValueKey).value)) {
+          return false;
+        }
+        return true;
+      }),
     ];
   }
 

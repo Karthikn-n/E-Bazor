@@ -7,6 +7,7 @@ import 'package:Ebozor/data/model/user_model.dart';
 
 import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_keys.dart';
+import 'package:Ebozor/utils/ApiService/Socketservice.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 class HiveUtils {
@@ -397,6 +398,9 @@ class HiveUtils {
     } catch (_) {}
 
     Constant.favoriteItemList.clear();
+    try {
+      ChatSocketService().disconnect();
+    } catch (_) {}
 
     onLogout.call();
 
@@ -430,6 +434,9 @@ class HiveUtils {
     } catch (_) {}
 
     Constant.favoriteItemList.clear();
+    try {
+      ChatSocketService().disconnect();
+    } catch (_) {}
   }
 
   static void setAudioIntroPath(String? path) {

@@ -17,20 +17,42 @@ class ChatSocketService {
 
   IO.Socket? _socket;
   Timer? _presenceTimer;
+  Timer? _typingTimeoutTimer;
   bool _isConnecting = false;
+  String? _connectedUserId;
   final Set<int> _joinedOfferIds = <int>{};
 
   bool get isConnected => _socket?.connected ?? false;
   final ValueNotifier<bool> isOtherUserTyping = ValueNotifier(false);
 
   /// Connect socket safely
-  void connect() {
-    if (_socket?.connected == true || _isConnecting) return;
+  Future<void> connect({bool force = false}) async {
+    final currentUserId = HiveUtils.getUserId() ?? '';
+    final token = HiveUtils.getJWT();
+    if (token == null || token.isEmpty || currentUserId.isEmpty) {
+      disconnect();
+      return;
+    }
+
+    if (!force && _socket?.connected == true && _connectedUserId == currentUserId) {
+      return;
+    }
+
+    if (_isConnecting && _connectedUserId == currentUserId) return;
 
     if (_socket != null) {
-      _isConnecting = true;
-      _socket!.connect();
-      return;
+      disconnect();
+    }
+
+    _connectedUserId = currentUserId;
+    _isConnecting = true;
+
+    // Trigger backend WS authorization session if available
+    try {
+      final authRes = await wsAuth();
+      log("[ChatSocket] wsAuth handshake response: $authRes");
+    } catch (e) {
+      log("[ChatSocket] wsAuth optional check: $e");
     }
 
     _connectWithUrl(AppSettings.socketUrl);
@@ -39,49 +61,65 @@ class ChatSocketService {
   void _connectWithUrl(String targetUrl) {
     _isConnecting = true;
     final token = HiveUtils.getJWT();
-    log("[ChatSocket] Connecting to: $targetUrl (JWT present: ${token != null && token.isNotEmpty})");
+    final rawToken = token != null && token.startsWith('Bearer ')
+        ? token.substring(7).trim()
+        : (token?.trim() ?? '');
+    final userId = HiveUtils.getUserId() ?? '';
+
+    log("[ChatSocket] Connecting to: $targetUrl (User: $userId, JWT present: ${rawToken.isNotEmpty})");
+
+    if (_socket != null) {
+      try {
+        _socket!.disconnect();
+        _socket!.dispose();
+      } catch (_) {}
+      _socket = null;
+    }
+
+    final authPayload = <String, dynamic>{
+      if (rawToken.isNotEmpty) "token": rawToken,
+      if (rawToken.isNotEmpty) "accessToken": rawToken,
+      if (rawToken.isNotEmpty) "Authorization": "Bearer $rawToken",
+      if (rawToken.isNotEmpty) "authorization": "Bearer $rawToken",
+      if (userId.isNotEmpty) "userId": userId,
+      if (userId.isNotEmpty) "user_id": userId,
+    };
+
+    final queryPayload = <String, dynamic>{
+      if (rawToken.isNotEmpty) "token": rawToken,
+      if (userId.isNotEmpty) "userId": userId,
+      if (userId.isNotEmpty) "user_id": userId,
+    };
 
     _socket = IO.io(
       targetUrl,
       IO.OptionBuilder()
           .setTransports(['websocket', 'polling'])
-          .disableAutoConnect()
+          .enableForceNew()
           .enableReconnection()
           .setReconnectionDelay(2000)
           .setReconnectionAttempts(5)
           .setTimeout(5000)
-          .setAuth({"token": "Bearer $token"})
-          .setExtraHeaders({"Authorization": "Bearer $token"})
+          .setAuth(authPayload)
+          .setQuery(queryPayload)
+          .setExtraHeaders({
+            if (rawToken.isNotEmpty) "Authorization": "Bearer $rawToken",
+          })
           .build(),
     );
 
-    _socket!.on("typing", (data) {
-      final myId = HiveUtils.getUserId();
-      final senderId = data is Map ? (data["userId"] ?? data["sender_id"] ?? data["senderId"])?.toString() : null;
+    final typingEvents = ["typing", "user:typing", "user-typing", "user_typing"];
+    for (final event in typingEvents) {
+      _socket!.off(event);
+      _socket!.on(event, _onTypingReceived);
+    }
 
-      // ignore own typing
-      if (senderId != null && senderId == myId) return;
-
-      final status = data is Map ? data["status"]?.toString() : null;
-      if (status == "start") {
-        print("[ChatSocket] ✍️ Other user typing");
-        isOtherUserTyping.value = true;
-      } else {
-        print("[ChatSocket] 🛑 Other user stopped typing");
-        isOtherUserTyping.value = false;
-      }
-    });
-
-    // Add listeners
-    _socket!.off("message");
-    _socket!.off("chat-message");
-    _socket!.off("receive-message");
-    _socket!.off("newMessage");
-
-    _socket!.on("message", _onMessageReceived);
-    _socket!.on("chat-message", _onMessageReceived);
-    _socket!.on("receive-message", _onMessageReceived);
-    _socket!.on("newMessage", _onMessageReceived);
+    // Add message listeners
+    final messageEvents = ["message", "chat-message", "receive-message", "newMessage"];
+    for (final event in messageEvents) {
+      _socket!.off(event);
+      _socket!.on(event, _onMessageReceived);
+    }
 
     _socket!.onConnect((_) {
       _isConnecting = false;
@@ -110,41 +148,80 @@ class ChatSocketService {
     _socket!.connect();
   }
 
+  void _onTypingReceived(dynamic data) {
+    final payload = _messagePayload(data);
+    if (payload == null) return;
+
+    final myId = HiveUtils.getUserId();
+    final senderId = (payload["userId"] ??
+            payload["user_id"] ??
+            payload["sender_id"] ??
+            payload["senderId"] ??
+            payload["from"])
+        ?.toString();
+
+    // Ignore own typing
+    if (senderId != null && senderId == myId) return;
+
+    final itemOfferId = _asInt(
+        payload['item_offer_id'] ?? payload['offerId'] ?? payload['cid']);
+    if (itemOfferId != null && !_joinedOfferIds.contains(itemOfferId)) return;
+
+    final rawStatus = payload["status"]?.toString().toLowerCase();
+    final isTyping = rawStatus == "start" ||
+        rawStatus == "typing" ||
+        rawStatus == "true" ||
+        payload["isTyping"] == true ||
+        payload["typing"] == true ||
+        payload["on"] == true;
+
+    _typingTimeoutTimer?.cancel();
+    if (isTyping) {
+      log("[ChatSocket] ✍️ Other user typing in offer: $itemOfferId");
+      isOtherUserTyping.value = true;
+      _typingTimeoutTimer = Timer(const Duration(seconds: 5), () {
+        isOtherUserTyping.value = false;
+      });
+    } else {
+      log("[ChatSocket] 🛑 Other user stopped typing in offer: $itemOfferId");
+      isOtherUserTyping.value = false;
+    }
+  }
+
   /// Handle incoming messages
   void _onMessageReceived(dynamic data) {
     final payload = _messagePayload(data);
     if (payload == null) return;
 
-    final senderId = _asInt(payload['sender_id'] ?? payload['senderId']);
-    final itemOfferId = _asInt(payload['item_offer_id'] ?? payload['offerId']);
+    final senderId = _asInt(payload['sender_id'] ?? payload['senderId'] ?? payload['userId'] ?? payload['user_id']);
+    final itemOfferId = _asInt(payload['item_offer_id'] ?? payload['offerId'] ?? payload['cid']);
     if (senderId == null || itemOfferId == null) return;
     if (!_joinedOfferIds.contains(itemOfferId)) return;
 
-    final myId = HiveUtils.getUserId();
-
-    // Ignore own messages
-    if (senderId.toString() == myId) {
-      log("🔥 Ignored own message");
-      return;
-    }
-
     final now = DateTime.now().toUtc().toIso8601String();
     final messageId = _asInt(payload['id']);
+    final createdAt = payload['created_at']?.toString() ?? now;
+
+    // Reset typing status on incoming message
+    _typingTimeoutTimer?.cancel();
+    isOtherUserTyping.value = false;
 
     final chat = ChatMessage(
       key: ValueKey(
-          messageId ?? '${itemOfferId}_${payload['created_at'] ?? now}'),
+          messageId ?? '${itemOfferId}_$createdAt'),
       id: messageId,
       message: payload['message']?.toString() ?? "",
       senderId: senderId,
-      createdAt: payload['created_at']?.toString() ?? now,
+      createdAt: createdAt,
       updatedAt: payload['updated_at']?.toString() ?? now,
       itemOfferId: itemOfferId,
       file: payload['file']?.toString() ?? "",
       audio: payload['audio']?.toString() ?? "",
       messageType: payload['message_type']?.toString(),
+      isSentNow: false,
     );
 
+    log("[ChatSocket] 📥 Processing message: id=$messageId sender=$senderId offerId=$itemOfferId");
     ChatMessageHandler.add(chat);
   }
 
@@ -175,6 +252,11 @@ class ChatSocketService {
   /// Join a specific offer room
   void joinOffer(int offerId) {
     _joinedOfferIds.add(offerId);
+    wsCanJoin(itemOfferId: offerId).then((res) {
+      log("[ChatSocket] wsCanJoin($offerId) response: $res");
+    }).catchError((e) {
+      log("[ChatSocket] wsCanJoin($offerId) error: $e");
+    });
     if (_socket?.connected == true) {
       _emitJoin(offerId);
     } else {
@@ -189,6 +271,7 @@ class ChatSocketService {
       "item_offer_id": offerId,
       "room": "offer_$offerId",
       "user_id": HiveUtils.getUserId(),
+      "userId": HiveUtils.getUserId(),
     };
     _socket?.emit("join", payload);
     _socket?.emit("join-room", payload);
@@ -197,48 +280,70 @@ class ChatSocketService {
 
   /// Send a chat message
   void sendMessage(int offerId, String message, {String? file, String? audio}) {
-    if (_socket?.connected != true) {
-      connect();
-      return;
-    }
+    final myId = HiveUtils.getUserId();
     final payload = {
       "offerId": offerId,
       "item_offer_id": offerId,
+      "room": "offer_$offerId",
       "message": message,
-      "sender_id": HiveUtils.getUserId(),
+      "sender_id": myId,
+      "userId": myId,
+      "user_id": myId,
       "file": file ?? "",
       "audio": audio ?? "",
       "created_at": DateTime.now().toUtc().toIso8601String(),
     };
+
+    if (_socket?.connected != true) {
+      log("[ChatSocket] Direct socket not connected. Connecting...");
+      connect();
+      return;
+    }
+
     log("[ChatSocket] 🔥 Emitting message: $payload");
     _socket?.emit("message", payload);
-    _socket?.emit("send-message", payload);
     _socket?.emit("sendMessage", payload);
   }
 
   /// Typing indicators
   void typingStart(int offerId) {
     if (_socket?.connected != true) return;
+    final myId = HiveUtils.getUserId();
     final payload = {
       "offerId": offerId,
       "item_offer_id": offerId,
-      "userId": HiveUtils.getUserId(),
-      "sender_id": HiveUtils.getUserId(),
+      "room": "offer_$offerId",
+      "userId": myId,
+      "user_id": myId,
+      "sender_id": myId,
       "status": "start",
+      "isTyping": true,
+      "typing": true,
+      "on": true,
     };
     _socket?.emit("typing", payload);
+    _socket?.emit("user:typing", payload);
+    _socket?.emit("user-typing", payload);
   }
 
   void typingStop(int offerId) {
     if (_socket?.connected != true) return;
+    final myId = HiveUtils.getUserId();
     final payload = {
       "offerId": offerId,
       "item_offer_id": offerId,
-      "userId": HiveUtils.getUserId(),
-      "sender_id": HiveUtils.getUserId(),
+      "room": "offer_$offerId",
+      "userId": myId,
+      "user_id": myId,
+      "sender_id": myId,
       "status": "stop",
+      "isTyping": false,
+      "typing": false,
+      "on": false,
     };
     _socket?.emit("typing", payload);
+    _socket?.emit("user:typing", payload);
+    _socket?.emit("user-typing", payload);
   }
 
   /// Presence ping
@@ -342,10 +447,21 @@ class ChatSocketService {
   /// Disconnect socket safely
   void disconnect() {
     _stopPresencePing();
+    _typingTimeoutTimer?.cancel();
+    isOtherUserTyping.value = false;
     _isConnecting = false;
+    _connectedUserId = null;
     _joinedOfferIds.clear();
-    _socket?.off("message");
+    final messageEvents = ["message", "chat-message", "receive-message", "newMessage"];
+    for (final event in messageEvents) {
+      _socket?.off(event);
+    }
+    final typingEvents = ["typing", "user:typing", "user-typing", "user_typing"];
+    for (final event in typingEvents) {
+      _socket?.off(event);
+    }
     _socket?.disconnect();
+    _socket?.dispose();
     _socket = null;
   }
 

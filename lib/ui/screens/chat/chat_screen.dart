@@ -9,6 +9,7 @@ import 'package:Ebozor/data/cubits/chat/delete_message_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/get_buyer_chat_users_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/get_seller_chat_users_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/load_chat_messages.dart';
+import 'package:Ebozor/data/cubits/chat/send_message.dart';
 import 'package:Ebozor/data/cubits/chat/unblock_user_cubit.dart';
 import 'package:Ebozor/data/helper/widgets.dart';
 import 'package:Ebozor/data/model/chat/chated_user_model.dart';
@@ -217,7 +218,6 @@ class _ChatScreenState extends State<ChatScreen>
 
       if (!_socketService.isConnected) _socketService.connect();
       _socketService.joinOffer(_currentItemOfferId);
-      _startPolling();
     }
 
     currentlyChatItemId = widget.itemId;
@@ -267,28 +267,13 @@ class _ChatScreenState extends State<ChatScreen>
     }
   }
 
-  Timer? _pollingTimer;
-
-  void _startPolling() {
-    _pollingTimer?.cancel();
-    if (_currentItemOfferId > 0) {
-      _pollingTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-        if (mounted && _currentItemOfferId > 0) {
-          context
-              .read<LoadChatMessagesCubit>()
-              .load(itemOfferId: _currentItemOfferId, isBackground: true);
-        }
-      });
-    }
-  }
-
   @override
   void dispose() {
-    _pollingTimer?.cancel();
     if (_currentItemOfferId > 0) {
       _socketService.typingStop(_currentItemOfferId);
       _socketService.leaveOffer(_currentItemOfferId);
     }
+    _socketService.isOtherUserTyping.value = false;
     _typingTimer?.cancel();
     _pageScrollController.removeListener(_scrollListener);
     _pageScrollController.dispose();
@@ -411,26 +396,49 @@ class _ChatScreenState extends State<ChatScreen>
     }
 
     _socketService.typingStop(_currentItemOfferId);
-    _socketService.sendMessage(_currentItemOfferId, text,
-        file: filePath, audio: audioPath);
 
-    ChatMessageHandler.add(ChatMessage(
-      key: ValueKey(DateTime.now().millisecondsSinceEpoch),
+    final bool hasAttachment = (filePath != null && filePath.isNotEmpty) ||
+        (audioPath != null && audioPath.isNotEmpty);
+    final bool sendViaSocket = _socketService.isConnected && !hasAttachment;
+
+    if (sendViaSocket) {
+      _socketService.sendMessage(_currentItemOfferId, text);
+    }
+
+    final currentUserId = int.parse(HiveUtils.getUserId()!);
+    final now = DateTime.now();
+    final optimisticMsg = ChatMessage(
+      key: ValueKey(now.millisecondsSinceEpoch),
       message: text,
-      senderId: int.parse(HiveUtils.getUserId()!),
-      createdAt: DateTime.now().toString(),
-      updatedAt: DateTime.now().toString(),
-      isSentNow: true,
+      senderId: currentUserId,
+      createdAt: now.toIso8601String(),
+      updatedAt: now.toIso8601String(),
+      isSentNow: !sendViaSocket,
       audio: audioPath ?? "",
       file: filePath ?? "",
       itemOfferId: _currentItemOfferId,
-    ));
+    );
+
+    ChatMessageHandler.add(optimisticMsg);
+    try {
+      context.read<LoadChatMessagesCubit>().addOrUpdateMessage(optimisticMsg);
+    } catch (_) {}
 
     totalMessageCount++;
     controller.clear();
     messageAttachment = null;
     setState(() {
       showRecordButton = true;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_pageScrollController.hasClients) {
+        _pageScrollController.animateTo(
+          0.0,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
@@ -1775,14 +1783,31 @@ class _ChatScreenState extends State<ChatScreen>
                 Column(
                   children: [
                     Expanded(
-                      child:
+                      child: MultiBlocListener(
+                        listeners: [
                           BlocListener<DeleteMessageCubit, DeleteMessageState>(
-                        listener: (context, state) {
-                          if (state is DeleteMessageSuccess) {
-                            ChatMessageHandler.removeMessage(state.id);
-                            showDeletebutton.value = false;
-                          }
-                        },
+                            listener: (context, state) {
+                              if (state is DeleteMessageSuccess) {
+                                ChatMessageHandler.removeMessage(state.id);
+                                showDeletebutton.value = false;
+                              }
+                            },
+                          ),
+                          BlocListener<SendMessageCubit, SendMessageState>(
+                            listener: (context, state) {
+                              if (state is SendMessageSuccess) {
+                                try {
+                                  final confirmedMsg =
+                                      ChatMessage.fromJson(state.responseData);
+                                  ChatMessageHandler.add(confirmedMsg);
+                                  context
+                                      .read<LoadChatMessagesCubit>()
+                                      .addOrUpdateMessage(confirmedMsg);
+                                } catch (_) {}
+                              }
+                            },
+                          ),
+                        ],
                         child: GestureDetector(
                           onTap: () {
                             showDeletebutton.value = false;
@@ -1805,7 +1830,7 @@ class _ChatScreenState extends State<ChatScreen>
                               }
 
                               return StreamBuilder<List<Widget>>(
-                                stream: ChatMessageHandler.getChatStream(),
+                                stream: ChatMessageHandler.chatStream,
                                 initialData: List<Widget>.of(
                                     ChatMessageHandler.messages),
                                 builder: (context,
