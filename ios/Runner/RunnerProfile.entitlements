@@ -10,6 +10,8 @@
 	</array>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
+		<string>applinks:services.ebozor.tj</string>
+		<string>applinks:ebozor.tj</string>
 		<string>applinks:admin.Ebozor.co</string>
 	</array>
 </dict>

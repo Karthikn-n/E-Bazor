@@ -1,5 +1,6 @@
 import 'package:Ebozor/data/model/saved_search_model.dart';
 import 'package:Ebozor/data/repositories/saved_search_repository.dart';
+import 'package:Ebozor/settings.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 abstract class FetchSavedSearchesState {}
@@ -166,6 +167,8 @@ class FetchSavedSearchesCubit extends Cubit<FetchSavedSearchesState> {
 
     String normalize(String u) {
       return u
+          .replaceAll('https://services.ebozor.tj/api/', '')
+          .replaceAll(AppSettings.baseUrl, '')
           .replaceAll('http://13.233.244.104/api/', '')
           .replaceAll('api/', '')
           .replaceAll('get-item?', '')

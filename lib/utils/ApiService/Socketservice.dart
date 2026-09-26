@@ -66,7 +66,13 @@ class ChatSocketService {
         : (token?.trim() ?? '');
     final userId = HiveUtils.getUserId() ?? '';
 
-    log("[ChatSocket] Connecting to: $targetUrl (User: $userId, JWT present: ${rawToken.isNotEmpty})");
+    final uri = Uri.parse(targetUrl);
+    final baseUrl = "${uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}";
+    final socketPath = uri.path.isNotEmpty && uri.path != '/'
+        ? (uri.path.endsWith('/') ? uri.path : '${uri.path}/')
+        : '/socket.io/';
+
+    log("[ChatSocket] Connecting to: $baseUrl (path: $socketPath, User: $userId, JWT present: ${rawToken.isNotEmpty})");
 
     if (_socket != null) {
       try {
@@ -92,9 +98,10 @@ class ChatSocketService {
     };
 
     _socket = IO.io(
-      targetUrl,
+      baseUrl,
       IO.OptionBuilder()
           .setTransports(['websocket', 'polling'])
+          .setPath(socketPath)
           .enableForceNew()
           .enableReconnection()
           .setReconnectionDelay(2000)
@@ -123,7 +130,7 @@ class ChatSocketService {
 
     _socket!.onConnect((_) {
       _isConnecting = false;
-      log("[ChatSocket] 🔥 Socket Connected successfully to $targetUrl");
+      log("[ChatSocket] 🔥 Socket Connected successfully to $baseUrl$socketPath");
       for (final offerId in _joinedOfferIds) {
         _emitJoin(offerId);
       }
@@ -138,11 +145,11 @@ class ChatSocketService {
 
     _socket!.onConnectError((error) {
       _isConnecting = false;
-      log("[ChatSocket] Socket connection error ($targetUrl): $error");
+      log("[ChatSocket] Socket connection error ($baseUrl$socketPath): $error");
     });
 
     _socket!.onError((error) {
-      log("[ChatSocket] Socket error ($targetUrl): $error");
+      log("[ChatSocket] Socket error ($baseUrl$socketPath): $error");
     });
 
     _socket!.connect();

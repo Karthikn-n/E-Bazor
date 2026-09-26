@@ -222,6 +222,9 @@ class Routes {
 
     if (routeSettings.name!.contains('/product-details/')) {
       String itemSlug = routeSettings.name!.split('/').last;
+      if (itemSlug.contains('?')) {
+        itemSlug = itemSlug.split('?').first;
+      }
       // Fetch item details based on the itemId
       return MaterialPageRoute(builder: (context) {
         return FutureBuilder<DataOutput<ItemModel>>(

@@ -31,10 +31,10 @@ class AppSettings {
   static const String shareAppText = "Share this App";
 
   ///static const String hostUrl = "https://admin.Ebozor.co"; //don't add / at end but https:// is required
-  static const String hostUrl = "http://13.233.244.104";
+  static const String hostUrl = "https://services.ebozor.tj";
 
   /// Socket.IO URL supplied by the chat backend.
-  static const String socketUrl = "http://13.233.244.104:6002";
+  static const String socketUrl = "https://services.ebozor.tj/socket.io/";
 
   ///API Setting
 
@@ -59,10 +59,10 @@ it will call API in background without showing the process and when data availab
   //static const String shareNavigationWebUrl = "eclassify.thewrteam.in";
 
   //static const String shareNavigationWebUrl = "eclassify.wrteam.me";
-  static const String shareNavigationWebUrl = "api.Ebozor.co";
+  static const String shareNavigationWebUrl = "services.ebozor.tj";
 
   //set anything you want
-  static const String deepLinkName = "Ebozor.co"; //deeplink demo.com
+  static const String deepLinkName = "services.ebozor.tj"; //deeplink demo.com
 
   static const MapType googleMapType =
       MapType.normal; //none , normal , satellite , terrain , hybrid

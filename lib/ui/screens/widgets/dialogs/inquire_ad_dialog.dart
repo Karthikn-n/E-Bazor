@@ -131,7 +131,7 @@ class _InquireAdBottomSheetState extends State<InquireAdBottomSheet> {
     }
 
     final listingUrl = widget.model.slug != null
-        ? "${Constant.baseUrl}/product-details/${widget.model.slug}"
+        ? HelperUtils.nativeDeepLinkUrlOfItem(widget.model.slug!)
         : null;
 
     context.read<ItemInquiryCubit>().sendInquiry(
