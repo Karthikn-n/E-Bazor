@@ -11,11 +11,13 @@ import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/model/cars/car_models.dart';
 import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
+import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/posting_form_shared.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/dynamic_custom_fields_form.dart';
+import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/ad_creation_stepper.dart';
 
 class CarPostingDetailsScreen extends StatefulWidget {
   final CarSpecsData specsData;
@@ -316,6 +318,7 @@ class _CarPostingDetailsScreenState extends State<CarPostingDetailsScreen> {
           ),
           body: Column(
             children: [
+              const AdCreationStepper(currentStep: 2),
               Expanded(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
@@ -452,8 +455,7 @@ class _CarPostingDetailsScreenState extends State<CarPostingDetailsScreen> {
                   child: ElevatedButton(
                     onPressed: _validateAndProceed,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(
-                          0xFFD31027), // Red CTA matching web screenshot
+                      backgroundColor: const Color(0xFF007AFF),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -509,7 +511,7 @@ class _CarPostingDetailsScreenState extends State<CarPostingDetailsScreen> {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFFD31027),
+                    color: Color(0xFF007AFF),
                   ),
                 ),
               ),
@@ -524,8 +526,8 @@ class _CarPostingDetailsScreenState extends State<CarPostingDetailsScreen> {
           _buildSummaryRow("Model", widget.specsData.model.name),
           if (widget.specsData.trim != null)
             _buildSummaryRow("Trim", widget.specsData.trim!.name),
-          _buildSummaryRow(
-              "Price", "${widget.specsData.price.toStringAsFixed(0)} AED"),
+          _buildSummaryRow("Price",
+              "${widget.specsData.price.toStringAsFixed(0)} ${Constant.currencySymbol}"),
           _buildSummaryRow("Phone number", widget.specsData.phoneNumber),
           ...widget.specsData.customFields.entries.map(
             (entry) => _buildSummaryRow(

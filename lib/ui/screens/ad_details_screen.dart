@@ -365,16 +365,21 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Title first, matching ad_detail.jpeg
+                        Text(
+                          model.name ?? "",
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: context.color.textDefaultColor,
+                            height: 1.25,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 6),
                         // Price and status widget
                         setPriceAndStatus(),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4.0, bottom: 2.0),
-                          child: Text(model.name ?? "")
-                              .size(context.font.large)
-                              .bold(weight: FontWeight.w700)
-                              .setMaxLines(lines: 2)
-                              .color(context.color.textDefaultColor),
-                        ),
                         _buildKeyHighlights(),
 
                         if (isAddedByMe) setRejectedReason(),
@@ -848,61 +853,128 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   }
 
   Widget _buildKeyHighlights() {
-    List<Widget> chips = [];
-    if (model.customFields != null) {
-      for (var cf in model.customFields!) {
-        final nameLower = (cf.name ?? "").toLowerCase();
+    final year = _findCustomFieldVal(['year', 'model year']);
+    final mileage = _findCustomFieldVal(['mileage', 'kilometer', 'km']);
+    final fuel = _findCustomFieldVal(['fuel', 'fuel type', 'gas']);
+    final transmission = _findCustomFieldVal(['transmission', 'gear']);
+    final drive = _findCustomFieldVal(['drive', '4wd', 'drivetrain']);
+
+    List<Map<String, dynamic>> specs = [];
+    if (year != null) {
+      specs.add({'icon': Icons.calendar_today_outlined, 'val': year, 'label': 'Year'});
+    }
+    if (mileage != null) {
+      specs.add({
+        'icon': Icons.speed_outlined,
+        'val': mileage.contains('km') ? mileage : '$mileage km',
+        'label': 'Mileage'
+      });
+    }
+    if (fuel != null) {
+      specs.add({'icon': Icons.local_gas_station_outlined, 'val': fuel, 'label': 'Fuel'});
+    }
+    if (transmission != null) {
+      specs.add({'icon': Icons.settings_outlined, 'val': transmission, 'label': 'Transmission'});
+    }
+    if (drive != null) {
+      specs.add({'icon': Icons.tune_outlined, 'val': drive, 'label': 'Drive'});
+    }
+
+    // If non-car or fields missing, pick other real custom fields
+    if (specs.isEmpty && model.customFields != null) {
+      for (final cf in model.customFields!) {
         if (cf.value != null && cf.value!.isNotEmpty) {
-          final val = cf.value![0].toString();
-          if (nameLower.contains("year") || nameLower.contains("model")) {
-            chips.add(_specChip(Icons.calendar_today_outlined, val));
-          } else if (nameLower.contains("kilometer") ||
-              nameLower.contains("mileage") ||
-              nameLower.contains("km")) {
-            chips.add(_specChip(Icons.speed_outlined, "$val km"));
-          } else if (nameLower.contains("spec") ||
-              nameLower.contains("regional")) {
-            chips.add(_specChip(Icons.public_outlined, val));
+          final val = cf.value!.first.toString().trim();
+          if (val.isNotEmpty && val.toLowerCase() != 'null') {
+            specs.add({
+              'icon': Icons.info_outline_rounded,
+              'val': val,
+              'label': cf.name ?? cf.label ?? 'Feature',
+            });
+            if (specs.length >= 5) break;
           }
         }
       }
     }
-    if (chips.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: 6, bottom: 6),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 6,
-        children: chips,
+
+    if (specs.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+      decoration: BoxDecoration(
+        color: context.color.secondaryColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.color.borderColor.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: List.generate(specs.length * 2 - 1, (i) {
+          if (i.isOdd) {
+            return Container(
+              height: 32,
+              width: 1,
+              color: context.color.borderColor.withValues(alpha: 0.4),
+            );
+          }
+          final item = specs[i ~/ 2];
+          return Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  item['icon'] as IconData,
+                  size: 20,
+                  color: context.color.textLightColor,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  item['val'].toString(),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: context.color.textDefaultColor,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  item['label'].toString(),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: context.color.textLightColor,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
       ),
     );
   }
 
-  Widget _specChip(IconData icon, String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: context.color.borderColor.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon,
-              size: 14,
-              color: context.color.textDefaultColor.withValues(alpha: 0.65)),
-          const SizedBox(width: 5),
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 13,
-              color: context.color.textDefaultColor.withValues(alpha: 0.8),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
+  String? _findCustomFieldVal(List<String> keywords) {
+    if (model.customFields == null) return null;
+    for (final cf in model.customFields!) {
+      final nameLower = (cf.name ?? '').toLowerCase();
+      final labelLower = (cf.label ?? '').toLowerCase();
+      for (final k in keywords) {
+        if (nameLower.contains(k) || labelLower.contains(k)) {
+          if (cf.value != null && cf.value!.isNotEmpty) {
+            final val = cf.value!.first.toString().trim();
+            if (val.isNotEmpty && val.toLowerCase() != 'null') return val;
+          }
+        }
+      }
+    }
+    return null;
   }
 
   bool _isPropertyListing() {
@@ -1720,43 +1792,124 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   }
 
   Widget _buildLocationSection() {
-    final LatLng currentPosition =
-        LatLng(model.latitude ?? 0.0, model.longitude ?? 0.0);
+    final cityName = model.city?.isNotEmpty == true
+        ? model.city!
+        : (model.address?.isNotEmpty == true ? model.address! : "Dushanbe");
+
+    final double lat = (model.latitude != null && model.latitude != 0.0)
+        ? model.latitude!
+        : 38.5358;
+    final double lng = (model.longitude != null && model.longitude != 0.0)
+        ? model.longitude!
+        : 68.7791;
+    final LatLng currentPosition = LatLng(lat, lng);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 18),
-        Text("locationLbl".translate(context))
-            .bold(weight: FontWeight.w700)
-            .size(18)
-            .color(context.color.textDefaultColor),
-        const SizedBox(height: 8),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              Icons.location_on_outlined,
-              size: 20,
-              color: context.color.territoryColor,
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                model.address ?? "",
-                style: TextStyle(
-                  fontSize: 14,
-                  color: context.color.textDefaultColor.withValues(alpha: 0.8),
-                ),
+        InkWell(
+          onTap: () => _navigateToGoogleMapScreen(context),
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            margin: const EdgeInsets.only(top: 14, bottom: 8),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEBF5FF),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFF007AFF).withValues(alpha: 0.15),
               ),
             ),
-          ],
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.location_on_rounded,
+                    color: Color(0xFF007AFF),
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        cityName,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: context.color.textDefaultColor,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        model.address?.isNotEmpty == true
+                            ? model.address!
+                            : 'Exact location provided after contact',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: context.color.textLightColor,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF007AFF),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.map_outlined, color: Colors.white, size: 14),
+                      SizedBox(width: 4),
+                      Text(
+                        'Open',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        const SizedBox(height: 10),
+        // Embedded Map View Preview
         ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: SizedBox(
-            height: 190,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            height: 160,
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: context.color.borderColor.withValues(alpha: 0.4),
+              ),
+            ),
             child: Stack(
               children: [
                 GoogleMap(
@@ -1764,29 +1917,65 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   myLocationButtonEnabled: false,
                   compassEnabled: false,
                   mapToolbarEnabled: false,
-                  liteModeEnabled: true,
+                  liteModeEnabled: false,
                   zoomGesturesEnabled: false,
                   scrollGesturesEnabled: false,
                   rotateGesturesEnabled: false,
                   tiltGesturesEnabled: false,
-                  initialCameraPosition:
-                      CameraPosition(target: currentPosition, zoom: 14),
+                  initialCameraPosition: CameraPosition(
+                    target: currentPosition,
+                    zoom: 14,
+                  ),
                   mapType: MapType.normal,
                   markers: {
                     Marker(
                       markerId: const MarkerId('currentPosition'),
                       position: currentPosition,
-                    )
+                    ),
                   },
                 ),
                 Positioned.fill(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTap: () {
-                      _navigateToGoogleMapScreen(context);
-                    },
-                    child: Container(
-                      color: Colors.transparent,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => _navigateToGoogleMapScreen(context),
+                      child: Container(
+                        alignment: Alignment.bottomRight,
+                        padding: const EdgeInsets.all(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.92),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.1),
+                                blurRadius: 6,
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.fullscreen_rounded,
+                                size: 16,
+                                color: Color(0xFF007AFF),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                "viewMapLbl".translate(context),
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF007AFF),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -1807,145 +1996,161 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
       return const SizedBox.shrink();
     }
 
-    final isVerified = user?.isVerified == 1;
+    final isVerified = user?.isVerified == 1 || user?.isVerified == true;
     final userName = user?.name ?? "Owner / Seller";
     final profileUrl = user?.profile;
+    final sellerRating = context.read<FetchSellerRatingsCubit>().sellerData()?.averageRating;
+    final totalRatings = context.read<FetchSellerRatingsCubit>().totalSellerRatings() ?? 0;
 
-    return Container(
-      margin: const EdgeInsets.only(top: 18),
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Centered Profile Image (Rounded square portrait)
-          Container(
-            height: 72,
-            width: 72,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              color: context.color.territoryColor.withValues(alpha: 0.12),
+    return InkWell(
+      onTap: () {
+        if (user != null) {
+          Navigator.pushNamed(context, Routes.sellerProfileScreen, arguments: {
+            "model": user,
+            "total": totalRatings,
+            "rating": sellerRating,
+          });
+        }
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        margin: const EdgeInsets.only(top: 14, bottom: 8),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: context.color.secondaryColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: context.color.borderColor.withValues(alpha: 0.5),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: profileUrl != null && profileUrl.isNotEmpty
-                  ? UiUtils.getImage(profileUrl, fit: BoxFit.cover)
-                  : Center(
-                      child: Text(
-                        userName.isNotEmpty ? userName[0].toUpperCase() : "U",
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: context.color.territoryColor,
+          ],
+        ),
+        child: Row(
+          children: [
+            // Circle avatar with initials or profile image
+            Container(
+              height: 50,
+              width: 50,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF0F172A),
+              ),
+              child: ClipOval(
+                child: profileUrl != null && profileUrl.isNotEmpty
+                    ? UiUtils.getImage(profileUrl, fit: BoxFit.cover)
+                    : Center(
+                        child: Text(
+                          userName.isNotEmpty
+                              ? userName
+                                  .split(" ")
+                                  .map((e) => e.isNotEmpty ? e[0] : "")
+                                  .take(2)
+                                  .join()
+                                  .toUpperCase()
+                              : "SK",
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
-                    ),
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // Seller Name + Verified Badge
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Flexible(
-                child: Text(
-                  userName,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16.5,
-                    fontWeight: FontWeight.bold,
-                    color: context.color.textDefaultColor,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (isVerified) ...[
-                const SizedBox(width: 6),
-                const Icon(
-                  Icons.verified,
-                  color: Colors.blue,
-                  size: 18,
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 6),
-
-          // "View All Properties" / "View All Listings" link
-          if (user != null)
-            InkWell(
-              onTap: () {
-                Navigator.pushNamed(context, Routes.sellerProfileScreen,
-                    arguments: {
-                      "model": user,
-                      "total": context
-                              .read<FetchSellerRatingsCubit>()
-                              .totalSellerRatings() ??
-                          0,
-                      "rating": context
-                          .read<FetchSellerRatingsCubit>()
-                          .sellerData()
-                          ?.averageRating
-                    });
-              },
-              child: const Padding(
-                padding: EdgeInsets.symmetric(vertical: 3, horizontal: 8),
-                child: Text(
-                  "View All Properties",
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    color: Color(0xFF2563EB),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
               ),
             ),
-
-          // "View Agency Profile >" / "View Profile >"
-          if (user != null)
-            InkWell(
-              onTap: () {
-                Navigator.pushNamed(context, Routes.sellerProfileScreen,
-                    arguments: {
-                      "model": user,
-                      "total": context
-                              .read<FetchSellerRatingsCubit>()
-                              .totalSellerRatings() ??
-                          0,
-                      "rating": context
-                          .read<FetchSellerRatingsCubit>()
-                          .sellerData()
-                          ?.averageRating
-                    });
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      "View Agency Profile",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: context.color.textDefaultColor
-                            .withValues(alpha: 0.7),
-                        fontWeight: FontWeight.w500,
+            const SizedBox(width: 14),
+            // Seller Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          userName,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: context.color.textDefaultColor,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 2),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      size: 16,
-                      color:
-                          context.color.textDefaultColor.withValues(alpha: 0.7),
-                    ),
-                  ],
-                ),
+                      if (isVerified) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEBF3FF),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.check_circle_rounded,
+                                  size: 13, color: Color(0xFF007AFF)),
+                              SizedBox(width: 3),
+                              Text(
+                                'Verified seller',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF007AFF),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      if (sellerRating != null && sellerRating > 0) ...[
+                        const Icon(Icons.star_rounded,
+                            size: 15, color: Colors.amber),
+                        const SizedBox(width: 2),
+                        Text(
+                          '$sellerRating ${totalRatings > 0 ? "($totalRatings reviews)" : ""}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: context.color.textDefaultColor,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Icon(Icons.access_time_rounded,
+                          size: 13, color: Colors.green.shade600),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Responds within 1 hour',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.color.textLightColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-        ],
+            Icon(
+              Icons.chevron_right_rounded,
+              color: context.color.textLightColor,
+              size: 22,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -3874,19 +4079,13 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     Widget buildCallButton() {
       return Expanded(
         child: SizedBox(
-          height: 42,
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFEF2F2),
-              foregroundColor: const Color(0xFFDC2626),
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 2),
+          height: 48,
+          child: OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF007AFF),
+              side: const BorderSide(color: Color(0xFF007AFF), width: 1.5),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: const BorderSide(
-                  color: Color(0xFFFEE2E2),
-                  width: 1,
-                ),
+                borderRadius: BorderRadius.circular(24),
               ),
             ),
             onPressed: () {
@@ -3894,122 +4093,37 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
             },
             icon: const Icon(
               Icons.phone_outlined,
-              color: Color(0xFFDC2626),
-              size: 16,
-            ),
-            label: Text(
-              "Call".translate(context),
-              style: const TextStyle(
-                color: Color(0xFFDC2626),
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    // 3. WhatsApp Button
-    Widget buildWhatsAppButton() {
-      return Expanded(
-        child: SizedBox(
-          height: 42,
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFF0FDF4),
-              foregroundColor: const Color(0xFF16A34A),
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: const BorderSide(
-                  color: Color(0xFFDCFCE7),
-                  width: 1,
-                ),
-              ),
-            ),
-            onPressed: () async {
-              if (isPhoneHidden) {
-                HelperUtils.showSnackBarMessage(
-                  context,
-                  "Phone number is hidden by seller",
-                );
-                return;
-              }
-              if (phone == null || phone.trim().isEmpty) {
-                HelperUtils.showSnackBarMessage(
-                  context,
-                  "Seller WhatsApp number not available",
-                );
-                return;
-              }
-
-              String cleanPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
-              final message =
-                  "Hi, I am interested in your ad '${model.name ?? ''}' on ${Constant.appName}.";
-              final whatsappApiUrl = Uri.parse(
-                  "https://api.whatsapp.com/send?phone=$cleanPhone&text=${Uri.encodeComponent(message)}");
-
-              try {
-                if (await canLaunchUrl(whatsappApiUrl)) {
-                  await launchUrl(whatsappApiUrl,
-                      mode: LaunchMode.externalApplication);
-                } else {
-                  final fallbackUrl = Uri.parse(
-                      "https://wa.me/$cleanPhone?text=${Uri.encodeComponent(message)}");
-                  if (await canLaunchUrl(fallbackUrl)) {
-                    await launchUrl(fallbackUrl,
-                        mode: LaunchMode.externalApplication);
-                  } else {
-                    HelperUtils.showSnackBarMessage(
-                      context,
-                      "WhatsApp is not installed",
-                    );
-                  }
-                }
-              } catch (e) {
-                HelperUtils.showSnackBarMessage(
-                  context,
-                  "Could not open WhatsApp: $e",
-                );
-              }
-            },
-            icon: const Icon(
-              Icons.chat_outlined,
-              color: Color(0xFF16A34A),
-              size: 16,
+              color: Color(0xFF007AFF),
+              size: 18,
             ),
             label: const Text(
-              "WhatsApp",
+              "Call",
               style: TextStyle(
-                color: Color(0xFF16A34A),
+                color: Color(0xFF007AFF),
                 fontWeight: FontWeight.bold,
-                fontSize: 11.5,
+                fontSize: 15,
               ),
             ),
           ),
         ),
       );
     }
+
+
 
     // 4. Chat Button
     Widget buildChatButton() {
       return Expanded(
         child: SizedBox(
-          height: 42,
+          height: 48,
           child: ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFF5F3FF),
-              foregroundColor: const Color(0xFF7C3AED),
+              backgroundColor: const Color(0xFF007AFF),
+              foregroundColor: Colors.white,
               elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: const BorderSide(
-                  color: Color(0xFFEDE9FE),
-                  width: 1,
-                ),
+                borderRadius: BorderRadius.circular(24),
               ),
             ),
             onPressed: () {
@@ -4058,16 +4172,16 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
               );
             },
             icon: const Icon(
-              Icons.forum_outlined,
-              color: Color(0xFF7C3AED),
-              size: 16,
+              Icons.chat_bubble_outline_rounded,
+              color: Colors.white,
+              size: 18,
             ),
-            label: Text(
-              "Chat".translate(context),
-              style: const TextStyle(
-                color: Color(0xFF7C3AED),
+            label: const Text(
+              "Message",
+              style: TextStyle(
+                color: Colors.white,
                 fontWeight: FontWeight.bold,
-                fontSize: 12,
+                fontSize: 15,
               ),
             ),
           ),
@@ -4081,43 +4195,41 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     List<Widget> buttons = [];
 
     if (isProp) {
-      // 1) Properties (Property for Sale, Property for Rent) -> Inquiry, Call, WhatsApp
+      // Properties -> Call and Inquiry
       buttons = [
-        buildInquiryButton(),
         if (canShowPhoneActions) ...[
-          const SizedBox(width: 6),
           buildCallButton(),
-          const SizedBox(width: 6),
-          buildWhatsAppButton(),
+          const SizedBox(width: 12),
         ],
+        buildInquiryButton(),
       ];
     } else if (isMot) {
-      // 2) Motors -> Chat, plus phone actions when the number is visible.
+      // Motors -> Call and Message
       buttons = [
-        buildChatButton(),
         if (canShowPhoneActions) ...[
-          const SizedBox(width: 6),
           buildCallButton(),
-          const SizedBox(width: 6),
-          buildWhatsAppButton(),
+          const SizedBox(width: 12),
         ],
+        buildChatButton(),
       ];
     } else if (model.isClassifiedsCategory ||
         widget.model.isClassifiedsCategory) {
-      // 3) Classifieds and mobiles -> Chat only
+      // Classifieds -> Call and Message
       buttons = [
+        if (canShowPhoneActions) ...[
+          buildCallButton(),
+          const SizedBox(width: 12),
+        ],
         buildChatButton(),
       ];
     } else {
-      // Unknown/service categories never receive chat implicitly.
+      // Other categories -> Call and Message
       buttons = [
-        buildInquiryButton(),
         if (canShowPhoneActions) ...[
-          const SizedBox(width: 8),
           buildCallButton(),
-          const SizedBox(width: 8),
-          buildWhatsAppButton(),
+          const SizedBox(width: 12),
         ],
+        buildChatButton(),
       ];
     }
 
@@ -4250,31 +4362,33 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Colors.black.withValues(alpha: 0.35),
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.18),
-                    blurRadius: 6,
-                    spreadRadius: 1,
-                  ),
-                ],
               ),
               child: const Center(
-                child: Icon(Icons.arrow_back, color: Colors.black, size: 20),
+                child: Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
               ),
             ),
           ),
         ),
-        // Top Floating More Button (if added by me)
-        if (isAddedByMe &&
-            (!_isHiringPost() ||
-                const {'active', 'approved', 'live', '1'}
-                    .contains((model.status ?? '').trim().toLowerCase())))
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
-            right: 14,
-            child: MultiBlocProvider(
+        // Top Floating Action Buttons (Favorite, Share, More)
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 8,
+          right: 14,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!isAddedByMe) ...[
+                _buildFavoriteCircleButton(),
+                const SizedBox(width: 8),
+              ],
+              _buildShareCircleButton(),
+              if (isAddedByMe &&
+                  (!_isHiringPost() ||
+                      const {'active', 'approved', 'live', '1'}
+                          .contains((model.status ?? '').trim().toLowerCase()))) ...[
+                const SizedBox(width: 8),
+                MultiBlocProvider(
               providers: [
                 BlocProvider(create: (context) => DeleteItemCubit()),
                 BlocProvider(create: (context) => ChangeMyItemStatusCubit()),
@@ -4310,19 +4424,12 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                       width: 38,
                       height: 38,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Colors.black.withValues(alpha: 0.35),
                         shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.18),
-                            blurRadius: 6,
-                            spreadRadius: 1,
-                          ),
-                        ],
                       ),
                       child: PopupMenuButton<String>(
                         icon: const Icon(Icons.more_vert,
-                            color: Colors.black, size: 20),
+                            color: Colors.white, size: 20),
                         padding: EdgeInsets.zero,
                         color: context.color.secondaryColor,
                         shape: RoundedRectangleBorder(
@@ -4582,33 +4689,28 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                 );
               }),
             ),
-          ),
+            ],
+          ],
+        ),
+      ),
         // Photo Counter Pill
         if (images.isNotEmpty)
           Positioned(
             bottom: 14,
-            left: 14,
+            right: 14,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(20),
+                color: Colors.black.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(16),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.photo_camera_outlined,
-                      color: Colors.white, size: 14),
-                  const SizedBox(width: 5),
-                  Text(
-                    "${currentPage + 1}/${images.length}",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+              child: Text(
+                "${currentPage + 1}/${images.length}",
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -4641,137 +4743,111 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   .color(context.color.backgroundColor),
             ),
           ),
-        // Floating Action Buttons (Like & Share over the border)
-        imageActionButtons(),
       ]),
     );
   }
 
-  Widget imageActionButtons() {
-    return Positioned(
-      bottom: 10,
-      right: 14,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (!isAddedByMe)
-            BlocBuilder<FavoriteCubit, FavoriteState>(
-              bloc: context.read<FavoriteCubit>(),
-              builder: (context, favState) {
-                bool isLike = context.select(
-                    (FavoriteCubit cubit) => cubit.isItemFavorite(model.id!));
+  Widget _buildFavoriteCircleButton() {
+    return BlocBuilder<FavoriteCubit, FavoriteState>(
+      bloc: context.read<FavoriteCubit>(),
+      builder: (context, favState) {
+        bool isLike = context.select(
+            (FavoriteCubit cubit) => cubit.isItemFavorite(model.id!));
 
-                return BlocConsumer<UpdateFavoriteCubit, UpdateFavoriteState>(
-                  bloc: context.read<UpdateFavoriteCubit>(),
-                  listener: (context, state) {
-                    if (state is UpdateFavoriteSuccess) {
-                      if (state.wasProcess) {
+        return BlocConsumer<UpdateFavoriteCubit, UpdateFavoriteState>(
+          bloc: context.read<UpdateFavoriteCubit>(),
+          listener: (context, state) {
+            if (state is UpdateFavoriteSuccess) {
+              if (state.wasProcess) {
+                context
+                    .read<FavoriteCubit>()
+                    .addFavoriteitem(state.item);
+              } else {
+                context
+                    .read<FavoriteCubit>()
+                    .removeFavoriteItem(state.item);
+              }
+            }
+          },
+          builder: (context, state) {
+            return GestureDetector(
+              onTap: () {
+                UiUtils.checkUser(
+                    onNotGuest: () {
+                      if (isLike) {
                         context
-                            .read<FavoriteCubit>()
-                            .addFavoriteitem(state.item);
+                            .read<UpdateFavoriteCubit>()
+                            .setFavoriteItem(
+                              item: model,
+                              type: 0,
+                            );
+                        HelperUtils.showSnackBarMessage(
+                          context,
+                          "Removed from Favorites".translate(context),
+                        );
                       } else {
                         context
-                            .read<FavoriteCubit>()
-                            .removeFavoriteItem(state.item);
+                            .read<UpdateFavoriteCubit>()
+                            .setFavoriteItem(
+                              item: model,
+                              type: 1,
+                            );
+                        SaveToFavoriteBottomSheet.show(context,
+                            item: model);
                       }
-                    }
-                  },
-                  builder: (context, state) {
-                    return Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.18),
-                            blurRadius: 6,
-                            spreadRadius: 1,
-                          ),
-                        ],
-                      ),
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: () {
-                          UiUtils.checkUser(
-                              onNotGuest: () {
-                                if (isLike) {
-                                  context
-                                      .read<UpdateFavoriteCubit>()
-                                      .setFavoriteItem(
-                                        item: model,
-                                        type: 0,
-                                      );
-                                  HelperUtils.showSnackBarMessage(
-                                    context,
-                                    "Removed from Favorites".translate(context),
-                                  );
-                                } else {
-                                  context
-                                      .read<UpdateFavoriteCubit>()
-                                      .setFavoriteItem(
-                                        item: model,
-                                        type: 1,
-                                      );
-                                  SaveToFavoriteBottomSheet.show(context,
-                                      item: model);
-                                }
-                              },
-                              context: context);
-                        },
-                        child: Center(
-                          child: state is UpdateFavoriteInProgress
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : Icon(
-                                  isLike
-                                      ? Icons.favorite
-                                      : Icons.favorite_border,
-                                  color: isLike ? Colors.red : Colors.grey[700],
-                                  size: 20,
-                                ),
-                        ),
-                      ),
-                    );
-                  },
-                );
+                    },
+                    context: context);
               },
-            ),
-          const SizedBox(width: 10),
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.18),
-                  blurRadius: 6,
-                  spreadRadius: 1,
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.black.withValues(alpha: 0.35),
                 ),
-              ],
-            ),
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: () {
-                HelperUtils.share(context, model.slug ?? "");
-              },
-              child: Center(
-                child: Icon(
-                  Icons.share_outlined,
-                  size: 20,
-                  color: Colors.grey[700],
+                child: Center(
+                  child: state is UpdateFavoriteInProgress
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child:
+                              CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : Icon(
+                          isLike
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          color: isLike ? Colors.red : Colors.white,
+                          size: 20,
+                        ),
                 ),
               ),
-            ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildShareCircleButton() {
+    return GestureDetector(
+      onTap: () {
+        HelperUtils.share(context, model.slug ?? "");
+      },
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.black.withValues(alpha: 0.35),
+        ),
+        child: const Center(
+          child: Icon(
+            Icons.share_outlined,
+            size: 20,
+            color: Colors.white,
           ),
-        ],
+        ),
       ),
     );
   }
@@ -4794,13 +4870,16 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   }
 
   Widget buildDot(int index) {
-    return Container(
+    final isSelected = currentPage == index;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
       margin: const EdgeInsets.symmetric(horizontal: 3.0),
-      width: currentPage == index ? 12.0 : 8.0,
-      height: 8.0,
+      width: isSelected ? 18.0 : 6.0,
+      height: 6.0,
       decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: currentPage == index ? Colors.white : Colors.grey),
+        borderRadius: BorderRadius.circular(3),
+        color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.45),
+      ),
     );
   }
 
@@ -4846,15 +4925,26 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   }
 
   Widget setPriceAndStatus() {
+    final formattedPrice = model.price != null
+        ? model.price!.toInt().toString().replaceAllMapped(
+              RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+              (m) => '${m[1]},',
+            )
+        : '0';
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 5),
-          child: Text("${Constant.currencySymbol} ${model.price.toString()}")
-              .size(context.font.larger)
-              .color(context.color.territoryColor)
-              .bold(),
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Text(
+            "$formattedPrice ${Constant.currencySymbol}",
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF007AFF),
+            ),
+          ),
         ),
         if (model.status != null && isAddedByMe)
           Container(

@@ -149,20 +149,18 @@ class _CategoryFilterScreenState extends State<CategoryFilterScreen>
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(20),
-                                      color: context.color.territoryColor
+                                      color: const Color(0xFF007AFF)
                                           .withValues(alpha: 0.1)),
                                   child: (category.url != null &&
                                           category.url!.trim().isNotEmpty)
                                       ? UiUtils.imageType(
                                           category.url!,
-                                          color: category.url!.endsWith('.svg')
-                                              ? context.color.territoryColor
-                                              : null,
+                                          color: const Color(0xFF007AFF),
                                           fit: BoxFit.contain,
                                         )
-                                      : Icon(
+                                      : const Icon(
                                           Icons.category_outlined,
-                                          color: context.color.territoryColor,
+                                          color: Color(0xFF007AFF),
                                           size: 20,
                                         ),
                                 ),

@@ -607,23 +607,40 @@ class FavoriteScreenState extends State<FavoriteScreen> {
                 color: context.color.textDefaultColor,
               ),
             ),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black87,
-                foregroundColor: Colors.white,
+            InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: _showCreateListDialog,
+              child: Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(
+                  color: context.color.territoryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color:
+                        context.color.territoryColor.withValues(alpha: 0.28),
+                    width: 1,
+                  ),
                 ),
-                elevation: 0,
-              ),
-              onPressed: _showCreateListDialog,
-              icon: const Icon(Icons.add, size: 15),
-              label: Text(
-                "New List".translate(context),
-                style:
-                    const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.add_rounded,
+                      size: 16,
+                      color: context.color.territoryColor,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      "New List".translate(context),
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: context.color.territoryColor,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -689,23 +706,37 @@ class FavoriteScreenState extends State<FavoriteScreen> {
                   ),
                   child: Row(
                     children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          width: 56,
-                          height: 56,
-                          color: Colors.grey.shade200,
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          color: context.color.territoryColor
+                              .withValues(alpha: 0.08),
+                          border: Border.all(
+                            color: context.color.territoryColor
+                                .withValues(alpha: 0.15),
+                            width: 1,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(13),
                           child: listing.latestItem?.image != null &&
                                   listing.latestItem!.image!.isNotEmpty
                               ? CachedNetworkImage(
                                   imageUrl: listing.latestItem!.image!,
                                   fit: BoxFit.cover,
-                                  errorWidget: (_, __, ___) => const Icon(
-                                      Icons.image,
-                                      color: Colors.grey),
+                                  errorWidget: (_, __, ___) => Icon(
+                                    Icons.collections_bookmark_rounded,
+                                    color: context.color.territoryColor,
+                                    size: 24,
+                                  ),
                                 )
-                              : const Icon(Icons.bookmark_border_rounded,
-                                  color: Colors.grey),
+                              : Icon(
+                                  Icons.collections_bookmark_rounded,
+                                  color: context.color.territoryColor,
+                                  size: 24,
+                                ),
                         ),
                       ),
                       const SizedBox(width: 12),

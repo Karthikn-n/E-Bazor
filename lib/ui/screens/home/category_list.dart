@@ -3,7 +3,6 @@ import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import 'package:Ebozor/utils/sliver_grid_delegate_with_fixed_cross_axis_count_and_fixed_height.dart';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/category/fetch_category_cubit.dart';
 import 'package:Ebozor/data/model/category_model.dart';
@@ -15,8 +14,9 @@ import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
 
 class CategoryList extends StatefulWidget {
   final String? from;
+  final List<CategoryModel>? passedCategories;
 
-  const CategoryList({super.key, this.from});
+  const CategoryList({super.key, this.from, this.passedCategories});
 
   @override
   State<CategoryList> createState() => _CategoryListState();
@@ -24,7 +24,10 @@ class CategoryList extends StatefulWidget {
   static Route route(RouteSettings routeSettings) {
     Map? args = routeSettings.arguments as Map?;
     return BlurredRouter(
-      builder: (_) => CategoryList(from: args?['from']),
+      builder: (_) => CategoryList(
+        from: args?['from'],
+        passedCategories: args?['categories'] as List<CategoryModel>?,
+      ),
     );
   }
 }
@@ -69,72 +72,89 @@ class _CategoryListState extends State<CategoryList> {
             // if (state is FetchCategorySuccess) {}
           }),
           builder: (context, state) {
-            if (state is FetchCategoryInProgress) {
+            List<CategoryModel> categories = [];
+            bool isLoading = false;
+            bool isLoadingMore = false;
+
+            if (state is FetchCategorySuccess) {
+              categories = state.categories;
+              isLoadingMore = state.isLoadingMore;
+            } else if (widget.passedCategories != null &&
+                widget.passedCategories!.isNotEmpty) {
+              categories = widget.passedCategories!;
+            } else if (state is FetchCategoryInProgress) {
+              isLoading = true;
+            }
+
+            if (isLoading && categories.isEmpty) {
               return UiUtils.progress();
             }
-            if (state is FetchCategorySuccess) {
+
+            if (categories.isNotEmpty) {
               return Column(
                 children: [
                   Expanded(
-                      child: GridView.builder(
-                    shrinkWrap: true,
-                    controller: _pageScrollController,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 15,
-                      vertical: 15,
-                    ),
-                    gridDelegate:
-                        SliverGridDelegateWithFixedCrossAxisCountAndFixedHeight(
-                      crossAxisCount: 3,
-                      height: MediaQuery.of(context).size.height * 0.18,
-                      crossAxisSpacing: 14,
-                      mainAxisSpacing: 14,
-                    ),
-                    itemBuilder: (context, index) {
-                      CategoryModel category = state.categories[index];
-                      return CategoryCard(
-                        onTap: () {
-                          if (widget.from == Routes.filterScreen) {
-                            Navigator.pop(context, category);
-                          } else {
-                            if (PropertyFilterCategoryResolver
-                                .isPropertyCategory(category)) {
-                              Navigator.pushNamed(
-                                context,
-                                Routes.filterpage,
-                                arguments: category,
-                              );
-                            } else if (category.id == 4 ||
-                                (category.name != null &&
-                                    category.name!.toLowerCase() == 'jobs') ||
-                                (category.slug != null &&
-                                    category.slug!.toLowerCase() == 'jobs')) {
-                              JobsBottomSheet.show(context,
-                                  jobsCategory: category);
+                    child: GridView.builder(
+                      shrinkWrap: true,
+                      controller: _pageScrollController,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        childAspectRatio: 0.78,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                      ),
+                      itemBuilder: (context, index) {
+                        CategoryModel category = categories[index];
+                        return CategoryCard(
+                          onTap: () {
+                            if (widget.from == Routes.filterScreen) {
+                              Navigator.pop(context, category);
                             } else {
-                              Navigator.pushNamed(
-                                context,
-                                Routes.subCategoryScreen,
-                                arguments: {
-                                  "categoryList": category.children ?? [],
-                                  "catName": category.name ?? "",
-                                  "categorySlug": category.slug,
-                                  "catId": category.id ?? 0,
-                                  "categoryIds": [
-                                    category.id.toString(),
-                                  ],
-                                },
-                              );
+                              if (PropertyFilterCategoryResolver
+                                  .isPropertyCategory(category)) {
+                                Navigator.pushNamed(
+                                  context,
+                                  Routes.filterpage,
+                                  arguments: category,
+                                );
+                              } else if (category.id == 4 ||
+                                  (category.name != null &&
+                                      category.name!.toLowerCase() == 'jobs') ||
+                                  (category.slug != null &&
+                                      category.slug!.toLowerCase() == 'jobs')) {
+                                JobsBottomSheet.show(context,
+                                    jobsCategory: category);
+                              } else {
+                                Navigator.pushNamed(
+                                  context,
+                                  Routes.subCategoryScreen,
+                                  arguments: {
+                                    "categoryList": category.children ?? [],
+                                    "catName": category.name ?? "",
+                                    "categorySlug": category.slug,
+                                    "catId": category.id ?? 0,
+                                    "categoryIds": [
+                                      category.id.toString(),
+                                    ],
+                                  },
+                                );
+                              }
                             }
-                          }
-                        },
-                        title: category.name!,
-                        url: category.url!,
-                      );
-                    },
-                    itemCount: state.categories.length,
-                  )),
-                  if (state.isLoadingMore) UiUtils.progress()
+                          },
+                          title: category.name ?? '',
+                          url: category.url ?? '',
+                          slug: category.slug,
+                        );
+                      },
+                      itemCount: categories.length,
+                    ),
+                  ),
+                  if (isLoadingMore) UiUtils.progress()
                 ],
               );
             }

@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter_android/google_maps_flutter_android.dart';
 import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
+import 'package:Ebozor/utils/login/google_login/google_login.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 PersonalizedInterestSettings personalizedInterestSettings =
@@ -126,6 +127,7 @@ Future<void> initApp() async {
   }
 
   await _configureCrashlytics();
+  await GoogleLogin.ensureInitialized();
   await _setBootstrapStage('initializing_local_storage');
 
   // Ads init

@@ -72,6 +72,7 @@ import 'package:Ebozor/data/cubits/seller/send_verification_field_cubit.dart';
 import 'package:Ebozor/data/cubits/subscription/fetch_featured_subscription_packages_cubit.dart';
 import 'package:Ebozor/data/cubits/saved_search/fetch_saved_searches_cubit.dart';
 import 'package:Ebozor/data/cubits/saved_search/save_search_cubit.dart';
+import 'package:Ebozor/data/cubits/system/location_change_cubit.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:nested/nested.dart';
 
@@ -80,6 +81,7 @@ import 'package:nested/nested.dart';
 
 class RegisterCubits {
   List<SingleChildWidget> providers = [
+    BlocProvider(create: (context) => LocationChangeCubit()),
     BlocProvider(create: (context) => FavoriteCubit(FavoriteRepository())),
     BlocProvider(create: (context) => FavoriteListingsCubit(FavoriteRepository())),
     BlocProvider(create: (context) => UpdateFavoriteCubit(FavoriteRepository())),

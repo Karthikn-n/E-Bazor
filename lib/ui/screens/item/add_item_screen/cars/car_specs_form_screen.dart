@@ -14,6 +14,8 @@ import 'package:Ebozor/data/model/custom_field/custom_field_model.dart';
 import 'package:Ebozor/data/repositories/custom_fields_repository.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/dynamic_custom_fields_form.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/posting_form_shared.dart';
+import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/ad_creation_stepper.dart';
+import 'package:Ebozor/utils/constant.dart';
 
 import 'package:Ebozor/data/model/item/item_model.dart';
 
@@ -390,7 +392,7 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
     if (_priceController.text.trim().isEmpty || price == null || price <= 0) {
       HelperUtils.showSnackBarMessage(
         context,
-        "Please enter a valid price in AED",
+        "Please enter a valid price in ${Constant.currencySymbol}",
         type: MessageType.warning,
       );
       return;
@@ -477,6 +479,7 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
           ),
           body: Column(
             children: [
+              const AdCreationStepper(currentStep: 1),
               Expanded(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
@@ -590,7 +593,7 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
                         controller: _priceController,
                         hint: "Price *",
                         keyboardType: TextInputType.number,
-                        suffixText: "AED",
+                        suffixText: Constant.currencySymbol,
                       ),
                       const SizedBox(height: 18),
 
@@ -629,8 +632,7 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
                   child: ElevatedButton(
                     onPressed: _validateAndProceed,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(
-                          0xFFD31027), // Red CTA matching web screenshot
+                      backgroundColor: const Color(0xFF007AFF), // Solid blue
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),

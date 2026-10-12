@@ -10,11 +10,7 @@ import 'package:Ebozor/ui/screens/widgets/dialogs/save_to_favorite_bottom_sheet.
 import 'package:Ebozor/data/repositories/favourites_repository.dart';
 import 'package:Ebozor/data/cubits/favorite/manage_fav_cubit.dart';
 import 'package:Ebozor/data/model/item/item_model.dart';
-
 import 'package:flutter/material.dart';
-
-import 'package:Ebozor/utils/app_icon.dart';
-
 import 'package:Ebozor/data/cubits/favorite/favorite_cubit.dart';
 import 'package:Ebozor/data/model/home/home_screen_section.dart';
 import 'package:Ebozor/ui/screens/home/widgets/grid_list_adapter.dart';
@@ -34,7 +30,12 @@ class HomeSectionsAdapter extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    final data = section.sectionData!;
+    final bool hasMore = data.length > 8;
+    final int itemCount = hasMore ? 9 : data.length;
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TitleHeader(
           title: section.title ?? "",
@@ -49,20 +50,93 @@ class HomeSectionsAdapter extends StatelessWidget {
             );
           },
         ),
-        GridListAdapter(
-          type: ListUiType.List,
-          listAxis: Axis.horizontal,
-          height: 210,
-          listSaperator: (_, __) => const SizedBox(width: 14),
-          builder: (context, index, _) {
-            final item = section.sectionData![index];
-            return ItemCard(
-              item: item,
-            );
-          },
-          total: section.sectionData!.length,
+        SizedBox(
+          height: 232,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: sidePadding),
+            itemCount: itemCount,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              if (index == 8 && hasMore) {
+                return _buildViewAllCard(context);
+              }
+              final item = data[index];
+              return ItemCard(
+                item: item,
+                width: 175,
+              );
+            },
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _buildViewAllCard(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () {
+        Navigator.pushNamed(
+          context,
+          Routes.sectionWiseItemsScreen,
+          arguments: {
+            "title": section.title,
+            "sectionId": section.sectionId,
+          },
+        );
+      },
+      child: Container(
+        width: 135,
+        height: 232,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0F6FF),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFF007AFF).withValues(alpha: 0.25),
+            width: 1.2,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(
+                color: Color(0xFF007AFF),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.arrow_forward_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              "seeAll".translate(context).isNotEmpty
+                  ? "seeAll".translate(context)
+                  : "View all",
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF007AFF),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              "${section.sectionData!.length} ads",
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: context.color.textLightColor,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -80,27 +154,67 @@ class ItemCard extends StatefulWidget {
   @override
   State<ItemCard> createState() => _ItemCardState();
 }
+
 class _ItemCardState extends State<ItemCard> {
-  final double likeButtonSize = 24;
-  final double imageHeight = 130;
+  final double imageHeight = 125;
+
+  String _buildSpecsAndLocation() {
+    final List<String> parts = [];
+    final city =
+        widget.item?.city?.trim() ?? widget.item?.address?.trim() ?? '';
+    if (city.isNotEmpty) {
+      parts.add(city);
+    }
+
+    // Extract dynamic specs ONLY if present in customFields
+    if (widget.item?.customFields != null &&
+        widget.item!.customFields!.isNotEmpty) {
+      for (final field in widget.item!.customFields!) {
+        final name = (field.name ?? field.label ?? '').toLowerCase();
+        if (name.contains('year') ||
+            name.contains('model') ||
+            name.contains('mileage') ||
+            name.contains('km')) {
+          if (field.value != null) {
+            String val = '';
+            if (field.value is List && (field.value as List).isNotEmpty) {
+              val = (field.value as List).first.toString().trim();
+            } else if (field.value is String) {
+              val = (field.value as String).trim();
+            }
+            if (val.isNotEmpty && !parts.contains(val)) {
+              parts.add(val);
+            }
+          }
+        }
+      }
+    }
+    return parts.join(' • ');
+  }
 
   @override
   Widget build(BuildContext context) {
+    final currency =
+        Constant.currencySymbol.isNotEmpty ? Constant.currencySymbol : 'TJS';
+    final specsLocation = _buildSpecsAndLocation();
+    final bool isVerified = widget.item?.user?.isVerified == 1;
+
     return Container(
-      width: widget.width ?? 160,
+      width: widget.width,
       decoration: BoxDecoration(
         color: context.color.secondaryColor,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: context.color.borderColor.darken(30),
+          color: context.color.borderColor.withValues(alpha: 0.6),
+          width: 1,
         ),
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           onTap: () {
             Navigator.pushNamed(
               context,
@@ -110,182 +224,195 @@ class _ItemCardState extends State<ItemCard> {
           },
           child: Stack(
             children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                /// IMAGE
-                SizedBox(
-                  height: imageHeight,
-                  width: double.infinity,
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(18),
-                    ),
-                    child: UiUtils.getImage(
-                      widget.item?.image ?? "",
-                      width: double.infinity,
-                      height: imageHeight,
-                      fit: BoxFit.cover,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  /// IMAGE
+                  SizedBox(
+                    height: imageHeight,
+                    width: double.infinity,
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(16),
+                      ),
+                      child: UiUtils.getImage(
+                        widget.item?.image ?? "",
+                        width: double.infinity,
+                        height: imageHeight,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
-                ),
 
-                /// CONTENT
-                Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      /// PRICE
-                      Text(
-                        "${Constant.currencySymbol} ${widget.item?.price ?? ""}",
-                      )
-                          .bold()
-                          .size(context.font.large)
-                          .color(context.color.territoryColor),
+                  /// CONTENT
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        /// ITEM NAME
+                        Text(
+                          widget.item?.name ?? "",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: context.color.textColorDark,
+                          ),
+                        ),
 
-                      const SizedBox(height: 5),
+                        const SizedBox(height: 3),
 
-                      /// ITEM NAME
-                      Text(widget.item?.name ?? "")
-                      .bold()
-                          .firstUpperCaseWidget()
-                          .setMaxLines(lines: 1)
-                          .size(context.font.small),
+                        /// PRICE (Bold blue)
+                        Text(
+                          "${widget.item?.price ?? ""} $currency",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF007AFF),
+                          ),
+                        ),
 
-                      const SizedBox(height: 5),
+                        const SizedBox(height: 3),
 
-                      /// LOCATION (compact)
-                      if ((widget.item?.address ?? "").isNotEmpty)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            UiUtils.getSvg(
-                              height: 20,
-                              width: 20,
-                              AppIcons.location,
-                            ),
-                            const SizedBox(width: 1),
-                            Expanded(
-                              child: Text(
-                                widget.item?.address ?? "",
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: context.font.small,
-                                  height: 1,
-                                  color: context.color.textDefaultColor
-                                      .withValues(alpha: 0.5),
+                        /// LOCATION & DYNAMIC SPECS
+                        if (specsLocation.isNotEmpty)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  specsLocation,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: context.color.textColorDark
+                                        .withValues(alpha: 0.55),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                    ],
+                              if (isVerified) ...[
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.verified_rounded,
+                                  size: 13,
+                                  color: Color(0xFF007AFF),
+                                ),
+                              ],
+                            ],
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
 
-            /// FAVORITE BUTTON
-            _favButton(),
-          ],
+              /// FAVORITE BUTTON (floating in top right of photo)
+              _favButton(),
+            ],
+          ),
         ),
       ),
-    ),
     );
   }
 
   Widget _favButton() {
+    if (widget.item?.id == null) return const SizedBox.shrink();
     bool isLike =
-    context.read<FavoriteCubit>().isItemFavorite(widget.item!.id!);
+        context.read<FavoriteCubit>().isItemFavorite(widget.item!.id!);
 
     return BlocProvider(
       create: (_) => UpdateFavoriteCubit(FavoriteRepository()),
       child: BlocConsumer<FavoriteCubit, FavoriteState>(
         bloc: context.read<FavoriteCubit>(),
         listener: (_, __) {
-          isLike = context
-              .read<FavoriteCubit>()
-              .isItemFavorite(widget.item!.id!);
+          isLike =
+              context.read<FavoriteCubit>().isItemFavorite(widget.item!.id!);
         },
         builder: (context, _) {
           return BlocConsumer<UpdateFavoriteCubit, UpdateFavoriteState>(
             listener: (context, state) {
               if (state is UpdateFavoriteSuccess) {
                 if (state.wasProcess) {
-                  context
-                      .read<FavoriteCubit>()
-                      .addFavoriteitem(state.item);
+                  context.read<FavoriteCubit>().addFavoriteitem(state.item);
                 } else {
-                  context
-                      .read<FavoriteCubit>()
-                      .removeFavoriteItem(state.item);
+                  context.read<FavoriteCubit>().removeFavoriteItem(state.item);
                 }
               }
             },
             builder: (context, state) {
+              final isDark = context.watch<AppThemeCubit>().state.appTheme ==
+                  AppTheme.dark;
+
               return Positioned(
-                top: imageHeight - (likeButtonSize / 2),
-                right: 12,
+                top: 8,
+                right: 8,
                 child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
                   onTap: () {
                     UiUtils.checkUser(
                       context: context,
                       onNotGuest: () {
                         if (isLike) {
-                          context
-                              .read<UpdateFavoriteCubit>()
-                              .setFavoriteItem(
-                            item: widget.item!,
-                            type: 0,
-                          );
+                          context.read<UpdateFavoriteCubit>().setFavoriteItem(
+                                item: widget.item!,
+                                type: 0,
+                              );
                           return;
                         }
                         context
                             .read<UpdateFavoriteCubit>()
                             .setFavoriteItem(item: widget.item!, type: 1);
-                        SaveToFavoriteBottomSheet.show(context, item: widget.item!);
+                        SaveToFavoriteBottomSheet.show(context,
+                            item: widget.item!);
                       },
                     );
                   },
-                   child: Container(
-                  width: likeButtonSize,
-                  height: likeButtonSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: context.color.secondaryColor,
-                    boxShadow:
-                    context.watch<AppThemeCubit>().state.appTheme == AppTheme.dark
-                        ? null
-                        : [
-                      BoxShadow(
-                        color: Colors.grey.shade300,
-                        blurRadius: 3,
-                        offset: const Offset(0, 2),
-                      )
-                    ],
-                  ),
-                  child: state is UpdateFavoriteInProgress
-                      ? Center(
-                    child: SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: UiUtils.progress(),
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isDark
+                          ? Colors.black.withValues(alpha: 0.5)
+                          : Colors.white.withValues(alpha: 0.88),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        )
+                      ],
                     ),
-                  )
-                      : Center(
-                    child: UiUtils.getSvg(
-                      isLike ? AppIcons.like_fill : AppIcons.like,
-                      width: 14,
-                      height: 14,
-                      color: context.color.territoryColor
-                    ),
+                    child: state is UpdateFavoriteInProgress
+                        ? Center(
+                            child: SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: UiUtils.progress(),
+                            ),
+                          )
+                        : Center(
+                            child: Icon(
+                              isLike
+                                  ? Icons.favorite_rounded
+                                  : Icons.favorite_border_rounded,
+                              size: 17,
+                              color: isLike
+                                  ? Colors.redAccent
+                                  : (isDark
+                                      ? Colors.white
+                                      : context.color.textColorDark
+                                          .withValues(alpha: 0.7)),
+                            ),
+                          ),
                   ),
                 ),
-
-              ),
               );
             },
           );
@@ -294,7 +421,6 @@ class _ItemCardState extends State<ItemCard> {
     );
   }
 }
-
 
 class TitleHeader extends StatelessWidget {
   final String title;
@@ -311,7 +437,7 @@ class TitleHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsetsDirectional.only(
+      padding: const EdgeInsetsDirectional.only(
         top: 18,
         bottom: 12,
         start: sidePadding,
@@ -334,10 +460,10 @@ class TitleHeader extends StatelessWidget {
               onTap: onTap,
               child: Padding(
                 padding:
-                const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                 child: Text("seeAll".translate(context))
                     .size(context.font.smaller + 3)
-                    .color(context.color.territoryColor),
+                    .color(const Color(0xFF007AFF)),
               ),
             ),
         ],
@@ -345,5 +471,3 @@ class TitleHeader extends StatelessWidget {
     );
   }
 }
-
-

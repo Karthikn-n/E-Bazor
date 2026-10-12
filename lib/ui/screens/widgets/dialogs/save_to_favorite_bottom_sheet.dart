@@ -419,19 +419,40 @@ class _SaveToFavoriteBottomSheetState extends State<SaveToFavoriteBottomSheet> {
                           color: context.color.textDefaultColor,
                         ),
                       ),
-                      TextButton.icon(
-                        style: TextButton.styleFrom(
+                      InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: _showCreateListDialog,
+                        child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          foregroundColor: context.color.territoryColor,
-                        ),
-                        onPressed: _showCreateListDialog,
-                        icon: const Icon(Icons.add, size: 16),
-                        label: Text(
-                          "New List".translate(context),
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: context.color.territoryColor
+                                .withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: context.color.territoryColor
+                                  .withValues(alpha: 0.28),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.add_rounded,
+                                size: 15,
+                                color: context.color.territoryColor,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                "New List".translate(context),
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.color.territoryColor,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -509,12 +530,23 @@ class _SaveToFavoriteBottomSheetState extends State<SaveToFavoriteBottomSheet> {
                                   ),
                                   child: Row(
                                     children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Container(
-                                          width: 54,
-                                          height: 54,
-                                          color: Colors.grey.shade200,
+                                      Container(
+                                        width: 54,
+                                        height: 54,
+                                        decoration: BoxDecoration(
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                          color: context.color.territoryColor
+                                              .withValues(alpha: 0.08),
+                                          border: Border.all(
+                                            color: context.color.territoryColor
+                                                .withValues(alpha: 0.15),
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(13),
                                           child: list.latestItem?.image !=
                                                       null &&
                                                   list.latestItem!.image!
@@ -523,13 +555,22 @@ class _SaveToFavoriteBottomSheetState extends State<SaveToFavoriteBottomSheet> {
                                                   imageUrl:
                                                       list.latestItem!.image!,
                                                   fit: BoxFit.cover,
-                                                  errorWidget: (_, __, ___) =>
-                                                      const Icon(Icons.image,
-                                                          color: Colors.grey),
+                                                  errorWidget:
+                                                      (_, __, ___) => Icon(
+                                                    Icons
+                                                        .collections_bookmark_rounded,
+                                                    color: context
+                                                        .color.territoryColor,
+                                                    size: 24,
+                                                  ),
                                                 )
-                                              : const Icon(
-                                                  Icons.bookmark_border_rounded,
-                                                  color: Colors.grey),
+                                              : Icon(
+                                                  Icons
+                                                      .collections_bookmark_rounded,
+                                                  color: context
+                                                      .color.territoryColor,
+                                                  size: 24,
+                                                ),
                                         ),
                                       ),
                                       const SizedBox(width: 12),

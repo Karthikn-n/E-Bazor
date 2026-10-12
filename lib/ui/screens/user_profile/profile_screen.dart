@@ -1679,18 +1679,13 @@ class _ProfileScreenState extends State<ProfileScreen>
   void shareApp() {
     try {
       if (Platform.isAndroid) {
-        Share.share(
-            '${Constant.appName}\n${Constant.playstoreURLAndroid}\n${Constant.shareappText}',
-            subject: Constant.appName);
+        SharePlus.instance.share(
+            ShareParams(subject: Constant.appName,
+            text: '${Constant.appName}\n${Constant.playstoreURLAndroid}\n${Constant.shareappText}'));
       } else {
-        Share.share(
-            '${Constant.appName}\n${Constant.appstoreURLios}\n${Constant.shareappText}',
-            subject: Constant.appName,
-            sharePositionOrigin: Rect.fromLTWH(
-                0,
-                0,
-                MediaQuery.of(context).size.width,
-                MediaQuery.of(context).size.height / 2));
+        SharePlus.instance.share(
+            ShareParams(subject: Constant.appName,
+            text: '${Constant.appName}\n${Constant.appstoreURLios}\n${Constant.shareappText}'));
       }
     } catch (e) {
       HelperUtils.showSnackBarMessage(context, e.toString());

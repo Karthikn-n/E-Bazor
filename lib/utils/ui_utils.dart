@@ -88,9 +88,7 @@ class UiUtils {
                     Navigator.pushNamed(context, Routes.login,
                         arguments: {"popToCurrent": true});
                   },
-                  child: Text("loginNow".translate(context)).color(
-                    context.color.buttonColor ?? Colors.white,
-                  ),
+                  child: Text("loginNow".translate(context)).color(context.color.buttonColor),
                 )
               ],
             ),
@@ -530,8 +528,15 @@ class UiUtils {
   static NetworkToLocalSvg networkToLocalSvg = NetworkToLocalSvg();
 
   static Widget imageType(String url,
-      {double? width, double? height, BoxFit? fit, Color? color}) {
-    if (url.trim().isEmpty) {
+      {double? width,
+      double? height,
+      BoxFit? fit,
+      Color? color,
+      Widget? fallbackWidget}) {
+    if (url.trim().isEmpty ||
+        url.trim().toLowerCase().contains('placeholder') ||
+        url.trim() == 'null') {
+      if (fallbackWidget != null) return fallbackWidget;
       return Container(
         width: width,
         height: height,
@@ -547,9 +552,13 @@ class UiUtils {
         ),
       );
     }
-    String? extension = mime(url);
+    final String? extension = mime(url);
+    final lowerUrl = url.toLowerCase();
+    final isSvg = extension == "image/svg+xml" ||
+        lowerUrl.endsWith(".svg") ||
+        lowerUrl.contains(".svg?");
 
-    if (extension == "image/svg+xml") {
+    if (isSvg) {
       return getSvgImage(
         url,
         fit: fit,
@@ -558,12 +567,19 @@ class UiUtils {
         color: color,
       );
     } else {
-      return getImage(
+      final img = getImage(
         url,
         fit: fit,
         height: height,
         width: width,
       );
+      if (color != null) {
+        return ColorFiltered(
+          colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+          child: img,
+        );
+      }
+      return img;
     }
   }
 

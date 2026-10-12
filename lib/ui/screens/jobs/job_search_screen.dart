@@ -11,7 +11,6 @@ import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_keys.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
-import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
@@ -714,112 +713,112 @@ class _JobSearchScreenState extends State<JobSearchScreen> {
   }
 
   */
-  Widget _buildJobResultCard(ItemModel item) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.color.secondaryColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: context.color.borderColor.withValues(alpha: 0.6),
-          width: 1,
-        ),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          _saveRecentSearch(_searchController.text.trim());
-          Navigator.pushNamed(
-            context,
-            Routes.adDetailsScreen,
-            arguments: {'model': item},
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Logo / Image
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: const Color(0xFFD31027).withValues(alpha: 0.08),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: item.image != null && item.image!.trim().isNotEmpty
-                      ? UiUtils.getImage(item.image!, fit: BoxFit.cover)
-                      : const Icon(
-                          Icons.work_outline_rounded,
-                          color: Color(0xFFD31027),
-                          size: 24,
-                        ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.name ?? "",
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.bold,
-                        color: context.color.textDefaultColor,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    if (item.category?.name != null)
-                      Text(
-                        item.category!.name!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: context.color.textLightColor,
-                        ),
-                      ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        if (item.price != null && item.price! > 0) ...[
-                          Text(
-                            "${Constant.currencySymbol} ${item.price!.toInt()} / month",
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF16A34A),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                        ],
-                        if (item.city != null && item.city!.isNotEmpty) ...[
-                          Icon(
-                            Icons.location_on_outlined,
-                            size: 13,
-                            color: context.color.textLightColor,
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            item.city!,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: context.color.textLightColor,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+//   Widget _buildJobResultCard(ItemModel item) {
+//     return Container(
+//       decoration: BoxDecoration(
+//         color: context.color.secondaryColor,
+//         borderRadius: BorderRadius.circular(12),
+//         border: Border.all(
+//           color: context.color.borderColor.withValues(alpha: 0.6),
+//           width: 1,
+//         ),
+//       ),
+//       child: InkWell(
+//         borderRadius: BorderRadius.circular(12),
+//         onTap: () {
+//           _saveRecentSearch(_searchController.text.trim());
+//           Navigator.pushNamed(
+//             context,
+//             Routes.adDetailsScreen,
+//             arguments: {'model': item},
+//           );
+//         },
+//         child: Padding(
+//           padding: const EdgeInsets.all(12),
+//           child: Row(
+//             crossAxisAlignment: CrossAxisAlignment.start,
+//             children: [
+//               // Logo / Image
+//               Container(
+//                 width: 48,
+//                 height: 48,
+//                 decoration: BoxDecoration(
+//                   borderRadius: BorderRadius.circular(8),
+//                   color: const Color(0xFFD31027).withValues(alpha: 0.08),
+//                 ),
+//                 child: ClipRRect(
+//                   borderRadius: BorderRadius.circular(8),
+//                   child: item.image != null && item.image!.trim().isNotEmpty
+//                       ? UiUtils.getImage(item.image!, fit: BoxFit.cover)
+//                       : const Icon(
+//                           Icons.work_outline_rounded,
+//                           color: Color(0xFFD31027),
+//                           size: 24,
+//                         ),
+//                 ),
+//               ),
+//               const SizedBox(width: 12),
+//               Expanded(
+//                 child: Column(
+//                   crossAxisAlignment: CrossAxisAlignment.start,
+//                   children: [
+//                     Text(
+//                       item.name ?? "",
+//                       maxLines: 1,
+//                       overflow: TextOverflow.ellipsis,
+//                       style: TextStyle(
+//                         fontSize: 14.5,
+//                         fontWeight: FontWeight.bold,
+//                         color: context.color.textDefaultColor,
+//                       ),
+//                     ),
+//                     const SizedBox(height: 3),
+//                     if (item.category?.name != null)
+//                       Text(
+//                         item.category!.name!,
+//                         style: TextStyle(
+//                           fontSize: 12,
+//                           color: context.color.textLightColor,
+//                         ),
+//                       ),
+//                     const SizedBox(height: 6),
+//                     Row(
+//                       children: [
+//                         if (item.price != null && item.price! > 0) ...[
+//                           Text(
+//                             "${Constant.currencySymbol} ${item.price!.toInt()} / month",
+//                             style: const TextStyle(
+//                               fontSize: 12.5,
+//                               fontWeight: FontWeight.bold,
+//                               color: Color(0xFF16A34A),
+//                             ),
+//                           ),
+//                           const SizedBox(width: 10),
+//                         ],
+//                         if (item.city != null && item.city!.isNotEmpty) ...[
+//                           Icon(
+//                             Icons.location_on_outlined,
+//                             size: 13,
+//                             color: context.color.textLightColor,
+//                           ),
+//                           const SizedBox(width: 2),
+//                           Text(
+//                             item.city!,
+//                             style: TextStyle(
+//                               fontSize: 11.5,
+//                               color: context.color.textLightColor,
+//                             ),
+//                           ),
+//                         ],
+//                       ],
+//                     ),
+//                   ],
+//                 ),
+//               ),
+//             ],
+//           ),
+//         ),
+//       ),
+//     );
+//   }
 }

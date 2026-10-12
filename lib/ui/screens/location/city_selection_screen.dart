@@ -2,6 +2,7 @@ import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/home/fetch_home_all_items_cubit.dart';
 import 'package:Ebozor/data/cubits/home/fetch_home_screen_cubit.dart';
 import 'package:Ebozor/data/cubits/location/fetch_cities_cubit.dart';
+import 'package:Ebozor/data/cubits/system/location_change_cubit.dart';
 import 'package:Ebozor/data/model/location/cityModel.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
@@ -149,7 +150,7 @@ class _CitySelectionScreenState extends State<CitySelectionScreen> {
 
     final selectedCity = city.name?.trim() ?? '';
     if (selectedCity.isEmpty) return;
-    await HiveUtils.setSelectedCity(
+    await context.read<LocationChangeCubit>().selectCity(
       selectedCity,
       latitude: location['latitude'] as double?,
       longitude: location['longitude'] as double?,

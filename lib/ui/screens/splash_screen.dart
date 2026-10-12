@@ -9,6 +9,7 @@ import 'package:Ebozor/data/cubits/system/fetch_system_settings_cubit.dart';
 import 'package:Ebozor/data/cubits/system/language_cubit.dart';
 import 'package:Ebozor/data/cubits/system/user_details.dart';
 import 'package:Ebozor/data/model/system_settings_model.dart';
+import 'package:Ebozor/ui/screens/widgets/app_logo_widget.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/no_internet.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/app_icon.dart';
@@ -238,11 +239,9 @@ class SplashScreenState extends State<SplashScreen> {
         value: const SystemUiOverlayStyle(statusBarColor: Colors.white),
         child: Scaffold(
           backgroundColor: Colors.white,
-          body: Center(
-            child: SizedBox(
-              width: 150.rw(context),
-              height: 150.rh(context),
-              child: Image.asset(AppIcons.splashLogo),
+          body: const Center(
+            child: AppLogoWidget(
+              height: 56,
             ),
           ),
         ),

@@ -23,6 +23,8 @@ import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/dynamic_custom_fields_form.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/posting_form_shared.dart';
+import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/ad_creation_stepper.dart';
+import 'package:Ebozor/utils/constant.dart';
 
 class PropertyPostingFormScreen extends StatefulWidget {
   final CategoryModel? category;
@@ -496,7 +498,7 @@ class _PropertyPostingFormScreenState
 
     Widgets.hideLoder(context);
 
-    // ignore: unnecessary_null_comparison
+    // ignore: unnecessary_null_comparison, dead_code
     if (createdItemModel == null) {
       if (mounted) {
         HelperUtils.showSnackBarMessage(
@@ -543,16 +545,20 @@ class _PropertyPostingFormScreenState
             showBackButton: true,
             title: "Property Details",
           ),
-          body: Form(
-            key: _formKey,
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header
-                  Text(
+          body: Column(
+            children: [
+              const AdCreationStepper(currentStep: 1),
+              Expanded(
+                child: Form(
+                  key: _formKey,
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Header
+                        Text(
                     "You're almost there!",
                     style: TextStyle(
                       fontSize: 22,
@@ -643,7 +649,7 @@ class _PropertyPostingFormScreenState
                     controller: _priceController,
                     hint: "e.g. 850000",
                     keyboardType: TextInputType.number,
-                    suffixText: "AED",
+                    suffixText: Constant.currencySymbol,
                     validator: (val) => val == null || val.trim().isEmpty
                         ? "Price is required"
                         : null,
@@ -690,7 +696,7 @@ class _PropertyPostingFormScreenState
                     height: 52,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFD31027),
+                        backgroundColor: const Color(0xFF007AFF),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -714,8 +720,11 @@ class _PropertyPostingFormScreenState
             ),
           ),
         ),
-      ),
-    );
+      ],
+    ),
+  ),
+),
+);
   }
 
   Widget _buildTextField({

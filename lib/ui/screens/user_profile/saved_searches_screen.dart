@@ -621,7 +621,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    final activeColor = Colors.redAccent.shade700;
+    final activeColor = context.color.territoryColor;
 
     return InkWell(
       onTap: onTap,

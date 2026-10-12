@@ -3,16 +3,21 @@ import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:flutter/material.dart';
 
 import 'package:Ebozor/utils/ui_utils.dart';
+import 'package:Ebozor/utils/category_fallback_helper.dart';
 
 class CategoryCard extends StatelessWidget {
   final String title;
   final String url;
+  final String? slug;
+  final IconData? fallbackIcon;
   final VoidCallback onTap;
 
   const CategoryCard({
     super.key,
     required this.title,
     required this.url,
+    this.slug,
+    this.fallbackIcon,
     required this.onTap,
   });
 
@@ -27,60 +32,78 @@ class CategoryCard extends StatelessWidget {
       isFullImage = true;
     }
 
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
       child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
         decoration: BoxDecoration(
           color: context.color.secondaryColor,
-          border: Border.all(color: context.color.borderColor.darken(40)),
-          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: context.color.borderColor.withValues(alpha: 0.5),
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        child: Column(
-          children: [
-            if (isFullImage) ...[
-              ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: Container(
-                  height: MediaQuery.of(context).size.height*0.11,//94,
-                  width: double.infinity,
-                  color: context.color.territoryColor.withValues(alpha: 0.1),
-                  child: UiUtils.imageType(url,
-                      fit: BoxFit.fill, color: context.color.territoryColor),
-                ),
-              ),
-            ] else ...[
-              ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: Container(
-                  height: MediaQuery.of(context).size.height*0.11,//94,
-                  color: context.color.territoryColor.withValues(alpha: 0.1),
-                  child: Center(
-                    child: SizedBox(
-                      // color: Colors.blue,
-                      width: 48,
-                      height: 48,
-                      child: UiUtils.imageType(url,
-                          fit: BoxFit.cover,
-                          color: context.color.territoryColor),
+        child: Center(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.center,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 100),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEBF5FF),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFF007AFF).withValues(alpha: 0.18),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CategoryFallbackHelper.buildCategoryIconWidget(
+                          url: url,
+                          title: title,
+                          slug: slug,
+                          fallbackIcon: fallbackIcon,
+                          iconColor: const Color(0xFF007AFF),
+                          size: 22,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ],
-            Expanded(
-                child: Padding(
-              padding:  EdgeInsets.all(10.0),
-              child: Text(title/*,style: Theme.of(context).textTheme.titleMedium,*/)
-                  .centerAlign()
-                  .setMaxLines(
-                    lines: 2,
-                  )
-              .size(context.font.small)
-                  .color(
-                    context.color.textColorDark,
+                  const SizedBox(height: 5),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      height: 1.15,
+                      fontWeight: FontWeight.w600,
+                      color: context.color.textColorDark,
+                    ),
                   ),
-            ))
-          ],
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );

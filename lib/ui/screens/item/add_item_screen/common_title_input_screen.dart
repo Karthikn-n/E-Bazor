@@ -231,9 +231,9 @@ class _CommonTitleInputScreenState extends CloudState<CommonTitleInputScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _handleLetsGo,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD31027),
+                      backgroundColor: const Color(0xFF007AFF),
                       disabledBackgroundColor:
-                          const Color(0xFFD31027).withValues(alpha: 0.6),
+                          const Color(0xFF007AFF).withValues(alpha: 0.6),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),

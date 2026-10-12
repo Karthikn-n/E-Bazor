@@ -7,7 +7,6 @@ import 'package:Ebozor/data/cubits/chat/block_user_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/blocked_users_list_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/delete_message_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/get_buyer_chat_users_cubit.dart';
-import 'package:Ebozor/data/cubits/chat/get_seller_chat_users_cubit.dart';
 import 'package:Ebozor/data/cubits/chat/load_chat_messages.dart';
 import 'package:Ebozor/data/cubits/chat/send_message.dart';
 import 'package:Ebozor/data/cubits/chat/unblock_user_cubit.dart';
@@ -96,17 +95,11 @@ class _ChatScreenState extends State<ChatScreen>
   bool showRecordButton = true;
   bool _showMakeOfferInput = false;
   bool _isSubmittingOffer = false;
-  bool _isMarkingSold = false;
   int _rating = 0;
 
   late int _currentItemOfferId;
   double? _currentItemOfferPrice;
   late String _currentStatus;
-
-  bool get _isCurrentUserSeller {
-    final currentUserId = HiveUtils.getUserId();
-    return widget.buyerId != null && currentUserId != widget.buyerId;
-  }
 
   bool get _isSoldOut {
     final norm = _currentStatus
@@ -117,76 +110,6 @@ class _ChatScreenState extends State<ChatScreen>
     return norm == 'sold out' || norm == 'sold';
   }
 
-  Future<void> _markSoldToChatBuyer() async {
-    if (_isMarkingSold) return;
-    final parsedItemId = int.tryParse(widget.itemId) ?? 0;
-    final buyerUserId =
-        int.tryParse(widget.buyerId ?? '') ?? int.tryParse(widget.userId);
-    if (parsedItemId == 0 || buyerUserId == null) {
-      HelperUtils.showSnackBarMessage(
-        context,
-        'Unable to identify this buyer. Please try from the ad details screen.',
-      );
-      return;
-    }
-
-    final buyerName =
-        widget.userName.trim().isEmpty ? 'this buyer' : widget.userName.trim();
-    final wasSoldOut = _isSoldOut;
-    final confirmed = await UiUtils.showBlurredDialoge(
-      context,
-      dialoge: BlurredDialogBox(
-        title: wasSoldOut ? 'Record another sale?' : 'Sold to $buyerName?',
-        acceptButtonName: wasSoldOut ? 'Record sale' : 'Confirm sale',
-        content: Text(
-          wasSoldOut
-              ? 'This will add $buyerName as another buyer for this ad.'
-              : 'Mark this ad as sold to $buyerName? The status will update immediately.',
-        ),
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    final previousStatus = _currentStatus;
-    setState(() {
-      _isMarkingSold = true;
-      _currentStatus = 'sold out';
-    });
-
-    try {
-      final response = await ItemRepository().changeMyItemStatus(
-        itemId: parsedItemId,
-        status: 'sold out',
-        userId: buyerUserId,
-      );
-      if (response['error'] == true) {
-        throw response['message']?.toString() ?? 'Could not record this sale';
-      }
-      if (!mounted) return;
-      setState(() => _isMarkingSold = false);
-      try {
-        context
-            .read<GetSellerChatListCubit>()
-            .updateItemStatus(parsedItemId, 'sold out');
-      } catch (_) {}
-      try {
-        context
-            .read<GetBuyerChatListCubit>()
-            .updateItemStatus(parsedItemId, 'sold out');
-      } catch (_) {}
-      HelperUtils.showSnackBarMessage(
-        context,
-        wasSoldOut ? 'Sale recorded for $buyerName' : 'Item sold to $buyerName',
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isMarkingSold = false;
-        _currentStatus = previousStatus;
-      });
-      HelperUtils.showSnackBarMessage(context, e.toString());
-    }
-  }
 
   final ScrollController _pageScrollController = ScrollController();
   final ChatSocketService _socketService = ChatSocketService();
@@ -1795,8 +1718,7 @@ class _ChatScreenState extends State<ChatScreen>
                           ),
                           BlocListener<SendMessageCubit, SendMessageState>(
                             listener: (context, state) {
-                              if (state is SendMessageSuccess &&
-                                  state.responseData is Map) {
+                              if (state is SendMessageSuccess) {
                                 try {
                                   final confirmedMsg = ChatMessage.fromJson(
                                       state.responseData as Map);

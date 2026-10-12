@@ -136,20 +136,18 @@ class _SubCategoryFilterScreenState extends State<SubCategoryFilterScreen>
                                 padding: const EdgeInsets.all(11),
                                 decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(14),
-                                    color: context.color.territoryColor
+                                    color: const Color(0xFF007AFF)
                                         .withValues(alpha: 0.09)),
                                 child: (category.url != null &&
                                         category.url!.trim().isNotEmpty)
                                     ? UiUtils.imageType(
                                         category.url!,
-                                        color: category.url!.endsWith('.svg')
-                                            ? context.color.territoryColor
-                                            : null,
+                                        color: const Color(0xFF007AFF),
                                         fit: BoxFit.contain,
                                       )
-                                    : Icon(
+                                    : const Icon(
                                         Icons.category_outlined,
-                                        color: context.color.territoryColor,
+                                        color: Color(0xFF007AFF),
                                         size: 24,
                                       )),
                             title: Text(
@@ -182,12 +180,12 @@ class _SubCategoryFilterScreenState extends State<SubCategoryFilterScreen>
                                 height: 34,
                                 decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: context.color.territoryColor
+                                    color: const Color(0xFF007AFF)
                                         .withValues(alpha: 0.08)),
-                                child: Icon(
+                                child: const Icon(
                                   Icons.arrow_forward_ios_rounded,
                                   size: 15,
-                                  color: context.color.territoryColor,
+                                  color: Color(0xFF007AFF),
                                 )),
                           );
                         },

@@ -719,7 +719,9 @@ class _MotorsInspectionCheckoutScreenState
           color: context.color.secondaryColor,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: selected ? Colors.red : context.color.borderColor,
+            color: selected
+                ? context.color.territoryColor
+                : context.color.borderColor,
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -729,7 +731,9 @@ class _MotorsInspectionCheckoutScreenState
               selected
                   ? Icons.radio_button_checked_rounded
                   : Icons.radio_button_unchecked_rounded,
-              color: selected ? Colors.red : context.color.textLightColor,
+              color: selected
+                  ? context.color.territoryColor
+                  : context.color.textLightColor,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -794,7 +798,7 @@ class _MotorsInspectionCheckoutScreenState
                     onPressed: _canPay ? _pay : null,
                     style: FilledButton.styleFrom(
                       minimumSize: const Size.fromHeight(48),
-                      backgroundColor: Colors.red,
+                      backgroundColor: context.color.territoryColor,
                     ),
                     child: _processing
                         ? const SizedBox(

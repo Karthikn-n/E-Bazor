@@ -1,7 +1,6 @@
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/category/fetch_category_cubit.dart';
 import 'package:Ebozor/data/model/property_filter_category_resolver.dart';
-import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -13,6 +12,66 @@ import 'package:Ebozor/utils/extensions/extensions.dart';
 
 class CategoryWidgetHome extends StatelessWidget {
   const CategoryWidgetHome({super.key});
+
+  static Map<String, dynamic> _getCategoryStyle(String name, String slug, int index) {
+    final lowerName = name.toLowerCase();
+    final lowerSlug = slug.toLowerCase();
+
+    if (lowerName.contains('motor') || lowerName.contains('car') || lowerName.contains('auto') || lowerSlug.contains('motor') || lowerSlug.contains('car')) {
+      return {
+        'bg': const Color(0xFFEBF3FF),
+        'iconColor': const Color(0xFF007AFF),
+        'icon': Icons.directions_car_rounded,
+      };
+    } else if (lowerName.contains('propert') || lowerName.contains('real estate') || (lowerName.contains('home') && lowerName.contains('rent')) || lowerSlug.contains('propert')) {
+      return {
+        'bg': const Color(0xFFFFF3EB),
+        'iconColor': const Color(0xFFFF7A1A),
+        'icon': Icons.home_rounded,
+      };
+    } else if (lowerName.contains('electr') || lowerName.contains('phone') || lowerName.contains('computer') || lowerSlug.contains('electr')) {
+      return {
+        'bg': const Color(0xFFE8F5FE),
+        'iconColor': const Color(0xFF0284C7),
+        'icon': Icons.devices_rounded,
+      };
+    } else if (lowerName.contains('job') || lowerName.contains('career') || lowerSlug.contains('job')) {
+      return {
+        'bg': const Color(0xFFF3EDFD),
+        'iconColor': const Color(0xFF8B5CF6),
+        'icon': Icons.work_rounded,
+      };
+    } else if (lowerName.contains('home') || lowerName.contains('furnitur') || lowerName.contains('garden') || lowerSlug.contains('home') || lowerSlug.contains('garden')) {
+      return {
+        'bg': const Color(0xFFFDE8EF),
+        'iconColor': const Color(0xFFEC4899),
+        'icon': Icons.weekend_rounded,
+      };
+    } else if (lowerName.contains('fashion') || lowerName.contains('cloth') || lowerName.contains('wear') || lowerSlug.contains('fashion')) {
+      return {
+        'bg': const Color(0xFFFEF6E4),
+        'iconColor': const Color(0xFFF59E0B),
+        'icon': Icons.checkroom_rounded,
+      };
+    } else if (lowerName.contains('servic') || lowerSlug.contains('servic')) {
+      return {
+        'bg': const Color(0xFFEBF5FF),
+        'iconColor': const Color(0xFF2563EB),
+        'icon': Icons.build_rounded,
+      };
+    }
+
+    const defaultStyles = [
+      {'bg': Color(0xFFEBF3FF), 'iconColor': Color(0xFF007AFF), 'icon': Icons.directions_car_rounded},
+      {'bg': Color(0xFFFFF3EB), 'iconColor': Color(0xFFFF7A1A), 'icon': Icons.home_rounded},
+      {'bg': Color(0xFFE8F5FE), 'iconColor': Color(0xFF0284C7), 'icon': Icons.devices_rounded},
+      {'bg': Color(0xFFF3EDFD), 'iconColor': Color(0xFF8B5CF6), 'icon': Icons.work_rounded},
+      {'bg': Color(0xFFFDE8EF), 'iconColor': Color(0xFFEC4899), 'icon': Icons.weekend_rounded},
+      {'bg': Color(0xFFFEF6E4), 'iconColor': Color(0xFFF59E0B), 'icon': Icons.checkroom_rounded},
+      {'bg': Color(0xFFEBF5FF), 'iconColor': Color(0xFF2563EB), 'icon': Icons.build_rounded},
+    ];
+    return defaultStyles[index % defaultStyles.length];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,24 +89,62 @@ class CategoryWidgetHome extends StatelessWidget {
             );
           }
 
+          final bool hasMore = state.categories.length > 7;
+          final int displayCount = hasMore ? 8 : (state.categories.length + 1);
+          final categoriesToShow = state.categories.take(7).toList();
+
           return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: state.categories.length,
+              itemCount: displayCount,
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                // crossAxisSpacing: 6,
-                // mainAxisSpacing: 6,
-                childAspectRatio: 1,
+                crossAxisCount: 4,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 6,
+                mainAxisExtent: 88,
               ),
               itemBuilder: (context, index) {
-                final category = state.categories[index];
+                // The 8th slot (index 7 or last) is "More"
+                if (index == displayCount - 1) {
+                  return CategoryHomeCard(
+                    title: "more".translate(context).isNotEmpty
+                        ? "more".translate(context)
+                        : "More",
+                    bgColor: const Color(0xFFF1F5F9),
+                    iconColor: const Color(0xFF334155),
+                    customIcon: const Icon(
+                      Icons.more_horiz_rounded,
+                      size: 26,
+                      color: Color(0xFF334155),
+                    ),
+                    onTap: () {
+                      Navigator.pushNamed(
+                        context,
+                        Routes.categories,
+                        arguments: {
+                          "from": Routes.home,
+                          "categories": state.categories,
+                        },
+                      );
+                    },
+                  );
+                }
+
+                final category = categoriesToShow[index];
+                final style = _getCategoryStyle(
+                  category.name ?? '',
+                  category.slug ?? '',
+                  index,
+                );
 
                 return CategoryHomeCard(
                   title: category.name ?? "",
                   url: category.url ?? "",
+                  bgColor: style['bg'] as Color,
+                  iconColor: style['iconColor'] as Color,
+                  fallbackIcon: style['icon'] as IconData,
                   onTap: () {
                     /// ✅ FILTER PAGE FOR PROPERTY
                     if (PropertyFilterCategoryResolver.isPropertyCategory(
@@ -96,42 +193,34 @@ class CategoryWidgetHome extends StatelessWidget {
 
   Widget _buildShimmerGrid(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        itemCount: 6,
+        itemCount: 8,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          childAspectRatio: 1,
+          crossAxisCount: 4,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 6,
+          mainAxisExtent: 88,
         ),
         itemBuilder: (context, index) {
-          return Card(
-            elevation: 0.5,
-            color: context.color.secondaryColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CustomShimmer(
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
-                  ),
-                  const SizedBox(height: 6),
-                  CustomShimmer(
-                    width: 48,
-                    height: 8,
-                    borderRadius: 4,
-                  ),
-                ],
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CustomShimmer(
+                width: 56,
+                height: 56,
+                borderRadius: 16,
               ),
-            ),
+              const SizedBox(height: 6),
+              CustomShimmer(
+                width: 48,
+                height: 8,
+                borderRadius: 4,
+              ),
+            ],
           );
         },
       ),

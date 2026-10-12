@@ -466,10 +466,10 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
               fontWeight: FontWeight.w900,
             ),
           ),
-          const TextSpan(
+          TextSpan(
             text: " cars",
             style: TextStyle(
-              color: Colors.redAccent,
+              color: context.color.territoryColor,
               fontWeight: FontWeight.w800,
             ),
           ),

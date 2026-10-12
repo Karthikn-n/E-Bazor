@@ -1,261 +1,96 @@
-/*
-import 'package:Ebozor/utils/extensions/extensions.dart';
-import 'package:Ebozor/utils/hive_keys.dart';
-import 'package:Ebozor/utils/responsiveSize.dart';
-
-import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import '../../../../data/cubits/Home/fetch_home_all_items_cubit.dart';
-import '../../../../data/cubits/Home/fetch_home_screen_cubit.dart';
-import '../../../../data/model/google_place_model.dart';
-import '../../../../utils/app_icon.dart';
-
-import '../../../../utils/ui_utils.dart';
-import '../../widgets/BottomSheets/choose_location_bottomsheet.dart';
-
-class LocationWidget extends StatelessWidget {
-  const LocationWidget({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return FittedBox(
-      fit: BoxFit.none,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 16.rw(context),
-          ),
-          GestureDetector(
-            onTap: () async {
-              var result = await showModalBottomSheet(
-                isScrollControlled: true,
-                shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(20),
-                        topRight: Radius.circular(20))),
-                context: context,
-                builder: (context) {
-                  return const ChooseLocatonBottomSheet();
-                },
-              );
-              if (result != null) {
-                GooglePlaceModel place = (result as GooglePlaceModel);
-
-                HiveUtils.setLocation(
-                    city: place.city,
-                    state: place.state,
-                    country: place.country,
-                    placeId: place.placeId,
-                    latitude: place.latitude,
-                    longitude: place.longitude);
-
-                Future.delayed(
-                  Duration.zero,
-                  () {
-                    context.read<FetchHomeScreenCubit>().fetch(
-                          city: HiveUtils.getCityName(),
-                        );
-                    context.read<FetchHomeAllItemsCubit>().fetch(
-                          city: HiveUtils.getCityName(),
-                        );
-                  },
-                );
-              }
-            },
-            child: Container(
-              width: 40.rw(context),
-              height: 40.rh(context),
-              decoration: BoxDecoration(
-                  color: context.color.secondaryColor,
-                  borderRadius: BorderRadius.circular(10)),
-              child: UiUtils.getSvg(
-                AppIcons.location,
-                fit: BoxFit.none,
-                color: context.color.territoryColor,
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 10.rw(context),
-          ),
-          ValueListenableBuilder(
-              valueListenable: Hive.box(HiveKeys.userDetailsBox).listenable(),
-              builder: (context, value, child) {
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("locationLbl".translate(context))
-                        .color(context.color.textColorDark)
-                        .size(
-                          context.font.small,
-                        ),
-                    SizedBox(
-                      width: 150,
-                      child: Text(
-                        HiveUtils.getCityName() == null
-                            ? "---"
-                            : ((HiveUtils.getCityName() ?? "") +
-                                    (HiveUtils.getStateName() == null ||
-                                            HiveUtils.getStateName() == ""
-                                        ? ""
-                                        : ",") +
-                                    (HiveUtils.getStateName() ?? "") +
-                                    (HiveUtils.getCountryName() == null ||
-                                            HiveUtils.getCountryName() == ""
-                                        ? ""
-                                        : ",") +
-                                    (HiveUtils.getCountryName() ?? "")) +
-                                "",
-                        maxLines: 1,
-                        softWrap: true,
-                        overflow: TextOverflow.ellipsis,
-                      )
-                          .color(context.color.textColorDark)
-                          .size(context.font.small)
-                          .bold(weight: FontWeight.w600),
-                    ),
-                  ],
-                );
-              }),
-        ],
-      ),
-    );
-  }
-}
-*/
-
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/cubits/home/fetch_home_all_items_cubit.dart';
 import 'package:Ebozor/data/cubits/home/fetch_home_screen_cubit.dart';
+import 'package:Ebozor/data/cubits/system/location_change_cubit.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
-import 'package:Ebozor/utils/extensions/extensions.dart';
-import 'package:Ebozor/utils/LocalStoreage/hive_keys.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
-import 'package:Ebozor/utils/responsiveSize.dart';
-
+import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:Ebozor/utils/app_icon.dart';
-
-import 'package:Ebozor/utils/ui_utils.dart';
 
 class LocationWidget extends StatelessWidget {
   const LocationWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return FittedBox(
-      fit: BoxFit.none,
-      alignment: AlignmentDirectional.centerStart,
-      child: GestureDetector(
-        onTap: () async {
-          await Navigator.pushNamed(
-            context,
-            Routes.selectLocationScreen,
-            arguments: {"from": "home"},
-          );
-          if (context.mounted) {
-            context.read<FetchHomeScreenCubit>().fetch(
-                  city: HiveUtils.getCityName(),
-                  areaId: HiveUtils.getAreaId(),
-                  country: HiveUtils.getCountryName(),
-                  state: HiveUtils.getStateName(),
-                );
-            context.read<FetchHomeAllItemsCubit>().fetch(
-                  city: HiveUtils.getCityName(),
-                  areaId: HiveUtils.getAreaId(),
-                  radius: HiveUtils.getNearbyRadius(),
-                  longitude: HiveUtils.getLongitude(),
-                  latitude: HiveUtils.getLatitude(),
-                  country: HiveUtils.getCountryName(),
-                  state: HiveUtils.getStateName(),
-                );
-          }
-        },
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40.rw(context),
-              height: 40.rh(context),
-              child: UiUtils.getSvg(
-                AppIcons.location,
-                fit: BoxFit.none,
-                color: context.color.textLightColor,
+    return BlocBuilder<LocationChangeCubit, LocationChangeState>(
+      builder: (context, state) {
+        final currentCity = state.displayName.isNotEmpty
+            ? state.displayName
+            : (HiveUtils.getCityName()?.toString().isNotEmpty == true
+                ? HiveUtils.getCityName()!.toString()
+                : 'Dushanbe');
+
+        return InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () async {
+            await Navigator.pushNamed(
+              context,
+              Routes.selectLocationScreen,
+              arguments: const {"from": "home"},
+            );
+            if (context.mounted) {
+              final activeCity = HiveUtils.getCityName()?.toString();
+              context.read<FetchHomeScreenCubit>().fetch(
+                    city: activeCity,
+                    areaId: HiveUtils.getAreaId(),
+                    country: HiveUtils.getCountryName(),
+                    state: HiveUtils.getStateName(),
+                  );
+              context.read<FetchHomeAllItemsCubit>().fetch(
+                    city: activeCity,
+                    areaId: HiveUtils.getAreaId(),
+                    radius: HiveUtils.getNearbyRadius(),
+                    longitude: HiveUtils.getLongitude(),
+                    latitude: HiveUtils.getLatitude(),
+                    country: HiveUtils.getCountryName(),
+                    state: HiveUtils.getStateName(),
+                  );
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: context.color.secondaryColor.withValues(alpha: 0.8),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: context.color.borderColor.withValues(alpha: 0.6),
+                width: 1,
               ),
             ),
-            SizedBox(
-              width: 10.rw(context),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.location_on_outlined,
+                  size: 17,
+                  color: context.color.territoryColor,
+                ),
+                const SizedBox(width: 4),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 130),
+                  child: Text(
+                    currentCity,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: context.color.textColorDark,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 2),
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 18,
+                  color: context.color.textColorDark.withValues(alpha: 0.7),
+                ),
+              ],
             ),
-          ValueListenableBuilder(
-              valueListenable: Hive.box(HiveKeys.userDetailsBox).listenable(),
-              builder: (context, value, child) {
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("locationLbl".translate(context))
-                        .color(context.color.textColorDark)
-                        .size(
-                          context.font.small,
-                        ),
-                    Text(
-                      [
-                        HiveUtils.getAreaName(),
-                        HiveUtils.getCityName(),
-                        HiveUtils.getStateName(),
-                        HiveUtils.getCountryName()
-                      ]
-                              .where((element) =>
-                                  element != null && element.isNotEmpty)
-                              .join(", ")
-                              .isEmpty
-                          ? "------"
-                          : [
-                              HiveUtils.getAreaName(),
-                              HiveUtils.getCityName(),
-                              HiveUtils.getStateName(),
-                              HiveUtils.getCountryName()
-                            ]
-                              .where((element) =>
-                                  element != null && element.isNotEmpty)
-                              .join(", ")
-                      /*HiveUtils.getCityName() == null
-                          ? "---"
-                          : (HiveUtils.getAreaName() ?? "") +
-                              ((HiveUtils.getAreaName() == null ||
-                                          HiveUtils.getAreaName() == ""
-                                      ? ""
-                                      : ",") +
-                                  (HiveUtils.getCityName() ?? "") +
-                                  (HiveUtils.getStateName() == null ||
-                                          HiveUtils.getStateName() == ""
-                                      ? ""
-                                      : ",") +
-                                  (HiveUtils.getStateName() ?? "") +
-                                  (HiveUtils.getCountryName() == null ||
-                                          HiveUtils.getCountryName() == ""
-                                      ? ""
-                                      : ",") +
-                                  (HiveUtils.getCountryName() ?? "")) +
-                              ""*/
-                      ,
-                      maxLines: 1,
-                      softWrap: true,
-                      overflow: TextOverflow.ellipsis,
-                    )
-                        .color(context.color.textColorDark)
-                        .size(context.font.small)
-                        .bold(weight: FontWeight.w600),
-                  ],
-                );
-              }),
-        ],
-      ),
-      )
+          ),
+        );
+      },
     );
   }
 }

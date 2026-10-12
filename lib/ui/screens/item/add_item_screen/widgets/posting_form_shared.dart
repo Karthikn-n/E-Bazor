@@ -334,38 +334,123 @@ class PostingPicturesSection extends StatelessWidget {
     final totalCount = netImages.length + images.length;
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: OutlinedButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(
-              Icons.camera_alt_outlined,
-              color: Color(0xFFD31027),
-            ),
-            label: Text(
-              totalCount == 0
-                  ? 'Add Pictures'
-                  : 'Add More Pictures ($totalCount selected)',
-              style: const TextStyle(
-                color: Color(0xFFD31027),
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
+        if (totalCount == 0)
+          InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: onAdd,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              decoration: BoxDecoration(
+                color: context.color.secondaryColor,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: const Color(0xFF007AFF).withValues(alpha: 0.35),
+                  width: 1.5,
+                ),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF007AFF).withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.add_a_photo_outlined,
+                      color: Color(0xFF007AFF),
+                      size: 26,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    "Add up to 20 photos",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: context.color.textDefaultColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "First photo will be your ad's cover image",
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: context.color.textLightColor,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF007AFF),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.photo_library_outlined,
+                            size: 16, color: Colors.white),
+                        SizedBox(width: 6),
+                        Text(
+                          "Select Photos",
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFFD31027), width: 1.5),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          )
+        else ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Photos ($totalCount/20)',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: context.color.textDefaultColor,
+                ),
               ),
-            ),
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: onAdd,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  child: Row(
+                    children: [
+                      Icon(Icons.add_photo_alternate_outlined,
+                          size: 16, color: Color(0xFF007AFF)),
+                      SizedBox(width: 4),
+                      Text(
+                        'Add more',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF007AFF),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-        if (totalCount > 0) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           SizedBox(
-            height: 90,
+            height: 94,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
@@ -381,8 +466,8 @@ class PostingPicturesSection extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     child: UiUtils.getImage(
                       netImages[index],
-                      width: 90,
-                      height: 90,
+                      width: 94,
+                      height: 94,
                       fit: BoxFit.cover,
                     ),
                   );
@@ -392,8 +477,8 @@ class PostingPicturesSection extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     child: Image.file(
                       images[fileIndex],
-                      width: 90,
-                      height: 90,
+                      width: 94,
+                      height: 94,
                       fit: BoxFit.cover,
                     ),
                   );
@@ -404,21 +489,21 @@ class PostingPicturesSection extends StatelessWidget {
                     imageWidget,
                     if (isMain)
                       Positioned(
-                        bottom: 4,
-                        left: 4,
+                        bottom: 6,
+                        left: 6,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
+                            horizontal: 7,
+                            vertical: 2.5,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.7),
+                            color: const Color(0xFF007AFF),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: const Text(
-                            'Main',
+                            'Cover',
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: 10.5,
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
@@ -438,9 +523,9 @@ class PostingPicturesSection extends StatelessWidget {
                           }
                         },
                         child: Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.6),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(

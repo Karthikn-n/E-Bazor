@@ -219,7 +219,7 @@ class _MotorsServiceScreenState extends State<MotorsServiceScreen> {
             onPressed: _openForm,
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(50),
-              backgroundColor: Colors.red,
+              backgroundColor: context.color.territoryColor,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(6),
               ),
@@ -305,7 +305,7 @@ class _MotorsServiceScreenState extends State<MotorsServiceScreen> {
                   foregroundColor: context.color.textDefaultColor,
                   side: BorderSide(
                     color: selected
-                        ? Colors.red.shade200
+                        ? context.color.territoryColor.withValues(alpha: .35)
                         : context.color.borderColor,
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 10),
@@ -349,7 +349,7 @@ class _MotorsServiceScreenState extends State<MotorsServiceScreen> {
           Text(
             'Ebazzor',
             style: TextStyle(
-              color: Colors.red.shade700,
+              color: context.color.territoryColor,
               fontSize: 21,
               fontWeight: FontWeight.w800,
             ),
@@ -553,7 +553,9 @@ class _MotorsServiceScreenState extends State<MotorsServiceScreen> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: selected ? Colors.red : context.color.borderColor,
+                color: selected
+                    ? context.color.territoryColor
+                    : context.color.borderColor,
                 width: selected ? 2 : 1,
               ),
             ),
@@ -589,7 +591,7 @@ class _MotorsServiceScreenState extends State<MotorsServiceScreen> {
                             : Icons.radio_button_unchecked_rounded,
                         key: ValueKey(selected),
                         color: selected
-                            ? Colors.red
+                            ? context.color.territoryColor
                             : context.color.textLightColor,
                       ),
                     ),
@@ -707,8 +709,8 @@ class _MotorsServiceScreenState extends State<MotorsServiceScreen> {
                           context.color.territoryColor.withValues(alpha: .12),
                       child: Text(
                         review.name.substring(0, 1).toUpperCase(),
-                        style: const TextStyle(
-                          color: Colors.red,
+                        style: TextStyle(
+                          color: context.color.territoryColor,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -1135,8 +1137,8 @@ class _MotorsServiceScreenState extends State<MotorsServiceScreen> {
                           context.color.territoryColor.withValues(alpha: .12),
                       child: Text(
                         '${index + 1}',
-                        style: const TextStyle(
-                          color: Colors.red,
+                        style: TextStyle(
+                          color: context.color.territoryColor,
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                         ),

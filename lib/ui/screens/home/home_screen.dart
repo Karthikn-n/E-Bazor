@@ -8,7 +8,6 @@ import 'package:Ebozor/data/cubits/category/fetch_category_cubit.dart';
 import 'package:Ebozor/data/cubits/slider_cubit.dart';
 import 'package:Ebozor/data/cubits/system/fetch_system_settings_cubit.dart';
 import 'package:Ebozor/data/cubits/system/get_api_keys_cubit.dart';
-import 'package:Ebozor/ui/screens/home/widgets/grid_list_adapter.dart';
 import 'package:Ebozor/data/cubits/home/fetch_home_all_items_cubit.dart';
 import 'package:Ebozor/data/cubits/home/fetch_home_screen_cubit.dart';
 import 'package:Ebozor/data/cubits/favorite/favorite_cubit.dart';
@@ -37,19 +36,20 @@ import 'package:Ebozor/data/model/item/item_model.dart';
 import 'package:Ebozor/data/model/system_settings_model.dart';
 
 import 'package:Ebozor/utils/extensions/extensions.dart';
-import 'package:Ebozor/utils/responsiveSize.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/ui/screens/ad_banner_screen.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/no_internet.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
 import 'package:Ebozor/ui/screens/widgets/shimmerLoadingContainer.dart';
-import 'package:Ebozor/ui/screens/home/widgets/item_horizontal_card.dart';
+import 'package:Ebozor/ui/screens/widgets/app_logo_widget.dart';
 import 'package:Ebozor/ui/screens/home/widgets/category_widget_home.dart';
 import 'package:Ebozor/ui/screens/home/widgets/home_search.dart';
 import 'package:Ebozor/ui/screens/home/widgets/home_sections_adapter.dart';
 import 'package:Ebozor/ui/screens/home/widgets/home_shimmers.dart';
 import 'package:Ebozor/ui/screens/home/slider_widget.dart';
 import 'package:Ebozor/ui/screens/home/widgets/verification_banner.dart';
+import 'package:Ebozor/data/cubits/system/location_change_cubit.dart';
+import 'package:Ebozor/ui/screens/home/widgets/location_widget.dart';
 
 const double sidePadding = 12;
 
@@ -209,90 +209,140 @@ class HomeScreenState extends State<HomeScreen>
     }
   }*/
 
+  Widget _buildTopBar(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: sidePadding, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // App Logo (eBozor Blue Branding)
+          const AppLogoWidget(height: 32),
+
+          // Location Pill (synced with LocationChangeCubit)
+          const LocationWidget(),
+
+          // Notification Bell
+          GestureDetector(
+            onTap: () {
+              UiUtils.checkUser(
+                onNotGuest: () {
+                  Navigator.pushNamed(context, Routes.notificationPage);
+                },
+                context: context,
+              );
+            },
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: context.color.secondaryColor,
+                    border: Border.all(
+                      color: context.color.borderColor.withValues(alpha: 0.6),
+                      width: 1,
+                    ),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      Icons.notifications_none_rounded,
+                      size: 22,
+                      color: context.color.textColorDark,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: -2,
+                  right: -2,
+                  child: Container(
+                    width: 14,
+                    height: 14,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFF9500),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Text(
+                        "1",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    print(context.watch<SliderCubit>().state);
 
-    return SafeArea(
-      child: Scaffold(
-        /*   appBar: AppBar(
-          elevation: 0,
-          leadingWidth: double.maxFinite,
-          leading: Padding(
-              padding: EdgeInsetsDirectional.only(
-                  start: sidePadding.rw(context), end: sidePadding.rw(context)),
-              child: const LocationWidget()),
-          /* HiveUtils.getCityName() != null
-                    ? const LocationWidget()
-                    : const SizedBox.shrink()),*/
-          backgroundColor: const Color.fromARGB(0, 0, 0, 0),
-        ),*/
-        backgroundColor: context.color.primaryColor,
-        body: RefreshIndicator(
-          key: _refreshIndicatorKey,
-
-          color: context.color.territoryColor,
-          //triggerMode: RefreshIndicatorTriggerMode.onEdge,
-          onRefresh: _refreshData,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            controller: _scrollController,
-            child: Column(
-              children: [
-                BlocBuilder<FetchHomeScreenCubit, FetchHomeScreenState>(
-                  builder: (context, state) {
-                    if (state is FetchHomeScreenInProgress) {
-                      return shimmerEffect();
-                    }
-                    if (state is FetchHomeScreenSuccess) {
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // seach widget at home scree
-                          const HomeSearchField(),
-                          // const SliderWidget(),
-                          const CategoryWidgetHome(),
-                          if (HiveUtils.isUserAuthenticated())
-                            const VerificationBanner(),
-                          ...List.generate(state.sections.length, (index) {
-                            HomeScreenSection section = state.sections[index];
-                            if (state.sections.isNotEmpty) {
+    return BlocListener<LocationChangeCubit, LocationChangeState>(
+      listener: (context, locationState) {
+        _refreshData();
+      },
+      child: SafeArea(
+        child: Scaffold(
+          backgroundColor: context.color.primaryColor,
+          body: RefreshIndicator(
+            key: _refreshIndicatorKey,
+            color: context.color.territoryColor,
+            onRefresh: _refreshData,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              controller: _scrollController,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildTopBar(context),
+                  const HomeSearchField(),
+                  const CategoryWidgetHome(),
+                  const SliderWidget(),
+                  const AllItemsWidget(),
+                  if (HiveUtils.isUserAuthenticated())
+                    const VerificationBanner(),
+                  BlocBuilder<FetchHomeScreenCubit, FetchHomeScreenState>(
+                    builder: (context, state) {
+                      if (state is FetchHomeScreenInProgress) {
+                        return const SizedBox.shrink();
+                      }
+                      if (state is FetchHomeScreenSuccess) {
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ...List.generate(state.sections.length, (index) {
+                              HomeScreenSection section = state.sections[index];
                               return HomeSectionsAdapter(
                                 section: section,
                               );
-                            } else {
-                              return SizedBox.shrink();
-                            }
-                          }),
-                          if (state.sections.isNotEmpty &&
-                              Constant.isGoogleBannerAdsEnabled == "1") ...[
-                            Container(
-                              padding: EdgeInsets.only(top: 5),
-                              margin: EdgeInsets.symmetric(vertical: 10),
-                              child:
-                                  AdBannerWidget(), // Custom widget for banner ad
-                            )
-                          ] else ...[
-                            SizedBox(
-                              height: 10,
-                            )
+                            }),
+                            if (state.sections.isNotEmpty &&
+                                Constant.isGoogleBannerAdsEnabled == "1")
+                              Container(
+                                padding: const EdgeInsets.only(top: 5),
+                                margin: const EdgeInsets.symmetric(vertical: 10),
+                                child: AdBannerWidget(),
+                              ),
                           ],
-                        ],
-                      );
-                    }
-
-                    if (state is FetchHomeScreenFail) {
-                      print('hey bro ${state.error}');
-                    }
-                    return SizedBox.shrink();
-                  },
-                ),
-                // const AllItemsWidget(),
-                const SizedBox(
-                  height: 30,
-                )
-              ],
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                  const SizedBox(height: 30),
+                ],
+              ),
             ),
           ),
         ),
@@ -524,65 +574,114 @@ class AllItemsWidget extends StatelessWidget {
       builder: (context, state) {
         if (state is FetchHomeAllItemsSuccess) {
           if (state.items.isNotEmpty) {
+            final bool hasMore = state.items.length > 8;
+            final int itemCount = hasMore ? 9 : state.items.length;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(
-                    top: 18,
-                    bottom: 12,
-                    start: sidePadding,
-                    end: sidePadding,
-                  ),
-                  child: Text("recentAds".translate(context).isNotEmpty
+                TitleHeader(
+                  title: "recommendedNearYou".translate(context).isNotEmpty
+                      ? "recommendedNearYou".translate(context)
+                      : ("recentAds".translate(context).isNotEmpty
                           ? "recentAds".translate(context)
-                          : "Recent Ads")
-                      .size(context.font.large)
-                      .bold(weight: FontWeight.bold)
-                      .color(context.color.textColorDark),
+                          : "Recommended near you"),
+                  onTap: () {
+                    Navigator.pushNamed(
+                      context,
+                      Routes.itemsList,
+                      arguments: {
+                        "categoryName": "Recommended near you",
+                        "categoryId": "",
+                      },
+                    );
+                  },
                 ),
-                GridListAdapter(
-                  type: ListUiType.Mixed,
-                  mixMode: true,
-                  crossAxisCount: 2,
-                  height: MediaQuery.of(context).size.height / 3.5.rh(context),
-                  builder: (context, int index, bool isGrid) {
-                    ItemModel? item = state.items[index];
-
-                    if (isGrid) {
-                      // Show ItemCard for grid items
+                SizedBox(
+                  height: 232,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: sidePadding),
+                    itemCount: itemCount,
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (context, int index) {
+                      if (index == 8 && hasMore) {
+                        return InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () {
+                            Navigator.pushNamed(
+                              context,
+                              Routes.itemsList,
+                              arguments: {
+                                "categoryName": "Recommended near you",
+                                "categoryId": "",
+                              },
+                            );
+                          },
+                          child: Container(
+                            width: 135,
+                            height: 232,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0F6FF),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: const Color(0xFF007AFF).withValues(alpha: 0.25),
+                                width: 1.2,
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF007AFF),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.arrow_forward_rounded,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  "seeAll".translate(context).isNotEmpty
+                                      ? "seeAll".translate(context)
+                                      : "View all",
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF007AFF),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "${state.items.length} ads",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: context.color.textLightColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+                      final item = state.items[index];
                       return ItemCard(
                         item: item,
-                        width: 192,
+                        width: 175,
                       );
-                    } else {
-                      // Show ItemHorizontalCard for list items
-                      return InkWell(
-                        onTap: () {
-                          Navigator.pushNamed(
-                            context,
-                            Routes.adDetailsScreen,
-                            arguments: {
-                              'model': item,
-                            },
-                          );
-                        },
-                        child: ItemHorizontalCard(
-                          item: item,
-                          showLikeButton: true,
-                          additionalImageWidth: 8,
-                        ),
-                      );
-                    }
-                    // }
-                  },
-                  total: state.items.length,
+                    },
+                  ),
                 ),
-                if (state.isLoadingMore) UiUtils.progress(),
               ],
             );
           } else {
-            return SizedBox.shrink();
+            return const SizedBox.shrink();
           }
         }
         if (state is FetchHomeAllItemsFail) {
@@ -594,7 +693,13 @@ class AllItemsWidget extends StatelessWidget {
 
           return const SomethingWentWrong();
         }
-        return SizedBox.shrink();
+        if (state is FetchHomeAllItemsInProgress) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(horizontal: sidePadding, vertical: 12),
+            child: CustomShimmer(height: 200, width: double.maxFinite),
+          );
+        }
+        return const SizedBox.shrink();
       },
     );
   }

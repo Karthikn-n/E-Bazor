@@ -473,10 +473,11 @@ class MainActivityState extends State<MainActivity>
   BottomAppBar bottomBar() {
     return BottomAppBar(
       color: context.color.secondaryColor,
-      elevation: 0,
+      elevation: 4,
       padding: EdgeInsets.zero,
+      clipBehavior: Clip.none,
       child: Container(
-        height: kToolbarHeight,
+        height: 62,
         decoration: BoxDecoration(
           color: context.color.secondaryColor,
           border: Border(
@@ -494,83 +495,32 @@ class MainActivityState extends State<MainActivity>
               title: "homeTab".translate(context).isNotEmpty
                   ? "homeTab".translate(context)
                   : "Home",
-              asset: AppIcons.homeNavPng,
+              icon: currtab == 0
+                  ? Icons.home_rounded
+                  : Icons.home_outlined,
             ),
 
             buildBottomNavigationbarItem(
               index: 1,
               title: "favorites".translate(context).isNotEmpty
                   ? "favorites".translate(context)
-                  : "Favorites",
-              icon: Icons.favorite_border_rounded,
+                  : "Saved",
+              icon: currtab == 1
+                  ? Icons.favorite_rounded
+                  : Icons.favorite_border_rounded,
             ),
 
-            /// CENTER PLACE AD BUTTON
-            Expanded(
-              child: Material(
-                type: MaterialType.transparency,
-                child: InkWell(
-                  highlightColor: Colors.transparent,
-                  splashColor: Colors.transparent,
-                  onTap: () {
-                    UiUtils.checkUser(
-                      context: context,
-                      onNotGuest: () {
-                        Navigator.pushNamed(
-                          context,
-                          Routes.selectCategoryScreen,
-                          arguments: <String, dynamic>{},
-                        );
-                      },
-                    );
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: context.color.territoryColor,
-                          ),
-                          child: const Center(
-                            child: Icon(
-                              Icons.add_rounded,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          "placeAd".translate(context).isNotEmpty
-                              ? "placeAd".translate(context)
-                              : "Place Ad",
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: context.color.territoryColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            /// CENTER ELEVATED FLOATING SELL BUTTON
+            _buildCenterSellButton(),
 
             buildBottomNavigationbarItem(
               index: 2,
               title: "message".translate(context).isNotEmpty
                   ? "message".translate(context)
                   : "Chats",
-              asset: AppIcons.chatNavPng,
+              icon: currtab == 2
+                  ? Icons.chat_bubble_rounded
+                  : Icons.chat_bubble_outline_rounded,
             ),
 
             buildBottomNavigationbarItem(
@@ -578,9 +528,83 @@ class MainActivityState extends State<MainActivity>
               title: "profileTab".translate(context).isNotEmpty
                   ? "profileTab".translate(context)
                   : "Profile",
-              asset: AppIcons.profileNavPng,
+              icon: currtab == 3
+                  ? Icons.person_rounded
+                  : Icons.person_outline_rounded,
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCenterSellButton() {
+    return Expanded(
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          highlightColor: Colors.transparent,
+          splashColor: Colors.transparent,
+          onTap: () {
+            UiUtils.checkUser(
+              context: context,
+              onNotGuest: () {
+                Navigator.pushNamed(
+                  context,
+                  Routes.selectCategoryScreen,
+                  arguments: <String, dynamic>{},
+                );
+              },
+            );
+          },
+          child: Transform.translate(
+            offset: const Offset(0, -14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF007AFF),
+                    border: Border.all(
+                      color: context.color.secondaryColor,
+                      width: 3.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF007AFF).withValues(alpha: 0.4),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.add_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  "placeAd".translate(context).isNotEmpty
+                      ? "placeAd".translate(context)
+                      : "Sell",
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF007AFF),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -593,6 +617,9 @@ class MainActivityState extends State<MainActivity>
     IconData? icon,
   }) {
     final isSelected = currtab == index;
+    final activeColor = const Color(0xFF007AFF);
+    final inactiveColor =
+        context.color.textColorDark.withValues(alpha: 0.55);
 
     return Expanded(
       child: Material(
@@ -614,16 +641,12 @@ class MainActivityState extends State<MainActivity>
                     child: icon != null
                         ? Icon(
                             icon,
-                            color: isSelected
-                                ? context.color.territoryColor
-                                : context.color.textColorDark.withValues(alpha: 0.55),
+                            color: isSelected ? activeColor : inactiveColor,
                             size: 22,
                           )
                         : Image.asset(
                             asset!,
-                            color: isSelected
-                                ? context.color.territoryColor
-                                : context.color.textColorDark.withValues(alpha: 0.55),
+                            color: isSelected ? activeColor : inactiveColor,
                             width: 22,
                             height: 22,
                             fit: BoxFit.contain,
@@ -638,9 +661,7 @@ class MainActivityState extends State<MainActivity>
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected
-                        ? context.color.territoryColor
-                        : context.color.textColorDark.withValues(alpha: 0.55),
+                    color: isSelected ? activeColor : inactiveColor,
                   ),
                 ),
               ],
@@ -651,3 +672,4 @@ class MainActivityState extends State<MainActivity>
     );
   }
 }
+

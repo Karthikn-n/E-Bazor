@@ -4,8 +4,6 @@ import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:Ebozor/app/routes.dart';
-import 'package:Ebozor/utils/app_icon.dart';
-import 'package:Ebozor/utils/ui_utils.dart';
 
 import 'package:Ebozor/ui/screens/home/home_screen.dart';
 import 'package:flutter_svg/svg.dart';
@@ -15,97 +13,62 @@ class HomeSearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        /// 🔥 SEARCH FIELD (TAKES REMAINING SPACE)
-        Expanded(
-          child: BlocBuilder<FetchCategoryCubit, FetchCategoryState>(
-            builder: (context, state) {
-              List categories = [];
+    return BlocBuilder<FetchCategoryCubit, FetchCategoryState>(
+      builder: (context, state) {
+        List categories = [];
 
-              if (state is FetchCategorySuccess) {
-                categories = state.categories;
-              }
+        if (state is FetchCategorySuccess) {
+          categories = state.categories;
+        }
 
-              return Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: sidePadding,
-                  vertical: 20,
-                ),
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.pushNamed(
-                      context,
-                      Routes.searchScreenRoute,
-                      arguments: {"autoFocus": true},
-                    );
-                  },
-                  child: Container(
-                    height: 56,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: context.color.secondaryColor,
-                      border: Border.all(
-                        width: 1.5,
-                        color: context.color.borderColor.withValues(alpha: 0.8),
-                      ),
-                      borderRadius: BorderRadius.circular(50),
-                    ),
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _DynamicSearchText(
-                            categories: categories,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+        return Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: sidePadding,
+            vertical: 8,
+          ),
+          child: GestureDetector(
+            onTap: () {
+              Navigator.pushNamed(
+                context,
+                Routes.searchScreenRoute,
+                arguments: const {"autoFocus": true},
               );
             },
+            child: Container(
+              height: 48,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: context.color.secondaryColor,
+                border: Border.all(
+                  width: 1,
+                  color: context.color.borderColor.withValues(alpha: 0.7),
+                ),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.search_rounded,
+                    size: 22,
+                    color: context.color.textColorDark.withValues(alpha: 0.45),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _DynamicSearchText(
+                      categories: categories,
+                    ),
+                  ),
+                  Icon(
+                    Icons.qr_code_scanner_rounded,
+                    size: 20,
+                    color: context.color.textColorDark.withValues(alpha: 0.55),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-
-        /// 📍 LOCATION ICON
-          // GestureDetector(
-          //   onTap: () {
-          //     Navigator.pushNamed(
-          //       context,
-          //       Routes.countriesScreen,
-          //       arguments: {"from": "home"},
-          //     );
-          //   },
-          //   child: UiUtils.getSvg(
-          //     AppIcons.location,
-          //     color: context.color.textColorDark.withValues(alpha: 0.7),
-          //     width: 28, // 👈 reduce size slightly
-          //     height: 28,
-          //   ),
-          // ),
-
-        const SizedBox(width: 10),
-
-        /// 🔔 NOTIFICATION ICON
-        GestureDetector(
-          onTap: () {
-            UiUtils.checkUser(
-              onNotGuest: () {
-                Navigator.pushNamed(context, Routes.notificationPage);
-              },
-              context: context,
-            );
-          },
-          child: UiUtils.getSvg(
-            AppIcons.notification,
-            color: context.color.textColorDark.withValues(alpha: 0.7),
-            width: 28,
-            height: 28,
-          ),
-        ),
-        const SizedBox(width: 10),
-      ],
+        );
+      },
     );
   }
 }

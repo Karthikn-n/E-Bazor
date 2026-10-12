@@ -147,6 +147,8 @@ String authenticationErrorMessage(dynamic error) {
     }
     return 'Authentication failed (${error.code}). Please try again.';
   }
+  AppLog.e('Unhandled authentication error: $error (${error.runtimeType})',
+      error: error, name: 'AuthCubit');
   return 'Authentication failed. Please try again.';
 }
 

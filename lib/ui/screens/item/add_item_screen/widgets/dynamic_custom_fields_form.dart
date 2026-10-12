@@ -262,14 +262,27 @@ class DynamicCustomFieldsForm extends StatelessWidget {
     }
     if (_isText(field)) {
       final number = type == 'number' || type == 'numeric';
-      return TextFormField(
-        controller: controller.textController(field),
-        keyboardType: number
-            ? const TextInputType.numberWithOptions(decimal: true)
-            : TextInputType.text,
-        maxLines: type == 'textarea' ? 4 : 1,
-        maxLength: field.maxLength,
-        decoration: _decoration(context, 'Enter ${_label(field)}', error),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextFormField(
+            controller: controller.textController(field),
+            keyboardType: number
+                ? const TextInputType.numberWithOptions(decimal: true)
+                : TextInputType.text,
+            maxLines: type == 'textarea' ? 4 : 1,
+            maxLength: field.maxLength,
+            decoration: _decoration(context, 'Enter ${_label(field)}', null),
+          ),
+          if (error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, left: 4),
+              child: Text(
+                error,
+                style: const TextStyle(color: Colors.red, fontSize: 12),
+              ),
+            ),
+        ],
       );
     }
 
@@ -287,7 +300,7 @@ class DynamicCustomFieldsForm extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: InputDecorator(
               decoration:
-                  _decoration(context, 'Select ${_label(field)}', error),
+                  _decoration(context, 'Select ${_label(field)}', null),
               child: Row(
                 children: [
                   Expanded(
@@ -311,6 +324,14 @@ class DynamicCustomFieldsForm extends StatelessWidget {
               ),
             ),
           ),
+          if (error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, left: 4),
+              child: Text(
+                error,
+                style: const TextStyle(color: Colors.red, fontSize: 12),
+              ),
+            ),
           if (expanded && options.isNotEmpty) ...[
             const SizedBox(height: 6),
             Container(
@@ -390,24 +411,37 @@ class DynamicCustomFieldsForm extends StatelessWidget {
       orElse: () => '',
     );
 
-    return DropdownButtonFormField<String>(
-      initialValue: matchingOption.isNotEmpty ? matchingOption : null,
-      isExpanded: true,
-      dropdownColor: context.color.secondaryColor,
-      borderRadius: BorderRadius.circular(12),
-      menuMaxHeight: 320,
-      icon: const Icon(Icons.keyboard_arrow_down_rounded),
-      decoration: _decoration(context, 'Select ${_label(field)}', error),
-      hint: Text('Select ${_label(field)}'),
-      items: options
-          .map((option) => DropdownMenuItem(
-                value: option,
-                child: Text(option, overflow: TextOverflow.ellipsis),
-              ))
-          .toList(growable: false),
-      onChanged: options.isEmpty
-          ? null
-          : (value) => controller.selectOne(field, value),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DropdownButtonFormField<String>(
+          initialValue: matchingOption.isNotEmpty ? matchingOption : null,
+          isExpanded: true,
+          dropdownColor: context.color.secondaryColor,
+          borderRadius: BorderRadius.circular(12),
+          menuMaxHeight: 320,
+          icon: const Icon(Icons.keyboard_arrow_down_rounded),
+          decoration: _decoration(context, 'Select ${_label(field)}', null),
+          hint: Text('Select ${_label(field)}'),
+          items: options
+              .map((option) => DropdownMenuItem(
+                    value: option,
+                    child: Text(option, overflow: TextOverflow.ellipsis),
+                  ))
+              .toList(growable: false),
+          onChanged: options.isEmpty
+              ? null
+              : (value) => controller.selectOne(field, value),
+        ),
+        if (error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Text(
+              error,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ),
+      ],
     );
   }
 
@@ -427,6 +461,13 @@ class DynamicCustomFieldsForm extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(
           color: context.color.borderColor.withValues(alpha: 0.6),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(
+          color: Color(0xFF007AFF),
+          width: 1.5,
         ),
       ),
     );

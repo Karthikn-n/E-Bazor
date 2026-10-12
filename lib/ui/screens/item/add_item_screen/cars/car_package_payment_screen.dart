@@ -18,6 +18,7 @@ import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/payment/gatways/stripe_service.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
+import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/ad_creation_stepper.dart';
 
 class CarPackagePaymentScreen extends StatefulWidget {
   final CarPostingData? postingData;
@@ -81,6 +82,8 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
   double _discountPercent = 0.0;
   String? _appliedPromoCode;
   bool _isProcessingPayment = false;
+  bool _isReviewStep = false;
+  ItemModel? _createdItemForReview;
 
   @override
   void initState() {
@@ -297,7 +300,7 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      "Choose how you would like to pay AED ${_totalAmount.toStringAsFixed(1)}",
+                      "Choose how you would like to pay ${Constant.currencySymbol} ${_totalAmount.toStringAsFixed(1)}",
                       style: TextStyle(
                         fontSize: 13,
                         color: context.color.textLightColor,
@@ -390,7 +393,7 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
                           elevation: 0,
                         ),
                         child: Text(
-                          "Pay with Stripe • AED ${_totalAmount.toStringAsFixed(1)}",
+                          "Pay with Stripe • ${Constant.currencySymbol} ${_totalAmount.toStringAsFixed(1)}",
                           style: const TextStyle(
                             fontSize: 15.5,
                             fontWeight: FontWeight.bold,
@@ -649,12 +652,23 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
           ?.fetchMyItems(getItemsWithStatus: "inactive");
     } catch (_) {}
 
+    setState(() {
+      _createdItemForReview = createdItem;
+      _isReviewStep = true;
+    });
+  }
+
+  void _publishListingNow() {
+    if (_createdItemForReview == null) return;
+    final isEditMode = widget.isEdit ||
+        (_createdItemForReview!.id != null && _createdItemForReview!.id! > 0);
+
     if (isEditMode) {
       Navigator.pushReplacementNamed(
         context,
         Routes.successItemScreen,
         arguments: {
-          'model': createdItem,
+          'model': _createdItemForReview!,
           'isEdit': true,
         },
       );
@@ -664,15 +678,439 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
         Routes.successItemScreen,
         (route) => route.isFirst,
         arguments: {
-          'model': createdItem,
+          'model': _createdItemForReview!,
           'isEdit': false,
         },
       );
     }
   }
 
+  Widget _buildReviewListingScreen(BuildContext context) {
+    final item = _createdItemForReview;
+    final title = item?.name ?? widget.postingData?.title ?? "Vehicle Listing";
+    final price = item?.price != null ? item!.price!.toInt().toString() : "0";
+    final city = item?.city ?? HiveUtils.getCityName() ?? "Dushanbe";
+    final photoCount = widget.postingData?.imageFiles.length ?? 1;
+
+    return AnnotatedRegion(
+      value: UiUtils.getSystemUiOverlayStyle(
+        context: context,
+        statusBarColor: context.color.secondaryColor,
+      ),
+      child: SafeArea(
+        child: Scaffold(
+          backgroundColor: context.color.backgroundColor,
+          appBar: UiUtils.buildAppBar(
+            context,
+            showBackButton: true,
+            title: "Post a vehicle",
+            actions: [
+              TextButton(
+                onPressed: () {
+                  HelperUtils.showSnackBarMessage(
+                    context,
+                    "Listing saved to drafts",
+                    type: MessageType.success,
+                  );
+                  Navigator.popUntil(context, (route) => route.isFirst);
+                },
+                child: const Text(
+                  "Save & exit",
+                  style: TextStyle(
+                    color: Color(0xFF007AFF),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+            onBackPress: () => setState(() => _isReviewStep = false),
+          ),
+          body: Column(
+            children: [
+              const AdCreationStepper(currentStep: 4),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header
+                      Text(
+                        "Ready to publish",
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: context.color.textDefaultColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Review your listing before it goes live.",
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: context.color.textLightColor,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+
+                      // Card Preview
+                      Container(
+                        decoration: BoxDecoration(
+                          color: context.color.secondaryColor,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: context.color.borderColor.withValues(alpha: 0.6),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Header Image
+                            Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+                                  child: SizedBox(
+                                    height: 190,
+                                    width: double.infinity,
+                                    child: (widget.postingData != null && widget.postingData!.imageFiles.isNotEmpty)
+                                        ? Image.file(
+                                            widget.postingData!.imageFiles.first,
+                                            fit: BoxFit.cover,
+                                          )
+                                        : (item?.image?.isNotEmpty == true
+                                            ? UiUtils.imageType(item!.image!, fit: BoxFit.cover)
+                                            : Container(
+                                                color: Colors.grey.shade200,
+                                                child: Icon(
+                                                  Icons.directions_car_rounded,
+                                                  size: 60,
+                                                  color: Colors.grey.shade400,
+                                                ),
+                                              )),
+                                  ),
+                                ),
+                                // Edit button in top right
+                                Positioned(
+                                  top: 12,
+                                  right: 12,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.15),
+                                          blurRadius: 4,
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.edit_outlined, size: 14, color: Colors.black87),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'Edit',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                // Photo count on bottom right
+                                Positioned(
+                                  bottom: 12,
+                                  right: 12,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(alpha: 0.6),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      '1/$photoCount',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            // Listing info
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    title,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: context.color.textDefaultColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    "$price ${Constant.currencySymbol}",
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF007AFF),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.location_on_outlined,
+                                        size: 14,
+                                        color: context.color.textLightColor,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        city,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: context.color.textLightColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Divider(color: context.color.borderColor.withValues(alpha: 0.6)),
+                                  const SizedBox(height: 12),
+
+                                  // Sections review
+                                  _buildReviewRow(
+                                    icon: Icons.camera_alt_outlined,
+                                    title: "Photos",
+                                    subtitle: "$photoCount photos added",
+                                  ),
+                                  const SizedBox(height: 14),
+                                  _buildReviewRow(
+                                    icon: Icons.directions_car_outlined,
+                                    title: "Vehicle details",
+                                    subtitle: title,
+                                  ),
+                                  const SizedBox(height: 14),
+                                  _buildReviewRow(
+                                    icon: Icons.sell_outlined,
+                                    title: "Price",
+                                    subtitle: "$price ${Constant.currencySymbol} • Negotiable",
+                                  ),
+                                  const SizedBox(height: 14),
+                                  _buildReviewRow(
+                                    icon: Icons.phone_outlined,
+                                    title: "Contact",
+                                    subtitle: "Your phone number is ready",
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Privacy Banner
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF007AFF).withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: const Color(0xFF007AFF).withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.verified_user_rounded,
+                              size: 20,
+                              color: Color(0xFF007AFF),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "Your phone number stays private",
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF007AFF),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    "Buyers contact you securely through eBozor. Stay safe and in control.",
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: context.color.textDefaultColor.withValues(alpha: 0.75),
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Bottom Actions Bar
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: context.color.secondaryColor,
+                  border: Border(
+                    top: BorderSide(
+                      color: context.color.borderColor.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: OutlinedButton(
+                        onPressed: () {
+                          HelperUtils.showSnackBarMessage(
+                            context,
+                            "Draft saved",
+                            type: MessageType.success,
+                          );
+                          Navigator.popUntil(context, (route) => route.isFirst);
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: BorderSide(
+                            color: context.color.borderColor.withValues(alpha: 0.8),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: Text(
+                          "Save draft",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: context.color.textDefaultColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        onPressed: _publishListingNow,
+                        icon: const Icon(Icons.send_rounded, size: 18, color: Colors.white),
+                        label: const Text(
+                          "Publish now",
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF007AFF),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReviewRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: const Color(0xFF007AFF)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: context.color.textLightColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Text(
+          "Edit >",
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF007AFF),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isReviewStep) {
+      return _buildReviewListingScreen(context);
+    }
+
     return AnnotatedRegion(
       value: UiUtils.getSystemUiOverlayStyle(
         context: context,
@@ -689,6 +1127,7 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
           ),
           body: Column(
             children: [
+              const AdCreationStepper(currentStep: 3),
               Expanded(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
@@ -755,9 +1194,9 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
                     onPressed: _isProcessingPayment ? null : _handlePay,
                     style: ElevatedButton.styleFrom(
                       backgroundColor:
-                          const Color(0xFFD31027), // Modern red brand CTA
+                          const Color(0xFF007AFF),
                       disabledBackgroundColor:
-                          const Color(0xFFD31027).withValues(alpha: 0.6),
+                          const Color(0xFF007AFF).withValues(alpha: 0.6),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
@@ -774,7 +1213,7 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
                             ),
                           )
                         : Text(
-                            "Pay AED ${_totalAmount.toStringAsFixed(1)}",
+                            "Pay ${Constant.currencySymbol} ${_totalAmount.toStringAsFixed(1)}",
                             style: const TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.bold,
@@ -891,7 +1330,7 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
           ),
           const Spacer(),
           Text(
-            "1,438 AED",
+            "1,438 ${Constant.currencySymbol}",
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -958,7 +1397,7 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
           // Option 1: 7 Days
           _buildAddonOptionRow(
             title: "Premium Ad for 7 days",
-            priceStr: "+ 1,098 AED",
+            priceStr: "+ 1,098 ${Constant.currencySymbol}",
             isSelected: _selectedPremiumAddon == 'premium_7',
             onTap: () {
               setState(() {
@@ -975,7 +1414,7 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
           // Option 2: 14 Days
           _buildAddonOptionRow(
             title: "Premium Ad for 14 days",
-            priceStr: "+ 1,798 AED",
+            priceStr: "+ 1,798 ${Constant.currencySymbol}",
             isSelected: _selectedPremiumAddon == 'premium_14',
             onTap: () {
               setState(() {
@@ -1047,7 +1486,7 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
           // Option 1: 7 Days
           _buildAddonOptionRow(
             title: "Featured Ad for 7 days",
-            priceStr: "+ 499 AED",
+            priceStr: "+ 499 ${Constant.currencySymbol}",
             isSelected: _selectedFeaturedAddon == 'featured_7',
             onTap: () {
               setState(() {
@@ -1064,7 +1503,7 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
           // Option 2: 14 Days
           _buildAddonOptionRow(
             title: "Featured Ad for 14 days",
-            priceStr: "+ 899 AED",
+            priceStr: "+ 899 ${Constant.currencySymbol}",
             isSelected: _selectedFeaturedAddon == 'featured_14',
             onTap: () {
               setState(() {
@@ -1187,7 +1626,7 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
           const SizedBox(height: 14),
 
           // Standard Ad line
-          _buildSummaryLine("Standard Ad", "1,438 AED"),
+          _buildSummaryLine("Standard Ad", "1,438 ${Constant.currencySymbol}"),
 
           // Premium add-on line
           if (_selectedPremiumAddon != null) ...[
@@ -1196,7 +1635,7 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
               _selectedPremiumAddon == 'premium_7'
                   ? "Premium Ad (7 days)"
                   : "Premium Ad (14 days)",
-              "+ ${_premiumAddonPrice.toStringAsFixed(0)} AED",
+              "+ ${_premiumAddonPrice.toStringAsFixed(0)} ${Constant.currencySymbol}",
               isAddon: true,
             ),
           ],
@@ -1208,7 +1647,7 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
               _selectedFeaturedAddon == 'featured_7'
                   ? "Featured Ad (7 days)"
                   : "Featured Ad (14 days)",
-              "+ ${_featuredAddonPrice.toStringAsFixed(0)} AED",
+              "+ ${_featuredAddonPrice.toStringAsFixed(0)} ${Constant.currencySymbol}",
               isAddon: true,
             ),
           ],
@@ -1305,14 +1744,14 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
           // Subtotal
           _buildSummaryLine(
             "Subtotal",
-            "${_netSubtotal.toStringAsFixed(1)} AED",
+            "${_netSubtotal.toStringAsFixed(1)} ${Constant.currencySymbol}",
           ),
           const SizedBox(height: 8),
 
           // VAT 5%
           _buildSummaryLine(
             "VAT 5%",
-            "${_vatAmount.toStringAsFixed(1)} AED",
+            "${_vatAmount.toStringAsFixed(1)} ${Constant.currencySymbol}",
           ),
           const SizedBox(height: 12),
           Divider(
@@ -1334,7 +1773,7 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
                 ),
               ),
               Text(
-                "${_totalAmount.toStringAsFixed(1)} AED",
+                "${_totalAmount.toStringAsFixed(1)} ${Constant.currencySymbol}",
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,

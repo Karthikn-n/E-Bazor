@@ -8,6 +8,7 @@ import 'package:Ebozor/utils/constant.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/data/model/category_model.dart';
+import 'package:Ebozor/utils/category_fallback_helper.dart';
 
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
@@ -20,6 +21,7 @@ import 'package:Ebozor/ui/screens/widgets/errors/something_went_wrong.dart';
 import 'package:Ebozor/data/helper/widgets.dart';
 import 'package:Ebozor/data/repositories/custom_fields_repository.dart';
 import 'package:Ebozor/data/model/custom_field/custom_field_model.dart';
+import 'package:Ebozor/ui/screens/widgets/app_logo_widget.dart';
 
 int screenStack = 0;
 
@@ -47,6 +49,67 @@ class _SelectCategoryScreenState extends CloudState<SelectCategoryScreen> {
   void initState() {
     super.initState();
     _categoriesFuture = _categoryRepository.fetchCategoryChildrenByParent();
+  }
+
+  Map<String, dynamic> _getCategoryStyle(String name, String slug) {
+    final lower = '${name.toLowerCase()} ${slug.toLowerCase()}';
+    if (lower.contains('motor') ||
+        lower.contains('car') ||
+        lower.contains('auto') ||
+        lower.contains('vehicle')) {
+      return {
+        'color': const Color(0xFF007AFF),
+        'sublabel': 'Cars, bikes, trucks',
+        'icon': Icons.directions_car_rounded,
+      };
+    } else if (lower.contains('prop') ||
+        lower.contains('real') ||
+        lower.contains('estate') ||
+        lower.contains('house') ||
+        lower.contains('rent')) {
+      return {
+        'color': const Color(0xFF007AFF),
+        'sublabel': 'Homes, apartments',
+        'icon': Icons.home_work_rounded,
+      };
+    } else if (lower.contains('elect') ||
+        lower.contains('phone') ||
+        lower.contains('mobile') ||
+        lower.contains('gadget') ||
+        lower.contains('tech')) {
+      return {
+        'color': const Color(0xFF007AFF),
+        'sublabel': 'Phones, computers',
+        'icon': Icons.devices_other_rounded,
+      };
+    } else if (lower.contains('job') ||
+        lower.contains('career') ||
+        lower.contains('hire')) {
+      return {
+        'color': const Color(0xFF007AFF),
+        'sublabel': 'Find or offer work',
+        'icon': Icons.work_outline_rounded,
+      };
+    } else if (lower.contains('home') ||
+        lower.contains('garden') ||
+        lower.contains('furnit')) {
+      return {
+        'color': const Color(0xFF007AFF),
+        'sublabel': 'Furniture, appliances',
+        'icon': Icons.chair_outlined,
+      };
+    } else if (lower.contains('serv') || lower.contains('repair')) {
+      return {
+        'color': const Color(0xFF007AFF),
+        'sublabel': 'Skills and local services',
+        'icon': Icons.handyman_outlined,
+      };
+    }
+    return {
+      'color': const Color(0xFF007AFF),
+      'sublabel': 'Browse listings',
+      'icon': Icons.category_rounded,
+    };
   }
 
   void _handleCategoryTap(BuildContext context, CategoryModel cat) {
@@ -326,35 +389,86 @@ class _SelectCategoryScreenState extends CloudState<SelectCategoryScreen> {
       child: SafeArea(
         child: Scaffold(
           backgroundColor: context.color.backgroundColor,
-          appBar: UiUtils.buildAppBar(
-            context,
-            showBackButton: true,
-            title: "adListing".translate(context),
-            onBackPress: () {
-              Navigator.of(context).pop();
-            },
+          appBar: AppBar(
+            backgroundColor: context.color.secondaryColor,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            leading: Navigator.canPop(context)
+                ? IconButton(
+                    icon: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: context.color.textDefaultColor,
+                      size: 20,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  )
+                : null,
+            title: const AppLogoWidget(height: 28),
+            centerTitle: !Navigator.canPop(context),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.notifications_none_rounded, size: 24),
+                color: context.color.textDefaultColor,
+                onPressed: () {
+                  Navigator.pushNamed(context, Routes.notificationPage);
+                },
+              ),
+              const SizedBox(width: 6),
+            ],
           ),
           body: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(
-                  "Hello, what are you\nlisting today?",
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: context.color.textDefaultColor,
-                    height: 1.25,
+                const SizedBox(height: 4),
+                Center(
+                  child: Text(
+                    "What are you selling?",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      color: context.color.textDefaultColor,
+                      height: 1.2,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  "Select the area that best suits your ad",
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: context.color.textLightColor,
+                const SizedBox(height: 6),
+                Center(
+                  child: Text(
+                    "Choose a category to get started",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: context.color.textLightColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF007AFF).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.timer_outlined, size: 14, color: Color(0xFF007AFF)),
+                        SizedBox(width: 5),
+                        Text(
+                          "Usually takes about 2 minutes",
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF007AFF),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -414,11 +528,16 @@ class _SelectCategoryScreenState extends CloudState<SelectCategoryScreen> {
                         crossAxisCount: 2,
                         crossAxisSpacing: 14,
                         mainAxisSpacing: 14,
-                        childAspectRatio: 1.15,
+                        childAspectRatio: 1.05,
                       ),
                       itemCount: categories.length,
                       itemBuilder: (context, index) {
                         final cat = categories[index];
+                        final style = _getCategoryStyle(
+                          cat.name ?? '',
+                          cat.slug ?? '',
+                        );
+
                         return InkWell(
                           borderRadius: BorderRadius.circular(16),
                           onTap: () => _handleCategoryTap(context, cat),
@@ -431,40 +550,61 @@ class _SelectCategoryScreenState extends CloudState<SelectCategoryScreen> {
                                     .withValues(alpha: 0.6),
                                 width: 1,
                               ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.02),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 16),
+                                horizontal: 12, vertical: 14),
                             child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                SizedBox(
-                                  width: 42,
-                                  height: 42,
-                                  child: (cat.url != null &&
-                                          cat.url!.isNotEmpty)
-                                      ? UiUtils.imageType(
-                                          cat.url!,
-                                          fit: BoxFit.contain,
-                                          // color: cat.url!.endsWith('.svg')
-                                          //     ? context.color.territoryColor
-                                          //     : null,
-                                        )
-                                      : Icon(
-                                          Icons.category_outlined,
-                                          size: 38,
-                                          color: context.color.territoryColor,
-                                        ),
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF007AFF)
+                                        .withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: CategoryFallbackHelper
+                                        .buildCategoryIconWidget(
+                                      url: cat.url,
+                                      title: cat.name ?? '',
+                                      slug: cat.slug,
+                                      fallbackIcon: style['icon'] as IconData?,
+                                      iconColor: const Color(0xFF007AFF),
+                                      size: 26,
+                                    ),
+                                  ),
                                 ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 10),
                                 Text(
                                   cat.name ?? "",
                                   textAlign: TextAlign.center,
-                                  maxLines: 2,
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
                                     color: context.color.textDefaultColor,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  style['sublabel'] as String,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: context.color.textLightColor,
                                   ),
                                 ),
                               ],
@@ -475,6 +615,60 @@ class _SelectCategoryScreenState extends CloudState<SelectCategoryScreen> {
                     );
                   },
                 ),
+                const SizedBox(height: 24),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF007AFF).withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFF007AFF).withValues(alpha: 0.15),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF007AFF).withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.schedule_rounded,
+                          color: Color(0xFF007AFF),
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Usually takes about 2 minutes",
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: context.color.textColorDark,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              "A few simple steps and you're live!",
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: context.color.textLightColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
               ],
             ),
           ),

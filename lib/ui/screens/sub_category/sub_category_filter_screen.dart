@@ -6,6 +6,8 @@ import 'package:Ebozor/data/model/property_filter_category_resolver.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
+import 'package:Ebozor/utils/ui_utils.dart';
+import 'package:Ebozor/utils/category_fallback_helper.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -913,9 +915,9 @@ class _FiltersPageState extends State<FiltersPage> {
       scrolledUnderElevation: 0,
       leading: IconButton(
         icon: Icon(
-          Icons.arrow_back_ios_new_rounded,
+          Icons.close_rounded,
           color: context.color.textDefaultColor,
-          size: 20,
+          size: 24,
         ),
         onPressed: () => Navigator.pop(context),
       ),
@@ -923,7 +925,7 @@ class _FiltersPageState extends State<FiltersPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            "Filters".translate(context),
+            "Advanced filters".translate(context),
             style: TextStyle(
               color: context.color.textDefaultColor,
               fontWeight: FontWeight.w700,
@@ -1249,19 +1251,17 @@ class _FiltersPageState extends State<FiltersPage> {
         ? context.color.territoryColor
         : context.color.textLightColor;
 
-    if (image != null && image.isNotEmpty) {
-      return Image.network(
-        image,
-        height: 26,
-        width: 26,
-        fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) {
-          return Icon(_getIcon(name), size: 24, color: activeColor);
-        },
-      );
-    } else {
-      return Icon(_getIcon(name), size: 24, color: activeColor);
-    }
+    return SizedBox(
+      width: 26,
+      height: 26,
+      child: CategoryFallbackHelper.buildCategoryIconWidget(
+        url: image,
+        title: name ?? '',
+        fallbackIcon: _getIcon(name),
+        iconColor: activeColor,
+        size: 24,
+      ),
+    );
   }
 
   Widget _buildSubCategoriesSection(
@@ -1441,6 +1441,29 @@ class _FiltersPageState extends State<FiltersPage> {
     );
   }
 
+  Widget _buildFilterCardContainer({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.color.secondaryColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: context.color.borderColor.withValues(alpha: 0.5),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
   Widget _buildEditableRangeField(
     TextEditingController controller,
     String hint,
@@ -1449,7 +1472,7 @@ class _FiltersPageState extends State<FiltersPage> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: context.color.secondaryColor,
+        color: context.color.backgroundColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: context.color.borderColor.withValues(alpha: 0.6),
@@ -1540,7 +1563,7 @@ class _FiltersPageState extends State<FiltersPage> {
           _buildSectionTitle(filterName),
           Container(
             decoration: BoxDecoration(
-              color: context.color.secondaryColor,
+              color: context.color.backgroundColor,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: context.color.borderColor.withValues(alpha: 0.6),
@@ -1685,7 +1708,7 @@ class _FiltersPageState extends State<FiltersPage> {
                   ? filter.placeholder
                   : 'Select $filterName',
               filled: true,
-              fillColor: context.color.secondaryColor,
+              fillColor: context.color.backgroundColor,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(
@@ -1938,36 +1961,69 @@ class _FiltersPageState extends State<FiltersPage> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
       child: SafeArea(
         top: false,
-        child: SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton(
-            onPressed: _applyFiltersAndNavigate,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: context.color.territoryColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              elevation: 0,
-            ),
-            child: _isLoadingCount
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: Colors.white,
+        child: Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: SizedBox(
+                height: 48,
+                child: OutlinedButton(
+                  onPressed: _resetAllFilters,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(
+                      color: const Color(0xFF007AFF).withValues(alpha: 0.35),
+                      width: 1.2,
                     ),
-                  )
-                : Text(
-                    'Show $countFormatted Results'.translate(context),
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
                     ),
                   ),
-          ),
+                  child: Text(
+                    "Reset".translate(context),
+                    style: const TextStyle(
+                      color: Color(0xFF007AFF),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 7,
+              child: SizedBox(
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: _applyFiltersAndNavigate,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF007AFF),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: _isLoadingCount
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          'Show $countFormatted results'.translate(context),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -2060,14 +2116,23 @@ class _FiltersPageState extends State<FiltersPage> {
                         ],
 
                         // Price Range Section with RangeSlider
-                        _buildPriceRangeSection(),
-                        const SizedBox(height: 20),
+                        _buildFilterCardContainer(
+                          child: _buildPriceRangeSection(),
+                        ),
+                        const SizedBox(height: 16),
 
                         // API-driven Dynamic Filters with RangeSliders
                         ..._sortedActiveFilters(state.data).map((filter) {
+                          final filterWidget =
+                              _buildDynamicFilterSection(filter);
+                          if (filterWidget is SizedBox) {
+                            return const SizedBox.shrink();
+                          }
                           return Padding(
-                            padding: const EdgeInsets.only(bottom: 20),
-                            child: _buildDynamicFilterSection(filter),
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: _buildFilterCardContainer(
+                              child: filterWidget,
+                            ),
                           );
                         }),
                       ],

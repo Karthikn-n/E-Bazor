@@ -20,6 +20,8 @@ import 'package:Ebozor/utils/helper_utils.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/dynamic_custom_fields_form.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/posting_form_shared.dart';
+import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/ad_creation_stepper.dart';
+import 'package:Ebozor/utils/constant.dart';
 
 class MotorPostingFormScreen extends StatefulWidget {
   final CategoryModel? category;
@@ -254,7 +256,7 @@ class _MotorPostingFormScreenState extends State<MotorPostingFormScreen> {
     if (_priceController.text.trim().isEmpty || price == null || price <= 0) {
       HelperUtils.showSnackBarMessage(
         context,
-        "Please enter a valid Price in AED",
+        "Please enter a valid Price in ${Constant.currencySymbol}",
         type: MessageType.warning,
       );
       return;
@@ -470,6 +472,7 @@ class _MotorPostingFormScreenState extends State<MotorPostingFormScreen> {
           ),
           body: Column(
             children: [
+              const AdCreationStepper(currentStep: 1),
               Expanded(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
@@ -525,13 +528,13 @@ class _MotorPostingFormScreenState extends State<MotorPostingFormScreen> {
                       ),
                       const SizedBox(height: 18),
 
-                      // 2. Price (AED)
+                      // 2. Price
                       const PostingFieldLabel("Price *"),
                       _buildTextField(
                         controller: _priceController,
                         hint: "Price *",
                         keyboardType: TextInputType.number,
-                        suffixText: "AED",
+                        suffixText: Constant.currencySymbol,
                       ),
                       const SizedBox(height: 18),
 
@@ -648,7 +651,7 @@ class _MotorPostingFormScreenState extends State<MotorPostingFormScreen> {
                   child: ElevatedButton(
                     onPressed: _validateAndProceed,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD31027),
+                      backgroundColor: const Color(0xFF007AFF),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),

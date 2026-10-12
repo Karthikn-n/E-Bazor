@@ -1,25 +1,30 @@
-import 'dart:async';
-import 'dart:convert';
+// ignore_for_file: public_member_api_docs, sort_constructors_first
 
-import 'package:Ebozor/app/routes.dart';
-import 'package:Ebozor/data/cubits/item/fetch_popular_items_cubit.dart';
-import 'package:Ebozor/data/cubits/item/search_item_cubit.dart';
-import 'package:Ebozor/data/model/category_model.dart';
-import 'package:Ebozor/data/model/item/item_model.dart';
-import 'package:Ebozor/data/model/item_filter_model.dart';
-import 'package:Ebozor/data/repositories/category_repository.dart';
-import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
-import 'package:Ebozor/ui/theme/theme.dart';
-import 'package:Ebozor/utils/ApiService/api.dart';
-import 'package:Ebozor/utils/LocalStoreage/hive_keys.dart';
-import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
-import 'package:Ebozor/utils/constant.dart';
-import 'package:Ebozor/utils/extensions/extensions.dart';
-import 'package:Ebozor/utils/ui_utils.dart';
-import 'package:Ebozor/data/cubits/saved_search/fetch_saved_searches_cubit.dart';
+import 'dart:async';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hive_flutter/adapters.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+
+import 'package:Ebozor/app/routes.dart';
+import 'package:Ebozor/data/cubits/favorite/favorite_cubit.dart';
+import 'package:Ebozor/data/cubits/favorite/manage_fav_cubit.dart';
+import 'package:Ebozor/data/cubits/item/search_item_cubit.dart';
+import 'package:Ebozor/data/cubits/system/location_change_cubit.dart';
+import 'package:Ebozor/data/model/category_model.dart';
+import 'package:Ebozor/data/model/custom_field/custom_field_model.dart';
+import 'package:Ebozor/data/model/item/item_model.dart';
+import 'package:Ebozor/data/model/item_filter_model.dart';
+import 'package:Ebozor/data/repositories/favourites_repository.dart';
+import 'package:Ebozor/ui/screens/widgets/animated_routes/blur_page_route.dart';
+import 'package:Ebozor/ui/screens/widgets/dialogs/save_to_favorite_bottom_sheet.dart';
+import 'package:Ebozor/ui/screens/widgets/errors/no_data_found.dart';
+import 'package:Ebozor/ui/theme/theme.dart';
+import 'package:Ebozor/utils/constant.dart';
+import 'package:Ebozor/utils/extensions/extensions.dart';
+import 'package:Ebozor/utils/LocalStoreage/hive_utils.dart';
+import 'package:Ebozor/utils/ui_utils.dart';
 
 class SearchScreen extends StatefulWidget {
   final bool autoFocus;
@@ -35,15 +40,8 @@ class SearchScreen extends StatefulWidget {
     Map? arguments = settings.arguments as Map?;
 
     return BlurredRouter(
-      builder: (context) => MultiBlocProvider(
-        providers: [
-          BlocProvider(
-            create: (context) => SearchItemCubit(),
-          ),
-          BlocProvider(
-            create: (context) => FetchPopularItemsCubit(),
-          ),
-        ],
+      builder: (context) => BlocProvider(
+        create: (context) => SearchItemCubit(),
         child: SearchScreen(
           autoFocus: arguments?['autoFocus'] ?? false,
           initialQuery: arguments?['query'] ?? arguments?['search'],
@@ -57,567 +55,878 @@ class SearchScreen extends StatefulWidget {
 }
 
 class SearchScreenState extends State<SearchScreen>
-    with TickerProviderStateMixin, AutomaticKeepAliveClientMixin<SearchScreen> {
-  @override
-  bool get wantKeepAlive => true;
-
-  String previousSearchQuery = "";
+    with TickerProviderStateMixin {
   static TextEditingController searchController = TextEditingController();
-  final FocusNode searchFocusNode = FocusNode();
-  final ScrollController searchScrollController = ScrollController();
-  final ScrollController popularScrollController = ScrollController();
-  Timer? _searchDelay;
+  TextEditingController get _searchController => searchController;
+  final FocusNode _searchFocusNode = FocusNode();
+  final ScrollController _scrollController = ScrollController();
+  Timer? _searchDebounceTimer;
+
+  // View Mode: false = List View, true = Map View
+  bool _isMapView = false;
+
+  // Filter & Categories
   ItemFilterModel? filter;
   List<CategoryModel> categoryList = [];
-  List<Map<String, dynamic>> _bannerSuggestions = [];
-  bool _isLoadingSuggestions = false;
-  bool _isOpeningSuggestion = false;
+
+  // Sorting
+  String _selectedSort = 'new-to-old';
+
+  // Map state
+  GoogleMapController? _mapController;
+  Set<Marker> _mapMarkers = {};
+  ItemModel? _selectedMapItem;
+  List<ItemModel> _latestItems = [];
+  static const LatLng _dushanbeCenter = LatLng(38.5598, 68.7870);
 
   @override
   void initState() {
     super.initState();
-    Constant.itemFilter = null;
-    searchController = TextEditingController(text: widget.initialQuery ?? "");
-    context.read<FetchPopularItemsCubit>().fetchPopularItems();
-    if (HiveUtils.isUserAuthenticated()) {
-      context.read<FetchSavedSearchesCubit>().fetchSavedSearches();
-    }
+    searchController.text = widget.initialQuery ?? "";
 
-    searchScrollController.addListener(_pageScrollListen);
-    popularScrollController.addListener(_pagePopularScrollListen);
+    // Initialize default filter with current location
+    filter = Constant.itemFilter ??
+        ItemFilterModel(
+          city: HiveUtils.getCityName() ?? "Dushanbe",
+          country: HiveUtils.getCountryName() ?? "",
+        );
 
-    if (widget.initialQuery != null && widget.initialQuery!.trim().isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _fetchBannerSuggestions(widget.initialQuery!.trim());
-        }
-      });
-    }
+    _scrollController.addListener(_onScroll);
+
+    // Initial search
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _executeSearch();
+    });
   }
 
   @override
   void dispose() {
-    _searchDelay?.cancel();
-    searchFocusNode.dispose();
-    searchScrollController.dispose();
-    popularScrollController.dispose();
+    _searchDebounceTimer?.cancel();
+    _searchFocusNode.dispose();
+    _scrollController.dispose();
+    _mapController?.dispose();
     super.dispose();
   }
 
-  void _pageScrollListen() {
-    if (searchScrollController.isEndReached()) {
+  void _onScroll() {
+    if (_scrollController.isEndReached()) {
       if (context.read<SearchItemCubit>().hasMoreData()) {
         context.read<SearchItemCubit>().fetchMoreSearchData(
-              searchController.text,
-              filter ?? Constant.itemFilter,
+              _searchController.text.trim(),
+              filter,
             );
       }
     }
   }
 
-  void _pagePopularScrollListen() {
-    if (popularScrollController.isEndReached()) {
-      if (context.read<FetchPopularItemsCubit>().hasMoreData()) {
-        context.read<FetchPopularItemsCubit>().fetchMyMoreItems();
-      }
-    }
+  void _executeSearch() {
+    context.read<SearchItemCubit>().searchItem(
+          _searchController.text.trim(),
+          page: 1,
+          filter: filter,
+        );
   }
 
-  void _onSearchChanged(String value) {
-    _searchDelay?.cancel();
-    _searchDelay = Timer(const Duration(milliseconds: 400), () {
-      _fetchBannerSuggestions(value);
+  void _onSearchChanged(String query) {
+    _searchDebounceTimer?.cancel();
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 400), () {
+      _executeSearch();
     });
     setState(() {});
   }
 
-  Future<void> _fetchBannerSuggestions(String query) async {
-    final trimmedQuery = query.trim();
-    if (trimmedQuery.isEmpty) {
-      previousSearchQuery = "";
-      if (mounted) {
-        setState(() {
-          _bannerSuggestions = [];
-          _isLoadingSuggestions = false;
-        });
-      }
-      return;
-    }
-    if (mounted) setState(() => _isLoadingSuggestions = true);
+  // --- Map Marker Generation ---
+
+  Future<BitmapDescriptor> _createPriceMarkerBitmap(String price) async {
     try {
-      final response = await Api.get(
-        url: Api.searchBannerSuggestionApi,
-        queryParameters: {'search': trimmedQuery},
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+
+      final textSpan = TextSpan(
+        text: price,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.2,
+        ),
       );
-      if (!mounted || searchController.text.trim() != trimmedQuery) return;
-      final rawSuggestions = response['data'];
-      setState(() {
-        _bannerSuggestions = rawSuggestions is List
-            ? rawSuggestions
-                .whereType<Map>()
-                .map((item) => Map<String, dynamic>.from(item))
-                .toList()
-            : [];
-        _isLoadingSuggestions = false;
-      });
+      final textPainter = TextPainter(
+        text: textSpan,
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+
+      const double padX = 10;
+      const double padY = 5;
+      final double width = textPainter.width + (padX * 2);
+      final double height = textPainter.height + (padY * 2);
+      const double triangleH = 4;
+      const double triangleW = 7;
+
+      // Shadow
+      final Paint shadowPaint = Paint()
+        ..color = Colors.black.withValues(alpha: 0.2)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
+      final RRect bubbleRRect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 0, width, height),
+        const Radius.circular(8),
+      );
+      canvas.drawRRect(bubbleRRect.shift(const Offset(0, 1.5)), shadowPaint);
+
+      // Bubble background
+      final Paint bubblePaint = Paint()..color = const Color(0xFF007AFF);
+      canvas.drawRRect(bubbleRRect, bubblePaint);
+
+      // Down arrow pointer
+      final Path triangle = Path();
+      triangle.moveTo(width / 2 - triangleW / 2, height);
+      triangle.lineTo(width / 2 + triangleW / 2, height);
+      triangle.lineTo(width / 2, height + triangleH);
+      triangle.close();
+      canvas.drawPath(triangle, bubblePaint);
+
+      // Circle pin dot below pointer (matches map_view.jpeg)
+      canvas.drawCircle(
+        Offset(width / 2, height + triangleH + 2.5),
+        2.5,
+        bubblePaint,
+      );
+
+      // Text
+      textPainter.paint(canvas, const Offset(padX, padY));
+
+      final picture = recorder.endRecording();
+      final img = await picture.toImage(
+        width.toInt(),
+        (height + triangleH + 7).toInt(),
+      );
+      final pngBytes = await img.toByteData(format: ui.ImageByteFormat.png);
+      return BitmapDescriptor.bytes(pngBytes!.buffer.asUint8List());
     } catch (_) {
-      if (mounted && searchController.text.trim() == trimmedQuery) {
-        setState(() {
-          _bannerSuggestions = [];
-          _isLoadingSuggestions = false;
-        });
+      return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
+    }
+  }
+
+  void _animateCameraToItems(List<ItemModel> items) {
+    if (_mapController == null || items.isEmpty) return;
+
+    final validCoords = <LatLng>[];
+    for (int i = 0; i < items.length; i++) {
+      final item = items[i];
+      final lat = item.latitude != null && item.latitude != 0
+          ? item.latitude!
+          : (_dushanbeCenter.latitude + (((item.id ?? i) % 17) - 8) * 0.007);
+      final lng = item.longitude != null && item.longitude != 0
+          ? item.longitude!
+          : (_dushanbeCenter.longitude + (((item.id ?? i) % 13) - 6) * 0.008);
+      validCoords.add(LatLng(lat, lng));
+    }
+
+    if (validCoords.isNotEmpty) {
+      if (validCoords.length == 1) {
+        _mapController!.animateCamera(
+          CameraUpdate.newLatLngZoom(validCoords.first, 13.5),
+        );
+      } else {
+        double minLat = validCoords.first.latitude;
+        double maxLat = validCoords.first.latitude;
+        double minLng = validCoords.first.longitude;
+        double maxLng = validCoords.first.longitude;
+        for (final c in validCoords) {
+          if (c.latitude < minLat) minLat = c.latitude;
+          if (c.latitude > maxLat) maxLat = c.latitude;
+          if (c.longitude < minLng) minLng = c.longitude;
+          if (c.longitude > maxLng) maxLng = c.longitude;
+        }
+        _mapController!.animateCamera(
+          CameraUpdate.newLatLngBounds(
+            LatLngBounds(
+              southwest: LatLng(minLat - 0.005, minLng - 0.005),
+              northeast: LatLng(maxLat + 0.005, maxLng + 0.005),
+            ),
+            50,
+          ),
+        );
       }
     }
   }
 
-  // ItemFilterModel _getLocationFilter() {
-  //   return ItemFilterModel(
-  //     city: HiveUtils.getCityName(),
-  //     areaId: HiveUtils.getAreaId(),
-  //     country: HiveUtils.getCountryName(),
-  //     state: HiveUtils.getStateName(),
-  //   );
-  // }
+  Future<void> _buildMapMarkers(List<ItemModel> items) async {
+    _latestItems = items;
+    final Set<Marker> markers = {};
+    for (int i = 0; i < items.length; i++) {
+      final item = items[i];
+      // Use real item coords or distribute realistically across Dushanbe
+      final lat = item.latitude != null && item.latitude != 0
+          ? item.latitude!
+          : (_dushanbeCenter.latitude + (((item.id ?? i) % 17) - 8) * 0.007);
+      final lng = item.longitude != null && item.longitude != 0
+          ? item.longitude!
+          : (_dushanbeCenter.longitude + (((item.id ?? i) % 13) - 6) * 0.008);
 
-  Future<void> _clearBoxData() async {
-    final box = Hive.box(HiveKeys.historyBox);
-    final historyKeys = <dynamic>[];
-    for (final key in box.keys) {
-      final value = box.get(key);
-      if (value is! String) continue;
-      try {
-        final decoded = jsonDecode(value);
-        if (decoded is Map && decoded['name'] != null) {
-          historyKeys.add(key);
-        }
-      } catch (_) {}
+      final priceStr = item.price != null
+          ? item.price!.toInt().toString().replaceAllMapped(
+                RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                (m) => '${m[1]} ',
+              )
+          : '0';
+
+      final icon = await _createPriceMarkerBitmap(priceStr);
+
+      markers.add(
+        Marker(
+          markerId: MarkerId('item_${item.id ?? i}'),
+          position: LatLng(lat, lng),
+          icon: icon,
+          onTap: () {
+            setState(() {
+              _selectedMapItem = item;
+            });
+            _mapController?.animateCamera(
+              CameraUpdate.newLatLngZoom(LatLng(lat, lng), 14.5),
+            );
+          },
+        ),
+      );
     }
-    await box.deleteAll(historyKeys);
+
+    if (mounted) {
+      setState(() {
+        _mapMarkers = markers;
+        if (_selectedMapItem == null && items.isNotEmpty) {
+          _selectedMapItem = items.first;
+        }
+      });
+      _animateCameraToItems(items);
+    }
   }
 
-  // void _removeHistoryItem(int index) async {
-  //   var box = Hive.box(HiveKeys.historyBox);
-  //   await box.deleteAt(index);
-  //   setState(() {});
-  // }
+  // --- Filter Navigation ---
 
-  // void _insertNewItem(ItemModel model) {
-  //   var box = Hive.box(HiveKeys.historyBox);
-  //   bool exists = false;
-  //   for (int i = 0; i < box.length; i++) {
-  //     var itemString = box.getAt(i);
-  //     if (itemString is String) {
-  //       try {
-  //         var item = jsonDecode(itemString);
-  //         if (item['id'] == model.id) {
-  //           exists = true;
-  //           break;
-  //         }
-  //       } catch (_) {}
-  //     }
-  //   }
-
-  //   if (!exists) {
-  //     if (box.length >= 10) {
-  //       box.deleteAt(0);
-  //     }
-  //     box.add(jsonEncode(model.toJson()));
-  //   }
-  //   setState(() {});
-  // }
-
-  Future<void> _insertSearchQuery(String query) async {
-    final trimmedQuery = query.trim();
-    if (trimmedQuery.isEmpty) return;
-
-    final box = Hive.box(HiveKeys.historyBox);
-    final historyKeys = <dynamic>[];
-    dynamic duplicateKey;
-
-    for (final key in box.keys) {
-      final value = box.get(key);
-      if (value is! String) continue;
-      try {
-        final decoded = jsonDecode(value);
-        if (decoded is! Map || decoded['name'] == null) continue;
-        historyKeys.add(key);
-        if (decoded['is_query'] == true &&
-            decoded['name'].toString().toLowerCase() ==
-                trimmedQuery.toLowerCase()) {
-          duplicateKey = key;
-        }
-      } catch (_) {}
-    }
-
-    if (duplicateKey != null) {
-      await box.delete(duplicateKey);
-      historyKeys.remove(duplicateKey);
-    }
-    if (historyKeys.length >= 10) {
-      await box.delete(historyKeys.first);
-    }
-
-    await box.add(jsonEncode({
-      'id': -1,
-      'name': trimmedQuery,
-      'is_query': true,
-      'category': {'name': ''},
-      'image': '',
-      'price': 0,
-      'total_likes': 0,
-      'clicks': 0,
-    }));
+  void _openFilterScreen() {
+    Navigator.pushNamed(
+      context,
+      Routes.filterScreen,
+      arguments: {
+        "update": (ItemFilterModel newFilter) {
+          setState(() {
+            filter = newFilter;
+          });
+          _executeSearch();
+        },
+        "from": "search",
+        "categoryList": categoryList,
+      },
+    ).then((value) {
+      if (value == true) {
+        setState(() {
+          filter = Constant.itemFilter;
+        });
+        _executeSearch();
+      }
+    });
   }
 
-  // void _getFilterValue(ItemFilterModel model) {
-  //   setState(() {
-  //     filter = model;
-  //   });
-  // }
-
-  // bool get _hasActiveFilters {
-  //   if (filter == null) return false;
-  //   return (filter?.categoryId != null && filter!.categoryId!.isNotEmpty) ||
-  //       (filter?.minPrice != null && filter!.minPrice!.isNotEmpty) ||
-  //       (filter?.maxPrice != null && filter!.maxPrice!.isNotEmpty) ||
-  //       (filter?.postedSince != null && filter!.postedSince!.isNotEmpty) ||
-  //       (filter?.city != null && filter!.city!.isNotEmpty);
-  // }
-
-  // PreferredSizeWidget _buildAppBar() {
-  //   return AppBar(
-  //     backgroundColor: context.color.secondaryColor,
-  //     surfaceTintColor: Colors.transparent,
-  //     elevation: 0.5,
-  //     leading: IconButton(
-  //       icon: Icon(
-  //         Icons.arrow_back_ios_new_rounded,
-  //         color: context.color.textDefaultColor,
-  //         size: 20,
-  //       ),
-  //       onPressed: () => Navigator.pop(context),
-  //     ),
-  //     titleSpacing: 0,
-  //     title: Padding(
-  //       padding: const EdgeInsetsDirectional.only(end: 12),
-  //       child: Row(
-  //         children: [
-  //           // Search Input Field
-  //           Expanded(
-  //             child: Container(
-  //               height: 44,
-  //               decoration: BoxDecoration(
-  //                 color: context.color.backgroundColor,
-  //                 borderRadius: BorderRadius.circular(12),
-  //                 border: Border.all(
-  //                   color: context.color.borderColor.withValues(alpha: 0.7),
-  //                   width: 1,
-  //                 ),
-  //               ),
-  //               child: TextField(
-  //                 autofocus: widget.autoFocus,
-  //                 controller: searchController,
-  //                 focusNode: searchFocusNode,
-  //                 onChanged: _onSearchChanged,
-  //                 textInputAction: TextInputAction.search,
-  //                 textAlignVertical: TextAlignVertical.center,
-  //                 onSubmitted: (value) {
-  //                   searchFocusNode.unfocus();
-  //                   _fetchBannerSuggestions(value);
-  //                 },
-  //                 style: TextStyle(
-  //                   color: context.color.textDefaultColor,
-  //                   fontSize: 14.5,
-  //                   fontWeight: FontWeight.w500,
-  //                 ),
-  //                 decoration: InputDecoration(
-  //                   isDense: true,
-  //                   hintText: "searchHintLbl"
-  //                           .translate(context)
-  //                           .replaceAll("%s", "items")
-  //                           .isNotEmpty
-  //                       ? "searchHintLbl"
-  //                           .translate(context)
-  //                           .replaceAll("%s", "items")
-  //                       : "Search items...",
-  //                   hintStyle: TextStyle(
-  //                     color: context.color.textLightColor,
-  //                     fontSize: 13.5,
-  //                   ),
-  //                   border: InputBorder.none,
-  //                   prefixIcon: Icon(
-  //                     Icons.search_rounded,
-  //                     color: context.color.textLightColor,
-  //                     size: 20,
-  //                   ),
-  //                   prefixIconConstraints:
-  //                       const BoxConstraints(minWidth: 38, minHeight: 38),
-  //                   suffixIcon: searchController.text.isNotEmpty
-  //                       ? IconButton(
-  //                           icon: Icon(
-  //                             Icons.close_rounded,
-  //                             color: context.color.textLightColor,
-  //                             size: 18,
-  //                           ),
-  //                           onPressed: () {
-  //                             searchController.clear();
-  //                             _fetchBannerSuggestions("");
-  //                           },
-  //                         )
-  //                       : null,
-  //                   suffixIconConstraints:
-  //                       const BoxConstraints(minWidth: 36, minHeight: 36),
-  //                   contentPadding: const EdgeInsets.symmetric(
-  //                     horizontal: 10,
-  //                     vertical: 10,
-  //                   ),
-  //                 ),
-  //               ),
-  //             ),
-  //           ),
-  //           const SizedBox(width: 8),
-
-  //           // Filter Button
-  //           Stack(
-  //             clipBehavior: Clip.none,
-  //             children: [
-  //               Material(
-  //                 color: Colors.transparent,
-  //                 child: InkWell(
-  //                   borderRadius: BorderRadius.circular(12),
-  //                   onTap: () {
-  //                     Navigator.pushNamed(
-  //                       context,
-  //                       Routes.filterScreen,
-  //                       arguments: {
-  //                         "update": _getFilterValue,
-  //                         "from": "search",
-  //                         "categoryList": categoryList,
-  //                       },
-  //                     ).then((value) {
-  //                       if (value == true) {
-  //                         setState(() {});
-  //                         context.read<SearchItemCubit>().searchItem(
-  //                               searchController.text,
-  //                               page: 1,
-  //                               filter: filter,
-  //                             );
-  //                       }
-  //                     });
-  //                   },
-  //                   child: Container(
-  //                     width: 44,
-  //                     height: 44,
-  //                     decoration: BoxDecoration(
-  //                       color: _hasActiveFilters
-  //                           ? context.color.territoryColor
-  //                               .withValues(alpha: 0.12)
-  //                           : context.color.backgroundColor,
-  //                       borderRadius: BorderRadius.circular(12),
-  //                       border: Border.all(
-  //                         color: _hasActiveFilters
-  //                             ? context.color.territoryColor
-  //                             : context.color.borderColor
-  //                                 .withValues(alpha: 0.6),
-  //                         width: 1,
-  //                       ),
-  //                     ),
-  //                     child: Center(
-  //                       child: Icon(
-  //                         Icons.tune_rounded,
-  //                         size: 20,
-  //                         color: _hasActiveFilters
-  //                             ? context.color.territoryColor
-  //                             : context.color.textDefaultColor
-  //                                 .withValues(alpha: 0.8),
-  //                       ),
-  //                     ),
-  //                   ),
-  //                 ),
-  //               ),
-  //               if (_hasActiveFilters)
-  //                 Positioned(
-  //                   top: -2,
-  //                   right: -2,
-  //                   child: Container(
-  //                     width: 9,
-  //                     height: 9,
-  //                     decoration: BoxDecoration(
-  //                       color: context.color.territoryColor,
-  //                       shape: BoxShape.circle,
-  //                       border: Border.all(
-  //                         color: context.color.secondaryColor,
-  //                         width: 1.5,
-  //                       ),
-  //                     ),
-  //                   ),
-  //                 ),
-  //             ],
-  //           ),
-  //         ],
-  //       ),
-  //     ),
-  //   );
-  // }
-
-  // Widget _buildActiveFilterBar() {
-  //   if (!_hasActiveFilters) return const SizedBox.shrink();
-
-  //   return Container(
-  //     width: double.infinity,
-  //     color: context.color.secondaryColor,
-  //     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-  //     child: SingleChildScrollView(
-  //       scrollDirection: Axis.horizontal,
-  //       child: Row(
-  //         children: [
-  //           Text(
-  //             "Filters:".translate(context),
-  //             style: TextStyle(
-  //               color: context.color.textLightColor,
-  //               fontSize: 12,
-  //               fontWeight: FontWeight.w600,
-  //             ),
-  //           ),
-  //           const SizedBox(width: 8),
-  //           if (filter?.minPrice != null && filter!.minPrice!.isNotEmpty)
-  //             _buildFilterChip("Min: ${filter!.minPrice}", () {
-  //               setState(() {
-  //                 filter = filter?.copyWith(minPrice: "");
-  //               });
-  //               context.read<SearchItemCubit>().searchItem(
-  //                     searchController.text,
-  //                     page: 1,
-  //                     filter: filter,
-  //                   );
-  //             }),
-  //           if (filter?.maxPrice != null && filter!.maxPrice!.isNotEmpty)
-  //             _buildFilterChip("Max: ${filter!.maxPrice}", () {
-  //               setState(() {
-  //                 filter = filter?.copyWith(maxPrice: "");
-  //               });
-  //               context.read<SearchItemCubit>().searchItem(
-  //                     searchController.text,
-  //                     page: 1,
-  //                     filter: filter,
-  //                   );
-  //             }),
-  //           if (filter?.postedSince != null && filter!.postedSince!.isNotEmpty)
-  //             _buildFilterChip(filter!.postedSince!, () {
-  //               setState(() {
-  //                 filter = filter?.copyWith(postedSince: "");
-  //               });
-  //               context.read<SearchItemCubit>().searchItem(
-  //                     searchController.text,
-  //                     page: 1,
-  //                     filter: filter,
-  //                   );
-  //             }),
-  //           TextButton(
-  //             onPressed: () {
-  //               setState(() {
-  //                 filter = null;
-  //                 Constant.itemFilter = null;
-  //               });
-  //               context.read<SearchItemCubit>().searchItem(
-  //                     searchController.text,
-  //                     page: 1,
-  //                     filter: _getLocationFilter(),
-  //                   );
-  //             },
-  //             child: Text(
-  //               "Clear All".translate(context),
-  //               style: TextStyle(
-  //                 color: context.color.territoryColor,
-  //                 fontSize: 12,
-  //                 fontWeight: FontWeight.bold,
-  //               ),
-  //             ),
-  //           ),
-  //         ],
-  //       ),
-  //     ),
-  //   );
-  // }
-
-
-  // Widget _buildFilterChip(String label, VoidCallback onRemove) {
-  //   return Container(
-  //     margin: const EdgeInsets.only(right: 6),
-  //     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-  //     decoration: BoxDecoration(
-  //       color: context.color.territoryColor.withValues(alpha: 0.1),
-  //       borderRadius: BorderRadius.circular(20),
-  //       border: Border.all(
-  //         color: context.color.territoryColor.withValues(alpha: 0.3),
-  //       ),
-  //     ),
-  //     child: Row(
-  //       mainAxisSize: MainAxisSize.min,
-  //       children: [
-  //         Text(
-  //           label,
-  //           style: TextStyle(
-  //             color: context.color.territoryColor,
-  //             fontSize: 11,
-  //             fontWeight: FontWeight.w600,
-  //           ),
-  //         ),
-  //         const SizedBox(width: 4),
-  //         InkWell(
-  //           onTap: onRemove,
-  //           child: Icon(
-  //             Icons.close,
-  //             size: 14,
-  //             color: context.color.territoryColor,
-  //           ),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
-
-  Widget _buildHistoryItemList() {
-    return ValueListenableBuilder(
-      valueListenable: Hive.box(HiveKeys.historyBox).listenable(),
-      builder: (context, Box box, _) {
-        List<ItemModel> items = [];
-        for (var item in box.values) {
-          if (item is String) {
-            try {
-              var json = jsonDecode(item);
-              if (json['is_query'] == true) {
-                items.add(ItemModel(
-                  id: -1,
-                  name: json['name'],
-                  category: CategoryModel(name: ""),
-                ));
-              } else {
-                items.add(ItemModel.fromJson(json));
-              }
-            } catch (_) {}
-          }
-        }
-
-        items = items.reversed.toList();
-
-        if (items.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.only(top: 80),
+  void _showSortSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: BoxDecoration(
+            color: context.color.secondaryColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.manage_search_rounded,
-                  size: 52,
-                  color: context.color.textLightColor,
+                Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Sort Results',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: context.color.textDefaultColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _buildSortOption(ctx, 'Newest first', 'new-to-old'),
+                _buildSortOption(ctx, 'Oldest first', 'old-to-new'),
+                _buildSortOption(ctx, 'Price: Low to High', 'price-low-to-high'),
+                _buildSortOption(ctx, 'Price: High to Low', 'price-high-to-low'),
                 const SizedBox(height: 12),
-                Text(
-                  'Your recent searches will appear here',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSortOption(BuildContext ctx, String label, String value) {
+    final isSelected = _selectedSort == value;
+    return ListTile(
+      title: Text(
+        label,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          color: isSelected
+              ? context.color.territoryColor
+              : context.color.textDefaultColor,
+        ),
+      ),
+      trailing: isSelected
+          ? Icon(Icons.check_rounded, color: context.color.territoryColor)
+          : null,
+      onTap: () {
+        setState(() {
+          _selectedSort = value;
+        });
+        Navigator.pop(ctx);
+        _executeSearch();
+      },
+    );
+  }
+
+  // --- Spec Extraction Helpers ---
+
+  String? _findCustomFieldValue(List<CustomFieldModel>? fields, String query) {
+    if (fields == null) return null;
+    final q = query.toLowerCase();
+    for (final f in fields) {
+      final name = (f.name ?? '').toLowerCase();
+      final label = (f.label ?? '').toLowerCase();
+      if (name.contains(q) || label.contains(q)) {
+        if (f.value != null && f.value!.isNotEmpty) {
+          final val = f.value!.first.toString().trim();
+          if (val.isNotEmpty && val.toLowerCase() != 'null') return val;
+        }
+      }
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocListener<LocationChangeCubit, LocationChangeState>(
+      listener: (context, locState) {
+        if (locState.city != null && locState.city != filter?.city) {
+          setState(() {
+            filter = (filter ?? ItemFilterModel()).copyWith(
+              city: locState.city,
+              state: locState.state,
+              country: locState.country,
+              area: locState.area,
+              areaId: locState.areaId,
+              latitude: locState.latitude,
+              longitude: locState.longitude,
+            );
+          });
+          _executeSearch();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: context.color.backgroundColor,
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              _buildTopSearchBar(),
+              _buildFilterChipsRow(),
+              _buildSegmentedToggle(),
+              Expanded(
+                child: BlocConsumer<SearchItemCubit, SearchItemState>(
+                  listener: (context, state) {
+                    if (state is SearchItemSuccess) {
+                      _buildMapMarkers(state.searchedItems);
+                    }
+                  },
+                  builder: (context, state) {
+                    if (state is SearchItemFetchProgress) {
+                      return Center(
+                        child: CircularProgressIndicator(
+                          color: context.color.territoryColor,
+                        ),
+                      );
+                    }
+
+                    if (state is SearchItemFailure) {
+                      return Center(
+                        child: Text(
+                          state.errorMessage,
+                          style: TextStyle(color: context.color.textLightColor),
+                        ),
+                      );
+                    }
+
+                    final items = (state is SearchItemSuccess)
+                        ? state.searchedItems
+                        : <ItemModel>[];
+
+                    if (_isMapView) {
+                      return _buildMapView(items);
+                    }
+
+                    return _buildListView(items, state);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- UI Components ---
+
+
+
+
+  Widget _buildTopSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: () {
+              if (_isMapView) {
+                setState(() => _isMapView = false);
+              } else {
+                Navigator.pop(context);
+              }
+            },
+            icon: Icon(
+              Icons.arrow_back_rounded,
+              color: context.color.textDefaultColor,
+              size: 24,
+            ),
+          ),
+          Expanded(
+            child: Container(
+              height: 48,
+              decoration: BoxDecoration(
+                color: context.color.secondaryColor,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: context.color.borderColor.withValues(alpha: 0.6),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 14),
+                  Icon(
+                    Icons.search_rounded,
                     color: context.color.textLightColor,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      focusNode: _searchFocusNode,
+                      autofocus: widget.autoFocus,
+                      textInputAction: TextInputAction.search,
+                      onChanged: _onSearchChanged,
+                      onSubmitted: (_) {
+                        _searchFocusNode.unfocus();
+                        _executeSearch();
+                      },
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: context.color.textDefaultColor,
+                      ),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: 'Toyota Land Cruiser',
+                        hintStyle: TextStyle(
+                          color: context.color.textLightColor.withValues(alpha: 0.7),
+                          fontSize: 15,
+                        ),
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                  if (_searchController.text.isNotEmpty)
+                    IconButton(
+                      icon: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.grey.shade300,
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 14,
+                          color: Colors.white,
+                        ),
+                      ),
+                      onPressed: () {
+                        _searchController.clear();
+                        _executeSearch();
+                        setState(() {});
+                      },
+                    ),
+                  const SizedBox(width: 4),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChipsRow() {
+    final activeCity = filter?.city?.isNotEmpty == true
+        ? filter!.city!
+        : (HiveUtils.getCityName() ?? 'Dushanbe');
+
+    final minPrice = filter?.minPrice;
+    final maxPrice = filter?.maxPrice;
+    final year = filter?.customFields?['min_year'] ?? filter?.customFields?['year'];
+    final make = filter?.customFields?['car_make_name'] ?? filter?.customFields?['make'];
+
+    return Container(
+      height: 42,
+      margin: const EdgeInsets.only(bottom: 6),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: [
+          _buildFilterChip(
+            label: activeCity,
+            onRemove: () {
+              setState(() {
+                filter = filter?.copyWith(city: '');
+              });
+              _executeSearch();
+            },
+          ),
+          if (make != null)
+            _buildFilterChip(
+              label: make.toString(),
+              onRemove: () {
+                setState(() {
+                  filter?.customFields?.remove('car_make');
+                  filter?.customFields?.remove('car_make_name');
+                  filter?.customFields?.remove('make');
+                });
+                _executeSearch();
+              },
+            ),
+          if (year != null)
+            _buildFilterChip(
+              label: '${year}+',
+              onRemove: () {
+                setState(() {
+                  filter?.customFields?.remove('min_year');
+                  filter?.customFields?.remove('year');
+                });
+                _executeSearch();
+              },
+            ),
+          if (maxPrice != null && maxPrice.isNotEmpty)
+            _buildFilterChip(
+              label: 'Under $maxPrice ${Constant.currencySymbol}',
+              onRemove: () {
+                setState(() {
+                  filter = filter?.copyWith(clearMaxPrice: true);
+                });
+                _executeSearch();
+              },
+            )
+          else if (minPrice != null && minPrice.isNotEmpty && minPrice != '0')
+            _buildFilterChip(
+              label: 'Over $minPrice ${Constant.currencySymbol}',
+              onRemove: () {
+                setState(() {
+                  filter = filter?.copyWith(clearMinPrice: true);
+                });
+                _executeSearch();
+              },
+            ),
+          // Filter Settings Icon
+          InkWell(
+            onTap: _openFilterScreen,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 38,
+              height: 36,
+              decoration: BoxDecoration(
+                color: context.color.secondaryColor,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: context.color.borderColor.withValues(alpha: 0.6),
+                ),
+              ),
+              child: Icon(
+                Icons.tune_rounded,
+                size: 18,
+                color: context.color.textDefaultColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip({
+    required String label,
+    required VoidCallback onRemove,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.only(left: 12, right: 6, top: 4, bottom: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEBF3FF),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF007AFF),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 4),
+          InkWell(
+            onTap: onRemove,
+            child: const Padding(
+              padding: EdgeInsets.all(2.0),
+              child: Icon(
+                Icons.close_rounded,
+                size: 14,
+                color: Color(0xFF007AFF),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSegmentedToggle() {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Container(
+        height: 52,
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: isDark ? context.color.secondaryColor : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(
+            color: isDark
+                ? context.color.borderColor.withValues(alpha: 0.5)
+                : const Color(0xFFE2E8F0),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // List Tab
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  if (_isMapView) {
+                    setState(() => _isMapView = false);
+                  }
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.fastOutSlowIn,
+                  decoration: BoxDecoration(
+                    color: !_isMapView ? const Color(0xFF007AFF) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: !_isMapView
+                        ? [
+                            BoxShadow(
+                              color: const Color(0xFF007AFF).withValues(alpha: 0.32),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.format_list_bulleted_rounded,
+                        size: 20,
+                        color: !_isMapView
+                            ? Colors.white
+                            : (isDark ? Colors.white70 : const Color(0xFF475569)),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'List',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                          color: !_isMapView
+                              ? Colors.white
+                              : (isDark ? Colors.white70 : const Color(0xFF475569)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Map Tab
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  if (!_isMapView) {
+                    setState(() => _isMapView = true);
+                    Future.delayed(const Duration(milliseconds: 250), () {
+                      if (_latestItems.isNotEmpty) {
+                        _animateCameraToItems(_latestItems);
+                      }
+                    });
+                  }
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.fastOutSlowIn,
+                  decoration: BoxDecoration(
+                    color: _isMapView ? const Color(0xFF007AFF) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: _isMapView
+                        ? [
+                            BoxShadow(
+                              color: const Color(0xFF007AFF).withValues(alpha: 0.32),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.location_on_rounded,
+                        size: 20,
+                        color: _isMapView
+                            ? Colors.white
+                            : (isDark ? Colors.white70 : const Color(0xFF475569)),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Map',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                          color: _isMapView
+                              ? Colors.white
+                              : (isDark ? Colors.white70 : const Color(0xFF475569)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- List View Content ---
+
+  Widget _buildListView(List<ItemModel> items, SearchItemState state) {
+    if (items.isEmpty) {
+      return Center(
+        child: NoDataFound(onTap: _executeSearch),
+      );
+    }
+
+    final totalCount = (state is SearchItemSuccess) ? state.total : items.length;
+
+    return ListView.builder(
+      controller: _scrollController,
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+      itemCount: items.length + 1,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          // Results Header & Sort
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12, top: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '$totalCount results',
+                  style: TextStyle(
                     fontSize: 14,
+                    color: context.color.textLightColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                InkWell(
+                  onTap: _showSortSheet,
+                  child: Row(
+                    children: [
+                      Text(
+                        'Sort',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: context.color.textDefaultColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.swap_vert_rounded,
+                        size: 18,
+                        color: context.color.textDefaultColor,
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -625,818 +934,647 @@ class SearchScreenState extends State<SearchScreen>
           );
         }
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-          decoration: BoxDecoration(
-            color: context.color.secondaryColor,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: context.color.borderColor.withValues(alpha: 0.5),
-            ),
+        final item = items[index - 1];
+        return _buildItemCard(item);
+      },
+    );
+  }
+
+  Widget _buildItemCard(ItemModel item) {
+    final year = _findCustomFieldValue(item.customFields, 'year');
+    final mileage = _findCustomFieldValue(item.customFields, 'mileage') ??
+        _findCustomFieldValue(item.customFields, 'km');
+    final fuel = _findCustomFieldValue(item.customFields, 'fuel');
+    final transmission = _findCustomFieldValue(item.customFields, 'transmission');
+    final drivetrain = _findCustomFieldValue(item.customFields, 'drive') ??
+        _findCustomFieldValue(item.customFields, '4wd');
+
+    final bool isFeatured = item.isFeature == true;
+    final bool isVerified =
+        item.user?.isVerified == 1 || item.user?.isVerified == true;
+
+    final formattedPrice = item.price != null
+        ? item.price!.toInt().toString().replaceAllMapped(
+              RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+              (m) => '${m[1]},',
+            )
+        : null;
+
+    final imageSrc = item.image?.isNotEmpty == true
+        ? item.image!
+        : (item.galleryImages?.isNotEmpty == true
+            ? item.galleryImages!.first.image ?? ''
+            : '');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: context.color.secondaryColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: context.color.borderColor.withValues(alpha: 0.5),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            Navigator.pushNamed(
+              context,
+              Routes.adDetailsScreen,
+              arguments: {'model': item},
+            );
+          },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // Photo Header
+              Stack(
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.history_rounded,
-                        size: 18,
-                        color: context.color.textLightColor,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        "recentSearches".translate(context),
-                        style: TextStyle(
-                          color: context.color.textDefaultColor,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    child: SizedBox(
+                      height: 190,
+                      width: double.infinity,
+                      child: imageSrc.isNotEmpty
+                          ? UiUtils.imageType(
+                              imageSrc,
+                              fit: BoxFit.cover,
+                            )
+                          : Container(
+                              color: Colors.grey.shade200,
+                              child: Icon(
+                                Icons.image_outlined,
+                                size: 48,
+                                color: Colors.grey.shade400,
+                              ),
+                            ),
+                    ),
                   ),
-                  InkWell(
-                    onTap: _clearBoxData,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 4, vertical: 2),
-                      child: Text(
-                        "clear".translate(context),
-                        style: TextStyle(
-                          color: context.color.territoryColor,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                  if (isFeatured)
+                    Positioned(
+                      top: 12,
+                      left: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF7A00),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'Featured',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
+                  // Favorite Heart Button
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: _buildFavoriteButton(item),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: items.map((item) {
-                  return InkWell(
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: () {
-                      searchController.text = item.name!;
-                      searchController.selection = TextSelection.fromPosition(
-                        TextPosition(offset: searchController.text.length),
-                      );
-                      searchFocusNode.unfocus();
-                      _fetchBannerSuggestions(item.name!);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: context.color.backgroundColor,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color:
-                              context.color.borderColor.withValues(alpha: 0.6),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.north_west_rounded,
-                            size: 13,
-                            color: context.color.textLightColor,
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              item.name!,
-                              style: TextStyle(
-                                color: context.color.textDefaultColor,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
+              // Body Content
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title
+                    Text(
+                      item.name ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: context.color.textDefaultColor,
                       ),
                     ),
-                  );
-                }).toList(),
+                    const SizedBox(height: 6),
+                    // Price
+                    if (formattedPrice != null)
+                      Text(
+                        '$formattedPrice ${Constant.currencySymbol}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF007AFF),
+                        ),
+                      ),
+                    // Dynamic Specs Row (Real values only)
+                    if (year != null ||
+                        mileage != null ||
+                        fuel != null ||
+                        transmission != null ||
+                        drivetrain != null) ...[
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 6,
+                        children: [
+                          if (year != null)
+                            _buildSpecChip(Icons.calendar_today_outlined, year),
+                          if (mileage != null)
+                            _buildSpecChip(
+                              Icons.speed_outlined,
+                              mileage.contains('km') ? mileage : '$mileage km',
+                            ),
+                          if (fuel != null)
+                            _buildSpecChip(Icons.local_gas_station_outlined, fuel),
+                          if (transmission != null)
+                            _buildSpecChip(Icons.settings_outlined, transmission),
+                          if (drivetrain != null)
+                            _buildSpecChip(Icons.tune_outlined, drivetrain),
+                        ],
+                      ),
+                    ] else if (item.customFields != null &&
+                        item.customFields!.isNotEmpty) ...[
+                      // Dynamic real attributes for non-car items
+                      Builder(builder: (context) {
+                        final validFields = item.customFields!
+                            .where((f) =>
+                                f.value != null &&
+                                f.value!.isNotEmpty &&
+                                f.value!.first.toString().trim().isNotEmpty &&
+                                f.value!.first.toString().toLowerCase() != 'null')
+                            .take(4)
+                            .toList();
+                        if (validFields.isEmpty) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Wrap(
+                            spacing: 12,
+                            runSpacing: 6,
+                            children: validFields.map((f) {
+                              return _buildSpecChip(
+                                Icons.info_outline_rounded,
+                                '${f.value!.first}',
+                              );
+                            }).toList(),
+                          ),
+                        );
+                      }),
+                    ],
+                    const SizedBox(height: 12),
+                    Divider(height: 1, color: Colors.grey.shade100),
+                    const SizedBox(height: 10),
+                    // Footer: Location & Verified Seller Badge
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on_outlined,
+                              size: 15,
+                              color: context.color.textLightColor,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              item.city?.isNotEmpty == true
+                                  ? item.city!
+                                  : (item.address ?? 'Dushanbe'),
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: context.color.textLightColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (isVerified)
+                          Row(
+                            children: const [
+                              Icon(
+                                Icons.check_circle_rounded,
+                                size: 16,
+                                color: Color(0xFF007AFF),
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'Verified seller',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF007AFF),
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
-        );
-      },
-    );
-  }
-
-  // Widget _shimmerEffect() {
-  //   return ListView.separated(
-  //     shrinkWrap: true,
-  //     physics: const NeverScrollableScrollPhysics(),
-  //     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-  //     itemCount: 6,
-  //     separatorBuilder: (_, __) => const SizedBox(height: 12),
-  //     itemBuilder: (context, index) {
-  //       return Container(
-  //         padding: const EdgeInsets.all(10),
-  //         decoration: BoxDecoration(
-  //           color: context.color.secondaryColor,
-  //           borderRadius: BorderRadius.circular(16),
-  //           border: Border.all(
-  //             color: context.color.borderColor.withValues(alpha: 0.4),
-  //           ),
-  //         ),
-  //         child: Row(
-  //           crossAxisAlignment: CrossAxisAlignment.start,
-  //           children: <Widget>[
-  //             ClipRRect(
-  //               borderRadius: BorderRadius.circular(12),
-  //               child: const CustomShimmer(height: 85, width: 85),
-  //             ),
-  //             const SizedBox(width: 12),
-  //             Expanded(
-  //               child: Column(
-  //                 crossAxisAlignment: CrossAxisAlignment.start,
-  //                 children: const <Widget>[
-  //                   SizedBox(height: 4),
-  //                   CustomShimmer(height: 14, width: 140),
-  //                   SizedBox(height: 8),
-  //                   CustomShimmer(height: 12, width: 90),
-  //                   SizedBox(height: 12),
-  //                   CustomShimmer(height: 16, width: 70),
-  //                 ],
-  //               ),
-  //             )
-  //           ],
-  //         ),
-  //       );
-  //     },
-  //   );
-  // }
-
-  // Widget _buildSearchResultsWidget() {
-  //   return BlocBuilder<SearchItemCubit, SearchItemState>(
-  //     builder: (context, state) {
-  //       if (state is SearchItemFetchProgress) {
-  //         return _shimmerEffect();
-  //       }
-
-  //       if (state is SearchItemFailure) {
-  //         if (state.errorMessage is ApiException) {
-  //           if (state.errorMessage == "no-internet") {
-  //             return NoInternet(
-  //               onRetry: () {
-  //                 context.read<SearchItemCubit>().searchItem(
-  //                       searchController.text,
-  //                       page: 1,
-  //                       filter: filter,
-  //                     );
-  //               },
-  //             );
-  //           }
-  //         }
-  //         return const Center(
-  //           child: Padding(
-  //             padding: EdgeInsets.all(24.0),
-  //             child: SomethingWentWrong(),
-  //           ),
-  //         );
-  //       }
-
-  //       if (state is SearchItemSuccess) {
-  //         if (state.searchedItems.isEmpty) {
-  //           return Center(
-  //             child: Padding(
-  //               padding:
-  //                   const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
-  //               child: Column(
-  //                 mainAxisSize: MainAxisSize.min,
-  //                 children: [
-  //                   Icon(
-  //                     Icons.search_off_rounded,
-  //                     size: 64,
-  //                     color:
-  //                         context.color.textLightColor.withValues(alpha: 0.5),
-  //                   ),
-  //                   const SizedBox(height: 16),
-  //                   Text(
-  //                     "No listings found".translate(context),
-  //                     style: TextStyle(
-  //                       color: context.color.textDefaultColor,
-  //                       fontSize: 16,
-  //                       fontWeight: FontWeight.w700,
-  //                     ),
-  //                   ),
-  //                   const SizedBox(height: 6),
-  //                   Text(
-  //                     "Try searching with different keywords or check filters"
-  //                         .translate(context),
-  //                     style: TextStyle(
-  //                       color: context.color.textLightColor,
-  //                       fontSize: 13,
-  //                     ),
-  //                     textAlign: TextAlign.center,
-  //                   ),
-  //                 ],
-  //               ),
-  //             ),
-  //           );
-  //         }
-
-  //         return Padding(
-  //           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-  //           child: Column(
-  //             crossAxisAlignment: CrossAxisAlignment.start,
-  //             children: [
-  //               Padding(
-  //                 padding:
-  //                     const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-  //                 child: Row(
-  //                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  //                   children: [
-  //                     Text(
-  //                       "${state.searchedItems.length} ${"searchedItems".translate(context)}",
-  //                       style: TextStyle(
-  //                         color: context.color.textLightColor,
-  //                         fontSize: 13,
-  //                         fontWeight: FontWeight.w600,
-  //                       ),
-  //                     ),
-  //                   ],
-  //                 ),
-  //               ),
-  //               ListView.separated(
-  //                 shrinkWrap: true,
-  //                 physics: const NeverScrollableScrollPhysics(),
-  //                 separatorBuilder: (_, __) => const SizedBox(height: 10),
-  //                 itemCount: state.searchedItems.length,
-  //                 itemBuilder: (context, index) {
-  //                   ItemModel item = state.searchedItems[index];
-
-  //                   return ItemHorizontalCard(
-  //                     item: item,
-  //                     showLikeButton: true,
-  //                     additionalImageWidth: 8,
-  //                     onTap: () {
-  //                       try {
-  //                         _insertNewItem(item);
-  //                       } catch (_) {}
-  //                       Navigator.pushNamed(
-  //                         context,
-  //                         Routes.adDetailsScreen,
-  //                         arguments: {
-  //                           'model': item,
-  //                         },
-  //                       );
-  //                     },
-  //                   );
-  //                 },
-  //               ),
-  //               if (state.isLoadingMore)
-  //                 Padding(
-  //                   padding: const EdgeInsets.symmetric(vertical: 16),
-  //                   child: Center(
-  //                     child: UiUtils.progress(
-  //                       normalProgressColor: context.color.territoryColor,
-  //                     ),
-  //                   ),
-  //                 ),
-  //             ],
-  //           ),
-  //         );
-  //       }
-
-  //       return const SizedBox.shrink();
-  //     },
-  //   );
-  // }
-
-  // Widget _buildPopularItemsWidget() {
-  //   return BlocBuilder<FetchPopularItemsCubit, FetchPopularItemsState>(
-  //     builder: (context, state) {
-  //       if (state is FetchPopularItemsInProgress) {
-  //         return _shimmerEffect();
-  //       }
-
-  //       if (state is FetchPopularItemsFailed) {
-  //         return const SizedBox.shrink();
-  //       }
-
-  //       if (state is FetchPopularItemsSuccess) {
-  //         if (state.items.isEmpty) {
-  //           return const SizedBox.shrink();
-  //         }
-
-  //         return Padding(
-  //           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-  //           child: Column(
-  //             crossAxisAlignment: CrossAxisAlignment.start,
-  //             children: [
-  //               Padding(
-  //                 padding:
-  //                     const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-  //                 child: Row(
-  //                   children: [
-  //                     Icon(
-  //                       Icons.trending_up_rounded,
-  //                       size: 18,
-  //                       color: context.color.territoryColor,
-  //                     ),
-  //                     const SizedBox(width: 6),
-  //                     Text(
-  //                       "popularAds".translate(context),
-  //                       style: TextStyle(
-  //                         color: context.color.textDefaultColor,
-  //                         fontSize: 15,
-  //                         fontWeight: FontWeight.w700,
-  //                       ),
-  //                     ),
-  //                   ],
-  //                 ),
-  //               ),
-  //               ListView.separated(
-  //                 shrinkWrap: true,
-  //                 physics: const NeverScrollableScrollPhysics(),
-  //                 separatorBuilder: (_, __) => const SizedBox(height: 10),
-  //                 itemCount: state.items.length,
-  //                 itemBuilder: (context, index) {
-  //                   ItemModel item = state.items[index];
-
-  //                   return ItemHorizontalCard(
-  //                     item: item,
-  //                     showLikeButton: true,
-  //                     additionalImageWidth: 8,
-  //                     onTap: () {
-  //                       Navigator.pushNamed(
-  //                         context,
-  //                         Routes.adDetailsScreen,
-  //                         arguments: {
-  //                           'model': item,
-  //                         },
-  //                       );
-  //                     },
-  //                   );
-  //                 },
-  //               ),
-  //               if (state.isLoadingMore)
-  //                 Padding(
-  //                   padding: const EdgeInsets.symmetric(vertical: 16),
-  //                   child: Center(
-  //                     child: UiUtils.progress(
-  //                       normalProgressColor: context.color.territoryColor,
-  //                     ),
-  //                   ),
-  //                 ),
-  //             ],
-  //           ),
-  //         );
-  //       }
-
-  //       return const SizedBox.shrink();
-  //     },
-  //   );
-  // }
-
-  // Widget? _buildFloatingBottomBar() {
-  //   final bool hasQueryOrFilter =
-  //       searchController.text.trim().isNotEmpty || _hasActiveFilters;
-  //   if (!hasQueryOrFilter) return null;
-
-  //   final city = HiveUtils.getCityName() ?? "Dubai";
-  //   final country = HiveUtils.getCountryName() ?? "United Arab Emirates";
-  //   final locationStr = "$city, $country";
-  //   final query = searchController.text.trim();
-
-  //   String queryParams = "";
-  //   if (query.isNotEmpty) {
-  //     queryParams += "search=${Uri.encodeComponent(query)}";
-  //   }
-  //   if (city.isNotEmpty) {
-  //     if (queryParams.isNotEmpty) queryParams += "&";
-  //     queryParams += "city=${Uri.encodeComponent(city)}";
-  //   }
-  //   if (filter?.categoryId != null && filter!.categoryId!.isNotEmpty) {
-  //     if (queryParams.isNotEmpty) queryParams += "&";
-  //     queryParams += "category_id=${filter!.categoryId}";
-  //   }
-  //   final apiSearchUrl = "${Api.getItemApi}?$queryParams";
-  //   final catIdInt =
-  //       filter?.categoryId != null ? int.tryParse(filter!.categoryId!) : null;
-
-  //   String suggestedTitle;
-  //   if (query.isNotEmpty) {
-  //     suggestedTitle = "$query in $city";
-  //   } else {
-  //     suggestedTitle = "Search in $city";
-  //   }
-
-  //   return BlocBuilder<FetchSavedSearchesCubit, FetchSavedSearchesState>(
-  //     builder: (context, savedSearchState) {
-  //       final matchedSearch =
-  //           context.read<FetchSavedSearchesCubit>().findSavedSearch(
-  //                 query: query,
-  //                 categoryId: catIdInt,
-  //                 apiSearchUrl: apiSearchUrl,
-  //               );
-  //       final bool isAlreadySaved = matchedSearch != null;
-
-  //       return Container(
-  //         margin: const EdgeInsets.symmetric(horizontal: 24),
-  //         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-  //         decoration: BoxDecoration(
-  //           color: context.color.secondaryColor,
-  //           borderRadius: BorderRadius.circular(30),
-  //           border: Border.all(
-  //             color: context.color.borderColor.withValues(alpha: 0.7),
-  //             width: 1,
-  //           ),
-  //           boxShadow: [
-  //             BoxShadow(
-  //               color: Colors.black.withValues(alpha: 0.16),
-  //               blurRadius: 16,
-  //               offset: const Offset(0, 4),
-  //             ),
-  //           ],
-  //         ),
-  //         child: Row(
-  //           mainAxisSize: MainAxisSize.min,
-  //           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-  //           children: [
-  //             // Filter Button
-  //             InkWell(
-  //               borderRadius: BorderRadius.circular(20),
-  //               onTap: () {
-  //                 Navigator.pushNamed(
-  //                   context,
-  //                   Routes.filterScreen,
-  //                   arguments: {
-  //                     "update": _getFilterValue,
-  //                     "from": "search",
-  //                     "categoryList": categoryList,
-  //                   },
-  //                 ).then((value) {
-  //                   if (value == true) {
-  //                     setState(() {});
-  //                     context.read<SearchItemCubit>().searchItem(
-  //                           searchController.text,
-  //                           page: 1,
-  //                           filter: filter,
-  //                         );
-  //                   }
-  //                 });
-  //               },
-  //               child: Padding(
-  //                 padding:
-  //                     const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-  //                 child: Row(
-  //                   mainAxisSize: MainAxisSize.min,
-  //                   children: [
-  //                     Icon(
-  //                       Icons.tune_rounded,
-  //                       size: 17,
-  //                       color: _hasActiveFilters
-  //                           ? context.color.territoryColor
-  //                           : context.color.textDefaultColor,
-  //                     ),
-  //                     const SizedBox(width: 6),
-  //                     Text(
-  //                       "Filter",
-  //                       style: TextStyle(
-  //                         fontSize: 13,
-  //                         fontWeight: _hasActiveFilters
-  //                             ? FontWeight.bold
-  //                             : FontWeight.w600,
-  //                         color: _hasActiveFilters
-  //                             ? context.color.territoryColor
-  //                             : context.color.textDefaultColor,
-  //                       ),
-  //                     ),
-  //                   ],
-  //                 ),
-  //               ),
-  //             ),
-
-  //             Container(
-  //               height: 18,
-  //               width: 1,
-  //               color: context.color.borderColor.withValues(alpha: 0.6),
-  //             ),
-
-  //             // Save Search / Saved Button
-  //             InkWell(
-  //               borderRadius: BorderRadius.circular(20),
-  //               onTap: () {
-  //                 SaveSearchBottomSheet.show(
-  //                   context,
-  //                   isAlreadySaved: isAlreadySaved,
-  //                   savedSearchId: matchedSearch?.id,
-  //                   initialTitle:
-  //                       isAlreadySaved ? matchedSearch.title : suggestedTitle,
-  //                   categoryId: catIdInt,
-  //                   apiSearchUrl: apiSearchUrl,
-  //                   location: locationStr,
-  //                   initialNotification: matchedSearch?.notification ?? true,
-  //                   initialSubscribeEmail:
-  //                       matchedSearch?.subscribeEmail ?? false,
-  //                 );
-  //               },
-  //               child: Padding(
-  //                 padding:
-  //                     const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-  //                 child: Row(
-  //                   mainAxisSize: MainAxisSize.min,
-  //                   children: [
-  //                     Icon(
-  //                       isAlreadySaved
-  //                           ? Icons.bookmark_rounded
-  //                           : Icons.bookmark_add_outlined,
-  //                       size: 17,
-  //                       color: context.color.territoryColor,
-  //                     ),
-  //                     const SizedBox(width: 6),
-  //                     Text(
-  //                       isAlreadySaved ? "Saved" : "Save Search",
-  //                       style: TextStyle(
-  //                         fontSize: 13,
-  //                         fontWeight: FontWeight.w600,
-  //                         color: context.color.territoryColor,
-  //                       ),
-  //                     ),
-  //                   ],
-  //                 ),
-  //               ),
-  //             ),
-  //           ],
-  //         ),
-  //       );
-  //     },
-  //   );
-  // }
-
-  Future<void> _openBannerSuggestion(Map<String, dynamic> suggestion) async {
-    final route = suggestion['route'] is Map
-        ? Map<String, dynamic>.from(suggestion['route'] as Map)
-        : const <String, dynamic>{};
-    final category = suggestion['category'] is Map
-        ? Map<String, dynamic>.from(suggestion['category'] as Map)
-        : const <String, dynamic>{};
-    final categorySlug =
-        (route['category_slug'] ?? category['slug'])?.toString().trim() ?? '';
-    final categoryId = int.tryParse(
-        category['id']?.toString() ?? route['category_id']?.toString() ?? '');
-    final categoryName =
-        (category['name'] ?? route['propertyType'] ?? 'Items').toString();
-    final suggestionName =
-        (suggestion['translated_name'] ?? suggestion['name'] ?? '').toString();
-    if (categorySlug.isEmpty || categoryId == null) return;
-
-    setState(() => _isOpeningSuggestion = true);
-    FilterCategory? configuration;
-    try {
-      configuration = await FilterRepository().getFilters(categorySlug);
-    } catch (_) {
-      configuration = null;
-    }
-    if (!mounted) return;
-
-    final selectedCategory = CategoryModel(
-      id: categoryId,
-      name: categoryName,
-      slug: categorySlug,
-      children: [],
-      subcategoriesCount: 0,
-    );
-    final appliedFilter = ItemFilterModel(
-      categoryId: categoryId.toString(),
-      categorySlug: categorySlug,
-      city: HiveUtils.getCityName(),
-      areaId: HiveUtils.getAreaId(),
-      state: HiveUtils.getStateName(),
-      country: HiveUtils.getCountryName(),
-    );
-    _insertSearchQuery(suggestionName);
-    setState(() => _isOpeningSuggestion = false);
-    Navigator.pushNamed(
-      context,
-      Routes.itemsList,
-      arguments: {
-        'catID': categoryId.toString(),
-        'catName': categoryName,
-        'categorySlug': categorySlug,
-        'categoryIds': [categoryId.toString()],
-        'selectedCategoryChain': [selectedCategory],
-        'appliedFilter': appliedFilter,
-        'filterConfiguration': configuration,
-        'search': suggestionName,
-      },
-    );
-  }
-
-  PreferredSizeWidget _buildSuggestionAppBar() {
-    return AppBar(
-      backgroundColor: context.color.secondaryColor,
-      surfaceTintColor: Colors.transparent,
-      elevation: 0,
-      leading: IconButton(
-        onPressed: () => Navigator.pop(context),
-        icon: Icon(
-          Icons.arrow_back_rounded,
-          color: context.color.textDefaultColor,
-        ),
-      ),
-      titleSpacing: 0,
-      title: Container(
-        height: 48,
-        margin: const EdgeInsetsDirectional.only(end: 16),
-        decoration: BoxDecoration(
-          color: context.color.secondaryColor,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: context.color.territoryColor.withValues(alpha: 0.65),
-            width: 1.4,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: context.color.territoryColor.withValues(alpha: 0.12),
-              blurRadius: 10,
-            ),
-          ],
-        ),
-        child: TextField(
-          autofocus: widget.autoFocus,
-          controller: searchController,
-          focusNode: searchFocusNode,
-          onChanged: _onSearchChanged,
-          textInputAction: TextInputAction.search,
-          onSubmitted: (value) {
-            _insertSearchQuery(value);
-            _fetchBannerSuggestions(value);
-            searchFocusNode.unfocus();
-          },
-          style: TextStyle(
-            color: context.color.textDefaultColor,
-            fontSize: 16,
-          ),
-          decoration: InputDecoration(
-            hintText: 'What are you looking for?',
-            border: InputBorder.none,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-            suffixIcon: searchController.text.isEmpty
-                ? null
-                : IconButton(
-                    onPressed: () {
-                      searchController.clear();
-                      _fetchBannerSuggestions('');
-                      searchFocusNode.requestFocus();
-                    },
-                    icon: Icon(
-                      Icons.close_rounded,
-                      color: context.color.textLightColor,
-                    ),
-                  ),
-          ),
         ),
       ),
     );
   }
 
-  Widget _buildBannerSuggestionBody() {
-    final query = searchController.text.trim();
-    if (query.isEmpty) {
-      return ListView(
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-        children: [_buildHistoryItemList()],
-      );
-    }
-    if (_isLoadingSuggestions) {
-      return Center(child: UiUtils.progress());
-    }
-    if (_bannerSuggestions.isEmpty) {
-      return Center(
-        child: Text(
-          'No suggestions found',
-          style: TextStyle(color: context.color.textLightColor, fontSize: 14),
-        ),
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildSpecChip(IconData icon, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 22, 20, 8),
-          child: Text(
-            'Suggestions',
-            style: TextStyle(
-              color: context.color.textDefaultColor,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        Expanded(
-          child: ListView.separated(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: _bannerSuggestions.length,
-            separatorBuilder: (_, __) => Divider(
-              height: 1,
-              color: context.color.borderColor.withValues(alpha: 0.45),
-            ),
-            itemBuilder: (context, index) {
-              final suggestion = _bannerSuggestions[index];
-              final category = suggestion['category'] is Map
-                  ? Map<String, dynamic>.from(suggestion['category'] as Map)
-                  : const <String, dynamic>{};
-              final title =
-                  (suggestion['translated_name'] ?? suggestion['name'] ?? '')
-                      .toString();
-              final subtitle =
-                  (category['translated_name'] ?? category['name'] ?? '')
-                      .toString();
-              return Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => _openBannerSuggestion(suggestion),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: context.color.textDefaultColor,
-                                  fontSize: 15.5,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              if (subtitle.isNotEmpty) ...[
-                                const SizedBox(height: 5),
-                                Text(
-                                  subtitle,
-                                  style: TextStyle(
-                                    color: context.color.textLightColor,
-                                    fontSize: 13.5,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          color: context.color.textDefaultColor,
-                          size: 26,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
+        Icon(icon, size: 14, color: Colors.grey.shade600),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12.5,
+            color: Colors.grey.shade700,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    return PopScope(
-      canPop: true,
-      onPopInvokedWithResult: (_, __) => Constant.itemFilter = null,
-      child: Scaffold(
-        backgroundColor: context.color.backgroundColor,
-        appBar: _buildSuggestionAppBar(),
-        body: Stack(
-          children: [
-            _buildBannerSuggestionBody(),
-            if (_isOpeningSuggestion)
-              Positioned.fill(
-                child: ColoredBox(
-                  color: Colors.black.withValues(alpha: 0.12),
-                  child: Center(child: UiUtils.progress()),
+  Widget _buildFavoriteButton(ItemModel item) {
+    if (item.id == null) return const SizedBox.shrink();
+
+    return BlocProvider(
+      create: (_) => UpdateFavoriteCubit(FavoriteRepository()),
+      child: BlocConsumer<FavoriteCubit, FavoriteState>(
+        bloc: context.read<FavoriteCubit>(),
+        listener: (context, favState) {},
+        builder: (context, favState) {
+          final isLike =
+              context.read<FavoriteCubit>().isItemFavorite(item.id!);
+
+          return BlocConsumer<UpdateFavoriteCubit, UpdateFavoriteState>(
+            listener: (context, updateState) {
+              if (updateState is UpdateFavoriteSuccess) {
+                if (updateState.wasProcess) {
+                  context.read<FavoriteCubit>().addFavoriteitem(updateState.item);
+                } else {
+                  context.read<FavoriteCubit>().removeFavoriteItem(updateState.item);
+                }
+              }
+            },
+            builder: (context, updateState) {
+              return InkWell(
+                onTap: () {
+                  UiUtils.checkUser(
+                    context: context,
+                    onNotGuest: () {
+                      if (isLike) {
+                        context.read<UpdateFavoriteCubit>().setFavoriteItem(
+                              item: item,
+                              type: 0,
+                            );
+                        return;
+                      }
+                      context
+                          .read<UpdateFavoriteCubit>()
+                          .setFavoriteItem(item: item, type: 1);
+                      SaveToFavoriteBottomSheet.show(context, item: item);
+                    },
+                  );
+                },
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Icon(
+                      isLike ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                      size: 20,
+                      color: isLike ? Colors.red : Colors.black87,
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  // --- Map View Content ---
+
+  Widget _buildMapView(List<ItemModel> items) {
+    return Stack(
+      children: [
+        GoogleMap(
+          initialCameraPosition: CameraPosition(
+            target: items.isNotEmpty && items.first.latitude != null && items.first.latitude != 0
+                ? LatLng(items.first.latitude!, items.first.longitude!)
+                : _dushanbeCenter,
+            zoom: 12.5,
+          ),
+          markers: _mapMarkers,
+          onMapCreated: (controller) {
+            _mapController = controller;
+            if (items.isNotEmpty) {
+              _animateCameraToItems(items);
+            }
+          },
+          myLocationEnabled: true,
+          myLocationButtonEnabled: false,
+          zoomControlsEnabled: false,
+          mapToolbarEnabled: false,
+        ),
+        // Floating Controls: GPS & compass buttons
+        Positioned(
+          right: 16,
+          bottom: _selectedMapItem != null ? 140 : 80,
+          child: Column(
+            children: [
+              FloatingActionButton.small(
+                heroTag: 'my_location',
+                backgroundColor: Colors.white,
+                elevation: 3,
+                onPressed: () {
+                  _mapController?.animateCamera(
+                    CameraUpdate.newLatLngZoom(_dushanbeCenter, 13.0),
+                  );
+                },
+                child: const Icon(
+                  Icons.my_location_rounded,
+                  color: Color(0xFF007AFF),
+                  size: 20,
                 ),
               ),
-          ],
+              const SizedBox(height: 8),
+              FloatingActionButton.small(
+                heroTag: 'compass_btn',
+                backgroundColor: Colors.white,
+                elevation: 3,
+                onPressed: () {
+                  _mapController?.animateCamera(
+                    CameraUpdate.newCameraPosition(
+                      CameraPosition(
+                        target: _selectedMapItem != null && _selectedMapItem!.latitude != null
+                            ? LatLng(_selectedMapItem!.latitude!, _selectedMapItem!.longitude!)
+                            : _dushanbeCenter,
+                        zoom: 13.0,
+                        bearing: 0,
+                      ),
+                    ),
+                  );
+                },
+                child: const Icon(
+                  Icons.navigation_rounded,
+                  color: Color(0xFF007AFF),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Switch back to list pill
+              InkWell(
+                onTap: () => setState(() => _isMapView = false),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 6,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: const [
+                      Icon(Icons.view_list_rounded,
+                          size: 16, color: Color(0xFF007AFF)),
+                      SizedBox(width: 6),
+                      Text(
+                        'List view',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF007AFF),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Bottom Selected Item Preview Card
+        if (_selectedMapItem != null)
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 24,
+            child: _buildMapPreviewCard(_selectedMapItem!),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildMapPreviewCard(ItemModel item) {
+    final formattedPrice = item.price != null
+        ? item.price!.toInt().toString().replaceAllMapped(
+              RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+              (m) => '${m[1]} ',
+            )
+        : null;
+
+    final imageSrc = item.image?.isNotEmpty == true
+        ? item.image!
+        : (item.galleryImages?.isNotEmpty == true
+            ? item.galleryImages!.first.image ?? ''
+            : '');
+
+    final year = _findCustomFieldValue(item.customFields, 'year');
+    final mileage = _findCustomFieldValue(item.customFields, 'mileage');
+
+    return Container(
+      decoration: BoxDecoration(
+        color: context.color.secondaryColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            Navigator.pushNamed(
+              context,
+              Routes.adDetailsScreen,
+              arguments: {'model': item},
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: SizedBox(
+                        width: 95,
+                        height: 85,
+                        child: imageSrc.isNotEmpty
+                            ? UiUtils.imageType(imageSrc, fit: BoxFit.cover)
+                            : Container(
+                                color: Colors.grey.shade200,
+                                child: const Icon(Icons.image_outlined),
+                              ),
+                      ),
+                    ),
+                    if (item.isFeature == true)
+                      Positioned(
+                        top: 6,
+                        left: 6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF7A00),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'Promoted',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.name ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.bold,
+                                color: context.color.textDefaultColor,
+                              ),
+                            ),
+                          ),
+                          _buildFavoriteButton(item),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      if (formattedPrice != null)
+                        Text(
+                          '$formattedPrice ${Constant.currencySymbol}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF007AFF),
+                          ),
+                        ),
+                      const SizedBox(height: 6),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.location_on_outlined,
+                              size: 13,
+                              color: context.color.textLightColor,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              item.city?.isNotEmpty == true
+                                  ? item.city!
+                                  : (item.address ?? 'Dushanbe'),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: context.color.textLightColor,
+                              ),
+                            ),
+                            if (year != null) ...[
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.calendar_today_outlined,
+                                size: 12,
+                                color: context.color.textLightColor,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                year,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: context.color.textLightColor,
+                                ),
+                              ),
+                            ],
+                            if (mileage != null) ...[
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.speed_outlined,
+                                size: 12,
+                                color: context.color.textLightColor,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                mileage.contains('km') ? mileage : '$mileage km',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: context.color.textLightColor,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
