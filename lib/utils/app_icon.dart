@@ -19,6 +19,8 @@ class AppIcons {
 
   static String splashLogo = "assets/svg/Logo/splashlogo.png";
   static String notificatinicon = "assets/svg/Logo/splashlogo.png";
+  static String ebozorLogo = "assets/svg/Logo/ebozor_logo.png";
+  static String ebozorLogoMaster = "assets/svg/Logo/ebozor_logo_master.png";
   static String noRatingsPlaceholder = "assets/icons/no-ratings-placeholder.webp";
 
   static String safety = _svgPath("safety");

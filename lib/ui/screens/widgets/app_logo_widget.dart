@@ -18,6 +18,27 @@ class AppLogoWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (showText) {
+      return Image.asset(
+        isWhite
+            ? "assets/svg/Logo/ebozor_logo_master.png"
+            : "assets/svg/Logo/ebozor_logo.png",
+        height: height,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) => _buildFallbackLogo(context),
+      );
+    } else {
+      return Image.asset(
+        "assets/svg/Logo/splashlogo.png",
+        height: height,
+        width: height,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) => _buildStoreCanopyIcon(height),
+      );
+    }
+  }
+
+  Widget _buildFallbackLogo(BuildContext context) {
     final double iconSize = height;
     final double fontSize = height * 0.72;
 
@@ -27,37 +48,35 @@ class AppLogoWidget extends StatelessWidget {
       children: [
         // Brand canopy icon
         _buildStoreCanopyIcon(iconSize),
-        if (showText) ...[
-          SizedBox(width: height * 0.22),
-          RichText(
-            text: TextSpan(
-              children: [
-                TextSpan(
-                  text: "e",
-                  style: TextStyle(
-                    fontFamily: "Manrope",
-                    fontSize: fontSize,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF007AFF),
-                    letterSpacing: -0.5,
-                  ),
+        SizedBox(width: height * 0.22),
+        RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: "e",
+                style: TextStyle(
+                  fontFamily: "Manrope",
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF168BFF),
+                  letterSpacing: -0.5,
                 ),
-                TextSpan(
-                  text: "Bozor",
-                  style: TextStyle(
-                    fontFamily: "Manrope",
-                    fontSize: fontSize,
-                    fontWeight: FontWeight.w800,
-                    color: isWhite
-                        ? Colors.white
-                        : context.color.textColorDark,
-                    letterSpacing: -0.5,
-                  ),
+              ),
+              TextSpan(
+                text: "Bozor",
+                style: TextStyle(
+                  fontFamily: "Manrope",
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w800,
+                  color: isWhite
+                      ? Colors.white
+                      : (context.color.textColorDark),
+                  letterSpacing: -0.5,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ],
     );
   }
@@ -67,11 +86,11 @@ class AppLogoWidget extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: const Color(0xFF007AFF),
+        color: const Color(0xFF168BFF),
         borderRadius: BorderRadius.circular(size * 0.30),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF007AFF).withValues(alpha: 0.28),
+            color: const Color(0xFF168BFF).withValues(alpha: 0.28),
             blurRadius: size * 0.25,
             offset: Offset(0, size * 0.08),
           ),

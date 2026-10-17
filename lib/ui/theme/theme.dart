@@ -4,24 +4,24 @@ import 'package:flutter/material.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 
 ///Light Theme Colors
-///This color format is different, isn't it? .You can use hex colors here also but you have to remove '#' symbol and add 0xff instead.
-const Color primaryColor_ = const Color(0xFFF8FAFE);
+///Official eBozor Brand System: Bright Blue #168BFF, Deep Navy #08275E, Soft Background #F6FAFF, Border #DCE8F7
+const Color primaryColor_ = Color(0xFFF6FAFF);
 const Color secondaryColor_ = Color(0xFFFFFFFF);
-const Color territoryColor_ = Color(0xFF007AFF);
-const Color forthColor_ = Color(0xFF0056B3);
-const Color _backgroundColor = const Color(0xFFF8FAFE);
-const Color textDarkColor = Color(0xFF121230);
-Color lightTextColor = const Color(0xFF000000).withValues(alpha: 0.5);
-Color widgetsBorderColorLight = const Color(0xffEEEEEE).withValues(alpha: 0.6);
+const Color territoryColor_ = Color(0xFF168BFF); // Official Brand Primary Bright Blue
+const Color forthColor_ = Color(0xFF08275E); // Official Deep Navy
+const Color _backgroundColor = Color(0xFFF6FAFF); // Official Soft Background
+const Color textDarkColor = Color(0xFF061E4F); // Official Navy Text
+Color lightTextColor = const Color(0xFF061E4F).withValues(alpha: 0.6);
+Color widgetsBorderColorLight = const Color(0xFFDCE8F7); // Official Border
 Color senderChatColor = const Color.fromARGB(255, 233, 233, 233).darken(22);
 
 ///Dark Theme Colors
 Color primaryColorDark = const Color(0xff121212);
 Color secondaryColorDark = const Color(0xff1C1C1C).brighten(5);
-const Color territoryColorDark = Color(0xFF007AFF);
+const Color territoryColorDark = Color(0xFF168BFF);
 Color deactivateColorLight = const Color(0xff7F7F7F);
 
-const Color forthColorDark = Color(0xFF388AF6);
+const Color forthColorDark = Color(0xFF3A93F8); // Official Accent Blue
 Color backgroundColorDark = primaryColorDark; //here you can change if you need
 const Color textColorDarkTheme = Color(0xffFDFDFD);
 Color lightTextColorDarkTheme = const Color(0xffFDFDFD).withValues(alpha: 0.3);
@@ -36,12 +36,12 @@ const Color errorMessageColor =
 const Color successMessageColor = Color(0xff00B2CA);
 const Color warningMessageColor = Color(0xFFC2AF6F);
 
-//status button color
+//status button color (Blue/Navy family - gold and orange excluded per brand rules)
 const Color pendingButtonColor = Color(0xff0C5D9C);
-const Color soldOutButtonColor = Color(0xffFFBB33);
+const Color soldOutButtonColor = Color(0xFF64748B); // Slate/Navy tone instead of gold/orange
 const Color deactivateButtonColor = Color(0xFF64748B);
 const Color activateButtonColor = Color(0xFF02AD11);
-const Color bannerBlue=Color(0xFF52A6FF);
+const Color bannerBlue = Color(0xFF168BFF);
 
 
 //Button text color
