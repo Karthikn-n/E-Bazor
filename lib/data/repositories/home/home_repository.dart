@@ -76,7 +76,7 @@ class HomeRepository {
     try {
       Map<String, dynamic> parameters = {
         "page": page,
-        "featured_section_id": sectionId,
+        if (sectionId > 0) "featured_section_id": sectionId,
         if (city != null && city != "") 'city': city,
         if (areaId != null && areaId != "") 'area_id': areaId,
         if (country != null && country != "") 'country': country,

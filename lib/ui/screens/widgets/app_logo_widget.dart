@@ -55,7 +55,6 @@ class AppLogoWidget extends StatelessWidget {
               TextSpan(
                 text: "e",
                 style: TextStyle(
-                  fontFamily: "Manrope",
                   fontSize: fontSize,
                   fontWeight: FontWeight.w800,
                   color: const Color(0xFF168BFF),
@@ -65,7 +64,6 @@ class AppLogoWidget extends StatelessWidget {
               TextSpan(
                 text: "Bozor",
                 style: TextStyle(
-                  fontFamily: "Manrope",
                   fontSize: fontSize,
                   fontWeight: FontWeight.w800,
                   color: isWhite
@@ -125,7 +123,6 @@ class AppLogoWidget extends StatelessWidget {
             child: Text(
               "e",
               style: TextStyle(
-                fontFamily: "Manrope",
                 fontSize: size * 0.58,
                 fontWeight: FontWeight.w900,
                 color: Colors.white,

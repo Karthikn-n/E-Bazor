@@ -255,7 +255,7 @@ class ItemRepository {
       int? areaId,
       ItemFilterModel? filter}) async {
     Map<String, dynamic> parameters = {
-      Api.categoryId: categoryId,
+      if (categoryId > 0) Api.categoryId: categoryId,
       Api.page: page,
     };
 
@@ -569,7 +569,9 @@ class ItemRepository {
       if (filter.maxPrice != null && filter.maxPrice!.isNotEmpty) {
         parameters['max_price'] = filter.maxPrice;
       }
-      if (filter.categoryId != null && filter.categoryId!.isNotEmpty) {
+      if (filter.categoryId != null &&
+          filter.categoryId!.isNotEmpty &&
+          filter.categoryId != '0') {
         parameters['category_id'] = filter.categoryId;
       }
       if (filter.postedSince != null && filter.postedSince!.isNotEmpty) {

@@ -439,6 +439,12 @@ class _SectionItemsScreenState extends State<SectionItemsScreen> {
                         );
                       }
 
+                      final int totalCount = (_searchQuery.trim().isEmpty &&
+                              _selectedMaxPrice == null &&
+                              _selectedCondition == 'All')
+                          ? (state.total > 0 ? state.total : filteredList.length)
+                          : filteredList.length;
+
                       return RefreshIndicator(
                         onRefresh: () async => _loadItems(),
                         color: context.color.territoryColor,
@@ -451,11 +457,11 @@ class _SectionItemsScreenState extends State<SectionItemsScreen> {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    '${filteredList.length} results',
-                                    style: TextStyle(
-                                      fontSize: 14,
+                                    '$totalCount results',
+                                    style: const TextStyle(
+                                      fontSize: 14.5,
                                       fontWeight: FontWeight.w600,
-                                      color: context.color.textLightColor,
+                                      color: Color(0xFF64748B),
                                     ),
                                   ),
                                   InkWell(
@@ -465,16 +471,16 @@ class _SectionItemsScreenState extends State<SectionItemsScreen> {
                                         Text(
                                           'Sort: ${_getSortLabel()}',
                                           style: TextStyle(
-                                            fontSize: 13.5,
-                                            fontWeight: FontWeight.w600,
-                                            color: context.color.textDefaultColor,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                            color: context.color.textColorDark,
                                           ),
                                         ),
-                                        const SizedBox(width: 4),
+                                        const SizedBox(width: 3),
                                         Icon(
                                           Icons.keyboard_arrow_down_rounded,
                                           size: 18,
-                                          color: context.color.textDefaultColor,
+                                          color: context.color.textColorDark,
                                         ),
                                       ],
                                     ),
@@ -491,7 +497,7 @@ class _SectionItemsScreenState extends State<SectionItemsScreen> {
                                 gridDelegate:
                                     const SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 2,
-                                  childAspectRatio: 0.58,
+                                  childAspectRatio: 0.70,
                                   crossAxisSpacing: 12,
                                   mainAxisSpacing: 12,
                                 ),
@@ -671,17 +677,17 @@ class _SectionItemsScreenState extends State<SectionItemsScreen> {
                       const SizedBox(width: 6),
                       Text(
                         cityName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF007AFF),
+                          color: context.color.textColorDark,
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(
+                      Icon(
                         Icons.keyboard_arrow_down_rounded,
                         size: 18,
-                        color: Color(0xFF007AFF),
+                        color: context.color.textColorDark,
                       ),
                     ],
                   ),
@@ -783,9 +789,9 @@ class _SectionItemsScreenState extends State<SectionItemsScreen> {
         child: Text(
           label,
           style: TextStyle(
-            color: isActive ? Colors.white : const Color(0xFF334155),
-            fontSize: 13.5,
-            fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+            color: isActive ? Colors.white : const Color(0xFF0F172A),
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
@@ -808,7 +814,7 @@ class _SectionItemsScreenState extends State<SectionItemsScreen> {
               : const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(20),
           border: isActive
-              ? Border.all(color: const Color(0xFF007AFF), width: 1)
+              ? Border.all(color: const Color(0xFF007AFF), width: 1.2)
               : null,
         ),
         child: Row(
@@ -817,16 +823,16 @@ class _SectionItemsScreenState extends State<SectionItemsScreen> {
             Text(
               label,
               style: TextStyle(
-                color: isActive ? const Color(0xFF007AFF) : const Color(0xFF334155),
-                fontSize: 13,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                color: isActive ? const Color(0xFF007AFF) : const Color(0xFF0F172A),
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(width: 4),
             Icon(
               Icons.keyboard_arrow_down_rounded,
-              size: 16,
-              color: isActive ? const Color(0xFF007AFF) : const Color(0xFF64748B),
+              size: 17,
+              color: isActive ? const Color(0xFF007AFF) : const Color(0xFF0F172A),
             ),
           ],
         ),
@@ -891,7 +897,7 @@ class _SectionItemsScreenState extends State<SectionItemsScreen> {
                     borderRadius:
                         const BorderRadius.vertical(top: Radius.circular(16)),
                     child: SizedBox(
-                      height: 135,
+                      height: 140,
                       width: double.infinity,
                       child: imageSrc.isNotEmpty
                           ? UiUtils.imageType(imageSrc, fit: BoxFit.cover)
@@ -907,11 +913,11 @@ class _SectionItemsScreenState extends State<SectionItemsScreen> {
                   ),
                   if (isPromoted)
                     Positioned(
-                      top: 8,
+                      bottom: 8,
                       left: 8,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
+                            horizontal: 8, vertical: 3.5),
                         decoration: BoxDecoration(
                           color: const Color(0xFFFF7A00),
                           borderRadius: BorderRadius.circular(6),
@@ -920,8 +926,8 @@ class _SectionItemsScreenState extends State<SectionItemsScreen> {
                           'Promoted',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
@@ -936,7 +942,7 @@ class _SectionItemsScreenState extends State<SectionItemsScreen> {
               ),
               // Card Details
               Padding(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -945,31 +951,32 @@ class _SectionItemsScreenState extends State<SectionItemsScreen> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.bold,
-                        color: context.color.textDefaultColor,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: context.color.textColorDark,
                         height: 1.25,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 5),
                     if (formattedPrice != null)
                       Text(
                         '$formattedPrice ${Constant.currencySymbol}',
                         style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: context.color.textDefaultColor,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                          color: context.color.textColorDark,
+                          letterSpacing: -0.2,
                         ),
                       ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 5),
                     Row(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.location_on_outlined,
-                          size: 13,
-                          color: context.color.textLightColor,
+                          size: 13.5,
+                          color: Color(0xFF64748B),
                         ),
-                        const SizedBox(width: 2),
+                        const SizedBox(width: 3),
                         Expanded(
                           child: Text(
                             item.city?.isNotEmpty == true
@@ -977,35 +984,80 @@ class _SectionItemsScreenState extends State<SectionItemsScreen> {
                                 : (item.address ?? 'Dushanbe'),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.color.textLightColor,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64748B),
                             ),
                           ),
                         ),
                       ],
                     ),
-                    if (isVerified) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        children: const [
-                          Icon(
-                            Icons.check_circle_rounded,
-                            size: 13,
-                            color: Color(0xFF007AFF),
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        if (isVerified) ...[
+                          Image.asset(
+                            'assets/icons/verified.png',
+                            width: 14,
+                            height: 14,
                           ),
-                          SizedBox(width: 4),
-                          Text(
+                          const SizedBox(width: 4),
+                          const Text(
                             'Verified',
                             style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
                               color: Color(0xFF007AFF),
                             ),
                           ),
+                          if (item.created?.trim().isNotEmpty == true) ...[
+                            const SizedBox(width: 6),
+                            const Text(
+                              '•',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                item.created!.formatDate(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ] else ...[
+                          const Icon(
+                            Icons.access_time_rounded,
+                            size: 13,
+                            color: Color(0xFF94A3B8),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              item.created?.trim().isNotEmpty == true
+                                  ? item.created!.formatDate()
+                                  : (item.category?.name ?? 'General'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ),
                         ],
-                      ),
-                    ],
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -1094,7 +1146,7 @@ class _SectionItemsScreenState extends State<SectionItemsScreen> {
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.58,
+        childAspectRatio: 0.65,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),

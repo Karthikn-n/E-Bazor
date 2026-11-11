@@ -1,10 +1,7 @@
 import 'package:Ebozor/data/cubits/category/fetch_sub_categories_cubit.dart';
-import 'package:Ebozor/data/cubits/category/subcategory_filters_cubit.dart';
 import 'package:Ebozor/data/model/motors_service_models.dart';
-import 'package:Ebozor/data/repositories/category_repository.dart';
 import 'package:Ebozor/settings.dart';
 import 'package:Ebozor/ui/screens/home/widgets/jobs_bottom_sheet.dart';
-import 'package:Ebozor/ui/screens/sub_category/sub_category_filter_screen.dart';
 import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -14,7 +11,6 @@ import 'package:shimmer/shimmer.dart';
 import 'package:Ebozor/utils/ApiService/api.dart';
 import 'package:Ebozor/app/routes.dart';
 import 'package:Ebozor/data/model/category_model.dart';
-import 'package:Ebozor/data/model/property_filter_category_resolver.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/ui/screens/widgets/errors/no_internet.dart';
@@ -103,12 +99,7 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
       slug: widget.catSlug,
       children: widget.categoryList,
     );
-    if (PropertyFilterCategoryResolver.isPropertyCategory(currentCategory)) {
-      return BlocProvider(
-        create: (_) => FilterCubit(FilterRepository()),
-        child: FiltersPage(category: currentCategory),
-      );
-    }
+    // Allow normal subcategory display and itemsList navigation
 
     return AnnotatedRegion(
       value: UiUtils.getSystemUiOverlayStyle(
@@ -250,15 +241,6 @@ class _SubCategoryScreenOneState extends State<SubCategoryScreenOne>
 
                   return ListTile(
                     onTap: () {
-                      if (PropertyFilterCategoryResolver.isPropertyCategory(
-                          category)) {
-                        Navigator.pushNamed(
-                          context,
-                          Routes.filterpage,
-                          arguments: category,
-                        );
-                        return;
-                      }
 
                       if (category.id == 4 ||
                           (category.name != null &&

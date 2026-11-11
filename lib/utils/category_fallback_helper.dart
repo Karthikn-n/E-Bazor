@@ -132,16 +132,26 @@ class CategoryFallbackHelper {
     return Icons.category_rounded;
   }
 
+  static String? getLocalAssetFallback(String? title, [String? slug]) {
+    return null;
+  }
+
   static Widget buildCategoryIconWidget({
     required String? url,
     required String title,
     String? slug,
     IconData? fallbackIcon,
     required Color iconColor,
-    double size = 26,
+    double size = 28,
   }) {
     final effectiveFallbackIcon =
         fallbackIcon ?? getFallbackIcon(title, slug);
+
+    final Widget fallbackWidget = Icon(
+      effectiveFallbackIcon,
+      size: size,
+      color: iconColor,
+    );
 
     final cleanUrl = url?.trim() ?? '';
     final isInvalidOrPlaceholder = cleanUrl.isEmpty ||
@@ -149,11 +159,7 @@ class CategoryFallbackHelper {
         cleanUrl == 'null';
 
     if (isInvalidOrPlaceholder) {
-      return Icon(
-        effectiveFallbackIcon,
-        size: size,
-        color: iconColor,
-      );
+      return fallbackWidget;
     }
 
     final lowerUrl = cleanUrl.toLowerCase();
@@ -167,17 +173,8 @@ class CategoryFallbackHelper {
         width: size,
         height: size,
         fit: BoxFit.contain,
-        colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
-        placeholderBuilder: (_) => Icon(
-          effectiveFallbackIcon,
-          size: size,
-          color: iconColor,
-        ),
-        errorBuilder: (_, __, ___) => Icon(
-          effectiveFallbackIcon,
-          size: size,
-          color: iconColor,
-        ),
+        placeholderBuilder: (_) => fallbackWidget,
+        errorBuilder: (_, __, ___) => fallbackWidget,
       );
     } else {
       return CachedNetworkImage(
@@ -185,17 +182,9 @@ class CategoryFallbackHelper {
         width: size,
         height: size,
         fit: BoxFit.contain,
-        color: iconColor,
-        placeholder: (_, __) => Icon(
-          effectiveFallbackIcon,
-          size: size,
-          color: iconColor,
-        ),
-        errorWidget: (_, __, ___) => Icon(
-          effectiveFallbackIcon,
-          size: size,
-          color: iconColor,
-        ),
+        memCacheWidth: 200,
+        placeholder: (_, __) => fallbackWidget,
+        errorWidget: (_, __, ___) => fallbackWidget,
       );
     }
   }

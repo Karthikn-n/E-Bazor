@@ -574,27 +574,32 @@ class AllItemsWidget extends StatelessWidget {
       builder: (context, state) {
         if (state is FetchHomeAllItemsSuccess) {
           if (state.items.isNotEmpty) {
-            final bool hasMore = state.items.length > 8;
-            final int itemCount = hasMore ? 9 : state.items.length;
+            final rawTitle = "recommendedNearYou".translate(context);
+            final String headerTitle = (rawTitle == "recommendedNearYou" || rawTitle.isEmpty)
+                ? "Recommended for you"
+                : rawTitle;
+
+            final bool hasMore = state.items.length > 8 || state.total > 8;
+            final itemsToShow = state.items.take(8).toList();
+            final int itemCount = hasMore ? (itemsToShow.length + 1) : itemsToShow.length;
+
+            void navigateToAllRecommended() {
+              Navigator.pushNamed(
+                context,
+                Routes.sectionWiseItemsScreen,
+                arguments: {
+                  "title": headerTitle,
+                  "sectionId": 0,
+                },
+              );
+            }
+
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 TitleHeader(
-                  title: "recommendedNearYou".translate(context).isNotEmpty
-                      ? "recommendedNearYou".translate(context)
-                      : ("recentAds".translate(context).isNotEmpty
-                          ? "recentAds".translate(context)
-                          : "Recommended near you"),
-                  onTap: () {
-                    Navigator.pushNamed(
-                      context,
-                      Routes.itemsList,
-                      arguments: {
-                        "categoryName": "Recommended near you",
-                        "categoryId": "",
-                      },
-                    );
-                  },
+                  title: headerTitle,
+                  onTap: navigateToAllRecommended,
                 ),
                 SizedBox(
                   height: 232,
@@ -605,72 +610,14 @@ class AllItemsWidget extends StatelessWidget {
                     itemCount: itemCount,
                     separatorBuilder: (_, __) => const SizedBox(width: 12),
                     itemBuilder: (context, int index) {
-                      if (index == 8 && hasMore) {
-                        return InkWell(
-                          borderRadius: BorderRadius.circular(16),
-                          onTap: () {
-                            Navigator.pushNamed(
-                              context,
-                              Routes.itemsList,
-                              arguments: {
-                                "categoryName": "Recommended near you",
-                                "categoryId": "",
-                              },
-                            );
-                          },
-                          child: Container(
-                            width: 135,
-                            height: 232,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF0F6FF),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: const Color(0xFF007AFF).withValues(alpha: 0.25),
-                                width: 1.2,
-                              ),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF007AFF),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.arrow_forward_rounded,
-                                    color: Colors.white,
-                                    size: 22,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  "seeAll".translate(context).isNotEmpty
-                                      ? "seeAll".translate(context)
-                                      : "View all",
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF007AFF),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  "${state.items.length} ads",
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: context.color.textLightColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                      if (index == itemsToShow.length && hasMore) {
+                        return _buildViewAllCard(
+                          context,
+                          state.total > 0 ? state.total : state.items.length,
+                          navigateToAllRecommended,
                         );
                       }
-                      final item = state.items[index];
+                      final item = itemsToShow[index];
                       return ItemCard(
                         item: item,
                         width: 175,
@@ -694,13 +641,114 @@ class AllItemsWidget extends StatelessWidget {
           return const SomethingWentWrong();
         }
         if (state is FetchHomeAllItemsInProgress) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(horizontal: sidePadding, vertical: 12),
-            child: CustomShimmer(height: 200, width: double.maxFinite),
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: SizedBox(
+              height: 232,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: sidePadding),
+                itemCount: 4,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  return Container(
+                    width: 175,
+                    decoration: BoxDecoration(
+                      color: context.color.secondaryColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: context.color.borderColor.withValues(alpha: 0.5),
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                          child: const CustomShimmer(height: 125, width: 175),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              CustomShimmer(height: 14, width: 130),
+                              SizedBox(height: 8),
+                              CustomShimmer(height: 16, width: 90),
+                              SizedBox(height: 8),
+                              CustomShimmer(height: 12, width: 80),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
           );
         }
         return const SizedBox.shrink();
       },
+    );
+  }
+
+  Widget _buildViewAllCard(BuildContext context, int totalCount, VoidCallback onTap) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        width: 135,
+        height: 232,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0F6FF),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFF007AFF).withValues(alpha: 0.25),
+            width: 1.2,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(
+                color: Color(0xFF007AFF),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.arrow_forward_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              "seeAll".translate(context).isNotEmpty
+                  ? "seeAll".translate(context)
+                  : "View all",
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF007AFF),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              "$totalCount ads",
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: context.color.textLightColor,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

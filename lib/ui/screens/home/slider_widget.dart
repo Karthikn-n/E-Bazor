@@ -66,110 +66,6 @@ class _SliderWidgetState extends State<SliderWidget>
     });
   }
 
-  Widget _buildPromotionalHero(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: sidePadding, vertical: 6),
-      child: Container(
-        height: 150,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF1652E2), Color(0xFF0D3296)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF1652E2).withValues(alpha: 0.25),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          children: [
-            // Background subtle circles
-            Positioned(
-              right: -30,
-              top: -30,
-              child: Container(
-                width: 140,
-                height: 140,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.08),
-                ),
-              ),
-            ),
-            Positioned(
-              right: 40,
-              bottom: -40,
-              child: Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.05),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    "Everything you need,\ncloser to home.",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 19,
-                      fontWeight: FontWeight.w700,
-                      height: 1.25,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Buy. Sell. Find. Belong.",
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              bottom: 18,
-              right: 18,
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.2),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.4),
-                    width: 1,
-                  ),
-                ),
-                child: const Center(
-                  child: Icon(
-                    Icons.arrow_forward_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -205,11 +101,15 @@ class _SliderWidgetState extends State<SliderWidget>
       builder: (context, SliderState state) {
         if (state is SliderFetchSuccess && state.sliderlist.isNotEmpty) {
           bannersLength = state.sliderlist.length;
+          final screenWidth = MediaQuery.sizeOf(context).width;
+          final bannerCardWidth = (screenWidth - (sidePadding * 2)).clamp(200.0, 800.0);
+          final bannerHeight = bannerCardWidth / 2.256;
+
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(
-                height: 160,
+                height: bannerHeight + 8,
                 child: PageView.builder(
                   itemCount: bannersLength,
                   controller: _pageController,
@@ -272,13 +172,13 @@ class _SliderWidgetState extends State<SliderWidget>
                         margin: const EdgeInsets.symmetric(
                             horizontal: sidePadding, vertical: 4),
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(20),
                           color: Colors.grey.shade200,
                         ),
                         clipBehavior: Clip.antiAlias,
                         child: UiUtils.getImage(
                           slider.image ?? "",
-                          fit: BoxFit.cover,
+                          fit: BoxFit.fill,
                         ),
                       ),
                     );
@@ -291,7 +191,22 @@ class _SliderWidgetState extends State<SliderWidget>
         } else if (state is SliderFetchInProgress) {
           return const SizedBox.shrink();
         } else {
-          return _buildPromotionalHero(context);
+          final screenWidth = MediaQuery.sizeOf(context).width;
+          final bannerCardWidth = (screenWidth - 32).clamp(200.0, 800.0);
+          final bannerHeight = bannerCardWidth / 2.256;
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.asset(
+                'assets/home_banner.png',
+                height: bannerHeight,
+                width: double.infinity,
+                fit: BoxFit.fill,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+          );
         }
       },
     );

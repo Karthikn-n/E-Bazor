@@ -41,6 +41,7 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
   Timer? _searchDebounce;
   List<LocationSearchResult> _searchResults = [];
   bool _showSuggestions = false;
+  bool _hasLocationPermission = false;
 
   bool _initialLocationSet = false;
   String? from;
@@ -165,6 +166,11 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
 
       if (permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always) {
+        if (mounted) {
+          setState(() {
+            _hasLocationPermission = true;
+          });
+        }
         Position position = await Geolocator.getCurrentPosition(
           locationSettings: LocationSettings(
             accuracy: LocationAccuracy.high,
@@ -396,7 +402,7 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                         onMapCreated: _onMapCreated,
                         markers: const {},
                         myLocationButtonEnabled: false,
-                        myLocationEnabled: true,
+                        myLocationEnabled: _hasLocationPermission,
                         zoomControlsEnabled: false,
                         mapToolbarEnabled: false,
                         compassEnabled: true,

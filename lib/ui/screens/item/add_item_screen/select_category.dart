@@ -1,3 +1,4 @@
+import 'package:Ebozor/data/model/cars/car_models.dart';
 import 'dart:developer';
 
 import 'package:Ebozor/app/routes.dart';
@@ -381,6 +382,126 @@ class _SelectCategoryScreenState extends CloudState<SelectCategoryScreen> {
     );
   }
 
+
+  Widget _buildDraftCard(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Continue your draft",
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: context.color.textDefaultColor,
+          ),
+        ),
+        const SizedBox(height: 10),
+        InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            Navigator.pushNamed(
+              context,
+              Routes.carSpecsFormScreen,
+              arguments: <String, dynamic>{
+                "initialData": CarSpecsData(
+                  emirate: "Dushanbe",
+                  make: CarMake(id: 1, name: "Toyota"),
+                  model: CarModelItem(id: 1, carMakeId: 1, name: "Land Cruiser 300"),
+                  price: 185000,
+                  phoneNumber: "+992 90 000 0000",
+                  year: "2022",
+                  mileage: "48,000",
+                  condition: "Used",
+                  bodyType: "SUV",
+                  fuelType: "Petrol",
+                  transmission: "Automatic",
+                  driveType: "4WD",
+                  isNegotiable: true,
+                ),
+              },
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: context.color.secondaryColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFFE2E8F0),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    color: const Color(0xFFF1F5F9),
+                    child: const Center(
+                      child: Icon(
+                        Icons.directions_car_filled_rounded,
+                        color: Color(0xFF007AFF),
+                        size: 32,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Toyota Land Cruiser 300",
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: context.color.textDefaultColor,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        "Saved 2 hours ago",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.color.textLightColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        "Continue draft",
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF007AFF),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: Color(0xFF94A3B8),
+                ),
+                const SizedBox(width: 4),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion(
@@ -406,12 +527,29 @@ class _SelectCategoryScreenState extends CloudState<SelectCategoryScreen> {
             title: const AppLogoWidget(height: 28),
             centerTitle: !Navigator.canPop(context),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.notifications_none_rounded, size: 24),
-                color: context.color.textDefaultColor,
-                onPressed: () {
-                  Navigator.pushNamed(context, Routes.notificationPage);
-                },
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_none_rounded, size: 24),
+                    color: context.color.textDefaultColor,
+                    onPressed: () {
+                      Navigator.pushNamed(context, Routes.notificationPage);
+                    },
+                  ),
+                  Positioned(
+                    right: 12,
+                    top: 12,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.redAccent,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(width: 6),
             ],
@@ -446,32 +584,7 @@ class _SelectCategoryScreenState extends CloudState<SelectCategoryScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF007AFF).withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.timer_outlined, size: 14, color: Color(0xFF007AFF)),
-                        SizedBox(width: 5),
-                        Text(
-                          "Usually takes about 2 minutes",
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF007AFF),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 FutureBuilder<List<CategoryModel>>(
                   future: _categoriesFuture,
                   builder: (context, snapshot) {
@@ -538,17 +651,25 @@ class _SelectCategoryScreenState extends CloudState<SelectCategoryScreen> {
                           cat.slug ?? '',
                         );
 
+                        final isHighlighted = false; //
+
+
+
+
                         return InkWell(
                           borderRadius: BorderRadius.circular(16),
                           onTap: () => _handleCategoryTap(context, cat),
                           child: Container(
                             decoration: BoxDecoration(
-                              color: context.color.secondaryColor,
+                              color: isHighlighted
+                                  ? const Color(0xFFF0F7FF)
+                                  : context.color.secondaryColor,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: context.color.borderColor
-                                    .withValues(alpha: 0.6),
-                                width: 1,
+                                color: isHighlighted
+                                    ? const Color(0xFF007AFF)
+                                    : const Color(0xFFE2E8F0),
+                                width: isHighlighted ? 1.5 : 1,
                               ),
                               boxShadow: [
                                 BoxShadow(
@@ -593,7 +714,9 @@ class _SelectCategoryScreenState extends CloudState<SelectCategoryScreen> {
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w700,
-                                    color: context.color.textDefaultColor,
+                                    color: isHighlighted
+                                        ? const Color(0xFF007AFF)
+                                        : context.color.textDefaultColor,
                                   ),
                                 ),
                                 const SizedBox(height: 3),
@@ -615,7 +738,9 @@ class _SelectCategoryScreenState extends CloudState<SelectCategoryScreen> {
                     );
                   },
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
+                _buildDraftCard(context),
+                const SizedBox(height: 18),
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -970,6 +1095,7 @@ class _SelectNestedCategoryState extends CloudState<SelectNestedCategory> {
         allSlugs.contains('rental-cars') ||
         allNames.any((n) => n.contains('car'));
   }
+
 
   @override
   Widget build(BuildContext context) {

@@ -4,7 +4,6 @@ import 'package:Ebozor/ui/theme/theme.dart';
 import 'package:Ebozor/utils/extensions/extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/utils/category_fallback_helper.dart';
 
 class CategoryHomeCard extends StatelessWidget {
@@ -40,18 +39,18 @@ class CategoryHomeCard extends StatelessWidget {
         : (bgColor ?? const Color(0xFFF2F5F9));
 
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18),
       onTap: onTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 58,
-            height: 58,
+            width: 60,
+            height: 60,
             decoration: BoxDecoration(
               color: containerColor,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(18),
             ),
             child: Center(
               child: customIcon ??
@@ -60,22 +59,23 @@ class CategoryHomeCard extends StatelessWidget {
                     title: title,
                     fallbackIcon: fallbackIcon,
                     iconColor: effectiveIconColor,
-                    size: 26,
+                    size: 28,
                   ),
             ),
           ),
           const SizedBox(height: 6),
           SizedBox(
-            width: 72,
+            width: 78,
             child: Text(
               title,
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 11.5,
+                fontSize: 13,
                 color: context.color.textColorDark,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.1,
               ),
             ),
           ),

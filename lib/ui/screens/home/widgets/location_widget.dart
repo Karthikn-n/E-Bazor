@@ -49,22 +49,18 @@ class LocationWidget extends StatelessWidget {
             }
           },
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             decoration: BoxDecoration(
-              color: context.color.secondaryColor.withValues(alpha: 0.8),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: context.color.borderColor.withValues(alpha: 0.6),
-                width: 1,
-              ),
+              color: context.color.secondaryColor.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.location_on_outlined,
-                  size: 17,
-                  color: context.color.territoryColor,
+                const Icon(
+                  Icons.location_on,
+                  size: 19,
+                  color: Color(0xFF007AFF),
                 ),
                 const SizedBox(width: 4),
                 ConstrainedBox(
@@ -74,8 +70,9 @@ class LocationWidget extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
                       color: context.color.textColorDark,
                     ),
                   ),
@@ -83,8 +80,8 @@ class LocationWidget extends StatelessWidget {
                 const SizedBox(width: 2),
                 Icon(
                   Icons.keyboard_arrow_down_rounded,
-                  size: 18,
-                  color: context.color.textColorDark.withValues(alpha: 0.7),
+                  size: 20,
+                  color: context.color.textColorDark,
                 ),
               ],
             ),

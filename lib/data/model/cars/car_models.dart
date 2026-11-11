@@ -8,6 +8,7 @@ class CarMake {
   final String? image;
   final int? activeStatus;
   final int? sortOrder;
+  final int? isPopular;
 
   CarMake({
     required this.id,
@@ -15,6 +16,7 @@ class CarMake {
     this.image,
     this.activeStatus,
     this.sortOrder,
+    this.isPopular,
   });
 
   factory CarMake.fromJson(Map<String, dynamic> json) {
@@ -30,6 +32,9 @@ class CarMake {
       sortOrder: json['sort_order'] is int
           ? json['sort_order']
           : int.tryParse(json['sort_order']?.toString() ?? ''),
+      isPopular: json['is_popular'] is int
+          ? json['is_popular']
+          : int.tryParse(json['is_popular']?.toString() ?? ''),
     );
   }
 
@@ -40,6 +45,7 @@ class CarMake {
       'image': image,
       'active_status': activeStatus,
       'sort_order': sortOrder,
+      'is_popular': isPopular,
     };
   }
 
@@ -137,6 +143,14 @@ class CarSpecsData {
   final List<CustomFieldModel> remainingCustomFields;
   final bool isEdit;
   final dynamic item;
+  final String? year;
+  final String? mileage;
+  final String? condition;
+  final String? bodyType;
+  final String? fuelType;
+  final String? transmission;
+  final String? driveType;
+  final bool isNegotiable;
 
   CarSpecsData({
     this.category,
@@ -153,6 +167,14 @@ class CarSpecsData {
     this.remainingCustomFields = const [],
     this.isEdit = false,
     this.item,
+    this.year,
+    this.mileage,
+    this.condition,
+    this.bodyType,
+    this.fuelType,
+    this.transmission,
+    this.driveType,
+    this.isNegotiable = true,
   });
 
   String get displayName => [make.name, model.name, trim?.name]

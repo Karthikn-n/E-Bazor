@@ -41,27 +41,43 @@ class HomeSearchField extends StatelessWidget {
                 color: context.color.secondaryColor,
                 border: Border.all(
                   width: 1,
-                  color: context.color.borderColor.withValues(alpha: 0.7),
+                  color: const Color(0xFFE2E8F0).withValues(alpha: 0.8),
                 ),
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.search_rounded,
-                    size: 22,
-                    color: context.color.textColorDark.withValues(alpha: 0.45),
+                    size: 21,
+                    color: Color(0xFF94A3B8),
                   ),
                   const SizedBox(width: 10),
+                  // Simple static hint matching design:
+                  const Expanded(
+                    child: Text(
+                      "What are you looking for?",
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                  /*
+                  // PREVIOUS DYNAMIC ANIMATED TEXT (Preserved):
                   Expanded(
                     child: _DynamicSearchText(
                       categories: categories,
                     ),
                   ),
+                  */
                   Icon(
                     Icons.qr_code_scanner_rounded,
                     size: 20,
-                    color: context.color.textColorDark.withValues(alpha: 0.55),
+                    color: context.color.textColorDark,
                   ),
                 ],
               ),
@@ -152,12 +168,12 @@ class _DynamicSearchTextState extends State<_DynamicSearchText>
     /// SVG
 
     if (widget.categories.isEmpty) {
-      return Text(
-        "search".translate(context),
+      return const Text(
+        "What are you looking for?",
         style: TextStyle(
-          color: context.color.textDefaultColor,
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
+          color: Color(0xFF94A3B8),
+          fontSize: 14.5,
+          fontWeight: FontWeight.w400,
         ),
       );
     }

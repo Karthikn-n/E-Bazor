@@ -279,8 +279,10 @@ class SellerProfileScreenState extends State<SellerProfileScreen>
               IconButton(
                 tooltip: 'Share',
                 onPressed: () {
-                  Share.share(
-                    "Check out ${widget.model.name ?? 'Seller'}'s profile on ${Constant.appName}",
+                  SharePlus.instance.share(
+                    ShareParams(
+                      text: "Check out ${widget.model.name ?? 'Seller'}'s profile on ${Constant.appName}",
+                    )
                   );
                 },
                 icon: Icon(

@@ -3,6 +3,8 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -64,6 +66,7 @@ class SearchScreenState extends State<SearchScreen>
 
   // View Mode: false = List View, true = Map View
   bool _isMapView = false;
+  late final TabController _tabController;
 
   // Filter & Categories
   ItemFilterModel? filter;
@@ -82,6 +85,21 @@ class SearchScreenState extends State<SearchScreen>
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) return;
+      if (mounted) {
+        setState(() {
+          _isMapView = _tabController.index == 1;
+        });
+      }
+      if (_isMapView && _latestItems.isNotEmpty) {
+        Future.delayed(const Duration(milliseconds: 250), () {
+          _animateCameraToItems(_latestItems);
+        });
+      }
+    });
+
     searchController.text = widget.initialQuery ?? "";
 
     // Initialize default filter with current location
@@ -101,6 +119,7 @@ class SearchScreenState extends State<SearchScreen>
 
   @override
   void dispose() {
+    _tabController.dispose();
     _searchDebounceTimer?.cancel();
     _searchFocusNode.dispose();
     _scrollController.dispose();
@@ -305,6 +324,11 @@ class SearchScreenState extends State<SearchScreen>
   // --- Filter Navigation ---
 
   void _openFilterScreen() {
+    List<String>? passedCategoryIds;
+    if (filter?.categoryId != null && filter!.categoryId!.isNotEmpty) {
+      passedCategoryIds = [filter!.categoryId!];
+    }
+
     Navigator.pushNamed(
       context,
       Routes.filterScreen,
@@ -317,6 +341,7 @@ class SearchScreenState extends State<SearchScreen>
         },
         "from": "search",
         "categoryList": categoryList,
+        "categoryIds": passedCategoryIds,
       },
     ).then((value) {
       if (value == true) {
@@ -422,6 +447,38 @@ class SearchScreenState extends State<SearchScreen>
     return null;
   }
 
+  String? _findDrivetrainValue(List<CustomFieldModel>? fields) {
+    if (fields == null) return null;
+    for (final f in fields) {
+      final name = (f.name ?? '').toLowerCase();
+      final label = (f.label ?? '').toLowerCase();
+      if (name == 'drive' ||
+          name == 'drivetrain' ||
+          name == 'drive_type' ||
+          name == '4wd' ||
+          label == 'drive' ||
+          label == 'drivetrain' ||
+          label == 'drive type') {
+        if (f.value != null && f.value!.isNotEmpty) {
+          final val = f.value!.first.toString().trim();
+          if (val.isNotEmpty && val.toLowerCase() != 'null') {
+            final lower = val.toLowerCase();
+            if (lower.contains('4wd') ||
+                lower.contains('awd') ||
+                lower.contains('fwd') ||
+                lower.contains('rwd') ||
+                lower.contains('4x4') ||
+                lower.contains('wheel drive') ||
+                val.length <= 6) {
+              return val;
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocListener<LocationChangeCubit, LocationChangeState>(
@@ -479,11 +536,14 @@ class SearchScreenState extends State<SearchScreen>
                         ? state.searchedItems
                         : <ItemModel>[];
 
-                    if (_isMapView) {
-                      return _buildMapView(items);
-                    }
-
-                    return _buildListView(items, state);
+                    return TabBarView(
+                      controller: _tabController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        _buildListView(items, state),
+                        _buildMapView(items),
+                      ],
+                    );
                   },
                 ),
               ),
@@ -496,9 +556,6 @@ class SearchScreenState extends State<SearchScreen>
 
   // --- UI Components ---
 
-
-
-
   Widget _buildTopSearchBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -506,16 +563,16 @@ class SearchScreenState extends State<SearchScreen>
         children: [
           IconButton(
             onPressed: () {
-              if (_isMapView) {
-                setState(() => _isMapView = false);
+              if (_tabController.index == 1) {
+                _tabController.animateTo(0);
               } else {
                 Navigator.pop(context);
               }
             },
             icon: Icon(
               Icons.arrow_back_rounded,
-              color: context.color.textDefaultColor,
-              size: 24,
+              color: context.color.textColorDark,
+              size: 22,
             ),
           ),
           Expanded(
@@ -556,9 +613,9 @@ class SearchScreenState extends State<SearchScreen>
                         _executeSearch();
                       },
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: 15.5,
                         fontWeight: FontWeight.w500,
-                        color: context.color.textDefaultColor,
+                        color: context.color.textColorDark,
                       ),
                       decoration: InputDecoration(
                         isDense: true,
@@ -612,8 +669,8 @@ class SearchScreenState extends State<SearchScreen>
     final make = filter?.customFields?['car_make_name'] ?? filter?.customFields?['make'];
 
     return Container(
-      height: 42,
-      margin: const EdgeInsets.only(bottom: 6),
+      height: 38,
+      margin: const EdgeInsets.only(bottom: 8),
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -673,9 +730,9 @@ class SearchScreenState extends State<SearchScreen>
           // Filter Settings Icon
           InkWell(
             onTap: _openFilterScreen,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             child: Container(
-              width: 38,
+              width: 36,
               height: 36,
               decoration: BoxDecoration(
                 color: context.color.secondaryColor,
@@ -687,7 +744,7 @@ class SearchScreenState extends State<SearchScreen>
               child: Icon(
                 Icons.tune_rounded,
                 size: 18,
-                color: context.color.textDefaultColor,
+                color: context.color.textColorDark,
               ),
             ),
           ),
@@ -702,10 +759,10 @@ class SearchScreenState extends State<SearchScreen>
   }) {
     return Container(
       margin: const EdgeInsets.only(right: 8),
-      padding: const EdgeInsets.only(left: 12, right: 6, top: 4, bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
       decoration: BoxDecoration(
-        color: const Color(0xFFEBF3FF),
-        borderRadius: BorderRadius.circular(18),
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -714,20 +771,17 @@ class SearchScreenState extends State<SearchScreen>
             label,
             style: const TextStyle(
               color: Color(0xFF007AFF),
-              fontSize: 13,
+              fontSize: 13.5,
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 6),
           InkWell(
             onTap: onRemove,
-            child: const Padding(
-              padding: EdgeInsets.all(2.0),
-              child: Icon(
-                Icons.close_rounded,
-                size: 14,
-                color: Color(0xFF007AFF),
-              ),
+            child: const Icon(
+              Icons.close_rounded,
+              size: 14,
+              color: Color(0xFF007AFF),
             ),
           ),
         ],
@@ -737,137 +791,56 @@ class SearchScreenState extends State<SearchScreen>
 
   Widget _buildSegmentedToggle() {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color trackColor = isDark
+        ? context.color.secondaryColor
+        : const Color(0xFFEDF2F7);
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
       child: Container(
-        height: 52,
-        padding: const EdgeInsets.all(4),
+        height: 44,
         decoration: BoxDecoration(
-          color: isDark ? context.color.secondaryColor : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(
-            color: isDark
-                ? context.color.borderColor.withValues(alpha: 0.5)
-                : const Color(0xFFE2E8F0),
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          color: trackColor,
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: Row(
-          children: [
-            // List Tab
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  if (_isMapView) {
-                    setState(() => _isMapView = false);
-                  }
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.fastOutSlowIn,
-                  decoration: BoxDecoration(
-                    color: !_isMapView ? const Color(0xFF007AFF) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(22),
-                    boxShadow: !_isMapView
-                        ? [
-                            BoxShadow(
-                              color: const Color(0xFF007AFF).withValues(alpha: 0.32),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.format_list_bulleted_rounded,
-                        size: 20,
-                        color: !_isMapView
-                            ? Colors.white
-                            : (isDark ? Colors.white70 : const Color(0xFF475569)),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'List',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.2,
-                          color: !_isMapView
-                              ? Colors.white
-                              : (isDark ? Colors.white70 : const Color(0xFF475569)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+        child: TabBar(
+          controller: _tabController,
+          indicatorSize: TabBarIndicatorSize.tab,
+          dividerColor: Colors.transparent,
+          indicator: BoxDecoration(
+            color: const Color(0xFF007AFF),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          labelColor: Colors.white,
+          unselectedLabelColor: isDark ? Colors.white : const Color(0xFF0F172A),
+          labelStyle: const TextStyle(
+            fontSize: 14.5,
+            fontWeight: FontWeight.w700,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontSize: 14.5,
+            fontWeight: FontWeight.w700,
+          ),
+          splashBorderRadius: BorderRadius.circular(12),
+          tabs: const [
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.format_list_bulleted_rounded, size: 18),
+                  SizedBox(width: 8),
+                  Text('List'),
+                ],
               ),
             ),
-            // Map Tab
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  if (!_isMapView) {
-                    setState(() => _isMapView = true);
-                    Future.delayed(const Duration(milliseconds: 250), () {
-                      if (_latestItems.isNotEmpty) {
-                        _animateCameraToItems(_latestItems);
-                      }
-                    });
-                  }
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.fastOutSlowIn,
-                  decoration: BoxDecoration(
-                    color: _isMapView ? const Color(0xFF007AFF) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(22),
-                    boxShadow: _isMapView
-                        ? [
-                            BoxShadow(
-                              color: const Color(0xFF007AFF).withValues(alpha: 0.32),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.location_on_rounded,
-                        size: 20,
-                        color: _isMapView
-                            ? Colors.white
-                            : (isDark ? Colors.white70 : const Color(0xFF475569)),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Map',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.2,
-                          color: _isMapView
-                              ? Colors.white
-                              : (isDark ? Colors.white70 : const Color(0xFF475569)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.location_on_rounded, size: 18),
+                  SizedBox(width: 8),
+                  Text('Map'),
+                ],
               ),
             ),
           ],
@@ -902,29 +875,29 @@ class SearchScreenState extends State<SearchScreen>
               children: [
                 Text(
                   '$totalCount results',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 14,
-                    color: context.color.textLightColor,
+                    color: Color(0xFF64748B),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 InkWell(
                   onTap: _showSortSheet,
                   child: Row(
-                    children: [
+                    children: const [
                       Text(
                         'Sort',
                         style: TextStyle(
                           fontSize: 14,
-                          color: context.color.textDefaultColor,
-                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF007AFF),
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(width: 4),
+                      SizedBox(width: 4),
                       Icon(
                         Icons.swap_vert_rounded,
                         size: 18,
-                        color: context.color.textDefaultColor,
+                        color: Color(0xFF007AFF),
                       ),
                     ],
                   ),
@@ -946,8 +919,7 @@ class SearchScreenState extends State<SearchScreen>
         _findCustomFieldValue(item.customFields, 'km');
     final fuel = _findCustomFieldValue(item.customFields, 'fuel');
     final transmission = _findCustomFieldValue(item.customFields, 'transmission');
-    final drivetrain = _findCustomFieldValue(item.customFields, 'drive') ??
-        _findCustomFieldValue(item.customFields, '4wd');
+    final drivetrain = _findDrivetrainValue(item.customFields);
 
     final bool isFeatured = item.isFeature == true;
     final bool isVerified =
@@ -1003,7 +975,7 @@ class SearchScreenState extends State<SearchScreen>
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                     child: SizedBox(
-                      height: 190,
+                      height: 195,
                       width: double.infinity,
                       child: imageSrc.isNotEmpty
                           ? UiUtils.imageType(
@@ -1022,21 +994,21 @@ class SearchScreenState extends State<SearchScreen>
                   ),
                   if (isFeatured)
                     Positioned(
-                      top: 12,
-                      left: 12,
+                      top: 10,
+                      left: 10,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: const Color(0xFFFF7A00),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Text(
                           'Featured',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
@@ -1047,11 +1019,47 @@ class SearchScreenState extends State<SearchScreen>
                     right: 10,
                     child: _buildFavoriteButton(item),
                   ),
+                  // Compare Toggle (Matching Design)
+                  Positioned(
+                    bottom: 10,
+                    right: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.55),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Compare',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            width: 13,
+                            height: 13,
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                  color: Colors.white, width: 1.5),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
               // Body Content
               Padding(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1061,23 +1069,23 @@ class SearchScreenState extends State<SearchScreen>
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: context.color.textDefaultColor,
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.w700,
+                        color: context.color.textColorDark,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 5),
                     // Price
                     if (formattedPrice != null)
                       Text(
                         '$formattedPrice ${Constant.currencySymbol}',
                         style: const TextStyle(
-                          fontSize: 18,
+                          fontSize: 18.5,
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF007AFF),
                         ),
                       ),
-                    // Dynamic Specs Row (Real values only)
+                    // Dynamic Specs Row (Real automotive values)
                     if (year != null ||
                         mileage != null ||
                         fuel != null ||
@@ -1085,7 +1093,7 @@ class SearchScreenState extends State<SearchScreen>
                         drivetrain != null) ...[
                       const SizedBox(height: 10),
                       Wrap(
-                        spacing: 12,
+                        spacing: 14,
                         runSpacing: 6,
                         children: [
                           if (year != null)
@@ -1112,7 +1120,8 @@ class SearchScreenState extends State<SearchScreen>
                                 f.value != null &&
                                 f.value!.isNotEmpty &&
                                 f.value!.first.toString().trim().isNotEmpty &&
-                                f.value!.first.toString().toLowerCase() != 'null')
+                                f.value!.first.toString().toLowerCase() != 'null' &&
+                                f.value!.first.toString().length <= 15)
                             .take(4)
                             .toList();
                         if (validFields.isEmpty) return const SizedBox.shrink();
@@ -1132,46 +1141,64 @@ class SearchScreenState extends State<SearchScreen>
                       }),
                     ],
                     const SizedBox(height: 12),
-                    Divider(height: 1, color: Colors.grey.shade100),
-                    const SizedBox(height: 10),
                     // Footer: Location & Verified Seller Badge
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Row(
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.location_on_outlined,
-                              size: 15,
-                              color: context.color.textLightColor,
+                              size: 14.5,
+                              color: Color(0xFF64748B),
                             ),
                             const SizedBox(width: 4),
                             Text(
                               item.city?.isNotEmpty == true
                                   ? item.city!
                                   : (item.address ?? 'Dushanbe'),
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: context.color.textLightColor,
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF64748B),
                               ),
                             ),
                           ],
                         ),
                         if (isVerified)
                           Row(
-                            children: const [
-                              Icon(
-                                Icons.check_circle_rounded,
-                                size: 16,
-                                color: Color(0xFF007AFF),
+                            children: [
+                              Image.asset(
+                                'assets/icons/verified.png',
+                                width: 14,
+                                height: 14,
                               ),
-                              SizedBox(width: 4),
-                              Text(
+                              const SizedBox(width: 4),
+                              const Text(
                                 'Verified seller',
                                 style: TextStyle(
                                   fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w700,
                                   color: Color(0xFF007AFF),
+                                ),
+                              ),
+                            ],
+                          )
+                        else if (item.created?.trim().isNotEmpty == true)
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.access_time_rounded,
+                                size: 12.5,
+                                color: Color(0xFF94A3B8),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                item.created!.formatDate(),
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF64748B),
                                 ),
                               ),
                             ],
@@ -1192,13 +1219,13 @@ class SearchScreenState extends State<SearchScreen>
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: Colors.grey.shade600),
+        Icon(icon, size: 14, color: const Color(0xFF64748B)),
         const SizedBox(width: 4),
         Text(
           label,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 12.5,
-            color: Colors.grey.shade700,
+            color: Color(0xFF475569),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -1297,7 +1324,16 @@ class SearchScreenState extends State<SearchScreen>
               _animateCameraToItems(items);
             }
           },
-          myLocationEnabled: true,
+          gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+            Factory<OneSequenceGestureRecognizer>(
+              () => EagerGestureRecognizer(),
+            ),
+          },
+          scrollGesturesEnabled: true,
+          zoomGesturesEnabled: true,
+          rotateGesturesEnabled: true,
+          tiltGesturesEnabled: true,
+          myLocationEnabled: false,
           myLocationButtonEnabled: false,
           zoomControlsEnabled: false,
           mapToolbarEnabled: false,

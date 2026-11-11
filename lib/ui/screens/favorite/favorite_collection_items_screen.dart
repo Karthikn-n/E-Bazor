@@ -180,7 +180,7 @@ class _FavoriteCollectionItemsScreenState
   void _shareListing() {
     final shareText =
         "Check out my favorite list '${_currentListing.title}' on Ebozor!\n${Constant.shareappText}";
-    Share.share(shareText);
+    SharePlus.instance.share(ShareParams(text: shareText));
   }
 
   void _openEditOptions() {
@@ -628,13 +628,16 @@ class _FavoriteCollectionItemsScreenState
                           )
                         ],
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.verified,
-                              color: Color(0xFF2563EB), size: 14),
-                          SizedBox(width: 4),
-                          Text(
+                          Image.asset(
+                            'assets/icons/verified.png',
+                            width: 14,
+                            height: 14,
+                          ),
+                          const SizedBox(width: 4),
+                          const Text(
                             "VERIFIED USER",
                             style: TextStyle(
                               color: Color(0xFF2563EB),

@@ -17,7 +17,15 @@ class CarsRepository {
 
       if (rawData is List && rawData.isNotEmpty) {
         List<CarMake> list = rawData.map((e) => CarMake.fromJson(e)).toList();
-        list.sort((a, b) => a.name.compareTo(b.name));
+        list.sort((a, b) {
+          final popA = a.isPopular ?? 0;
+          final popB = b.isPopular ?? 0;
+          if (popA != popB) return popB.compareTo(popA);
+          final orderA = a.sortOrder ?? 999999;
+          final orderB = b.sortOrder ?? 999999;
+          if (orderA != orderB) return orderA.compareTo(orderB);
+          return a.name.compareTo(b.name);
+        });
         return list;
       }
     } catch (e) {

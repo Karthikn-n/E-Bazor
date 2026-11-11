@@ -66,8 +66,8 @@ class ItemsList extends StatefulWidget {
     Map? arguments = routeSettings.arguments as Map?;
     return BlurredRouter(
       builder: (_) => ItemsList(
-        categoryId: (arguments?['catID'] ?? "").toString(),
-        categoryName: (arguments?['catName'] ?? "").toString(),
+        categoryId: (arguments?['catID'] ?? arguments?['categoryId'] ?? "").toString(),
+        categoryName: (arguments?['catName'] ?? arguments?['categoryName'] ?? "").toString(),
         categorySlug: arguments?['categorySlug']?.toString() ??
             arguments?['catSlug']?.toString(),
         initialSearch: arguments?['search']?.toString(),
@@ -643,7 +643,6 @@ class ItemsListState extends State<ItemsList> {
 
   void _fetchFilteredItems() {
     final categoryId = _activeCategoryId;
-    if (categoryId == 0) return;
     context.read<FetchItemFromCategoryCubit>().fetchItemFromCategory(
           categoryId: categoryId,
           search: searchController.text,
@@ -823,7 +822,13 @@ class ItemsListState extends State<ItemsList> {
                   width: 34,
                   height: 34,
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.35),
+                    color: Colors.white.withValues(alpha: 0.9),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 4,
+                      ),
+                    ],
                     shape: BoxShape.circle,
                   ),
                   child: Center(
@@ -837,9 +842,9 @@ class ItemsListState extends State<ItemsList> {
                             ),
                           )
                         : Icon(
-                            isLike ? Icons.favorite : Icons.favorite_border,
+                            isLike ? Icons.favorite : Icons.favorite_border_rounded,
                             size: 19,
-                            color: isLike ? Colors.red : Colors.white,
+                            color: isLike ? Colors.red : const Color(0xFF64748B),
                           ),
                   ),
                 ),
@@ -955,12 +960,10 @@ class ItemsListState extends State<ItemsList> {
     }
 
     final catIdInt = _activeCategoryId;
-    if (catIdInt != 0) {
-      context.read<FetchItemFromCategoryCubit>().fetchItemFromCategory(
-          categoryId: catIdInt,
-          search: widget.initialSearch?.trim() ?? '',
-          filter: initialFilter);
-    }
+    context.read<FetchItemFromCategoryCubit>().fetchItemFromCategory(
+        categoryId: catIdInt,
+        search: widget.initialSearch?.trim() ?? '',
+        filter: initialFilter);
 
     Future.delayed(Duration.zero, () {
       selectedcategoryId = widget.categoryId;
@@ -1028,14 +1031,14 @@ class ItemsListState extends State<ItemsList> {
           ),
           Expanded(
             child: Container(
-              height: 46,
+              height: 42,
               decoration: BoxDecoration(
                 border: Border.all(
                   width: 1,
-                  color: context.color.borderColor.withValues(alpha: 0.7),
+                  color: const Color(0xFFE2E8F0),
                 ),
-                borderRadius: BorderRadius.circular(10),
-                color: context.color.secondaryColor,
+                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFFF1F5F9),
               ),
               child: Row(
                 children: [
@@ -1044,7 +1047,7 @@ class ItemsListState extends State<ItemsList> {
                     _isJobsVertical()
                         ? Icons.search_rounded
                         : (_isPropertyVertical()
-                            ? Icons.location_on
+                            ? Icons.search_rounded
                             : Icons.search_rounded),
                     size: 20,
                     color: context.color.textDefaultColor,
@@ -1087,16 +1090,94 @@ class ItemsListState extends State<ItemsList> {
                         searchController.clear();
                         setState(() {});
                         final catIdInt = _activeCategoryId;
-                        if (catIdInt != 0) {
-                          context
-                              .read<FetchItemFromCategoryCubit>()
-                              .fetchItemFromCategory(
-                                categoryId: catIdInt,
-                                search: "",
-                                filter: filter,
-                              );
-                        }
+                        context
+                            .read<FetchItemFromCategoryCubit>()
+                            .fetchItemFromCategory(
+                              categoryId: catIdInt,
+                              search: "",
+                              filter: filter,
+                            );
                       },
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubHeader() {
+    final cityName = HiveUtils.getCityName() ?? "Dushanbe";
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          InkWell(
+            onTap: () {
+              Navigator.pushNamed(context, Routes.citiesScreen)
+                  .then((value) {
+                setState(() {});
+                _fetchFilteredItems();
+              });
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.location_on,
+                    size: 18,
+                    color: Color(0xFF007AFF),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    cityName,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: context.color.textDefaultColor,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                    color: context.color.textDefaultColor,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          InkWell(
+            onTap: _openFullFilterScreen,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(
+                    Icons.tune_rounded,
+                    size: 22,
+                    color: context.color.textDefaultColor,
+                  ),
+                  if (_activeFiltersCount > 0)
+                    Positioned(
+                      top: -2,
+                      right: -2,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF007AFF),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
                     ),
                 ],
               ),
@@ -1242,7 +1323,7 @@ class ItemsListState extends State<ItemsList> {
   //                 decoration: BoxDecoration(
   //                   color: isSelected
   //                       ? const Color(0xFFE8F1FD)
-  //                       : context.color.secondaryColor,
+  //                       : const Color(0xFFF1F5F9),
   //                   borderRadius: BorderRadius.circular(8),
   //                   border: Border.all(
   //                     color: isSelected
@@ -1385,7 +1466,6 @@ class ItemsListState extends State<ItemsList> {
         arguments: {
           'category': activeCategory,
           'categorySlug': _activeCategorySlug,
-          'appliedFilter': filter,
           'isFromItemsList': true,
           'filterConfiguration': _propertyFilterConfiguration,
         },
@@ -1431,13 +1511,11 @@ class ItemsListState extends State<ItemsList> {
         if (value == true && filter != null) {
           ItemFilterModel updatedFilter =
               filter!.copyWith(categoryId: widget.categoryId);
-          if (catIdInt != 0) {
-            context.read<FetchItemFromCategoryCubit>().fetchItemFromCategory(
-                  categoryId: catIdInt,
-                  search: searchController.text,
-                  filter: updatedFilter,
-                );
-          }
+          context.read<FetchItemFromCategoryCubit>().fetchItemFromCategory(
+                categoryId: catIdInt,
+                search: searchController.text,
+                filter: updatedFilter,
+              );
           setState(() {});
         }
       });
@@ -1453,6 +1531,45 @@ class ItemsListState extends State<ItemsList> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Row(
         children: [
+          // "All" chip matching listing_electronics.jpeg
+          InkWell(
+            onTap: () {
+              if (activeFiltersCount > 0) {
+                filter = null;
+                Constant.itemFilter = null;
+                // custom filter values cleared with filter reset above
+                _fetchFilteredItems();
+                setState(() {});
+              }
+            },
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+              decoration: BoxDecoration(
+                color: activeFiltersCount == 0
+                    ? const Color(0xFF007AFF)
+                    : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: activeFiltersCount == 0
+                      ? const Color(0xFF007AFF)
+                      : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Text(
+                "All",
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: activeFiltersCount == 0
+                      ? Colors.white
+                      : context.color.textDefaultColor,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+
           // Filter count chip -> opens full filter screen
           ActionChip(
             avatar: Icon(
@@ -1476,11 +1593,11 @@ class ItemsListState extends State<ItemsList> {
             ),
             backgroundColor: activeFiltersCount > 0
                 ? context.color.territoryColor
-                : context.color.secondaryColor,
+                : const Color(0xFFF1F5F9),
             side: BorderSide(
               color: activeFiltersCount > 0
                   ? context.color.territoryColor
-                  : context.color.borderColor,
+                  : const Color(0xFFE2E8F0),
             ),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -1515,12 +1632,12 @@ class ItemsListState extends State<ItemsList> {
         decoration: BoxDecoration(
           color: isActive
               ? context.color.territoryColor.withValues(alpha: 0.12)
-              : context.color.secondaryColor,
+              : const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isActive
                 ? context.color.territoryColor
-                : context.color.borderColor,
+                : const Color(0xFFE2E8F0),
           ),
         ),
         child: Row(
@@ -1635,7 +1752,7 @@ class ItemsListState extends State<ItemsList> {
               expand: false,
               builder: (context, scrollController) {
                 return Material(
-                  color: context.color.secondaryColor,
+                  color: const Color(0xFFF1F5F9),
                   borderRadius:
                       const BorderRadius.vertical(top: Radius.circular(20)),
                   clipBehavior: Clip.antiAlias,
@@ -1850,7 +1967,7 @@ class ItemsListState extends State<ItemsList> {
                                             ? context.color.territoryColor
                                                 .withValues(alpha: 0.08)
                                             : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(10),
+                                        borderRadius: BorderRadius.circular(12),
                                         clipBehavior: Clip.antiAlias,
                                         child: ListTile(
                                           contentPadding:
@@ -2005,7 +2122,7 @@ class ItemsListState extends State<ItemsList> {
         decoration: BoxDecoration(
           color: isActive
               ? context.color.territoryColor.withValues(alpha: 0.12)
-              : context.color.secondaryColor,
+              : const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
               color: isActive
@@ -3314,11 +3431,7 @@ class ItemsListState extends State<ItemsList> {
               backgroundColor: context.color.backgroundColor,
               onRefresh: () async {
                 searchbody = {};
-
-                final catIdInt = _activeCategoryId;
-                if (catIdInt != 0) {
-                  _fetchFilteredItems();
-                }
+                _fetchFilteredItems();
               },
               color: context.color.territoryColor,
               child: SingleChildScrollView(
@@ -3331,9 +3444,10 @@ class ItemsListState extends State<ItemsList> {
                   children: [
                     const SizedBox(height: 6),
                     _buildLocationHeader(),
+                    _buildSubHeader(),
                     const SizedBox(height: 6),
                     _buildFilterChips(),
-                    _buildVerifiedToggle(),
+                    // verified badge rendered on item cards
                     const SizedBox(height: 4),
                     fetchItems(),
                     const SizedBox(height: 90),
@@ -3512,15 +3626,13 @@ class ItemsListState extends State<ItemsList> {
                 onTap: () {
                   Navigator.pop(context);
                   final catIdInt = _activeCategoryId;
-                  if (catIdInt != 0) {
-                    context
-                        .read<FetchItemFromCategoryCubit>()
-                        .fetchItemFromCategory(
-                            categoryId: catIdInt,
-                            search: searchController.text.toString(),
-                            sortBy: null,
-                            filter: filter);
-                  }
+                  context
+                      .read<FetchItemFromCategoryCubit>()
+                      .fetchItemFromCategory(
+                          categoryId: catIdInt,
+                          search: searchController.text.toString(),
+                          sortBy: null,
+                          filter: filter);
 
                   setState(() {
                     sortBy = null;
@@ -3541,15 +3653,13 @@ class ItemsListState extends State<ItemsList> {
                 onTap: () {
                   Navigator.pop(context);
                   final catIdInt = _activeCategoryId;
-                  if (catIdInt != 0) {
-                    context
-                        .read<FetchItemFromCategoryCubit>()
-                        .fetchItemFromCategory(
-                            categoryId: catIdInt,
-                            search: searchController.text.toString(),
-                            sortBy: "new-to-old",
-                            filter: filter);
-                  }
+                  context
+                      .read<FetchItemFromCategoryCubit>()
+                      .fetchItemFromCategory(
+                          categoryId: catIdInt,
+                          search: searchController.text.toString(),
+                          sortBy: "new-to-old",
+                          filter: filter);
                   setState(() {
                     sortBy = "new-to-old";
                     FocusManager.instance.primaryFocus?.unfocus();
@@ -3569,15 +3679,13 @@ class ItemsListState extends State<ItemsList> {
                 onTap: () {
                   Navigator.pop(context);
                   final catIdInt = _activeCategoryId;
-                  if (catIdInt != 0) {
-                    context
-                        .read<FetchItemFromCategoryCubit>()
-                        .fetchItemFromCategory(
-                            categoryId: catIdInt,
-                            search: searchController.text.toString(),
-                            sortBy: "old-to-new",
-                            filter: filter);
-                  }
+                  context
+                      .read<FetchItemFromCategoryCubit>()
+                      .fetchItemFromCategory(
+                          categoryId: catIdInt,
+                          search: searchController.text.toString(),
+                          sortBy: "old-to-new",
+                          filter: filter);
                   setState(() {
                     sortBy = "old-to-new";
                     FocusManager.instance.primaryFocus?.unfocus();
@@ -3597,15 +3705,13 @@ class ItemsListState extends State<ItemsList> {
                 onTap: () {
                   Navigator.pop(context);
                   final catIdInt = _activeCategoryId;
-                  if (catIdInt != 0) {
-                    context
-                        .read<FetchItemFromCategoryCubit>()
-                        .fetchItemFromCategory(
-                            categoryId: catIdInt,
-                            search: searchController.text.toString(),
-                            sortBy: "price-high-to-low",
-                            filter: filter);
-                  }
+                  context
+                      .read<FetchItemFromCategoryCubit>()
+                      .fetchItemFromCategory(
+                          categoryId: catIdInt,
+                          search: searchController.text.toString(),
+                          sortBy: "price-high-to-low",
+                          filter: filter);
                   setState(() {
                     sortBy = "price-high-to-low";
                     FocusManager.instance.primaryFocus?.unfocus();
@@ -3625,15 +3731,13 @@ class ItemsListState extends State<ItemsList> {
                 onTap: () {
                   Navigator.pop(context);
                   final catIdInt = _activeCategoryId;
-                  if (catIdInt != 0) {
-                    context
-                        .read<FetchItemFromCategoryCubit>()
-                        .fetchItemFromCategory(
-                            categoryId: catIdInt,
-                            search: searchController.text.toString(),
-                            sortBy: "price-low-to-high",
-                            filter: filter);
-                  }
+                  context
+                      .read<FetchItemFromCategoryCubit>()
+                      .fetchItemFromCategory(
+                          categoryId: catIdInt,
+                          search: searchController.text.toString(),
+                          sortBy: "price-low-to-high",
+                          filter: filter);
                   setState(() {
                     sortBy = "price-low-to-high";
                     FocusManager.instance.primaryFocus?.unfocus();
@@ -3673,15 +3777,13 @@ class ItemsListState extends State<ItemsList> {
             child: NoDataFound(
               onTap: () {
                 final catIdInt = _activeCategoryId;
-                if (catIdInt != 0) {
-                  context
-                      .read<FetchItemFromCategoryCubit>()
-                      .fetchItemFromCategory(
-                          categoryId: catIdInt,
-                          search: searchController.text.toString(),
-                          sortBy: sortBy,
-                          filter: filter);
-                }
+                context
+                    .read<FetchItemFromCategoryCubit>()
+                    .fetchItemFromCategory(
+                        categoryId: catIdInt,
+                        search: searchController.text.toString(),
+                        sortBy: sortBy,
+                        filter: filter);
               },
             ),
           );
@@ -3735,7 +3837,18 @@ class ItemsListState extends State<ItemsList> {
       );
     }
 
-    return ListView.builder(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildResultsAndSortHeader(filteredItems.length),
+        GridView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 0.66,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 14,
+          ),
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: filteredItems.length,
@@ -3744,10 +3857,276 @@ class ItemsListState extends State<ItemsList> {
         if (_isJobItem(item)) {
           return _buildJobCard(context, item);
         }
-        return _buildPropertyCard(context, item);
+        return _buildListingGridCard(context, item);
       },
+        ),
+      ],
     );
   }
+
+  Widget _buildListingGridCard(BuildContext context, ItemModel item) {
+    final bool isPromoted = item.isFeature == true;
+    final bool isVerified =
+        item.user?.isVerified == 1 || item.user?.isVerified == true;
+
+    final formattedPrice = item.price != null
+        ? item.price!.toInt().toString().replaceAllMapped(
+              RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+              (m) => '${m[1]} ',
+            )
+        : null;
+
+    final imageSrc = item.image?.isNotEmpty == true
+        ? item.image!
+        : (item.galleryImages?.isNotEmpty == true
+            ? item.galleryImages!.first.image ?? ''
+            : '');
+
+    return Container(
+      decoration: BoxDecoration(
+        color: context.color.secondaryColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _navigateToDetails(context, item),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(15)),
+                    child: SizedBox(
+                      height: 140,
+                      width: double.infinity,
+                      child: imageSrc.isNotEmpty
+                          ? UiUtils.imageType(imageSrc, fit: BoxFit.cover)
+                          : Container(
+                              color: const Color(0xFFF1F5F9),
+                              child: const Icon(
+                                Icons.image_outlined,
+                                size: 36,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                    ),
+                  ),
+                  if (isPromoted)
+                    Positioned(
+                      bottom: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF9500),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'Promoted',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: _favButton(context, item),
+                  ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.name ?? '',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: context.color.textDefaultColor,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    if (formattedPrice != null)
+                      Text(
+                        '$formattedPrice TJS',
+                        style: TextStyle(
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.w900,
+                          color: context.color.textDefaultColor,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          size: 13,
+                          color: Color(0xFF64748B),
+                        ),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(
+                            item.city?.isNotEmpty == true
+                                ? item.city!
+                                : (item.address ?? 'Dushanbe'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        if (isVerified) ...[
+                          Image.asset('assets/icons/verified.png', width: 13, height: 13),
+                          const SizedBox(width: 3),
+                          const Text(
+                            'Verified',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF007AFF),
+                            ),
+                          ),
+                        ] else ...[
+                          const Icon(Icons.access_time_rounded, size: 12, color: Color(0xFF94A3B8)),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              item.created?.trim().isNotEmpty == true ? item.created!.formatDate() : (item.category?.name ?? ''),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Color(0xFF64748B)),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (false) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: const [
+                          Icon(
+                            Icons.check_circle_rounded,
+                            size: 13,
+                            color: Color(0xFF007AFF),
+                          ),
+                          SizedBox(width: 3),
+                          Text(
+                            'Verified',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF007AFF),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResultsAndSortHeader(int totalCount) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            "$totalCount results",
+            style: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF64748B),
+            ),
+          ),
+          InkWell(
+            onTap: showSortByBottomSheet,
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    "Sort: ${_currentSortLabel()}",
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: context.color.textDefaultColor,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                    color: context.color.textDefaultColor,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _currentSortLabel() {
+    switch (sortBy) {
+      case 'new-to-old':
+        return 'Newest';
+      case 'old-to-new':
+        return 'Oldest';
+      case 'price-low-to-high':
+        return 'Price: Low to High';
+      case 'price-high-to-low':
+        return 'Price: High to Low';
+      default:
+        return 'Newest';
+    }
+  }
+
+  // (legacy dead code removed)
+      
 
   Widget buildItemsShimmer(BuildContext context) {
     return Padding(

@@ -45,7 +45,7 @@ class FavoriteListOptionsBottomSheet extends StatelessWidget {
   void _shareList(BuildContext context) {
     Navigator.pop(context);
     final shareText = "Check out my favorite list '${listing.title}' on Ebozor!\n${Constant.shareappText}";
-    Share.share(shareText);
+    SharePlus.instance.share(ShareParams(text: shareText));
   }
 
   void _showRenameDialog(BuildContext context) {

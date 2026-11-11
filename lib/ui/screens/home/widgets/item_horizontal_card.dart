@@ -218,7 +218,7 @@ class ItemHorizontalCard extends StatelessWidget {
                   const SizedBox(height: 10),
 
                   // NAME
-                  Text(item.name!.firstUpperCase())
+                  Text(item.name ?? "")
                       .setMaxLines(lines: 2)
                       .size(context.font.normal)
                       .color(context.color.textDefaultColor),

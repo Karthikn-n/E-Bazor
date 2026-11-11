@@ -1,16 +1,26 @@
 // ignore_for_file: deprecated_member_use
 
 import 'package:Ebozor/ui/theme/theme.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 enum AppTheme { dark, light }
 
+String? get _appFontFamily =>
+    defaultTargetPlatform == TargetPlatform.iOS ? null : "SFProDisplay";
+
+List<String>? get _appFontFamilyFallback =>
+    defaultTargetPlatform == TargetPlatform.iOS
+        ? null
+        : const ["SFProDisplay", "Inter"];
+
 final appThemeData = {
   AppTheme.light: ThemeData(
     brightness: Brightness.light,
     useMaterial3: true,
-    fontFamily: "Manrope",
+    fontFamily: _appFontFamily,
+    fontFamilyFallback: _appFontFamilyFallback,
     scaffoldBackgroundColor: primaryColor_,
     appBarTheme: const AppBarTheme(
       backgroundColor: secondaryColor_,
@@ -46,7 +56,8 @@ final appThemeData = {
   AppTheme.dark: ThemeData(
     brightness: Brightness.dark,
     useMaterial3: true,
-    fontFamily: "Manrope",
+    fontFamily: _appFontFamily,
+    fontFamilyFallback: _appFontFamilyFallback,
     scaffoldBackgroundColor: backgroundColorDark,
     appBarTheme: AppBarTheme(
       backgroundColor: secondaryColorDark,
