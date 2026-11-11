@@ -24,6 +24,7 @@ import 'package:Ebozor/ui/screens/item/add_item_screen/motors/motor_posting_form
 import 'package:Ebozor/ui/screens/item/add_item_screen/common_title_input_screen.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/property/property_posting_form_screen.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/classifieds/classifieds_posting_form_screen.dart';
+import 'package:Ebozor/ui/screens/motors/motors_home_screen.dart';
 import 'package:Ebozor/ui/screens/jobs/job_home_screen.dart';
 import 'package:Ebozor/ui/screens/jobs/job_search_screen.dart';
 import 'package:Ebozor/ui/screens/jobs/my_job_applications_screen.dart';
@@ -198,6 +199,7 @@ class Routes {
   static const chooseOtpMethodScreen = '/chooseOtpMethodScreen';
   static const confirmPhoneNumberScreen = '/confirmPhoneNumberScreen';
   static const securityScreen = '/securityScreen';
+  static const motorsHomeScreen = '/motorsHomeScreen';
   static const jobHomeScreen = '/jobHomeScreen';
   static const jobSearchScreen = '/jobSearchScreen';
   static const myJobApplicationsScreen = '/myJobApplicationsScreen';
@@ -430,6 +432,8 @@ class Routes {
         return ConfirmPhoneNumberScreen.route(routeSettings);
       case securityScreen:
         return SecurityScreen.route(routeSettings);
+      case motorsHomeScreen:
+        return MotorsHomeScreen.route(routeSettings);
       case jobHomeScreen:
         return JobHomeScreen.route(routeSettings);
       case jobSearchScreen:

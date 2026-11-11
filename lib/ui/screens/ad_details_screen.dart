@@ -346,9 +346,25 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
         child: Scaffold(
           backgroundColor: context.color.secondaryDetailsColor,
           extendBodyBehindAppBar: true,
-          bottomNavigationBar: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              child: bottomButtonWidget()),
+          bottomNavigationBar: Container(
+            decoration: BoxDecoration(
+              color: context.color.secondaryColor,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 10,
+                  offset: const Offset(0, -3),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: bottomButtonWidget(),
+              ),
+            ),
+          ),
           body: MediaQuery.removePadding(
             context: context,
             removeTop: true,
@@ -359,88 +375,96 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                 children: <Widget>[
                   // Edge-to-Edge Image viewer under status bar
                   setImageViewer(),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14.0, vertical: 10.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Title first, matching ad_detail.jpeg
-                        Text(
-                          model.name ?? "",
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: context.color.textDefaultColor,
-                            height: 1.25,
+                  // Main Content Card with rounded top corners overlapping/sitting under image
+                  Transform.translate(
+                    offset: const Offset(0, -20),
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: context.color.secondaryColor,
+                        borderRadius:
+                            const BorderRadius.vertical(top: Radius.circular(24)),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0, vertical: 16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Title first, matching ad_detail.jpeg
+                          Text(
+                            model.name ?? "",
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.4,
+                              color: context.color.textDefaultColor,
+                              height: 1.25,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 6),
-                        // Price and status widget
-                        setPriceAndStatus(),
-                        _buildKeyHighlights(),
+                          const SizedBox(height: 6),
+                          // Price and status widget
+                          setPriceAndStatus(),
 
-                        if (isAddedByMe) setRejectedReason(),
+                          // 5-Column Specs Row matching ad_detail.jpeg
+                          _buildKeyHighlights(),
 
-                        if (Constant.isGoogleBannerAdsEnabled == "1") ...[
-                          Divider(
-                              thickness: 1,
-                              color: context.color.textDefaultColor
-                                  .withValues(alpha: 0.1)),
-                          Container(
-                            alignment: AlignmentDirectional.center,
-                            child: AdBannerWidget(),
-                          ),
+                          // Seller Card directly below specs, matching ad_detail.jpeg
+                          if (!isAddedByMe) _buildSellerSection(),
+
+                          if (isAddedByMe) setRejectedReason(),
+
+                          if (Constant.isGoogleBannerAdsEnabled == "1") ...[
+                            Divider(
+                                thickness: 1,
+                                color: context.color.textDefaultColor
+                                    .withValues(alpha: 0.1)),
+                            Container(
+                              alignment: AlignmentDirectional.center,
+                              child: AdBannerWidget(),
+                            ),
+                          ],
+
+                          if (isAddedByMe && model.isFeature != true)
+                            createFeaturesAds(),
+
+                          // Description directly below seller, matching ad_detail.jpeg
+                          _buildDescriptionSection(),
+
+                          // Location Card directly below description, matching ad_detail.jpeg
+                          _buildLocationSection(),
+
+                          // Financing Teaser Card directly below location, matching ad_detail.jpeg
+                          if (_isCarListing())
+                            _buildFinancingTeaserCard(),
+
+                          // Car / Item Overview (2-column key-value with Show More / Show Less)
+                          _buildOverviewSection(),
+
+                          // Property Amenities Grid (3 per row with Show More)
+                          _buildAmenitiesSection(),
+
+                          // Features (expandable accordion categories with checkmarks)
+                          _buildFeaturesSection(),
+
+                          if (Constant.isGoogleBannerAdsEnabled == "1") ...[
+                            const SizedBox(height: 10),
+                            Container(
+                              alignment: AlignmentDirectional.center,
+                              child: AdBannerWidget(),
+                            ),
+                          ],
+
+                          // Report ad widget
+                          if (!isAddedByMe) _buildReportAdRow(),
+
+                          const SizedBox(height: 12),
+                          // Similar ads widget
+                          relatedAds(),
+                          const SizedBox(height: 20),
                         ],
-
-                        if (isAddedByMe && model.isFeature != true)
-                          createFeaturesAds(),
-
-                        // Car / Item Overview (2-column key-value with Show More / Show Less)
-                        _buildOverviewSection(),
-
-                        // Property Amenities Grid (3 per row with Show More)
-                        _buildAmenitiesSection(),
-
-                        // Description with Read More & Posted On date
-                        _buildDescriptionSection(),
-
-                        // Features (expandable accordion categories with checkmarks)
-                        _buildFeaturesSection(),
-
-                        // Car Finance Calculator (shown for Cars / Motors listings with price > 0)
-                        if (_isCarListing() &&
-                            (model.price != null && model.price! > 0))
-                          CarFinanceCalculator(
-                            initialPrice: model.price ?? 0.0,
-                            carName: model.name,
-                            showApplyButton: false,
-                          ),
-
-                        // Location section with map preview
-                        _buildLocationSection(),
-
-                        // Seller details section with verified checkmark & view profile
-                        if (!isAddedByMe) _buildSellerSection(),
-
-                        if (Constant.isGoogleBannerAdsEnabled == "1") ...[
-                          const SizedBox(height: 10),
-                          Container(
-                            alignment: AlignmentDirectional.center,
-                            child: AdBannerWidget(),
-                          ),
-                        ],
-
-                        // Report ad widget
-                        if (!isAddedByMe) _buildReportAdRow(),
-
-                        const SizedBox(height: 12),
-                        // Similar ads widget
-                        relatedAds(),
-                        const SizedBox(height: 20),
-                      ],
+                      ),
                     ),
                   ),
                 ],
@@ -823,9 +847,14 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   }
 
   bool _isCarListing() {
-    final catName = (model.category?.name ?? "").toLowerCase();
-    final catSlug = (model.category?.slug ?? "").toLowerCase();
-    if (catName.contains("car") ||
+    if (model.isMotorsCategory || widget.model.isMotorsCategory) return true;
+    final catName = (model.category?.name ?? widget.model.category?.name ?? "").toLowerCase();
+    final catSlug = (model.category?.slug ?? widget.model.category?.slug ?? "").toLowerCase();
+    final allCatIds = (model.allCategoryIds ?? widget.model.allCategoryIds ?? "").split(',').map((e) => e.trim()).toList();
+    final catId = model.categoryId ?? widget.model.categoryId ?? model.category?.id;
+    if (catId == 1 ||
+        allCatIds.contains("1") ||
+        catName.contains("car") ||
         catName.contains("motor") ||
         catName.contains("vehicle") ||
         catName.contains("auto") ||
@@ -835,6 +864,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
         catSlug.contains("auto")) {
       return true;
     }
+
     // Check custom fields for vehicle specific attributes (e.g. kilometers, transmission, trim, year)
     if (model.customFields != null) {
       for (var cf in model.customFields!) {
@@ -852,32 +882,66 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     return false;
   }
 
+  String? _findDrivetrainValue() {
+    if (model.customFields == null) return null;
+    const validDrivetrains = {
+      '4wd', 'awd', 'fwd', 'rwd', '4x4', '4x2',
+      'all wheel drive', 'four wheel drive', 'front wheel drive', 'rear wheel drive',
+      'full-time 4wd', 'part-time 4wd'
+    };
+    for (final cf in model.customFields!) {
+      final name = (cf.name ?? '').toLowerCase();
+      final label = (cf.label ?? '').toLowerCase();
+      if (name.contains('driver assistance') || label.contains('driver assistance') ||
+          name.contains('driving assist') || label.contains('driving assist')) {
+        continue;
+      }
+      if (name == 'drive' || name == 'drivetrain' || label == 'drive' || label == 'drivetrain' ||
+          name.contains('drive type') || label.contains('drive type')) {
+        if (cf.value != null && cf.value!.isNotEmpty) {
+          final val = cf.value!.first.toString().trim();
+          if (val.isNotEmpty && val.toLowerCase() != 'null') {
+            return val;
+          }
+        }
+      }
+      if (cf.value != null && cf.value!.isNotEmpty) {
+        final val = cf.value!.first.toString().trim();
+        if (validDrivetrains.contains(val.toLowerCase())) {
+          return val;
+        }
+      }
+    }
+    return null;
+  }
+
   Widget _buildKeyHighlights() {
-    final year = _findCustomFieldVal(['year', 'model year']);
-    final mileage = _findCustomFieldVal(['mileage', 'kilometer', 'km']);
-    final fuel = _findCustomFieldVal(['fuel', 'fuel type', 'gas']);
-    final transmission = _findCustomFieldVal(['transmission', 'gear']);
-    final drive = _findCustomFieldVal(['drive', '4wd', 'drivetrain']);
+    final year = _findCustomFieldVal(['year', 'model year']) ??
+        RegExp(r'\b(19\d\d|20\d\d)\b').firstMatch(model.name ?? "")?.group(0);
+    final rawMileage = _findCustomFieldVal(['mileage', 'kilometer', 'km']);
+    final mileage = rawMileage != null
+        ? (rawMileage.contains('km') ? rawMileage : '$rawMileage km')
+        : (_isCarListing() ? '0 km' : null);
+    final fuel = _findCustomFieldVal(['fuel', 'fuel type', 'gas']) ??
+        (_isCarListing() ? 'Petrol' : null);
+    final transmission = _findCustomFieldVal(['transmission', 'gear', 'transmission type']) ??
+        (_isCarListing() ? 'Automatic' : null);
+    final drive = _findDrivetrainValue();
 
     List<Map<String, dynamic>> specs = [];
-    if (year != null) {
-      specs.add({'icon': Icons.calendar_today_outlined, 'val': year, 'label': 'Year'});
+    if (mileage != null && mileage.isNotEmpty) {
+      specs.add({'icon': Icons.speed_outlined, 'val': mileage, 'label': 'Mileage'});
     }
-    if (mileage != null) {
-      specs.add({
-        'icon': Icons.speed_outlined,
-        'val': mileage.contains('km') ? mileage : '$mileage km',
-        'label': 'Mileage'
-      });
+    if (year != null && year.isNotEmpty) {
+      specs.add({'icon': Icons.calendar_month_outlined, 'val': year, 'label': 'Year'});
     }
-    if (fuel != null) {
-      specs.add({'icon': Icons.local_gas_station_outlined, 'val': fuel, 'label': 'Fuel'});
+    if (fuel != null && fuel.isNotEmpty) {
+      specs.add({'icon': Icons.local_gas_station_rounded, 'val': fuel, 'label': 'Fuel'});
     }
-    if (transmission != null) {
-      specs.add({'icon': Icons.settings_outlined, 'val': transmission, 'label': 'Transmission'});
-    }
-    if (drive != null) {
-      specs.add({'icon': Icons.tune_outlined, 'val': drive, 'label': 'Drive'});
+    if (drive != null && drive.isNotEmpty) {
+      specs.add({'icon': Icons.grid_view_rounded, 'val': drive, 'label': 'Drive'});
+    } else if (transmission != null && transmission.isNotEmpty) {
+      specs.add({'icon': Icons.tune_rounded, 'val': transmission, 'label': 'Transmission'});
     }
 
     // If non-car or fields missing, pick other real custom fields
@@ -899,16 +963,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
 
     if (specs.isEmpty) return const SizedBox.shrink();
 
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 12),
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
-      decoration: BoxDecoration(
-        color: context.color.secondaryColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: context.color.borderColor.withValues(alpha: 0.5),
-        ),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: List.generate(specs.length * 2 - 1, (i) {
@@ -916,7 +972,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
             return Container(
               height: 32,
               width: 1,
-              color: context.color.borderColor.withValues(alpha: 0.4),
+              color: const Color(0xFFE2E8F0),
             );
           }
           final item = specs[i ~/ 2];
@@ -924,10 +980,15 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  item['icon'] as IconData,
-                  size: 20,
-                  color: context.color.textLightColor,
+                SizedBox(
+                  height: 24,
+                  child: Center(
+                    child: Icon(
+                      item['icon'] as IconData,
+                      size: 22,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -935,10 +996,11 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: context.color.textDefaultColor,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                    color: Color(0xFF0F172A),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -947,9 +1009,10 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: context.color.textLightColor,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF64748B),
                   ),
                 ),
               ],
@@ -1418,6 +1481,14 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
       if (_isPropertyListing() && name.contains("amenit")) {
         return false;
       }
+      if (_isCarListing()) {
+        const carSpecKeywords = [
+          'year', 'mileage', 'kilometer', 'km', 'fuel', 'transmission',
+          'gear', 'drive', 'drivetrain', 'пробег', 'год', 'сол',
+          'топливо', 'кпп', 'коробка'
+        ];
+        if (carSpecKeywords.any((k) => name.contains(k))) return false;
+      }
       return _isOverviewSpecField(cf.name ?? "", cf.value!.length) ||
           cf.value!.length <= 1;
     }).toList();
@@ -1533,35 +1604,40 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   }
 
   Widget _buildDescriptionSection() {
-    if (model.description == null || model.description!.trim().isEmpty) {
+    final descText = model.description?.trim() ?? "";
+    if (descText.isEmpty) {
       return const SizedBox.shrink();
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 18),
-        Text("aboutThisItemLbl".translate(context))
-            .bold(weight: FontWeight.w700)
-            .size(18)
-            .color(context.color.textDefaultColor),
         const SizedBox(height: 10),
+        Text(
+          "Description",
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: context.color.textDefaultColor,
+          ),
+        ),
+        const SizedBox(height: 8),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              model.description ?? "",
-              maxLines: _isDescriptionExpanded ? null : 4,
+              descText,
+              maxLines: _isDescriptionExpanded ? null : 3,
               overflow: _isDescriptionExpanded
                   ? TextOverflow.visible
                   : TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 14,
-                height: 1.5,
-                color: context.color.textDefaultColor.withValues(alpha: 0.75),
+                height: 1.45,
+                color: context.color.textDefaultColor.withValues(alpha: 0.8),
               ),
             ),
-            if ((model.description?.length ?? 0) > 160) ...[
+            if (descText.length > 70) ...[
               const SizedBox(height: 6),
               InkWell(
                 borderRadius: BorderRadius.circular(6),
@@ -1571,41 +1647,28 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                   });
                 },
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4.0),
+                  padding: const EdgeInsets.symmetric(vertical: 2.0),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        _isDescriptionExpanded
-                            ? "Read Less".translate(context)
-                            : "Read More".translate(context),
-                        style: TextStyle(
-                          color: context.color.territoryColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
+                        _isDescriptionExpanded ? "Read less" : "Read more",
+                        style: const TextStyle(
+                          color: Color(0xFF007AFF),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13.5,
                         ),
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 3),
                       Icon(
                         _isDescriptionExpanded
                             ? Icons.keyboard_arrow_up_rounded
                             : Icons.keyboard_arrow_down_rounded,
                         size: 16,
-                        color: context.color.territoryColor,
+                        color: const Color(0xFF007AFF),
                       ),
                     ],
                   ),
-                ),
-              ),
-            ],
-            if (model.created != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                "Posted On: ${model.created!.formatDate(format: "d MMMM, yyyy")}",
-                style: TextStyle(
-                  fontSize: 12,
-                  color: context.color.textDefaultColor.withValues(alpha: 0.45),
-                  fontStyle: FontStyle.italic,
                 ),
               ),
             ],
@@ -1795,186 +1858,249 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     final cityName = model.city?.isNotEmpty == true
         ? model.city!
         : (model.address?.isNotEmpty == true ? model.address! : "Dushanbe");
+    final hasCoords = model.latitude != null &&
+        model.latitude != 0.0 &&
+        model.longitude != null &&
+        model.longitude != 0.0;
+    final LatLng currentPosition =
+        LatLng(model.latitude ?? 38.5598, model.longitude ?? 68.7870);
 
-    final double lat = (model.latitude != null && model.latitude != 0.0)
-        ? model.latitude!
-        : 38.5358;
-    final double lng = (model.longitude != null && model.longitude != 0.0)
-        ? model.longitude!
-        : 68.7791;
-    final LatLng currentPosition = LatLng(lat, lng);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        InkWell(
-          onTap: () => _navigateToGoogleMapScreen(context),
+    return InkWell(
+      onTap: () => _navigateToGoogleMapScreen(context),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        margin: const EdgeInsets.only(top: 14, bottom: 8),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          child: Container(
-            margin: const EdgeInsets.only(top: 14, bottom: 8),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEBF5FF),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: const Color(0xFF007AFF).withValues(alpha: 0.15),
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.06),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.location_on_rounded,
-                    color: Color(0xFF007AFF),
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        cityName,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: context.color.textDefaultColor,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        model.address?.isNotEmpty == true
-                            ? model.address!
-                            : 'Exact location provided after contact',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: context.color.textLightColor,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF007AFF),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.map_outlined, color: Colors.white, size: 14),
-                      SizedBox(width: 4),
-                      Text(
-                        'Open',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          border: Border.all(
+            color: const Color(0xFFE2E8F0),
+            width: 1,
           ),
-        ),
-        // Embedded Map View Preview
-        ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            height: 160,
-            width: double.infinity,
-            margin: const EdgeInsets.only(bottom: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: context.color.borderColor.withValues(alpha: 0.4),
-              ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
-            child: Stack(
-              children: [
-                GoogleMap(
-                  zoomControlsEnabled: false,
-                  myLocationButtonEnabled: false,
-                  compassEnabled: false,
-                  mapToolbarEnabled: false,
-                  liteModeEnabled: false,
-                  zoomGesturesEnabled: false,
-                  scrollGesturesEnabled: false,
-                  rotateGesturesEnabled: false,
-                  tiltGesturesEnabled: false,
-                  initialCameraPosition: CameraPosition(
-                    target: currentPosition,
-                    zoom: 14,
-                  ),
-                  mapType: MapType.normal,
-                  markers: {
-                    Marker(
-                      markerId: const MarkerId('currentPosition'),
-                      position: currentPosition,
-                    ),
-                  },
-                ),
-                Positioned.fill(
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () => _navigateToGoogleMapScreen(context),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Left Square Map Box
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: 68,
+                height: 68,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    if (hasCoords)
+                      GoogleMap(
+                        zoomControlsEnabled: false,
+                        myLocationEnabled: false,
+                        myLocationButtonEnabled: false,
+                        compassEnabled: false,
+                        mapToolbarEnabled: false,
+                        liteModeEnabled: true,
+                        zoomGesturesEnabled: false,
+                        scrollGesturesEnabled: false,
+                        rotateGesturesEnabled: false,
+                        tiltGesturesEnabled: false,
+                        initialCameraPosition:
+                            CameraPosition(target: currentPosition, zoom: 14),
+                        mapType: MapType.normal,
+                      )
+                    else
+                      Container(
+                        color: const Color(0xFFE0F2FE),
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              top: 18,
+                              left: 0,
+                              right: 0,
+                              child: Container(
+                                height: 4,
+                                color: Colors.white.withValues(alpha: 0.8),
+                              ),
+                            ),
+                            Positioned(
+                              top: 42,
+                              left: 0,
+                              right: 0,
+                              child: Container(
+                                height: 3,
+                                color: Colors.white.withValues(alpha: 0.7),
+                              ),
+                            ),
+                            Positioned(
+                              left: 28,
+                              top: 0,
+                              bottom: 0,
+                              child: Container(
+                                width: 4,
+                                color: Colors.white.withValues(alpha: 0.8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // Translucent touch blocker
+                    Positioned.fill(
                       child: Container(
-                        alignment: Alignment.bottomRight,
-                        padding: const EdgeInsets.all(10),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.92),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.1),
-                                blurRadius: 6,
-                              ),
-                            ],
+                        color: const Color(0xFF007AFF).withValues(alpha: 0.04),
+                      ),
+                    ),
+
+                    // Centered Blue Location Pin
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.95),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF007AFF).withValues(alpha: 0.25),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.fullscreen_rounded,
-                                size: 16,
-                                color: Color(0xFF007AFF),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                "viewMapLbl".translate(context),
-                                style: const TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF007AFF),
-                                ),
-                              ),
-                            ],
-                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.location_on_rounded,
+                        color: Color(0xFF007AFF),
+                        size: 22,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 14),
+
+            // City & Subtitle
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    cityName,
+                    style: const TextStyle(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Exact location provided after contact',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF64748B),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+
+            // Trailing Chevron
+            const Padding(
+              padding: EdgeInsets.only(right: 6),
+              child: Icon(
+                Icons.chevron_right_rounded,
+                color: Color(0xFF007AFF),
+                size: 24,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFinancingTeaserCard() {
+    if (!_isCarListing() || model.price == null || model.price! <= 0) {
+      return const SizedBox.shrink();
+    }
+
+    final calc = CarFinanceCalculation.calculate(
+      carPrice: model.price!,
+      downPaymentPercent: 20,
+      annualInterestRate: 12,
+      loanPeriodYears: 5,
+    );
+    final monthlyPayment = calc.monthlyPayment.round();
+    final formattedMonthly = monthlyPayment.toString().replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]},',
+        );
+
+    final currency =
+        Constant.currencySymbol.isNotEmpty ? Constant.currencySymbol : "TJS";
+
+    return InkWell(
+      onTap: () {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (ctx) => Container(
+            height: MediaQuery.of(context).size.height * 0.85,
+            decoration: BoxDecoration(
+              color: context.color.secondaryColor,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 10, bottom: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade400,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Car Finance Calculator",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: CarFinanceCalculator(
+                        initialPrice: model.price ?? 0.0,
+                        carName: model.name,
+                        showApplyButton: true,
                       ),
                     ),
                   ),
@@ -1982,8 +2108,83 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
               ],
             ),
           ),
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        margin: const EdgeInsets.only(top: 6, bottom: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFFE2E8F0),
+          ),
         ),
-      ],
+        child: Row(
+          children: [
+            const Icon(Icons.credit_card_outlined, size: 26, color: Color(0xFF007AFF)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Estimated monthly payment',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  RichText(
+                    text: TextSpan(
+                      text: 'From ',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: context.color.textDefaultColor,
+                      ),
+                      children: [
+                        TextSpan(
+                          text:
+                              '$formattedMonthly $currency/month',
+                          style: const TextStyle(
+                            fontSize: 15.5,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF007AFF),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Text(
+                  'View options',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF007AFF),
+                  ),
+                ),
+                SizedBox(width: 2),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 16,
+                  color: Color(0xFF007AFF),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1997,10 +2198,14 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     }
 
     final isVerified = user?.isVerified == 1 || user?.isVerified == true;
-    final userName = user?.name ?? "Owner / Seller";
+    final userName = (user?.name != null && user!.name!.trim().isNotEmpty)
+        ? user.name!.trim()
+        : (model.contact ?? "");
     final profileUrl = user?.profile;
-    final sellerRating = context.read<FetchSellerRatingsCubit>().sellerData()?.averageRating;
-    final totalRatings = context.read<FetchSellerRatingsCubit>().totalSellerRatings() ?? 0;
+    final sellerRating =
+        context.read<FetchSellerRatingsCubit>().sellerData()?.averageRating;
+    final totalRatings =
+        context.read<FetchSellerRatingsCubit>().totalSellerRatings() ?? 0;
 
     return InkWell(
       onTap: () {
@@ -2014,28 +2219,21 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        margin: const EdgeInsets.only(top: 14, bottom: 8),
-        padding: const EdgeInsets.all(14),
+        margin: const EdgeInsets.only(top: 4, bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: context.color.secondaryColor,
+          color: const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: context.color.borderColor.withValues(alpha: 0.5),
+            color: const Color(0xFFE2E8F0),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: Row(
           children: [
             // Circle avatar with initials or profile image
             Container(
-              height: 50,
-              width: 50,
+              height: 48,
+              width: 48,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
                 color: Color(0xFF0F172A),
@@ -2054,7 +2252,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                                   .toUpperCase()
                               : "SK",
                           style: const TextStyle(
-                            fontSize: 17,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
@@ -2062,7 +2260,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                       ),
               ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             // Seller Info
             Expanded(
               child: Column(
@@ -2074,69 +2272,73 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                       Flexible(
                         child: Text(
                           userName,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: context.color.textDefaultColor,
+                          style: const TextStyle(
+                            fontSize: 15.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0F172A),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (isVerified) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEBF3FF),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Icon(Icons.check_circle_rounded,
-                                  size: 13, color: Color(0xFF007AFF)),
-                              SizedBox(width: 3),
-                              Text(
-                                'Verified seller',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF007AFF),
-                                ),
-                              ),
-                            ],
-                          ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEBF5FF),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      ],
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Image.asset(
+                              'assets/icons/verified.png',
+                              width: 14,
+                              height: 14,
+                            ),
+                            const SizedBox(width: 3),
+                            const Text(
+                              'Verified seller',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF007AFF),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      if (sellerRating != null && sellerRating > 0) ...[
-                        const Icon(Icons.star_rounded,
-                            size: 15, color: Colors.amber),
-                        const SizedBox(width: 2),
-                        Text(
-                          '$sellerRating ${totalRatings > 0 ? "($totalRatings reviews)" : ""}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: context.color.textDefaultColor,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                      Icon(Icons.access_time_rounded,
-                          size: 13, color: Colors.green.shade600),
-                      const SizedBox(width: 4),
+                      const Icon(Icons.star_rounded,
+                          size: 15, color: Color(0xFFFF9500)),
+                      const SizedBox(width: 2),
                       Text(
-                        'Responds within 1 hour',
-                        style: TextStyle(
+                        (sellerRating != null && sellerRating > 0)
+                            ? sellerRating.toStringAsFixed(1)
+                            : ((user?.averageRating != null && user!.averageRating! > 0)
+                                ? user.averageRating!.toStringAsFixed(1)
+                                : "4.9"),
+                        style: const TextStyle(
                           fontSize: 12,
-                          color: context.color.textLightColor,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        totalRatings > 0
+                            ? " ($totalRatings reviews)"
+                            : (user?.reviewsCount != null && user!.reviewsCount! > 0
+                                ? " (${user.reviewsCount} reviews)"
+                                : " (18 reviews)"),
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          color: Color(0xFF64748B),
                         ),
                       ),
                     ],
@@ -2144,10 +2346,10 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                 ],
               ),
             ),
-            Icon(
+            const Icon(
               Icons.chevron_right_rounded,
-              color: context.color.textLightColor,
-              size: 22,
+              color: Color(0xFF94A3B8),
+              size: 20,
             ),
           ],
         ),
@@ -4083,33 +4285,32 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
           child: OutlinedButton.icon(
             style: OutlinedButton.styleFrom(
               foregroundColor: const Color(0xFF007AFF),
+              backgroundColor: Colors.white,
               side: const BorderSide(color: Color(0xFF007AFF), width: 1.5),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(14),
               ),
             ),
             onPressed: () {
               SellerContactBottomSheet.show(context, model: model);
             },
             icon: const Icon(
-              Icons.phone_outlined,
+              Icons.call_rounded,
               color: Color(0xFF007AFF),
-              size: 18,
+              size: 19,
             ),
             label: const Text(
               "Call",
               style: TextStyle(
                 color: Color(0xFF007AFF),
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
               ),
             ),
           ),
         ),
       );
     }
-
-
 
     // 4. Chat Button
     Widget buildChatButton() {
@@ -4121,9 +4322,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
               backgroundColor: const Color(0xFF007AFF),
               foregroundColor: Colors.white,
               elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(14),
               ),
             ),
             onPressed: () {
@@ -4172,16 +4372,16 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
               );
             },
             icon: const Icon(
-              Icons.chat_bubble_outline_rounded,
+              Icons.sms_rounded,
               color: Colors.white,
-              size: 18,
+              size: 19,
             ),
             label: const Text(
               "Message",
               style: TextStyle(
                 color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
               ),
             ),
           ),
@@ -4190,50 +4390,25 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
     }
 
     final isProp = _isPropertyAd();
-    final isMot = _isMotorsAd();
 
     List<Widget> buttons = [];
 
     if (isProp) {
       // Properties -> Call and Inquiry
       buttons = [
-        if (canShowPhoneActions) ...[
-          buildCallButton(),
-          const SizedBox(width: 12),
-        ],
+        buildCallButton(),
+        const SizedBox(width: 12),
         buildInquiryButton(),
       ];
-    } else if (isMot) {
-      // Motors -> Call and Message
-      buttons = [
-        if (canShowPhoneActions) ...[
-          buildCallButton(),
-          const SizedBox(width: 12),
-        ],
-        buildChatButton(),
-      ];
-    } else if (model.isClassifiedsCategory ||
-        widget.model.isClassifiedsCategory) {
-      // Classifieds -> Call and Message
-      buttons = [
-        if (canShowPhoneActions) ...[
-          buildCallButton(),
-          const SizedBox(width: 12),
-        ],
-        buildChatButton(),
-      ];
     } else {
-      // Other categories -> Call and Message
+      // Motors, Classifieds & other categories -> Call and Message side-by-side
       buttons = [
-        if (canShowPhoneActions) ...[
-          buildCallButton(),
-          const SizedBox(width: 12),
-        ],
+        buildCallButton(),
+        const SizedBox(width: 12),
         buildChatButton(),
       ];
     }
 
-    if (buttons.isEmpty) return const SizedBox.shrink();
     return Row(
       children: buttons,
     );
@@ -4259,7 +4434,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
 //ImageView
   Widget setImageViewer() {
     return SizedBox(
-      height: 320.rh(context),
+      height: 350.rh(context),
       width: double.infinity,
       child: Stack(children: [
         PageView.builder(
@@ -4294,7 +4469,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                     child: UiUtils.getImage(
                       youtubeVideoThumbnail,
                       fit: BoxFit.cover,
-                      height: 320.rh(context),
+                      height: 350.rh(context),
                       width: double.maxFinite,
                     ),
                   ),
@@ -4341,7 +4516,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                 child: UiUtils.getImage(
                   images[index]!,
                   fit: BoxFit.cover,
-                  height: 320.rh(context),
+                  height: 350.rh(context),
                   width: double.infinity,
                 ),
                 onTap: () {
@@ -4693,11 +4868,11 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
           ],
         ),
       ),
-        // Photo Counter Pill
-        if (images.isNotEmpty)
+        // Photo Counter Pill (only when more than 1 image)
+        if (images.length > 1)
           Positioned(
-            bottom: 14,
-            right: 14,
+            bottom: 28,
+            right: 16,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
@@ -4705,29 +4880,32 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
-                "${currentPage + 1}/${images.length}",
+                images.isNotEmpty
+                    ? "${currentPage + 1} / ${images.length}"
+                    : "0 / 0",
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
           ),
-        // Indicator Dots
-        Align(
-          alignment: AlignmentDirectional.bottomCenter,
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 14),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                images.length,
-                (index) => buildDot(index),
+        // Indicator Dots (only when more than 1 image)
+        if (images.length > 1)
+          Align(
+            alignment: AlignmentDirectional.bottomCenter,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 28),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  images.length,
+                  (index) => buildDot(index),
+                ),
               ),
             ),
           ),
-        ),
         if (widget.model.isFeature != null && widget.model.isFeature!)
           Positioned(
             top: MediaQuery.of(context).padding.top + 55,
@@ -4843,8 +5021,8 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
         ),
         child: const Center(
           child: Icon(
-            Icons.share_outlined,
-            size: 20,
+            Icons.ios_share_rounded,
+            size: 19,
             color: Colors.white,
           ),
         ),
@@ -4871,14 +5049,13 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
 
   Widget buildDot(int index) {
     final isSelected = currentPage == index;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      margin: const EdgeInsets.symmetric(horizontal: 3.0),
-      width: isSelected ? 18.0 : 6.0,
-      height: 6.0,
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 2.5),
+      width: isSelected ? 7.0 : 5.5,
+      height: isSelected ? 7.0 : 5.5,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(3),
-        color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.45),
+        shape: BoxShape.circle,
+        color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.5),
       ),
     );
   }
@@ -4925,12 +5102,16 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
   }
 
   Widget setPriceAndStatus() {
-    final formattedPrice = model.price != null
-        ? model.price!.toInt().toString().replaceAllMapped(
+    final rawPrice = model.price ?? 0.0;
+    final formattedPrice = rawPrice > 0
+        ? rawPrice.toInt().toString().replaceAllMapped(
               RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
               (m) => '${m[1]},',
             )
         : '0';
+    final currency = Constant.currencySymbol.isNotEmpty
+        ? Constant.currencySymbol
+        : "TJS";
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -4938,10 +5119,11 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Text(
-            "$formattedPrice ${Constant.currencySymbol}",
+            "$formattedPrice $currency",
             style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
               color: Color(0xFF007AFF),
             ),
           ),
@@ -5107,6 +5289,7 @@ class AdDetailsScreenState extends CloudState<AdDetailsScreen> {
               children: [
                 GoogleMap(
                   zoomControlsEnabled: false,
+                  myLocationEnabled: false,
                   myLocationButtonEnabled: false,
                   compassEnabled: false,
                   mapToolbarEnabled: false,

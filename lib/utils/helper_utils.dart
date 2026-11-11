@@ -219,9 +219,12 @@ class HelperUtils {
 
                 String text =
                     "Exciting find! 🏡 Check out this amazing item I came across.  Let me know what you think! ⭐\n Here are the details:\n$deepLink.";
-                await Share.share(text,
-                    sharePositionOrigin:
-                        box!.localToGlobal(Offset.zero) & box.size);
+                await SharePlus.instance.share(
+                  ShareParams(
+                    text: text,
+                    sharePositionOrigin:  box!.localToGlobal(Offset.zero) & box.size
+                  )
+                  );
               },
             ),
           ],

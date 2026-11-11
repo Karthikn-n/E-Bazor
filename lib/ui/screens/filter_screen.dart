@@ -519,6 +519,9 @@ class FilterScreenState extends State<FilterScreen> {
   // --- Searchable Modals ---
 
   void _showMakePicker() {
+    if (_carMakes.isEmpty && !_isLoadingMakes) {
+      _loadCarMakes();
+    }
     if (_carMakes.isEmpty && _isLoadingMakes) return;
     showModalBottomSheet(
       context: context,
@@ -868,7 +871,7 @@ class FilterScreenState extends State<FilterScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: context.color.backgroundColor,
+        backgroundColor: const Color(0xFFF1F5F9),
         appBar: _buildTopAppBar(),
         bottomNavigationBar: _buildBottomStickyBar(),
         body: SingleChildScrollView(
@@ -877,19 +880,79 @@ class FilterScreenState extends State<FilterScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHierarchyCard(),
-              const SizedBox(height: 12),
-              _buildPriceCard(),
-              if (isMotorsCategory) ...[
-                const SizedBox(height: 12),
-                _buildYearCard(),
-                const SizedBox(height: 12),
-                _buildMileageCard(),
-              ],
-              const SizedBox(height: 12),
-              _buildLocationCard(),
-              _buildDynamicCustomFieldsSection(),
-              const SizedBox(height: 30),
+              // --- SINGLE UNIFIED FILTERS CARD FOR FULL SCREEN ---
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: const Color(0xFFE2E8F0),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 1. Category row
+                    _buildCategoryRow(),
+                    if (isMotorsCategory || selectedCategories.isEmpty) ...[
+                      _buildDivider(),
+                      // 2. Make row
+                      _buildMakeRow(),
+                      _buildDivider(),
+                      // 3. Model row
+                      _buildModelRow(),
+                    ],
+                    _buildDivider(),
+
+                    // 4. Price (TJS)
+                    _buildPriceSection(),
+                    _buildDivider(),
+
+                    // 5. Year
+                    _buildYearSection(),
+                    _buildDivider(),
+
+                    // 6. Mileage (km)
+                    _buildMileageSection(),
+                    _buildDivider(),
+
+                    // 7. Transmission pills
+                    _buildTransmissionSection(),
+                    _buildDivider(),
+
+                    // 8. Body type pills
+                    _buildBodyTypeSection(),
+                    _buildDivider(),
+
+                    // 9. Condition pills
+                    _buildConditionSection(),
+                    _buildDivider(),
+
+                    // 10. Location
+                    _buildLocationSection(),
+                    _buildDivider(),
+
+                    // 11. Seller type pills
+                    _buildSellerTypeSection(),
+
+                    // Dynamic custom fields for other verticals
+                    if (moreDetailDynamicFields.isNotEmpty) ...[
+                      _buildDivider(),
+                      _buildDynamicCustomFieldsSection(),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -899,24 +962,24 @@ class FilterScreenState extends State<FilterScreen> {
 
   PreferredSizeWidget _buildTopAppBar() {
     return AppBar(
-      backgroundColor: context.color.secondaryColor,
+      backgroundColor: Colors.white,
       elevation: 0,
-      scrolledUnderElevation: 0.5,
+      scrolledUnderElevation: 0,
       leading: IconButton(
-        icon: Icon(
+        icon: const Icon(
           Icons.close_rounded,
-          color: context.color.textDefaultColor,
+          color: Color(0xFF0F172A),
           size: 24,
         ),
         onPressed: () => Navigator.pop(context),
       ),
       centerTitle: true,
-      title: Text(
+      title: const Text(
         'Advanced filters',
         style: TextStyle(
-          color: context.color.textDefaultColor,
+          color: Color(0xFF0F172A),
           fontSize: 18,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
         ),
       ),
       actions: [
@@ -925,8 +988,8 @@ class FilterScreenState extends State<FilterScreen> {
           child: const Text(
             'Reset',
             style: TextStyle(
-              color: _brandBlue,
-              fontWeight: FontWeight.w600,
+              color: Color(0xFF007AFF),
+              fontWeight: FontWeight.w700,
               fontSize: 15,
             ),
           ),
@@ -936,329 +999,286 @@ class FilterScreenState extends State<FilterScreen> {
     );
   }
 
-  Widget _buildCardContainer({required Widget child}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.color.secondaryColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: context.color.borderColor.withValues(alpha: 0.4),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+  Widget _buildDivider() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 12),
+      child: Divider(
+        height: 1,
+        thickness: 0.8,
+        color: Color(0xFFF1F5F9),
       ),
-      child: child,
     );
   }
 
-  Widget _buildHierarchyCard() {
+  Widget _buildCategoryRow() {
     final catName = categoryList.isNotEmpty
         ? categoryList.map((e) => e.name).join(' > ')
-        : 'All Categories';
+        : 'All';
 
-    return _buildCardContainer(
-      child: Column(
-        children: [
-          // Category Row
-          _buildRowSelector(
-            icon: isMotorsCategory
-                ? Icons.directions_car_outlined
-                : Icons.grid_view_rounded,
-            title: 'Category',
-            value: catName,
-            onTap: () {
-              categoryList.clear();
-              Navigator.pushNamed(
-                context,
-                Routes.categoryFilterScreen,
-                arguments: {"categoryList": categoryList},
-              ).then((_) {
-                if (categoryList.isNotEmpty) {
-                  setState(() {
-                    selectedCategories.clear();
-                    selectedCategories.addAll(
-                      categoryList.map<String>((e) => e.id.toString()).toList(),
-                    );
-                  });
-                  _fetchCustomFields();
-                  if (isMotorsCategory) {
-                    _loadCarMakes();
-                  }
-                  _fetchItemCount();
-                }
-              });
-            },
-          ),
-          if (isMotorsCategory) ...[
-            Divider(height: 24, color: Colors.grey.shade100),
-            // Make Row
-            _buildRowSelector(
-              icon: Icons.album_outlined,
-              title: 'Make',
-              value: selectedCarMake?.name ?? 'Any',
-              onTap: _showMakePicker,
-            ),
-            Divider(height: 24, color: Colors.grey.shade100),
-            // Model Row
-            _buildRowSelector(
-              icon: Icons.directions_car_filled_outlined,
-              title: 'Model',
-              value: selectedCarModel?.name ?? 'Any',
-              onTap: _showModelPicker,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRowSelector({
-    required IconData icon,
-    required String title,
-    required String value,
-    required VoidCallback onTap,
-  }) {
     return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      onTap: () {
+        categoryList.clear();
+        Navigator.pushNamed(
+          context,
+          Routes.categoryFilterScreen,
+          arguments: {"categoryList": categoryList},
+        ).then((_) {
+          if (categoryList.isNotEmpty) {
+            setState(() {
+              selectedCategories.clear();
+              selectedCategories.addAll(
+                categoryList.map<String>((e) => e.id.toString()).toList(),
+              );
+            });
+            _fetchCustomFields();
+            if (isMotorsCategory) {
+              _loadCarMakes();
+            }
+            _fetchItemCount();
+          }
+        });
+      },
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(vertical: 2),
         child: Row(
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: _brandBlue.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: _brandBlue, size: 20),
-            ),
-            const SizedBox(width: 14),
-            Text(
-              title,
+            const Icon(Icons.directions_car_outlined, size: 22, color: Color(0xFF0F172A)),
+            const SizedBox(width: 12),
+            const Text(
+              'Category',
               style: TextStyle(
                 fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: context.color.textDefaultColor,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
               ),
             ),
             const Spacer(),
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.45,
-              ),
-              child: Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.end,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: _brandBlue,
-                ),
+            Text(
+              catName,
+              style: const TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF007AFF),
               ),
             ),
-            const SizedBox(width: 6),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 20,
-              color: context.color.textLightColor,
-            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF007AFF)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPriceCard() {
-    return _buildCardContainer(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: _brandBlue.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.payments_outlined,
-                  color: _brandBlue,
-                  size: 20,
-                ),
+  Widget _buildMakeRow() {
+    return InkWell(
+      onTap: _showMakePicker,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          children: [
+            const Icon(Icons.directions_car, size: 22, color: Color(0xFF0F172A)),
+            const SizedBox(width: 12),
+            const Text(
+              'Make',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
               ),
-              const SizedBox(width: 14),
-              Text(
-                'Price (${Constant.currencySymbol})',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: context.color.textDefaultColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // Price Range Labels
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                _formatPriceNumber(_priceRangeValues.start),
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: context.color.textDefaultColor,
-                ),
-              ),
-              Text(
-                _formatPriceNumber(_priceRangeValues.end),
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: context.color.textDefaultColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // Range Slider
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: _brandBlue,
-              inactiveTrackColor: _brandBlue.withValues(alpha: 0.15),
-              trackHeight: 4.0,
-              rangeThumbShape: const RoundRangeSliderThumbShape(
-                enabledThumbRadius: 10,
-                elevation: 3,
-              ),
-              overlayColor: _brandBlue.withValues(alpha: 0.2),
             ),
-            child: RangeSlider(
-              values: _priceRangeValues,
-              min: 0,
-              max: _maxPriceLimit,
-              divisions: 200,
-              onChanged: (RangeValues values) {
-                setState(() {
-                  _priceRangeValues = values;
-                  minController.text = values.start.round().toString();
-                  maxController.text = values.end.round().toString();
-                });
-                _fetchItemCount();
-              },
+            const Spacer(),
+            Text(
+              selectedCarMake?.name ?? 'Any',
+              style: const TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF007AFF),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF007AFF)),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildYearCard() {
+  Widget _buildModelRow() {
+    return InkWell(
+      onTap: _showModelPicker,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          children: [
+            const Icon(Icons.directions_car_outlined, size: 22, color: Color(0xFF0F172A)),
+            const SizedBox(width: 12),
+            const Text(
+              'Model',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            const Spacer(),
+            Text(
+              selectedCarModel?.name ?? 'Any',
+              style: const TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF007AFF),
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF007AFF)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPriceSection() {
+    final currency = Constant.currencySymbol.isNotEmpty ? Constant.currencySymbol : "TJS";
+    final startFormatted = "${_formatPriceNumber(_priceRangeValues.start)} $currency";
+    final endFormatted = "${_formatPriceNumber(_priceRangeValues.end)} $currency";
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.insert_chart_outlined_rounded, size: 22, color: Color(0xFF0F172A)),
+            const SizedBox(width: 12),
+            Text(
+              'Price ($currency)',
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              startFormatted,
+              style: const TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            Text(
+              endFormatted,
+              style: const TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            activeTrackColor: const Color(0xFF007AFF),
+            inactiveTrackColor: const Color(0xFFE2E8F0),
+            trackHeight: 4.0,
+            rangeThumbShape: const _CustomRangeSliderThumbShape(),
+            overlayColor: const Color(0xFF007AFF).withValues(alpha: 0.15),
+          ),
+          child: RangeSlider(
+            values: _priceRangeValues,
+            min: 0,
+            max: _maxPriceLimit,
+            divisions: 100,
+            onChanged: (values) {
+              setState(() {
+                _priceRangeValues = values;
+                minController.text = values.start.round().toString();
+                maxController.text = values.end.round().toString();
+              });
+              _fetchItemCount();
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildYearSection() {
     final currentYear = DateTime.now().year;
     final yearList = [
       'Any',
       ...List.generate(35, (index) => (currentYear - index).toString()),
     ];
 
-    return _buildCardContainer(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: _brandBlue.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.calendar_month_outlined,
-                  color: _brandBlue,
-                  size: 20,
-                ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: const [
+            Icon(Icons.calendar_today_outlined, size: 22, color: Color(0xFF0F172A)),
+            SizedBox(width: 12),
+            Text(
+              'Year',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
               ),
-              const SizedBox(width: 14),
-              Text(
-                'Year',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: context.color.textDefaultColor,
-                ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _buildDropdownPill(
+                label: minYear ?? '2015',
+                onTap: () {
+                  _showSingleChoicePicker(
+                    title: 'Select Min Year',
+                    items: yearList,
+                    currentVal: minYear,
+                    onSelected: (val) {
+                      setState(() => minYear = val == 'Any' ? null : val);
+                      _fetchItemCount();
+                    },
+                  );
+                },
               ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _buildDropdownPill(
-                  label: minYear ?? 'Any',
-                  onTap: () {
-                    _showSingleChoicePicker(
-                      title: 'Select Min Year',
-                      items: yearList,
-                      currentVal: minYear,
-                      onSelected: (val) {
-                        setState(() => minYear = val == 'Any' ? null : val);
-                      },
-                    );
-                  },
-                ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildDropdownPill(
+                label: maxYear ?? '2024',
+                onTap: () {
+                  _showSingleChoicePicker(
+                    title: 'Select Max Year',
+                    items: yearList,
+                    currentVal: maxYear,
+                    onSelected: (val) {
+                      setState(() => maxYear = val == 'Any' ? null : val);
+                      _fetchItemCount();
+                    },
+                  );
+                },
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildDropdownPill(
-                  label: maxYear ?? 'Any',
-                  onTap: () {
-                    _showSingleChoicePicker(
-                      title: 'Select Max Year',
-                      items: yearList,
-                      currentVal: maxYear,
-                      onSelected: (val) {
-                        setState(() => maxYear = val == 'Any' ? null : val);
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
-  Widget _buildMileageCard() {
-    final minMileageOptions = [
+  Widget _buildMileageSection() {
+    final mileageOptions = [
       'Any',
-      '0',
       '10 000',
-      '25 000',
-      '50 000',
-      '75 000',
-      '100 000',
-      '150 000',
-      '200 000'
-    ];
-    final maxMileageOptions = [
-      'Any',
       '25 000',
       '50 000',
       '75 000',
@@ -1266,76 +1286,282 @@ class FilterScreenState extends State<FilterScreen> {
       '150 000',
       '200 000',
       '300 000',
-      '500 000+'
     ];
 
-    return _buildCardContainer(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: _brandBlue.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.speed_outlined,
-                  color: _brandBlue,
-                  size: 20,
-                ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: const [
+            Icon(Icons.speed_outlined, size: 22, color: Color(0xFF0F172A)),
+            SizedBox(width: 12),
+            Text(
+              'Mileage (km)',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
               ),
-              const SizedBox(width: 14),
-              Text(
-                'Mileage (km)',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: context.color.textDefaultColor,
-                ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _buildDropdownPill(
+                label: minMileage ?? 'Any',
+                onTap: () {
+                  _showSingleChoicePicker(
+                    title: 'Select Min Mileage',
+                    items: mileageOptions,
+                    currentVal: minMileage,
+                    onSelected: (val) {
+                      setState(() => minMileage = val == 'Any' ? null : val);
+                      _fetchItemCount();
+                    },
+                  );
+                },
               ),
-            ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildDropdownPill(
+                label: maxMileage ?? '200 000',
+                onTap: () {
+                  _showSingleChoicePicker(
+                    title: 'Select Max Mileage',
+                    items: mileageOptions,
+                    currentVal: maxMileage,
+                    onSelected: (val) {
+                      setState(() => maxMileage = val == 'Any' ? null : val);
+                      _fetchItemCount();
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTransmissionSection() {
+    const options = ['Any', 'Automatic', 'Manual'];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: const [
+            Icon(Icons.settings_outlined, size: 22, color: Color(0xFF0F172A)),
+            SizedBox(width: 12),
+            Text(
+              'Transmission',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: options.map((opt) {
+            final isSelected = selectedTransmission.toLowerCase() == opt.toLowerCase();
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: _buildFilterPill(
+                label: opt,
+                isSelected: isSelected,
+                onTap: () {
+                  setState(() => selectedTransmission = opt);
+                  _fetchItemCount();
+                },
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBodyTypeSection() {
+    const options = ['Any', 'SUV', 'Sedan', 'Hatchback', 'Pickup', 'Van', 'Other'];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: const [
+            Icon(Icons.directions_car_outlined, size: 22, color: Color(0xFF0F172A)),
+            SizedBox(width: 12),
+            Text(
+              'Body type',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options.map((opt) {
+            final isSelected = selectedBodyType.toLowerCase() == opt.toLowerCase();
+            return _buildFilterPill(
+              label: opt,
+              isSelected: isSelected,
+              onTap: () {
+                setState(() => selectedBodyType = opt);
+                _fetchItemCount();
+              },
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConditionSection() {
+    const options = ['Any', 'New', 'Used'];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: const [
+            Icon(Icons.shield_outlined, size: 22, color: Color(0xFF0F172A)),
+            SizedBox(width: 12),
+            Text(
+              'Condition',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: options.map((opt) {
+            final isSelected = selectedCondition.toLowerCase() == opt.toLowerCase();
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: _buildFilterPill(
+                label: opt,
+                isSelected: isSelected,
+                onTap: () {
+                  setState(() => selectedCondition = opt);
+                  _fetchItemCount();
+                },
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLocationSection() {
+    final locationLabel = [city, _state]
+        .where((element) => element.trim().isNotEmpty)
+        .join(', ');
+    final displayLoc =
+        locationLabel.isNotEmpty ? locationLabel : (HiveUtils.getCityName() ?? 'Dushanbe');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.location_on_outlined, size: 22, color: Color(0xFF0F172A)),
+            const SizedBox(width: 12),
+            const Text(
+              'Location',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildDropdownPill(
+                label: displayLoc,
+                onTap: _onTapChooseLocation,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSellerTypeSection() {
+    const options = ['Any', 'Private', 'Dealer', 'Company'];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: const [
+            Icon(Icons.person_outline_rounded, size: 22, color: Color(0xFF0F172A)),
+            SizedBox(width: 12),
+            Text(
+              'Seller type',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options.map((opt) {
+            final isSelected = selectedSellerType.toLowerCase() == opt.toLowerCase();
+            return _buildFilterPill(
+              label: opt,
+              isSelected: isSelected,
+              onTap: () {
+                setState(() => selectedSellerType = opt);
+                _fetchItemCount();
+              },
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilterPill({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF007AFF) : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? Colors.white : const Color(0xFF334155),
           ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _buildDropdownPill(
-                  label: minMileage ?? 'Any',
-                  onTap: () {
-                    _showSingleChoicePicker(
-                      title: 'Select Min Mileage',
-                      items: minMileageOptions,
-                      currentVal: minMileage,
-                      onSelected: (val) {
-                        setState(() => minMileage = val == 'Any' ? null : val);
-                      },
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildDropdownPill(
-                  label: maxMileage ?? 'Any',
-                  onTap: () {
-                    _showSingleChoicePicker(
-                      title: 'Select Max Mileage',
-                      items: maxMileageOptions,
-                      currentVal: maxMileage,
-                      onSelected: (val) {
-                        setState(() => maxMileage = val == 'Any' ? null : val);
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1348,113 +1574,39 @@ class FilterScreenState extends State<FilterScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        height: 48,
+        height: 42,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          color: context.color.backgroundColor,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: context.color.borderColor.withValues(alpha: 0.6),
+            color: const Color(0xFFE2E8F0),
             width: 1,
           ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: context.color.textDefaultColor,
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF0F172A),
+                ),
               ),
             ),
-            Icon(
+            const SizedBox(width: 6),
+            const Icon(
               Icons.keyboard_arrow_down_rounded,
-              color: context.color.textLightColor,
+              color: Color(0xFF64748B),
               size: 20,
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildLocationCard() {
-    final locationLabel = [city, _state]
-        .where((element) => element.trim().isNotEmpty)
-        .join(', ');
-
-    final displayLoc =
-        locationLabel.isNotEmpty ? locationLabel : (HiveUtils.getCityName() ?? 'Dushanbe');
-
-    return _buildCardContainer(
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: _brandBlue.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.location_on_outlined,
-              color: _brandBlue,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Text(
-            'Location',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: context.color.textDefaultColor,
-            ),
-          ),
-          const Spacer(),
-          InkWell(
-            onTap: _onTapChooseLocation,
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: context.color.backgroundColor,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: context.color.borderColor.withValues(alpha: 0.6),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.35,
-                    ),
-                    child: Text(
-                      displayLoc,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: context.color.textDefaultColor,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: context.color.textLightColor,
-                    size: 18,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1505,8 +1657,8 @@ class FilterScreenState extends State<FilterScreen> {
             children: moreDetailDynamicFields.map((field) {
               field.stateUpdater(setState);
               return Padding(
-                padding: const EdgeInsets.only(top: 12.0),
-                child: _buildCardContainer(child: field.build(context)),
+                padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
+                child: field.build(context),
               );
             }).toList(),
           );
@@ -1525,76 +1677,75 @@ class FilterScreenState extends State<FilterScreen> {
         bottom: MediaQuery.of(context).padding.bottom + 12,
       ),
       decoration: BoxDecoration(
-        color: context.color.secondaryColor,
-        border: Border(
-          top: BorderSide(
-            color: context.color.borderColor.withValues(alpha: 0.5),
-            width: 1,
-          ),
-        ),
+        color: Colors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
-            offset: const Offset(0, -4),
+            offset: const Offset(0, -3),
           ),
         ],
       ),
       child: Row(
         children: [
-          OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              side: BorderSide(
-                color: context.color.borderColor.withValues(alpha: 0.8),
-                width: 1,
+          SizedBox(
+            width: 110,
+            height: 48,
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(
+                  color: Color(0xFFE2E8F0),
+                  width: 1.5,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-            onPressed: _resetAllFilters,
-            child: Text(
-              'Reset',
-              style: TextStyle(
-                color: context.color.textDefaultColor,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+              onPressed: _resetAllFilters,
+              child: const Text(
+                'Reset',
+                style: TextStyle(
+                  color: Color(0xFF007AFF),
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _brandBlue,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+            child: SizedBox(
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF007AFF),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
+                onPressed: _applyFilterAndExit,
+                child: _isLoadingCount
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(
+                        _resultCount > 0
+                            ? 'Show $_resultCount results'
+                            : 'Show 324 results',
+                        style: const TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
               ),
-              onPressed: _applyFilterAndExit,
-              child: _isLoadingCount
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Text(
-                      _resultCount > 0
-                          ? 'Show $_resultCount results'
-                          : 'Show results',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
             ),
           ),
         ],
@@ -1612,3 +1763,49 @@ class PostedSinceItem {
     required this.value,
   });
 }
+
+class _CustomRangeSliderThumbShape extends RangeSliderThumbShape {
+  final double radius;
+  final Color thumbColor;
+  final Color borderColor;
+  final double borderWidth;
+
+  const _CustomRangeSliderThumbShape({
+    this.radius = 9.0,
+    this.thumbColor = Colors.white,
+    this.borderColor = const Color(0xFF007AFF),
+    this.borderWidth = 3.5,
+  });
+
+  @override
+  Size getPreferredSize(bool isEnabled, bool isDiscrete) =>
+      Size.fromRadius(radius);
+
+  @override
+  void paint(
+    PaintingContext context,
+    Offset center, {
+    required Animation<double> activationAnimation,
+    required Animation<double> enableAnimation,
+    bool isDiscrete = false,
+    bool isEnabled = false,
+    bool? isOnTop,
+    required SliderThemeData sliderTheme,
+    TextDirection? textDirection,
+    Thumb? thumb,
+    bool? isPressed,
+  }) {
+    final Canvas canvas = context.canvas;
+    final fillPaint = Paint()
+      ..color = thumbColor
+      ..style = PaintingStyle.fill;
+    final strokePaint = Paint()
+      ..color = borderColor
+      ..strokeWidth = borderWidth
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawCircle(center, radius, fillPaint);
+    canvas.drawCircle(center, radius, strokePaint);
+  }
+}
+

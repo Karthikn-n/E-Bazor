@@ -1044,7 +1044,57 @@ class _FiltersPageState extends State<FiltersPage> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  IconData _getFallbackIcon(String title) {
+    final t = title.toLowerCase();
+    if (t.contains('category')) return Icons.directions_car_outlined;
+    if (t.contains('make') || t.contains('brand')) return Icons.directions_car_filled_outlined;
+    if (t.contains('model')) return Icons.directions_car_outlined;
+    if (t.contains('price')) return Icons.account_balance_wallet_outlined;
+    if (t.contains('year')) return Icons.calendar_month_outlined;
+    if (t.contains('mileage') || t.contains('kilometer') || t.contains('km')) return Icons.speed_outlined;
+    if (t.contains('transmission') || t.contains('gear')) return Icons.settings_outlined;
+    if (t.contains('body') || t.contains('type')) return Icons.directions_car_outlined;
+    if (t.contains('condition')) return Icons.shield_outlined;
+    if (t.contains('location') || t.contains('city') || t.contains('area')) return Icons.location_on_outlined;
+    if (t.contains('seller')) return Icons.person_outline;
+    if (t.contains('fuel')) return Icons.local_gas_station_outlined;
+    if (t.contains('color')) return Icons.palette_outlined;
+    if (t.contains('door')) return Icons.meeting_room_outlined;
+    if (t.contains('age')) return Icons.access_time_outlined;
+    return Icons.tune_rounded;
+  }
+
+  Widget _buildSectionTitle(String title, {String? iconUrl, IconData? fallbackIcon}) {
+    final iconData = fallbackIcon ?? _getFallbackIcon(title);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          if (iconUrl != null && iconUrl.isNotEmpty) ...[
+            UiUtils.imageType(iconUrl, width: 20, height: 20),
+            const SizedBox(width: 10),
+          ] else ...[
+            Icon(
+              iconData,
+              size: 20,
+              color: const Color(0xFF1E293B),
+            ),
+            const SizedBox(width: 10),
+          ],
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitleOld(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Text(
@@ -1441,21 +1491,32 @@ class _FiltersPageState extends State<FiltersPage> {
     );
   }
 
+  Widget _buildCardDivider() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 14),
+      child: Divider(
+        height: 1,
+        thickness: 0.8,
+        color: Color(0xFFF1F5F9),
+      ),
+    );
+  }
+
   Widget _buildFilterCardContainer({required Widget child}) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
-        color: context.color.secondaryColor,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: context.color.borderColor.withValues(alpha: 0.5),
+          color: const Color(0xFFE2E8F0),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 6,
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
@@ -1509,7 +1570,310 @@ class _FiltersPageState extends State<FiltersPage> {
     );
   }
 
+  String? _getOptionImage(FilterItem filter, String val) {
+    for (final obj in filter.valuesObject) {
+      final v = obj['option_value'] ?? obj['label'] ?? obj['name'] ?? obj['value'];
+      if (v?.toString().trim().toLowerCase() == val.trim().toLowerCase()) {
+        final img = obj['image']?.toString();
+        if (img != null && img.isNotEmpty) return img;
+      }
+    }
+    return null;
+  }
+
   Widget _buildDynamicFilterSection(FilterItem filter) {
+    final filterName = filter.name;
+    if (filterName == null || filterName.isEmpty) return const SizedBox();
+
+    final filterType = filter.type?.toLowerCase() ?? '';
+
+    if (filterType == 'range' ||
+        filterType == 'number_range' ||
+        filterType == 'numeric_range') {
+      final initialValue = _selectedFilters.remove(filterName);
+      final initialValues = initialValue is Iterable
+          ? initialValue.map((value) => value.toString()).toList()
+          : const <String>[];
+      _rangeMinControllers.putIfAbsent(
+        filterName,
+        () => TextEditingController(
+          text: initialValues.isNotEmpty ? initialValues.first : '',
+        ),
+      );
+      _rangeMaxControllers.putIfAbsent(
+        filterName,
+        () => TextEditingController(
+          text: initialValues.length > 1 ? initialValues[1] : '',
+        ),
+      );
+      return _buildRangeInputs(
+        fieldKey: filterName,
+        title: filterName,
+        minController: _rangeMinControllers[filterName]!,
+        maxController: _rangeMaxControllers[filterName]!,
+        unit: filterName.toLowerCase().contains('sqft')
+            ? 'Sqft'
+            : filterName.toLowerCase().contains('km')
+                ? 'Km'
+                : '',
+        maxLimit: filterName.toLowerCase().contains('sqft') ? 50000 : 500000,
+      );
+    }
+
+    if (filterType == 'text' || filterType == 'number') {
+      final initialValue = _selectedFilters.remove(filterName);
+      final initialText = initialValue is Iterable
+          ? (initialValue.isEmpty ? '' : initialValue.first.toString())
+          : initialValue?.toString() ?? '';
+      _filterTextControllers.putIfAbsent(
+        filterName,
+        () => TextEditingController(text: initialText),
+      );
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitle(filterName, iconUrl: filter.icon),
+          Container(
+            decoration: BoxDecoration(
+              color: context.color.backgroundColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: context.color.borderColor.withValues(alpha: 0.6),
+              ),
+            ),
+            child: TextField(
+              controller: _filterTextControllers[filterName],
+              keyboardType: filterType == 'number'
+                  ? const TextInputType.numberWithOptions(decimal: true)
+                  : TextInputType.text,
+              style: TextStyle(
+                color: context.color.textDefaultColor,
+                fontSize: 14,
+              ),
+              onChanged: (_) {
+                setState(() {});
+                _onFilterChanged();
+              },
+              decoration: InputDecoration(
+                hintText: filter.placeholder?.trim().isNotEmpty == true
+                    ? filter.placeholder
+                    : "Enter $filterName",
+                hintStyle: TextStyle(
+                  color: context.color.textLightColor,
+                  fontSize: 13,
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (filter.values.isEmpty) return const SizedBox();
+
+    if (filter.multiSelect) {
+      final initialVal = _selectedFilters[filterName];
+      final Set<String> selectedSet;
+      if (initialVal is Set<String>) {
+        selectedSet = initialVal;
+      } else if (initialVal is Iterable) {
+        selectedSet = Set<String>.from(initialVal.map((e) => e.toString()));
+      } else if (initialVal != null && initialVal.toString().isNotEmpty) {
+        selectedSet = {initialVal.toString()};
+      } else {
+        selectedSet = <String>{};
+      }
+      _selectedFilters[filterName] = selectedSet;
+      final canExpand = filterType == 'button' && filter.values.length > 5;
+      final isExpanded = _expandedMultiselectFilters.contains(filterName);
+      final visibleValues = canExpand && !isExpanded
+          ? filter.values.take(5).toList()
+          : filter.values;
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitle(filterName, iconUrl: filter.icon),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: visibleValues.map((val) {
+              final isSelected = selectedSet.contains(val);
+              return _buildFilterPill(
+                label: val,
+                imageUrl: _getOptionImage(filter, val),
+                isSelected: isSelected,
+                isMulti: true,
+                onTap: () {
+                  setState(() {
+                    if (isSelected) {
+                      selectedSet.remove(val);
+                    } else {
+                      selectedSet.add(val);
+                    }
+                  });
+                  _onFilterChanged();
+                },
+              );
+            }).toList(),
+          ),
+          if (canExpand) ...[
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  if (isExpanded) {
+                    _expandedMultiselectFilters.remove(filterName);
+                  } else {
+                    _expandedMultiselectFilters.add(filterName);
+                  }
+                });
+              },
+              icon: Icon(
+                isExpanded
+                    ? Icons.keyboard_arrow_up_rounded
+                    : Icons.keyboard_arrow_down_rounded,
+                size: 19,
+              ),
+              label: Text(
+                isExpanded
+                    ? 'Show less'
+                    : 'Show more (${filter.values.length - 5})',
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: context.color.territoryColor,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
+        ],
+      );
+    }
+
+    final initialValue = _selectedFilters[filterName];
+    final String? selectedVal;
+    if (initialValue is Iterable) {
+      final values = initialValue.map((e) => e.toString()).toList();
+      selectedVal = values.isEmpty ? null : values.first;
+    } else {
+      selectedVal = initialValue?.toString();
+    }
+    _selectedFilters[filterName] = selectedVal ?? '';
+
+    if (filterType == 'dropdown') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitle(filterName, iconUrl: filter.icon),
+          DropdownButtonFormField<String>(
+            key: ValueKey('$filterName-$selectedVal'),
+            initialValue:
+                filter.values.contains(selectedVal) ? selectedVal : null,
+            isExpanded: true,
+            decoration: InputDecoration(
+              hintText: filter.placeholder?.trim().isNotEmpty == true
+                  ? filter.placeholder
+                  : 'Select $filterName',
+              hintStyle: TextStyle(
+                color: context.color.textLightColor,
+                fontSize: 13,
+              ),
+              filled: true,
+              fillColor: context.color.backgroundColor,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: context.color.borderColor.withValues(alpha: 0.6),
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: context.color.borderColor.withValues(alpha: 0.6),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: context.color.territoryColor,
+                ),
+              ),
+            ),
+            items: filter.values.map((v) {
+              final img = _getOptionImage(filter, v);
+              return DropdownMenuItem<String>(
+                value: v,
+                child: Row(
+                  children: [
+                    if (img != null && img.isNotEmpty) ...[
+                      UiUtils.imageType(img, width: 16, height: 16),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(
+                      v,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: context.color.textDefaultColor,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+            onChanged: (val) {
+              setState(() {
+                _selectedFilters[filterName] = val ?? '';
+              });
+              _onFilterChanged();
+            },
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle(filterName, iconUrl: filter.icon),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: filter.values.map((val) {
+            final isSelected = selectedVal == val;
+            return _buildFilterPill(
+              label: val,
+              imageUrl: _getOptionImage(filter, val),
+              isSelected: isSelected,
+              isMulti: false,
+              onTap: () {
+                setState(() {
+                  if (isSelected) {
+                    _selectedFilters.remove(filterName);
+                  } else {
+                    _selectedFilters[filterName] = val;
+                  }
+                });
+                _onFilterChanged();
+              },
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDynamicFilterSectionOld(FilterItem filter) {
     final filterName = filter.name;
     if (filterName == null || filterName.isEmpty) return const SizedBox();
 
@@ -1772,6 +2136,50 @@ class _FiltersPageState extends State<FiltersPage> {
     required bool isSelected,
     required bool isMulti,
     required VoidCallback onTap,
+    String? imageUrl,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF007AFF)
+              : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF007AFF) : Colors.transparent,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (imageUrl != null && imageUrl.isNotEmpty) ...[
+              UiUtils.imageType(imageUrl, width: 16, height: 16),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected ? Colors.white : const Color(0xFF334155),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterPillOld({
+    required String label,
+    required bool isSelected,
+    required bool isMulti,
+    required VoidCallback onTap,
   }) {
     return InkWell(
       borderRadius: BorderRadius.circular(20),
@@ -1975,7 +2383,7 @@ class _FiltersPageState extends State<FiltersPage> {
                       width: 1.2,
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   child: Text(
@@ -1999,7 +2407,7 @@ class _FiltersPageState extends State<FiltersPage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF007AFF),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     elevation: 0,
                   ),
@@ -2030,7 +2438,138 @@ class _FiltersPageState extends State<FiltersPage> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
+    final propertyTypes = _getPropertyTypesForTab(_selectedTab);
+
+    return Scaffold(
+      backgroundColor: context.color.backgroundColor,
+      appBar: _buildAppBar(),
+      body: Column(
+        children: [
+          if (_isPropertyCategory) _buildTabBar(),
+          Expanded(
+            child: BlocConsumer<FilterCubit, FilterState>(
+              listener: (context, state) {
+                if (state is FilterLoaded) {
+                  _onFilterChanged();
+                }
+              },
+              builder: (context, state) {
+                final genericCategories = _isPropertyCategory
+                    ? const <FilterSubCategory>[]
+                    : _visibleGenericCategories(state);
+                final genericCategoryTitle = _isPropertyCategory
+                    ? 'Categories'
+                    : _visibleGenericCategoryTitle(state);
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 12),
+
+                      if (state is FilterLoading)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 30),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              color: context.color.territoryColor,
+                            ),
+                          ),
+                        )
+                      else if (state is FilterError)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          child: Center(
+                            child: Text(
+                              state.message,
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        )
+                      else ...[
+                        // Single unified card for all filters
+                        _buildFilterCardContainer(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Categories
+                              if (!_isPropertyCategory &&
+                                  (genericCategories.isNotEmpty ||
+                                      _genericCategoryHistory.isNotEmpty)) ...[
+                                if (genericCategories.isNotEmpty)
+                                  _buildSubCategoriesSection(
+                                    genericCategories,
+                                    genericCategoryTitle,
+                                  ),
+                                if (_genericCategoryHistory.isNotEmpty) ...[
+                                  const SizedBox(height: 6),
+                                  _buildGenericBackButton(),
+                                ],
+                                _buildCardDivider(),
+                              ],
+
+                              if (_isPropertyCategory) ...[
+                                _buildPropertyTypeSection(propertyTypes),
+                                _buildCardDivider(),
+                              ],
+
+                              if (_isPropertyCategory &&
+                                  state is FilterLoaded &&
+                                  state.data.children.isNotEmpty) ...[
+                                _buildSubCategoriesSection(
+                                  state.data.children,
+                                  state.data.name ?? 'Categories',
+                                ),
+                                _buildCardDivider(),
+                              ],
+
+                              // Price range
+                              _buildPriceRangeSection(),
+
+                              // Dynamic filters (Year, Mileage, Transmission, Body type, Condition, etc.)
+                              if (state is FilterLoaded) ...[
+                                ..._sortedActiveFilters(state.data).expand((filter) {
+                                  final filterWidget =
+                                      _buildDynamicFilterSection(filter);
+                                  if (filterWidget is SizedBox) {
+                                    return <Widget>[];
+                                  }
+                                  return <Widget>[
+                                    _buildCardDivider(),
+                                    filterWidget,
+                                  ];
+                                }),
+                              ],
+
+                              // Location
+                              _buildCardDivider(),
+                              _buildLocationSection(),
+
+                              // More filters
+                              _buildCardDivider(),
+                              _buildMoreFiltersSection(),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 30),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          _buildShowResultsButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget buildOld(BuildContext context) {
     final propertyTypes = _getPropertyTypesForTab(_selectedTab);
 
     return Scaffold(
@@ -2115,31 +2654,29 @@ class _FiltersPageState extends State<FiltersPage> {
                           const SizedBox(height: 20),
                         ],
 
-                        // Price Range Section with RangeSlider
+                        // Single unified card for all filters (Price, Kilometers, Seller Type, etc.)
                         _buildFilterCardContainer(
-                          child: _buildPriceRangeSection(),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildPriceRangeSection(),
+                              ..._sortedActiveFilters(state.data).expand((filter) {
+                                final filterWidget =
+                                    _buildDynamicFilterSection(filter);
+                                if (filterWidget is SizedBox) {
+                                  return <Widget>[];
+                                }
+                                return <Widget>[
+                                  _buildCardDivider(),
+                                  filterWidget,
+                                ];
+                              }),
+                              _buildCardDivider(),
+                              _buildMoreFiltersSection(),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 16),
-
-                        // API-driven Dynamic Filters with RangeSliders
-                        ..._sortedActiveFilters(state.data).map((filter) {
-                          final filterWidget =
-                              _buildDynamicFilterSection(filter);
-                          if (filterWidget is SizedBox) {
-                            return const SizedBox.shrink();
-                          }
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: _buildFilterCardContainer(
-                              child: filterWidget,
-                            ),
-                          );
-                        }),
                       ],
-
-                      // More Filters Section (Ads in English, Ads with Video, Ads with 360 Tour)
-                      const SizedBox(height: 10),
-                      _buildMoreFiltersSection(),
 
                       const SizedBox(height: 30),
                     ],

@@ -727,7 +727,12 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
           ),
           body: Column(
             children: [
-              const AdCreationStepper(currentStep: 4),
+              AdCreationStepper(
+                currentStep: 4,
+                onStepTapped: (step) {
+                  if (step == 3) setState(() => _isReviewStep = false);
+                },
+              ),
               Expanded(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
@@ -998,54 +1003,98 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
                   children: [
                     Expanded(
                       flex: 1,
-                      child: OutlinedButton(
-                        onPressed: () {
-                          HelperUtils.showSnackBarMessage(
-                            context,
-                            "Draft saved",
-                            type: MessageType.success,
-                          );
-                          Navigator.popUntil(context, (route) => route.isFirst);
-                        },
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          side: BorderSide(
-                            color: context.color.borderColor.withValues(alpha: 0.8),
+                      child: SizedBox(
+                        height: 48,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            HelperUtils.showSnackBarMessage(
+                              context,
+                              "Draft saved",
+                              type: MessageType.success,
+                            );
+                            Navigator.popUntil(context, (route) => route.isFirst);
+                          },
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            side: const BorderSide(color: Color(0xFFCBD5E1)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: Text(
-                          "Save draft",
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: context.color.textDefaultColor,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Image.asset(
+                                  'assets/icons/draft_folder.png',
+                                  width: 18,
+                                  height: 18,
+                                  errorBuilder: (_, __, ___) => Icon(
+                                    Icons.bookmark_border_rounded,
+                                    size: 17,
+                                    color: context.color.textDefaultColor,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  "Save draft",
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: context.color.textDefaultColor,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      flex: 2,
-                      child: ElevatedButton.icon(
-                        onPressed: _publishListingNow,
-                        icon: const Icon(Icons.send_rounded, size: 18, color: Colors.white),
-                        label: const Text(
-                          "Publish now",
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                      flex: 1,
+                      child: SizedBox(
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: _publishListingNow,
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            backgroundColor: const Color(0xFF007AFF),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF007AFF),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Image.asset(
+                                  'assets/icons/publish_airplane.png',
+                                  width: 18,
+                                  height: 18,
+                                  color: Colors.white,
+                                  errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.send_rounded,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                const Text(
+                                  "Publish now",
+                                  style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -1127,7 +1176,17 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
           ),
           body: Column(
             children: [
-              const AdCreationStepper(currentStep: 3),
+              AdCreationStepper(
+                currentStep: 3,
+                onStepTapped: (step) {
+                  if (step == 4) {
+                    setState(() {
+                      _createdItemForReview ??= widget.model;
+                      _isReviewStep = true;
+                    });
+                  }
+                },
+              ),
               Expanded(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
@@ -1187,7 +1246,10 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
                     ),
                   ],
                 ),
-                child: SizedBox(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
@@ -1221,9 +1283,28 @@ class _CarPackagePaymentScreenState extends State<CarPackagePaymentScreen> {
                               letterSpacing: 0.3,
                             ),
                           ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 6),
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _createdItemForReview ??= widget.model;
+                        _isReviewStep = true;
+                      });
+                    },
+                    child: const Text(
+                      "Proceed to Review listing >",
+                      style: TextStyle(
+                        color: Color(0xFF007AFF),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
+              )
             ],
           ),
         ),

@@ -288,17 +288,20 @@ class LogExporter {
       final mediaQuery = context.mounted ? MediaQuery.maybeOf(context) : null;
       final size = mediaQuery?.size ?? const Size(400, 600);
 
-      await Share.shareXFiles(
-        [
-          XFile(
-            logFilePath,
-            mimeType: 'text/plain',
-            name: 'ebozor_device_logs_$timestampStr.txt',
-          ),
-        ],
-        subject: 'Ebozor Device & Diagnostic Logs',
-        text: 'Ebozor Diagnostic Report ($timestampStr)',
-        sharePositionOrigin: Rect.fromLTWH(0, 0, size.width, size.height / 2),
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [
+            XFile(
+              logFilePath,
+              mimeType: 'text/plain',
+              name: 'ebozor_device_logs_$timestampStr.txt',
+            ),
+          ],
+          subject: 'Ebozor Device & Diagnostic Logs',
+          text: 'Ebozor Diagnostic Report ($timestampStr)',
+          sharePositionOrigin: Rect.fromLTWH(0, 0, size.width, size.height / 2),
+        )
+        
       );
     } catch (e, stack) {
       AppLog.e('Failed to export logs: $e', error: e, stackTrace: stack, name: 'LogExporter');

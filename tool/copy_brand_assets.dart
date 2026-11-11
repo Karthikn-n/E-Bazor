@@ -50,11 +50,31 @@ void main(List<String> args) {
   final iosDest = Directory('${root.path}/ios/Runner/Assets.xcassets/AppIcon.appiconset');
   if (iosSrc.existsSync()) {
     if (!iosDest.existsSync()) iosDest.createSync(recursive: true);
+
+    // Clean old template files (Icon-App-*.png)
+    for (final entity in iosDest.listSync()) {
+      if (entity is File && entity.path.contains('Icon-App-')) {
+        entity.deleteSync();
+      }
+    }
+
     _copyDirectory(iosSrc, iosDest);
-    print('✓ iOS AppIcon.appiconset synced.');
+    print('✓ iOS AppIcon.appiconset cleaned and synced.');
   }
 
-  // 3. In-App Flutter Assets (assets/svg/Logo/)
+  // 3. iOS Launch Image (LaunchImage.imageset)
+  final launchDest = Directory('${root.path}/ios/Runner/Assets.xcassets/LaunchImage.imageset');
+  if (!launchDest.existsSync()) launchDest.createSync(recursive: true);
+  if (iosSrc.existsSync()) {
+    _copyFile('${iosSrc.path}/icon-60.png', '${launchDest.path}/LaunchImage.png');
+    _copyFile('${iosSrc.path}/icon-120.png', '${launchDest.path}/LaunchImage@2x.png');
+    _copyFile('${iosSrc.path}/icon-180.png', '${launchDest.path}/LaunchImage@3x.png');
+    final old1024 = File('${launchDest.path}/1024.png');
+    if (old1024.existsSync()) old1024.deleteSync();
+    print('✓ iOS LaunchImage.imageset (Launch Screen splash) synced.');
+  }
+
+  // 4. In-App Flutter Assets (assets/svg/Logo/)
   final logoDest = Directory('${root.path}/assets/svg/Logo');
   if (!logoDest.existsSync()) logoDest.createSync(recursive: true);
 
@@ -78,7 +98,7 @@ void main(List<String> args) {
   }
   print('✓ Flutter app logos and splash icons synced.');
 
-  // 4. Web Assets
+  // 5. Web Assets
   final faviconSrc = Directory('${kitDir.path}/02_Favicon');
   final webDest = Directory('${root.path}/web');
   if (faviconSrc.existsSync() && webDest.existsSync()) {

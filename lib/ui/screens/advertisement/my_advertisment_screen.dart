@@ -935,7 +935,7 @@ class _MyAdvertisementScreenState extends CloudState<MyAdvertisementScreen> {
 
     Widget buildTitle() {
       return Text(
-        item.name?.firstUpperCase() ?? "",
+        item.name ?? "",
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(

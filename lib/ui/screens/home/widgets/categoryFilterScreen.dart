@@ -119,7 +119,21 @@ class _CategoryFilterScreenState extends State<CategoryFilterScreen>
 
                                   final cat = state.categories[index];
 
-                                  if (PropertyFilterCategoryResolver
+                                  final catName = (cat.name ?? '').toLowerCase();
+                                  final catSlug = (cat.slug ?? '').toLowerCase();
+                                  if (cat.id == 1 ||
+                                      catName == 'motors' ||
+                                      catName == 'motor' ||
+                                      catName == 'cars' ||
+                                      catSlug == 'motors' ||
+                                      catSlug == 'motor' ||
+                                      catSlug == 'cars') {
+                                    Navigator.pushNamed(
+                                      context,
+                                      Routes.motorsHomeScreen,
+                                      arguments: {'category': cat},
+                                    );
+                                  } else if (PropertyFilterCategoryResolver
                                       .isPropertyCategory(cat)) {
                                     Navigator.pushNamed(
                                       context,

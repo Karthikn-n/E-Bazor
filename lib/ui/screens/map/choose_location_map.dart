@@ -442,7 +442,7 @@ class _ChooseLocationMapState extends State<ChooseLocationMap> {
                       trafficEnabled: true,
                       myLocationButtonEnabled: true,
                       zoomControlsEnabled: false,
-                      myLocationEnabled: true,
+                      myLocationEnabled: false,
                       initialCameraPosition: CameraPosition(
                         target: cameraPosition,
                       ),

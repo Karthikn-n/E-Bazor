@@ -34,17 +34,22 @@ class HomeSectionsAdapter extends StatelessWidget {
     final bool hasMore = data.length > 8;
     final int itemCount = hasMore ? 9 : data.length;
 
+    final rawSectionTitle = section.title ?? "";
+    final sectionTitle = (rawSectionTitle == "recommendedNearYou" || rawSectionTitle.isEmpty)
+        ? "Recommended for you"
+        : rawSectionTitle;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TitleHeader(
-          title: section.title ?? "",
+          title: sectionTitle,
           onTap: () {
             Navigator.pushNamed(
               context,
               Routes.sectionWiseItemsScreen,
               arguments: {
-                "title": section.title,
+                "title": sectionTitle,
                 "sectionId": section.sectionId,
               },
             );
@@ -199,15 +204,39 @@ class _ItemCardState extends State<ItemCard> {
     final specsLocation = _buildSpecsAndLocation();
     final bool isVerified = widget.item?.user?.isVerified == 1;
 
+    String formatPrice(dynamic rawPrice) {
+      if (rawPrice == null) return "0 $currency";
+      final str = rawPrice.toString().replaceAll(',', '').trim();
+      final numVal = double.tryParse(str);
+      if (numVal != null) {
+        final intVal = numVal.toInt();
+        if (numVal == intVal) {
+          final formatted = intVal.toString().replaceAllMapped(
+            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+            (Match m) => '${m[1]},',
+          );
+          return "$formatted $currency";
+        }
+      }
+      return "$str $currency";
+    }
+
     return Container(
       width: widget.width,
       decoration: BoxDecoration(
         color: context.color.secondaryColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: context.color.borderColor.withValues(alpha: 0.6),
+          color: context.color.borderColor.withValues(alpha: 0.5),
           width: 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Material(
         color: Colors.transparent,
@@ -258,22 +287,24 @@ class _ItemCardState extends State<ItemCard> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.1,
                             color: context.color.textColorDark,
                           ),
                         ),
 
                         const SizedBox(height: 3),
 
-                        /// PRICE (Bold blue)
+                        /// PRICE (Bold blue with comma format)
                         Text(
-                          "${widget.item?.price ?? ""} $currency",
+                          formatPrice(widget.item?.price),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
                             color: Color(0xFF007AFF),
                           ),
                         ),
@@ -289,19 +320,19 @@ class _ItemCardState extends State<ItemCard> {
                                   specsLocation,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: context.color.textColorDark
-                                        .withValues(alpha: 0.55),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF64748B),
                                   ),
                                 ),
                               ),
                               if (isVerified) ...[
                                 const SizedBox(width: 4),
-                                const Icon(
-                                  Icons.verified_rounded,
-                                  size: 13,
-                                  color: Color(0xFF007AFF),
+                                Image.asset(
+                                  'assets/icons/verified.png',
+                                  width: 14,
+                                  height: 14,
                                 ),
                               ],
                             ],
@@ -374,16 +405,14 @@ class _ItemCardState extends State<ItemCard> {
                     );
                   },
                   child: Container(
-                    width: 30,
-                    height: 30,
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDark
-                          ? Colors.black.withValues(alpha: 0.5)
-                          : Colors.white.withValues(alpha: 0.88),
+                      color: Colors.black.withValues(alpha: 0.35),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
+                          color: Colors.black.withValues(alpha: 0.12),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         )
@@ -394,7 +423,7 @@ class _ItemCardState extends State<ItemCard> {
                             child: SizedBox(
                               width: 14,
                               height: 14,
-                              child: UiUtils.progress(),
+                              child: UiUtils.progress(normalProgressColor: Colors.white),
                             ),
                           )
                         : Center(
@@ -403,12 +432,7 @@ class _ItemCardState extends State<ItemCard> {
                                   ? Icons.favorite_rounded
                                   : Icons.favorite_border_rounded,
                               size: 17,
-                              color: isLike
-                                  ? Colors.redAccent
-                                  : (isDark
-                                      ? Colors.white
-                                      : context.color.textColorDark
-                                          .withValues(alpha: 0.7)),
+                              color: isLike ? const Color(0xFFFF3B30) : Colors.white,
                             ),
                           ),
                   ),
@@ -436,6 +460,10 @@ class TitleHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final seeAllText = "seeAll".translate(context).isNotEmpty
+        ? "seeAll".translate(context)
+        : "See all";
+
     return Padding(
       padding: const EdgeInsetsDirectional.only(
         top: 18,
@@ -444,14 +472,22 @@ class TitleHeader extends StatelessWidget {
         end: sidePadding,
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           /// TITLE
           Expanded(
-            child: Text(title)
-                .size(context.font.large)
-                .bold(weight: FontWeight.bold)
-                .color(context.color.textColorDark)
-                .setMaxLines(lines: 1),
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
+                color: context.color.textColorDark,
+              ),
+            ),
           ),
 
           /// SEE ALL
@@ -459,11 +495,15 @@ class TitleHeader extends StatelessWidget {
             GestureDetector(
               onTap: onTap,
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                child: Text("seeAll".translate(context))
-                    .size(context.font.smaller + 3)
-                    .color(const Color(0xFF007AFF)),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: Text(
+                  seeAllText,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF007AFF),
+                  ),
+                ),
               ),
             ),
         ],

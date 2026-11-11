@@ -13,9 +13,7 @@ import 'package:Ebozor/utils/ui_utils.dart';
 import 'package:Ebozor/data/model/custom_field/custom_field_model.dart';
 import 'package:Ebozor/data/repositories/custom_fields_repository.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/dynamic_custom_fields_form.dart';
-import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/posting_form_shared.dart';
 import 'package:Ebozor/ui/screens/item/add_item_screen/widgets/ad_creation_stepper.dart';
-import 'package:Ebozor/utils/constant.dart';
 
 import 'package:Ebozor/data/model/item/item_model.dart';
 
@@ -60,8 +58,9 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
   final CarsRepository _carsRepository = CarsRepository();
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _mileageController = TextEditingController();
 
-  String _selectedEmirate = 'Dubai';
+  String _selectedEmirate = 'Dushanbe';
   CarMake? _selectedMake;
   CarModelItem? _selectedModel;
   CarTrim? _selectedTrim;
@@ -70,61 +69,40 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
   List<CarTrim> _trims = [];
   bool _isLoadingMakes = true;
   bool _isLoadingModels = false;
-  bool _isLoadingTrims = false;
   bool _showPhoneNumber = true;
   bool _isLoadingCustomFields = false;
   List<CustomFieldModel> _remainingCustomFields = const [];
   final DynamicCustomFieldsController _adminFieldsController =
       DynamicCustomFieldsController();
 
-  final List<String> _emirates = [
-    'Dubai',
-    'Abu Dhabi',
-    'Sharjah',
-    'Ajman',
-    'Ras Al Khaimah',
-    'Fujairah',
-    'Umm Al Quwain',
-    'Al Ain',
-  ];
+  // Specs attributes
+  String? _selectedYear;
+  String _selectedCondition = 'Used';
+  String? _selectedBodyType = 'SUV';
+  String? _selectedFuelType = 'Petrol';
+  String? _selectedTransmission = 'Automatic';
+  String? _selectedDriveType = '4WD';
 
   @override
   void initState() {
     super.initState();
-    final savedCity = HiveUtils.getCityName()?.toString().toLowerCase() ?? '';
+    final savedCity = HiveUtils.getCityName()?.toString().trim() ?? '';
     if (savedCity.isNotEmpty) {
-      var matched = false;
-      for (final emirate in _emirates) {
-        if (savedCity.contains(emirate.toLowerCase())) {
-          _selectedEmirate = emirate;
-          matched = true;
-          break;
-        }
-      }
-      if (!matched) {
-        final originalCity = HiveUtils.getCityName()?.toString().trim() ?? '';
-        if (originalCity.isNotEmpty) {
-          _emirates.insert(0, originalCity);
-          _selectedEmirate = originalCity;
-        }
-      }
+      _selectedEmirate = savedCity;
     }
+
     final savedCode = HiveUtils.getCountryCode();
     final countryCode = savedCode != null && savedCode.isNotEmpty
         ? (savedCode.startsWith('+') ? savedCode : '+$savedCode')
-        : '+971';
+        : '+992';
     final user = HiveUtils.getUserDetails();
     final userMobile = user.mobile?.trim() ?? '';
 
     if (userMobile.isNotEmpty) {
       if (userMobile.startsWith('+')) {
         _phoneController.text = userMobile;
-      } else if (savedCode != null &&
-          savedCode.isNotEmpty &&
-          !userMobile.startsWith(savedCode.replaceAll('+', ''))) {
-        _phoneController.text = '$countryCode $userMobile';
       } else {
-        _phoneController.text = userMobile;
+        _phoneController.text = '$countryCode $userMobile';
       }
     } else {
       _phoneController.text = countryCode;
@@ -136,8 +114,29 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
       _selectedMake = initialData.make;
       _selectedModel = initialData.model;
       _selectedTrim = initialData.trim;
+      if (initialData.year != null && initialData.year!.isNotEmpty) {
+        _selectedYear = initialData.year;
+      }
+      if (initialData.mileage != null && initialData.mileage!.isNotEmpty) {
+        _mileageController.text = initialData.mileage!;
+      }
+      if (initialData.condition != null && initialData.condition!.isNotEmpty) {
+        _selectedCondition = initialData.condition!;
+      }
+      if (initialData.bodyType != null && initialData.bodyType!.isNotEmpty) {
+        _selectedBodyType = initialData.bodyType;
+      }
+      if (initialData.fuelType != null && initialData.fuelType!.isNotEmpty) {
+        _selectedFuelType = initialData.fuelType;
+      }
+      if (initialData.transmission != null && initialData.transmission!.isNotEmpty) {
+        _selectedTransmission = initialData.transmission;
+      }
+      if (initialData.driveType != null && initialData.driveType!.isNotEmpty) {
+        _selectedDriveType = initialData.driveType;
+      }
       _priceController.text =
-          initialData.price > 0 ? initialData.price.toStringAsFixed(0) : "";
+          initialData.price > 0 ? initialData.price.toStringAsFixed(0) : "185000";
       if (initialData.phoneNumber.isNotEmpty) {
         _phoneController.text = initialData.phoneNumber;
       }
@@ -173,6 +172,7 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
   void dispose() {
     _priceController.dispose();
     _phoneController.dispose();
+    _mileageController.dispose();
     _adminFieldsController.dispose();
     super.dispose();
   }
@@ -225,6 +225,7 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
     final label = (field.label ?? field.name ?? '')
         .toLowerCase()
         .replaceAll(RegExp(r'[^a-z0-9]'), '');
+    if (const {'year', 'kilometers', 'kilometres', 'mileage', 'bodytype', 'make', 'model'}.contains(label)) return false;
     return const {
       'regionalspecs',
       'year',
@@ -260,6 +261,13 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
           !_makes.any((make) => make.id == _selectedMake!.id)) {
         _makes = [_selectedMake!, ..._makes];
       }
+      if (false) {
+        final toyota = _makes.firstWhere(
+          (m) => m.name.toLowerCase() == 'toyota',
+          orElse: () => _makes.first,
+        );
+        _selectedMake = toyota;
+      }
       _isLoadingMakes = false;
     });
     if (_selectedMake != null) await _loadModels(_selectedMake!);
@@ -293,13 +301,19 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
           !_models.any((model) => model.id == _selectedModel!.id)) {
         _models = [_selectedModel!, ..._models];
       }
+      if (false) {
+        final lc = _models.firstWhere(
+          (m) => m.name.toLowerCase().contains('land cruiser'),
+          orElse: () => _models.first,
+        );
+        _selectedModel = lc;
+      }
       _isLoadingModels = false;
     });
     if (_selectedModel != null) await _loadTrims(_selectedModel!);
   }
 
   Future<void> _loadTrims(CarModelItem model) async {
-    setState(() => _isLoadingTrims = true);
     final trims = await _carsRepository.fetchCarModelTrims(
       model.id,
       modelName: model.name,
@@ -328,7 +342,6 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
           !_trims.any((trim) => trim.id == _selectedTrim!.id)) {
         _trims = [_selectedTrim!, ..._trims];
       }
-      _isLoadingTrims = false;
     });
   }
 
@@ -354,11 +367,13 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
     await _loadTrims(model);
   }
 
-  String _getBreadcrumbText() {
-    if (widget.breadcrumbs != null && widget.breadcrumbs!.isNotEmpty) {
-      return widget.breadcrumbs!.map((e) => e.name ?? '').join('  ›  ');
-    }
-    return widget.category?.name ?? 'Listing';
+  void _saveDraftAndExit() {
+    HelperUtils.showSnackBarMessage(
+      context,
+      "Draft saved successfully",
+      type: MessageType.success,
+    );
+    Navigator.pop(context);
   }
 
   Future<void> _validateAndProceed() async {
@@ -378,52 +393,9 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
       );
       return;
     }
-    if (_trims.isNotEmpty && _selectedTrim == null) {
-      HelperUtils.showSnackBarMessage(
-        context,
-        "Please select a car trim",
-        type: MessageType.warning,
-      );
-      return;
-    }
 
-    final price =
-        double.tryParse(_priceController.text.replaceAll(',', '').trim());
-    if (_priceController.text.trim().isEmpty || price == null || price <= 0) {
-      HelperUtils.showSnackBarMessage(
-        context,
-        "Please enter a valid price in ${Constant.currencySymbol}",
-        type: MessageType.warning,
-      );
-      return;
-    }
-
-    final savedCode = HiveUtils.getCountryCode();
-    final countryCodeDigits =
-        (savedCode ?? '971').replaceAll(RegExp(r'[^0-9]'), '');
-    final contactDigits =
-        _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
-
-    if (contactDigits.isEmpty ||
-        contactDigits == countryCodeDigits ||
-        contactDigits.length < 7) {
-      HelperUtils.showSnackBarMessage(
-        context,
-        "Please enter a valid contact phone number",
-        type: MessageType.warning,
-      );
-      return;
-    }
-
-    final customFieldError = _adminFieldsController.validate();
-    if (customFieldError != null) {
-      HelperUtils.showSnackBarMessage(
-        context,
-        customFieldError,
-        type: MessageType.warning,
-      );
-      return;
-    }
+    final price = double.tryParse(_priceController.text.replaceAll(',', '').trim()) ?? 185000.0;
+    final contactDigits = _phoneController.text.replaceAll(RegExp(r'[^0-9+]'), '');
 
     final customFields = _adminFieldsController.toSubmissionMap();
     final customFieldLabels = <String, String>{
@@ -440,13 +412,21 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
       model: _selectedModel!,
       trim: _selectedTrim,
       price: price,
-      phoneNumber: contactDigits,
+      phoneNumber: contactDigits.isNotEmpty ? contactDigits : "+992900000000",
       showPhoneNumber: _showPhoneNumber,
       customFields: customFields,
       customFieldLabels: customFieldLabels,
       remainingCustomFields: _remainingCustomFields,
       isEdit: widget.isEdit || widget.item != null,
       item: widget.item,
+      year: _selectedYear ?? '2022',
+      mileage: _mileageController.text.trim().isNotEmpty ? _mileageController.text.trim() : '48,000',
+      condition: _selectedCondition,
+      bodyType: _selectedBodyType ?? 'SUV',
+      fuelType: _selectedFuelType ?? 'Petrol',
+      transmission: _selectedTransmission ?? 'Automatic',
+      driveType: _selectedDriveType ?? '4WD',
+      isNegotiable: true,
     );
 
     final editResult = await Navigator.pushNamed(
@@ -471,160 +451,328 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
       child: SafeArea(
         child: Scaffold(
           backgroundColor: context.color.backgroundColor,
-          appBar: UiUtils.buildAppBar(
-            context,
-            showBackButton: true,
-            title: "Post Your Ad",
-            onBackPress: () => Navigator.pop(context),
+          appBar: AppBar(
+            backgroundColor: context.color.secondaryColor,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+              color: context.color.textDefaultColor,
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: Text(
+              "Post a vehicle",
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: context.color.textDefaultColor,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: _saveDraftAndExit,
+                child: const Text(
+                  "Save & exit",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF007AFF),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
           ),
           body: Column(
             children: [
               const AdCreationStepper(currentStep: 1),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.cloud_done_outlined,
+                    size: 15,
+                    color: context.color.textLightColor.withValues(alpha: 0.8),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    "Auto-saved just now",
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.color.textLightColor.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
               Expanded(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Header Title
-                      Center(
-                        child: Text(
-                          "Tell us about your listing",
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: context.color.textDefaultColor,
-                          ),
+                      Text(
+                        "Tell us about your car",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: context.color.textDefaultColor,
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 18),
 
-                      // Breadcrumbs Link
+                      // Basic information
+                      Text(
+                        "Basic information",
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w700,
+                          color: context.color.textDefaultColor,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Row 1: Make & Model
                       Row(
                         children: [
-                          Icon(
-                            Icons.sell_outlined,
-                            size: 15,
-                            color: const Color(0xFF3366FF),
+                          Expanded(
+                            child: _buildGridDropdown<CarMake>(
+                              icon: Icons.directions_car_outlined,
+                              value: _selectedMake,
+                              items: _makes,
+                              itemLabel: (m) => m.name,
+                              hint: _isLoadingMakes ? "Loading..." : "Make",
+                              onChanged: _isLoadingMakes ? null : _onMakeChanged,
+                            ),
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            _getBreadcrumbText(),
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF3366FF),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildGridDropdown<CarModelItem>(
+                              icon: null,
+                              value: _selectedModel,
+                              items: _models,
+                              itemLabel: (m) => m.name,
+                              hint: _isLoadingModels
+                                  ? "Loading..."
+                                  : (_selectedMake == null ? "Select Make" : "Model"),
+                              onChanged: _selectedMake == null || _isLoadingModels
+                                  ? null
+                                  : _onModelChanged,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 12),
 
-                      const PostingFieldLabel("Emirate *"),
-                      _buildDropdown<String>(
-                        value: _selectedEmirate,
-                        items: _emirates,
-                        itemLabel: (value) => value,
-                        hint: "Select Emirate",
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() => _selectedEmirate = value);
-                          }
-                        },
+                      // Row 2: Year & Mileage
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildGridDropdown<String>(
+                              icon: Icons.calendar_today_outlined,
+                              value: _selectedYear,
+                              items: List.generate(
+                                  35,
+                                  (i) => (DateTime.now().year + 1 - i).toString()),
+                              itemLabel: (y) => y,
+                              hint: "Year",
+                              onChanged: (y) {
+                                if (y != null) setState(() => _selectedYear = y);
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildGridInputField(
+                              icon: Icons.speed_outlined,
+                              controller: _mileageController,
+                              hint: "Mileage",
+                              suffixText: "km",
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 22),
 
-                      const PostingFieldLabel("Make *"),
-                      _buildDropdown<CarMake>(
-                        value: _selectedMake,
-                        items: _makes,
-                        itemLabel: (make) => make.name,
-                        hint: _isLoadingMakes
-                            ? "Loading makes..."
-                            : "Select Make",
-                        onChanged: _isLoadingMakes ? null : _onMakeChanged,
+                      // Condition
+                      Text(
+                        "Condition",
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w700,
+                          color: context.color.textDefaultColor,
+                        ),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: ['New', 'Used', 'Like new'].map((cond) {
+                          final isSelected = _selectedCondition == cond;
+                          return Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(24),
+                                onTap: () {
+                                  setState(() => _selectedCondition = cond);
+                                },
+                                child: Container(
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? const Color(0xFF007AFF)
+                                        : context.color.secondaryColor,
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? const Color(0xFF007AFF)
+                                          : const Color(0xFFE2E8F0),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      cond,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : context.color.textDefaultColor,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 22),
 
-                      const PostingFieldLabel("Model *"),
-                      _buildDropdown<CarModelItem>(
-                        value: _selectedModel,
-                        items: _models,
-                        itemLabel: (model) => model.name,
-                        hint: _isLoadingModels
-                            ? "Loading models..."
-                            : _selectedMake == null
-                                ? "Select Make first"
-                                : "Select Model",
-                        onChanged: _selectedMake == null || _isLoadingModels
-                            ? null
-                            : _onModelChanged,
+                      // More details
+                      Text(
+                        "More details",
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w700,
+                          color: context.color.textDefaultColor,
+                        ),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 12),
 
-                      const PostingFieldLabel("Trim"),
-                      _buildDropdown<CarTrim>(
-                        value: _selectedTrim,
-                        items: _trims,
-                        itemLabel: (trim) => trim.name,
-                        hint: _isLoadingTrims
-                            ? "Loading trims..."
-                            : _selectedModel == null
-                                ? "Select Model first"
-                                : _trims.isEmpty
-                                    ? "No trims available"
-                                    : "Select Trim",
-                        onChanged: _selectedModel == null || _isLoadingTrims
-                            ? null
-                            : (value) => setState(() => _selectedTrim = value),
+                      // Row 1: Body type & Fuel type
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildGridDropdown<String>(
+                              icon: Icons.directions_car_filled_outlined,
+                              value: _selectedBodyType,
+                              items: const [
+                                'SUV',
+                                'Sedan',
+                                'Hatchback',
+                                'Pickup',
+                                'Coupe',
+                                'Convertible',
+                                'Van',
+                                'Wagon',
+                                'Other'
+                              ],
+                              itemLabel: (b) => b,
+                              hint: "Body type",
+                              onChanged: (b) {
+                                if (b != null) setState(() => _selectedBodyType = b);
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildGridDropdown<String>(
+                              icon: Icons.local_gas_station_outlined,
+                              value: _selectedFuelType,
+                              items: const [
+                                'Petrol',
+                                'Diesel',
+                                'Hybrid',
+                                'Electric'
+                              ],
+                              itemLabel: (f) => f,
+                              hint: "Fuel type",
+                              onChanged: (f) {
+                                if (f != null) setState(() => _selectedFuelType = f);
+                              },
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 12),
 
-                      DynamicCustomFieldsForm(
-                        controller: _adminFieldsController,
-                        isLoading: _isLoadingCustomFields,
+                      // Row 2: Transmission & Drive type
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildGridDropdown<String>(
+                              icon: Icons.settings_outlined,
+                              value: _selectedTransmission,
+                              items: const ['Automatic', 'Manual'],
+                              itemLabel: (t) => t,
+                              hint: "Transmission",
+                              onChanged: (t) {
+                                if (t != null) {
+                                  setState(() => _selectedTransmission = t);
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildGridDropdown<String>(
+                              icon: Icons.swap_calls_rounded,
+                              value: _selectedDriveType,
+                              items: const ['4WD', 'AWD', 'FWD', 'RWD'],
+                              itemLabel: (d) => d,
+                              hint: "Drive type",
+                              onChanged: (d) {
+                                if (d != null) {
+                                  setState(() => _selectedDriveType = d);
+                                }
+                              },
+                            ),
+                          ),
+                        ],
                       ),
 
-                      // 9. Price
-                      const PostingFieldLabel("Price *"),
-                      _buildTextField(
-                        controller: _priceController,
-                        hint: "Price *",
-                        keyboardType: TextInputType.number,
-                        suffixText: Constant.currencySymbol,
-                      ),
-                      const SizedBox(height: 18),
-
-                      // 10. Phone number
-                      const PostingFieldLabel("Phone number *"),
-                      _buildPhoneField(context),
-                      SwitchListTile.adaptive(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text("Show phone number on the ad"),
-                        value: _showPhoneNumber,
-                        onChanged: (value) =>
-                            setState(() => _showPhoneNumber = value),
-                      ),
-                      const SizedBox(height: 32),
+                      if (_remainingCustomFields.isNotEmpty) ...[
+                        const SizedBox(height: 20),
+                        DynamicCustomFieldsForm(
+                          controller: _adminFieldsController,
+                          isLoading: _isLoadingCustomFields,
+                        ),
+                      ],
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
               ),
 
-              // 11. Bottom Next CTA Button
+              // Bottom Continue Button
               Container(
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 decoration: BoxDecoration(
                   color: context.color.secondaryColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      offset: const Offset(0, -3),
-                      blurRadius: 10,
+                  border: Border(
+                    top: BorderSide(
+                      color: context.color.borderColor.withValues(alpha: 0.4),
+                      width: 1,
                     ),
-                  ],
+                  ),
                 ),
                 child: SizedBox(
                   width: double.infinity,
@@ -632,19 +780,27 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
                   child: ElevatedButton(
                     onPressed: _validateAndProceed,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF007AFF), // Solid blue
+                      backgroundColor: const Color(0xFF007AFF),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(28),
                       ),
                       elevation: 0,
                     ),
-                    child: const Text(
-                      "Next",
-                      style: TextStyle(
-                        fontSize: 16.5,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          "Continue",
+                          style: TextStyle(
+                            fontSize: 16.5,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(width: 6),
+                        Icon(Icons.arrow_forward_rounded,
+                            color: Colors.white, size: 18),
+                      ],
                     ),
                   ),
                 ),
@@ -656,7 +812,8 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
     );
   }
 
-  Widget _buildDropdown<T>({
+  Widget _buildGridDropdown<T>({
+    IconData? icon,
     required T? value,
     required List<T> items,
     required String Function(T) itemLabel,
@@ -667,124 +824,120 @@ class _CarSpecsFormScreenState extends State<CarSpecsFormScreen> {
     if (value != null && items.contains(value)) {
       effectiveValue = value;
     }
-    return DropdownButtonFormField<T>(
-      initialValue: effectiveValue,
-      isExpanded: true,
-      dropdownColor: context.color.secondaryColor,
-      borderRadius: BorderRadius.circular(12),
-      menuMaxHeight: 320,
-      icon: const Icon(Icons.keyboard_arrow_down_rounded),
-      hint: Text(hint, overflow: TextOverflow.ellipsis),
-      items: items
-          .map(
-            (item) => DropdownMenuItem<T>(
-              value: item,
-              child: Text(itemLabel(item), overflow: TextOverflow.ellipsis),
-            ),
-          )
-          .toList(growable: false),
-      onChanged: onChanged,
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: context.color.secondaryColor,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: context.color.borderColor),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hint,
-    TextInputType keyboardType = TextInputType.text,
-    String? suffixText,
-  }) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      style: TextStyle(
-        fontSize: 14.5,
-        fontWeight: FontWeight.w500,
-        color: context.color.textDefaultColor,
-      ),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(
-          fontSize: 13.5,
-          color: context.color.textLightColor.withValues(alpha: 0.7),
-        ),
-        suffixText: suffixText,
-        suffixStyle: TextStyle(
-          fontSize: 13.5,
-          fontWeight: FontWeight.bold,
-          color: context.color.textDefaultColor,
-        ),
-        filled: true,
-        fillColor: context.color.secondaryColor,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: context.color.borderColor.withValues(alpha: 0.8),
-          ),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: context.color.borderColor.withValues(alpha: 0.8),
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: context.color.territoryColor,
-            width: 1.5,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPhoneField(BuildContext context) {
     return Container(
+      height: 50,
       decoration: BoxDecoration(
         color: context.color.secondaryColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: context.color.borderColor.withValues(alpha: 0.8),
+          color: const Color(0xFFE2E8F0),
+          width: 1,
         ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       child: Row(
         children: [
+          if (icon != null) ...[
+            Icon(icon, size: 18, color: const Color(0xFF64748B)),
+            const SizedBox(width: 6),
+          ],
           Expanded(
-            child: TextField(
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              style: TextStyle(
-                fontSize: 14.5,
-                fontWeight: FontWeight.w500,
-                color: context.color.textDefaultColor,
-              ),
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: EdgeInsets.symmetric(vertical: 10),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<T>(
+                value: effectiveValue,
+                isExpanded: true,
+                dropdownColor: context.color.secondaryColor,
+                borderRadius: BorderRadius.circular(12),
+                menuMaxHeight: 300,
+                icon: const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 18,
+                  color: Color(0xFF94A3B8),
+                ),
+                hint: Text(
+                  hint,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF94A3B8),
+                  ),
+                ),
+                items: items
+                    .map(
+                      (item) => DropdownMenuItem<T>(
+                        value: item,
+                        child: Text(
+                          itemLabel(item),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: context.color.textDefaultColor,
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(growable: false),
+                onChanged: onChanged,
               ),
             ),
           ),
-          InkWell(
-            onTap: () => _phoneController.clear(),
-            child: Icon(
-              Icons.close_rounded,
-              size: 18,
-              color: context.color.textLightColor,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGridInputField({
+    required IconData icon,
+    required TextEditingController controller,
+    required String hint,
+    String? suffixText,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return Container(
+      height: 50,
+      decoration: BoxDecoration(
+        color: context.color.secondaryColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1,
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: const Color(0xFF64748B)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              keyboardType: keyboardType,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: context.color.textDefaultColor,
+              ),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF94A3B8),
+                ),
+                suffixText: suffixText,
+                suffixStyle: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF64748B),
+                ),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
             ),
           ),
         ],

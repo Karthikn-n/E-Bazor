@@ -599,14 +599,19 @@ class FavoriteScreenState extends State<FavoriteScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              "Personalized Favorite lists".translate(context),
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: context.color.textDefaultColor,
+            Expanded(
+              child: Text(
+                "Personalized Favorite lists".translate(context),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 16.5,
+                  fontWeight: FontWeight.bold,
+                  color: context.color.textDefaultColor,
+                ),
               ),
             ),
+            const SizedBox(width: 8),
             InkWell(
               borderRadius: BorderRadius.circular(20),
               onTap: _showCreateListDialog,

@@ -1,3 +1,4 @@
+import 'package:Ebozor/utils/network_request_interseptor.dart';
 import 'dart:developer';
 
 import 'package:Ebozor/data/model/category_model.dart';
@@ -160,13 +161,18 @@ class CategoryRepository {
 }
 
 class FilterRepository {
-  final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: Constant.baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-    ),
-  );
+  late final Dio _dio;
+
+  FilterRepository() {
+    _dio = Dio(
+      BaseOptions(
+        baseUrl: Constant.baseUrl,
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+      ),
+    );
+    _dio.interceptors.add(NetworkRequestInterseptor());
+  }
 
   Future<FilterCategory> getFilters(String slug) async {
     try {

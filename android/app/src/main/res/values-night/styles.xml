@@ -4,6 +4,7 @@
     <!-- TODO document the necessary change -->
     <style name="LaunchTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+        <item name="android:windowLightStatusBar">false</item>
         <!--
         Show a splash screen on the activity. Automatically removed when
         Flutter draws its first frame
@@ -22,6 +23,7 @@
     -->
     <style name="NormalTheme" parent="Theme.MaterialComponents">
         <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+        <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
 </resources>
